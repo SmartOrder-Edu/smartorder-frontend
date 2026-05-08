@@ -187,6 +187,7 @@ module.exports = (env, argv) => {
       hot: true,
       open: false,
       compress: true,
+      port: 5172,  // 设置端口为5172
       client: {
         overlay: {
           errors: true,
