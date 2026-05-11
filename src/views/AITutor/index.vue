@@ -544,7 +544,7 @@ const loadSession = (session: any) => {
   max-width: 1400px;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - var(--spacing-md) - var(--spacing-xl));
+  height: 100%;
 }
 
 .page-header {

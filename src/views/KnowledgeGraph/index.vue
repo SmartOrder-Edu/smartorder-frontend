@@ -336,7 +336,7 @@ const toggleBranch = (branch: any) => {
 <style scoped>
 .knowledge-graph-page {
   max-width: 1200px;
-  height: calc(100vh - var(--header-height) - 2 * var(--spacing-xl));
+  height: 100%;
   overflow-y: auto;
 }
 
