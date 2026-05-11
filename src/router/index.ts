@@ -91,12 +91,6 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '个人云盘 - 知序智学', requiresAuth: true }
   },
   {
-    path: '/about',
-    name: 'About',
-    component: () => import('@/views/About/index.vue'),
-    meta: { title: '关于' }
-  },
-  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/NotFound/index.vue'),

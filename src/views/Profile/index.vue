@@ -686,7 +686,9 @@ onMounted(async () => {
 
 <style scoped>
 .profile-page {
-  max-width: 1100px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
   height: 100%;
   overflow-y: auto;
 }

@@ -280,7 +280,7 @@ const greetingText = computed(() => {
   else if (hour < 14) timeGreeting = '中午好'
   else if (hour < 18) timeGreeting = '下午好'
   else timeGreeting = '晚上好'
-  return `${timeGreeting}，${name}。我是你的 AI 总学习伙伴`
+  return `${timeGreeting}，${name}。我是你的 AI 学习伙伴`
 })
 
 interface Message {
