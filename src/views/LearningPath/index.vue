@@ -384,7 +384,9 @@ const submitAdjust = () => {
 
 <style scoped>
 .learning-path-page {
-  max-width: 1200px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
   height: 100%;
   overflow-y: auto;
 }

@@ -11,7 +11,6 @@
             class="nav-menu"
           >
             <el-menu-item index="/">首页</el-menu-item>
-            <el-menu-item index="/about">关于</el-menu-item>
           </el-menu>
         </div>
       </el-header>

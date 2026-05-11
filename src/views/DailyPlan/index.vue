@@ -289,7 +289,8 @@ const doRedistribute = () => {
 
 <style scoped lang="scss">
 .daily-plan-page {
-  max-width: 960px;
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
