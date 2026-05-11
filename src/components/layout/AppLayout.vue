@@ -1058,21 +1058,47 @@ const sendMessage = (_e?: any) => {
   margin-left: var(--sidebar-collapsed-width);
 }
 
-/* AI 助手悬浮框 */
+/* AI 助手悬浮框 — 展开态为基础样式 */
 .ai-assistant {
   position: fixed;
   bottom: var(--spacing-xl);
   right: var(--spacing-xl);
   width: 340px;
-  background: white;
-  border-radius: var(--radius-xl);
+  border-radius: 16px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
   overflow: hidden;
   z-index: 100;
   border: 1px solid var(--border-light);
-  transition: all var(--transition-base);
+  background: white;
+  /* 展开：横向无延迟立即开始；收起：延迟等 body 先收 */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s,
+              border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s,
+              box-shadow 0.25s ease,
+              transform 0.2s ease;
 }
 
+/* 收起状态：紧凑小圆按钮 */
+.ai-assistant:not(.expanded) {
+  width: 48px;
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(59, 91, 219, 0.3);
+  /* 收起：横向延迟等 body 先收完 */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.18s,
+              border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.18s,
+              box-shadow 0.25s ease,
+              transform 0.2s ease;
+}
+
+.ai-assistant:not(.expanded):hover {
+  box-shadow: 0 6px 24px rgba(59, 91, 219, 0.4);
+  transform: scale(1.06);
+}
+
+.ai-assistant:not(.expanded):active {
+  transform: scale(0.95);
+}
+
+/* header 条 */
 .ai-assistant .assistant-header {
   display: flex;
   align-items: center;
@@ -1080,59 +1106,99 @@ const sendMessage = (_e?: any) => {
   padding: var(--spacing-md) var(--spacing-lg);
   background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
   cursor: pointer;
+  transition: gap 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.ai-assistant:not(.expanded) .assistant-header {
+  gap: 0;
+  padding: 8px;
+  justify-content: center;
+}
+
+/* 头像 */
 .assistant-avatar {
   position: relative;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-lg);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .assistant-avatar .avatar-svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   color: white;
   stroke-width: 2;
 }
 
 .assistant-avatar .online-dot {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 10px;
-  height: 10px;
+  bottom: -1px;
+  right: -1px;
+  width: 9px;
+  height: 9px;
   background: #22c55e;
-  border: 2px solid white;
+  border: 2px solid #5c7cfa;
   border-radius: 50%;
+  transition: opacity 0.2s ease;
 }
 
+.ai-assistant:not(.expanded) .assistant-avatar .online-dot {
+  opacity: 0;
+}
+
+/* 信息区 */
 .assistant-info {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  /* 展开：等宽度撑完再显现 */
+  transition: opacity 0.2s ease 0.3s, max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
+}
+
+.ai-assistant:not(.expanded) .assistant-info {
+  opacity: 0;
+  max-width: 0;
+  /* 收起：立即消失 */
+  transition: opacity 0.1s ease, max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
 }
 
 .assistant-info .assistant-name {
   font-size: 0.875rem;
   font-weight: 600;
   color: white;
+  white-space: nowrap;
 }
 
 .assistant-info .assistant-status {
   font-size: 0.6875rem;
   color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
 }
 
+/* 展开箭头 */
 .expand-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   color: rgba(255, 255, 255, 0.8);
-  transition: transform var(--transition-base);
+  flex-shrink: 0;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.15s ease,
+              width 0.25s ease,
+              margin 0.25s ease;
+}
+
+.ai-assistant:not(.expanded) .expand-icon {
+  opacity: 0;
+  width: 0;
+  margin: 0;
 }
 
 .ai-assistant.expanded .expand-icon {
@@ -1141,7 +1207,6 @@ const sendMessage = (_e?: any) => {
 
 .assistant-body {
   border-top: 1px solid var(--border-light);
-  transition: all var(--transition-base);
 }
 
 /* 聊天消息 */
@@ -1297,16 +1362,23 @@ const sendMessage = (_e?: any) => {
   transform: scale(1.1);
 }
 
-/* 过渡动画 */
-.expand-enter-active,
+/* 过渡动画 — body 面板 */
+/* 展开：横向先撑开（0.3s），body 等宽度到位后再纵向展开 */
+.expand-enter-active {
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s,
+              opacity 0.2s ease 0.32s;
+}
+/* 收起：body 立即纵向收起，收完后再让横向收缩（见上方 .ai-assistant:not(.expanded) delay） */
 .expand-leave-active {
-  transition: all 0.3s ease;
+  transition: max-height 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.1s ease;
 }
 
 .expand-enter-from,
 .expand-leave-to {
   max-height: 0;
   opacity: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 992px) {
