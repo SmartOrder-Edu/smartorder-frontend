@@ -1,39 +1,100 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { userApi } from '@/api/user'
+import type { UserInfoResponse, UpdateUserParams } from '@/api/user'
+
+const TOKEN_KEY = 'token'
+const ACCOUNT_KEY = 'remembered_account'
 
 export interface UserInfo {
-  id: string
+  id: number
   username: string
   email: string
-  avatar?: string
-  roles?: string[]
+  phone?: string
+  avatarUrl?: string
+  gender?: number
+  birthday?: string
+  bio?: string
+  role?: number
+  vipLevel?: number
+  vipStartTime?: string
+  vipExpireTime?: string
+  status?: number
 }
 
 export const useUserStore = defineStore('user', () => {
-  const token = ref<string>('')
+  const token = ref<string>(localStorage.getItem(TOKEN_KEY) || '')
   const userInfo = ref<UserInfo | null>(null)
 
   const isLogin = computed(() => !!token.value)
   const userName = computed(() => userInfo.value?.username || '')
-  const userRoles = computed(() => userInfo.value?.roles || [])
+  const userRoles = computed(() => userInfo.value?.role != null ? [userInfo.value!.role!] : [])
 
   function setToken(newToken: string) {
     token.value = newToken
+    localStorage.setItem(TOKEN_KEY, newToken)
   }
 
   function setUserInfo(info: UserInfo) {
     userInfo.value = info
   }
 
-  function logout() {
+  async function login(email: string, password: string) {
+    const accessToken = await userApi.login({ email, password })
+    setToken(accessToken)
+  }
+
+  async function register(params: { username: string; email: string; password: string; confirmPassword: string; verificationCode: string }) {
+    await userApi.register(params)
+  }
+
+  async function fetchUserInfo() {
+    const info = await userApi.getUserInfo()
+    setUserInfo(info as UserInfo)
+  }
+
+  async function logout() {
+    try {
+      await userApi.logout()
+    } catch {}
     token.value = ''
     userInfo.value = null
+    localStorage.removeItem(TOKEN_KEY)
+  }
+
+  function saveRememberedAccount(account: string) {
+    localStorage.setItem(ACCOUNT_KEY, account)
+  }
+
+  function getRememberedAccount(): string {
+    return localStorage.getItem(ACCOUNT_KEY) || ''
+  }
+
+  function clearRememberedAccount() {
+    localStorage.removeItem(ACCOUNT_KEY)
   }
 
   function updateUserInfo(partial: Partial<UserInfo>) {
     if (userInfo.value) {
       userInfo.value = { ...userInfo.value, ...partial }
     }
+  }
+
+  async function updateProfile(data: UpdateUserParams) {
+    await userApi.updateProfile(data)
+    updateUserInfo(data)
+  }
+
+  async function uploadAvatar(file: File) {
+    const url = await userApi.uploadAvatar(file)
+    if (userInfo.value) {
+      userInfo.value = { ...userInfo.value, avatarUrl: url }
+    }
+    return url
+  }
+
+  async function changePassword(params: { newPassword: string; confirmPassword: string; email: string; verificationCode: number }) {
+    await userApi.changePassword(params)
   }
 
   return {
@@ -44,7 +105,16 @@ export const useUserStore = defineStore('user', () => {
     userRoles,
     setToken,
     setUserInfo,
+    login,
+    register,
+    fetchUserInfo,
     logout,
-    updateUserInfo
+    saveRememberedAccount,
+    getRememberedAccount,
+    clearRememberedAccount,
+    updateUserInfo,
+    updateProfile,
+    uploadAvatar,
+    changePassword
   }
 })

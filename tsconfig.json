@@ -46,7 +46,7 @@
       "@/directives/*": ["src/directives/*"],
       "@/layouts/*": ["src/layouts/*"]
     },
-    "types": ["node", "vite/client", "element-plus/global"]
+    "types": ["node", "element-plus/global"]
   },
   "include": [
     "src/**/*.ts",

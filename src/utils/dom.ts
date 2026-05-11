@@ -40,7 +40,7 @@ export function getStyle(el: HTMLElement, styleName: string): string {
  */
 export function setStyle(el: HTMLElement, styleName: string | Record<string, string>, value?: string): void {
   if (typeof styleName === 'string') {
-    el.style[styleName as any] = value
+    el.style[styleName as any] = value ?? ''
   } else {
     Object.keys(styleName).forEach(key => {
       el.style[key as any] = styleName[key]
@@ -87,9 +87,6 @@ export function getScrollContainer(el: HTMLElement): HTMLElement | Window {
  */
 export function scrollIntoView(el: HTMLElement, offsetTop = 0): void {
   const { top } = getOffset(el)
-  const scrollTop = getScrollContainer(el) instanceof Window
-    ? document.documentElement.scrollTop || document.body.scrollTop
-    : getScrollContainer(el).scrollTop
   const targetScrollTop = top - offsetTop
 
   if (getScrollContainer(el) instanceof Window) {
