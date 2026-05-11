@@ -363,7 +363,7 @@ const generateExam = () => {
 <style scoped>
 .exam-page {
   max-width: 900px;
-  height: calc(100vh - var(--header-height) - 2 * var(--spacing-xl));
+  height: 100%;
   overflow-y: auto;
 }
 

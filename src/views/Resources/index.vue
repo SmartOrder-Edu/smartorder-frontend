@@ -349,7 +349,7 @@ const generateResource = () => {
 <style scoped>
 .resources-page {
   max-width: 1100px;
-  height: calc(100vh - var(--header-height) - 2 * var(--spacing-xl));
+  height: 100%;
   overflow-y: auto;
 }
 

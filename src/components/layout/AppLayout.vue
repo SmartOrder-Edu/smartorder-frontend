@@ -151,7 +151,7 @@
           <div class="top-bar-left"></div>
           <div class="top-bar-right">
             <button class="top-notif-btn has-badge" @click="showNotifications = !showNotifications">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                 <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
               </svg>
@@ -182,7 +182,9 @@
             </transition>
           </div>
         </div>
-        <slot />
+        <div class="page-container">
+          <slot />
+        </div>
       </main>
     </div>
 
@@ -839,46 +841,44 @@ const sendMessage = (_e?: any) => {
 /* 顶部通知栏 */
 .top-bar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-bottom: var(--spacing-md);
 }
 
 .top-bar-right {
   position: relative;
-  margin-left: auto;
 }
 
 .top-notif-btn {
   position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: white;
-  border: 1px solid var(--border-light);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   transition: all var(--transition-fast);
 
   &:hover {
     background: rgba(59, 91, 219, 0.08);
     color: var(--primary-color);
-    border-color: rgba(59, 91, 219, 0.2);
   }
 
   &.has-badge .badge {
     position: absolute;
-    top: -4px;
-    right: -4px;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
+    top: -2px;
+    right: -2px;
+    min-width: 14px;
+    height: 14px;
+    padding: 0 3px;
     background: var(--danger-color);
     border-radius: var(--radius-full);
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
     color: white;
     display: flex;
@@ -1005,15 +1005,22 @@ const sendMessage = (_e?: any) => {
 .main-content {
   flex: 1;
   margin-left: var(--sidebar-width);
-  padding: var(--spacing-md) var(--spacing-2xl) var(--spacing-xl);
-  max-width: calc(100vw - var(--sidebar-width));
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
   transition: margin-left var(--transition-base), max-width var(--transition-base);
+}
+
+.page-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--spacing-sm) var(--spacing-2xl) var(--spacing-xl);
 }
 
 .layout-container.sidebar-collapsed .main-content {
   margin-left: var(--sidebar-collapsed-width);
-  max-width: calc(100vw - var(--sidebar-collapsed-width));
 }
 
 /* AI 助手悬浮框 */
@@ -1274,7 +1281,9 @@ const sendMessage = (_e?: any) => {
 
   .main-content {
     margin-left: 0 !important;
-    max-width: 100vw !important;
+  }
+
+  .page-container {
     padding: var(--spacing-lg);
   }
 }

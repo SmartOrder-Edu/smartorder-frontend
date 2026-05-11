@@ -335,7 +335,7 @@ const generateTasks = () => {
 <style scoped>
 .tasks-page {
   max-width: 1000px;
-  height: calc(100vh - var(--header-height) - 2 * var(--spacing-xl));
+  height: 100%;
   overflow-y: auto;
 }
 

@@ -537,7 +537,7 @@ const showNodeDetail = (node: string) => {}
 <style scoped>
 .study-execution-page {
   margin: calc(-1 * var(--spacing-xl)) calc(-1 * var(--spacing-2xl));
-  height: calc(100vh - var(--header-height));
+  height: 100%;
   overflow-y: auto;
   background: var(--bg-primary);
 }
@@ -598,7 +598,7 @@ const showNodeDetail = (node: string) => {}
 .study-container {
   display: grid;
   grid-template-columns: 260px 1fr 320px;
-  height: calc(100vh - var(--header-height) - 50px);
+  height: calc(100% - 50px);
   overflow: hidden;
 }
 
