@@ -4,7 +4,7 @@ import { useUserStore } from '@/stores/user'
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/ai-tutor'
+    redirect: '/dashboard'
   },
   {
     path: '/login',
