@@ -10,13 +10,14 @@
             <span class="sidebar-logo-title gradient-text">知序智学</span>
             <span class="sidebar-logo-subtitle">AI Learning OS</span>
           </div>
+          <button class="collapse-btn" @click.stop="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline v-if="!sidebarCollapsed" points="15,18 9,12 15,6"/>
+              <polyline v-else points="9,18 15,12 9,6"/>
+            </svg>
+          </button>
         </div>
 
-        <button class="collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: sidebarCollapsed ? 'rotate(180deg)' : '' }">
-            <polyline points="15,18 9,12 15,6"/>
-          </svg>
-        </button>
         <nav class="sidebar-nav">
           <!-- 核心入口 -->
           <router-link
@@ -101,52 +102,14 @@
         <div class="sidebar-footer">
           <!-- 用户区 -->
           <div class="sidebar-user" v-if="!sidebarCollapsed">
-            <button class="sidebar-notif-btn has-badge" @click="showNotifications = !showNotifications">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-              <span class="badge">3</span>
-            </button>
             <div class="sidebar-user-info" @click="showUserMenu = !showUserMenu">
               <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar" />
               <span class="sidebar-username">{{ userStore.userName || '用户' }}</span>
             </div>
           </div>
           <div class="sidebar-user-mini" v-else>
-            <button class="sidebar-notif-btn has-badge sidebar-notif-btn-mini" @click="showNotifications = !showNotifications">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-              <span class="badge">3</span>
-            </button>
             <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar-mini" @click="showUserMenu = !showUserMenu" />
           </div>
-
-          <!-- 通知面板 -->
-          <transition name="slide-up">
-            <div class="sidebar-notif-panel" v-if="showNotifications && !sidebarCollapsed">
-              <div class="notif-panel-header">
-                <span>通知</span>
-                <button class="mark-read-btn">全部已读</button>
-              </div>
-              <div class="notif-panel-list">
-                <div class="notif-panel-item unread">
-                  <p class="notif-panel-text">规划助理已为你调整本周任务</p>
-                  <span class="notif-panel-time">10分钟前</span>
-                </div>
-                <div class="notif-panel-item unread">
-                  <p class="notif-panel-text">资源生成完成</p>
-                  <span class="notif-panel-time">30分钟前</span>
-                </div>
-                <div class="notif-panel-item">
-                  <p class="notif-panel-text">测评报告已生成：本周正确率提升 8%</p>
-                  <span class="notif-panel-time">2小时前</span>
-                </div>
-              </div>
-            </div>
-          </transition>
 
           <!-- 用户下拉菜单 -->
           <transition name="slide-up">
@@ -183,6 +146,42 @@
 
       <!-- 主内容区 -->
       <main class="main-content">
+        <!-- 顶部通知栏 -->
+        <div class="top-bar">
+          <div class="top-bar-left"></div>
+          <div class="top-bar-right">
+            <button class="top-notif-btn has-badge" @click="showNotifications = !showNotifications">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              <span class="badge">3</span>
+            </button>
+            <!-- 通知面板 -->
+            <transition name="slide-down">
+              <div class="top-notif-panel" v-if="showNotifications">
+                <div class="notif-panel-header">
+                  <span>通知</span>
+                  <button class="mark-read-btn">全部已读</button>
+                </div>
+                <div class="notif-panel-list">
+                  <div class="notif-panel-item unread">
+                    <p class="notif-panel-text">规划助理已为你调整本周任务</p>
+                    <span class="notif-panel-time">10分钟前</span>
+                  </div>
+                  <div class="notif-panel-item unread">
+                    <p class="notif-panel-text">资源生成完成</p>
+                    <span class="notif-panel-time">30分钟前</span>
+                  </div>
+                  <div class="notif-panel-item">
+                    <p class="notif-panel-text">测评报告已生成：本周正确率提升 8%</p>
+                    <span class="notif-panel-time">2小时前</span>
+                  </div>
+                </div>
+              </div>
+            </transition>
+          </div>
+        </div>
         <slot />
       </main>
     </div>
@@ -318,6 +317,12 @@ const chatMessages = ref<ChatMessage[]>([
 
 const topMenuItems = [
   {
+    id: 'dashboard',
+    label: '总学习指挥台',
+    path: '/dashboard',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'
+  },
+  {
     id: 'ai-partner',
     label: 'AI 学习伙伴',
     path: '/ai-tutor',
@@ -340,7 +345,7 @@ const bottomMenuItems = [
   },
   {
     id: 'resources',
-    label: '资源库',
+    label: '资源广场',
     path: '/resources',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'
   },
@@ -513,8 +518,10 @@ const sendMessage = (_e?: any) => {
 }
 
 .sidebar.collapsed .sidebar-logo {
+  flex-direction: column;
   justify-content: center;
   padding: var(--spacing-xs) 0 var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 .sidebar-logo-img {
@@ -740,42 +747,40 @@ const sendMessage = (_e?: any) => {
 }
 
 .collapse-btn {
-  position: absolute;
-  top: 34px;
-  right: var(--spacing-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-md);
-  background: var(--background-color-base);
+  background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-secondary);
-  transition: all var(--transition-base);
-  z-index: 1;
+  color: var(--text-muted);
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
 }
 
 .collapse-btn svg {
   width: 16px;
   height: 16px;
-  transition: transform var(--transition-base);
 }
 
 .collapse-btn:hover {
-  background: rgba(59, 91, 219, 0.1);
+  background: rgba(59, 91, 219, 0.08);
   color: var(--primary-color);
 }
 
 .sidebar.collapsed .collapse-btn {
-  right: 50%;
-  transform: translateX(50%);
+  margin-left: 0;
 }
 
 .sidebar.collapsed .collapse-btn svg {
-  transform: rotate(180deg);
+  width: 18px;
+  height: 18px;
 }
+
 
 /* 侧边栏用户区域 */
 .sidebar-user {
@@ -783,41 +788,6 @@ const sendMessage = (_e?: any) => {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--spacing-xs);
-}
-
-.sidebar-notif-btn {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  background: var(--background-color-base);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
-
-  &:hover { background: rgba(59, 91, 219, 0.08); color: var(--primary-color); }
-
-  &.has-badge .badge {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    min-width: 14px;
-    height: 14px;
-    padding: 0 3px;
-    background: var(--danger-color);
-    border-radius: var(--radius-full);
-    font-size: 9px;
-    font-weight: 600;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
 }
 
 .sidebar-user-info {
@@ -858,16 +828,6 @@ const sendMessage = (_e?: any) => {
   gap: var(--spacing-xs);
 }
 
-.sidebar-notif-btn-mini {
-  width: 28px;
-  height: 28px;
-
-  .badge {
-    top: -2px;
-    right: -2px;
-  }
-}
-
 .sidebar-avatar-mini {
   width: 28px;
   height: 28px;
@@ -876,20 +836,81 @@ const sendMessage = (_e?: any) => {
   cursor: pointer;
 }
 
-/* 侧边栏通知面板 */
-.sidebar-notif-panel {
+/* 顶部通知栏 */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.top-bar-right {
+  position: relative;
+  margin-left: auto;
+}
+
+.top-notif-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: white;
+  border: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: rgba(59, 91, 219, 0.08);
+    color: var(--primary-color);
+    border-color: rgba(59, 91, 219, 0.2);
+  }
+
+  &.has-badge .badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: var(--danger-color);
+    border-radius: var(--radius-full);
+    font-size: 10px;
+    font-weight: 600;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* 顶部通知面板 */
+.top-notif-panel {
   position: absolute;
-  left: 0;
+  top: calc(100% + 8px);
   right: 0;
-  bottom: 100%;
-  margin-bottom: 4px;
-  width: 100%;
+  width: 340px;
   background: white;
   border-radius: var(--radius-lg);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
   border: 1px solid var(--border-light);
   overflow: hidden;
   z-index: 300;
+}
+
+/* 下滑动画 */
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.2s ease;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .notif-panel-header {
