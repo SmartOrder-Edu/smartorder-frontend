@@ -146,46 +146,44 @@
 
       <!-- 主内容区 -->
       <main class="main-content">
-        <!-- 顶部通知栏 -->
-        <div class="top-bar">
-          <div class="top-bar-left"></div>
-          <div class="top-bar-right">
-            <button class="top-notif-btn has-badge" @click="showNotifications = !showNotifications">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-              <span class="badge">3</span>
-            </button>
-            <!-- 通知面板 -->
-            <transition name="slide-down">
-              <div class="top-notif-panel" v-if="showNotifications">
-                <div class="notif-panel-header">
-                  <span>通知</span>
-                  <button class="mark-read-btn">全部已读</button>
-                </div>
-                <div class="notif-panel-list">
-                  <div class="notif-panel-item unread">
-                    <p class="notif-panel-text">规划助理已为你调整本周任务</p>
-                    <span class="notif-panel-time">10分钟前</span>
-                  </div>
-                  <div class="notif-panel-item unread">
-                    <p class="notif-panel-text">资源生成完成</p>
-                    <span class="notif-panel-time">30分钟前</span>
-                  </div>
-                  <div class="notif-panel-item">
-                    <p class="notif-panel-text">测评报告已生成：本周正确率提升 8%</p>
-                    <span class="notif-panel-time">2小时前</span>
-                  </div>
-                </div>
-              </div>
-            </transition>
-          </div>
-        </div>
         <div class="page-container">
           <slot />
         </div>
       </main>
+    </div>
+
+    <!-- 通知悬浮按钮 -->
+    <div class="notif-fab" :class="{ 'has-unread': unreadCount > 0 }">
+      <button class="notif-fab-btn" @click="showNotifications = !showNotifications" :title="unreadCount > 0 ? `${unreadCount} 条未读通知` : '通知'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span class="notif-fab-badge" v-if="unreadCount > 0">{{ unreadCount }}</span>
+      </button>
+      <!-- 通知面板 -->
+      <transition name="notif-panel">
+        <div class="notif-fab-panel" v-if="showNotifications">
+          <div class="notif-panel-header">
+            <span>通知</span>
+            <button class="mark-read-btn" @click="markAllRead">全部已读</button>
+          </div>
+          <div class="notif-panel-list">
+            <div class="notif-panel-item unread">
+              <p class="notif-panel-text">规划助理已为你调整本周任务</p>
+              <span class="notif-panel-time">10分钟前</span>
+            </div>
+            <div class="notif-panel-item unread">
+              <p class="notif-panel-text">资源生成完成</p>
+              <span class="notif-panel-time">30分钟前</span>
+            </div>
+            <div class="notif-panel-item">
+              <p class="notif-panel-text">测评报告已生成：本周正确率提升 8%</p>
+              <span class="notif-panel-time">2小时前</span>
+            </div>
+          </div>
+        </div>
+      </transition>
     </div>
 
     <!-- AI 助手悬浮框 -->
@@ -267,7 +265,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
@@ -284,6 +282,30 @@ const assistantExpanded = ref(true)
 const chatMessage = ref('')
 const showNotifications = ref(false)
 const showUserMenu = ref(false)
+const unreadCount = ref(2)
+
+const markAllRead = () => {
+  unreadCount.value = 0
+}
+
+// 点击外部关闭通知面板
+const handleClickOutside = (e: MouseEvent) => {
+  const fab = document.querySelector('.notif-fab')
+  if (showNotifications.value && fab && !fab.contains(e.target as Node)) {
+    showNotifications.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+  if (userStore.isLogin && !userStore.userInfo) {
+    userStore.fetchUserInfo().catch(() => {})
+  }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 interface LearningSpace {
   id: string
@@ -436,12 +458,6 @@ const handleLogout = async () => {
   }
   router.push('/login')
 }
-
-onMounted(() => {
-  if (userStore.isLogin && !userStore.userInfo) {
-    userStore.fetchUserInfo().catch(() => {})
-  }
-})
 
 const handleQuickAction = (_action: any, _e?: any) => {
   chatMessage.value = _action.label
@@ -844,61 +860,73 @@ const sendMessage = (_e?: any) => {
   cursor: pointer;
 }
 
-/* 顶部通知栏 */
-.top-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin-bottom: var(--spacing-md);
+/* 通知悬浮按钮 */
+.notif-fab {
+  position: fixed;
+  top: var(--spacing-sm);
+  right: var(--spacing-lg);
+  z-index: 95;
 }
 
-.top-bar-right {
+.notif-fab-btn {
   position: relative;
-}
-
-.top-notif-btn {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: white;
+  border: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text-muted);
-  transition: all var(--transition-fast);
-
-  &:hover {
-    background: rgba(59, 91, 219, 0.08);
-    color: var(--primary-color);
-  }
-
-  &.has-badge .badge {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    min-width: 14px;
-    height: 14px;
-    padding: 0 3px;
-    background: var(--danger-color);
-    border-radius: var(--radius-full);
-    font-size: 9px;
-    font-weight: 600;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+  color: var(--text-secondary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  transition: all var(--transition-base);
 }
 
-/* 顶部通知面板 */
-.top-notif-panel {
+.notif-fab-btn:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  color: var(--primary-color);
+  border-color: rgba(59, 91, 219, 0.3);
+  transform: scale(1.05);
+}
+
+/* 未读状态脉冲动画 */
+.notif-fab.has-unread .notif-fab-btn {
+  color: var(--primary-color);
+  border-color: rgba(59, 91, 219, 0.3);
+  animation: notif-pulse 2s ease-in-out infinite;
+}
+
+@keyframes notif-pulse {
+  0%, 100% { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06), 0 0 0 0 rgba(59, 91, 219, 0.3); }
+  50% { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06), 0 0 0 6px rgba(59, 91, 219, 0); }
+}
+
+.notif-fab-badge {
   position: absolute;
-  top: calc(100% + 8px);
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--danger-color);
+  border-radius: var(--radius-full);
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}
+
+/* 通知面板 */
+.notif-fab-panel {
+  position: absolute;
+  top: calc(100% + 10px);
   right: 0;
-  width: 340px;
+  width: 360px;
   background: white;
   border-radius: var(--radius-lg);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
@@ -907,16 +935,17 @@ const sendMessage = (_e?: any) => {
   z-index: 300;
 }
 
-/* 下滑动画 */
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.2s ease;
+/* 面板弹出动画 */
+.notif-panel-enter-active,
+.notif-panel-leave-active {
+  transition: all 0.25s ease;
 }
 
-.slide-down-enter-from,
-.slide-down-leave-to {
+.notif-panel-enter-from,
+.notif-panel-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-8px) scale(0.96);
+  transform-origin: top right;
 }
 
 .notif-panel-header {
@@ -1022,7 +1051,7 @@ const sendMessage = (_e?: any) => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--spacing-sm) var(--spacing-2xl) var(--spacing-xl);
+  padding: var(--spacing-xl) var(--spacing-2xl) var(--spacing-xl);
 }
 
 .layout-container.sidebar-collapsed .main-content {
