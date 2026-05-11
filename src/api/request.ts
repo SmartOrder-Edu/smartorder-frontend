@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 
 export interface RequestConfig extends AxiosRequestConfig {
@@ -8,12 +8,15 @@ export interface RequestConfig extends AxiosRequestConfig {
 class Request {
   private instance: AxiosInstance
   private baseURL: string
+  private isRefreshing = false
+  private pendingRequests: Array<(token: string) => void> = []
 
   constructor(config: AxiosRequestConfig = {}) {
     this.baseURL = config.baseURL || import.meta.env.VITE_API_BASE_URL || '/api'
     this.instance = axios.create({
       baseURL: this.baseURL,
       timeout: 15000,
+      withCredentials: true,
       headers: {
         'Content-Type': 'application/json;charset=UTF-8'
       },
@@ -41,20 +44,54 @@ class Request {
       (response: AxiosResponse) => {
         const { data } = response
         if (data.code !== 200 && data.code !== 0) {
-          ElMessage.error(data.message || '请求失败')
-          return Promise.reject(new Error(data.message || '请求失败'))
+          ElMessage.error(data.msg || data.message || '请求失败')
+          return Promise.reject(new Error(data.msg || data.message || '请求失败'))
         }
         return data.data
       },
-      (error) => {
-        const { response } = error
+      async (error) => {
+        const { response, config } = error
+
+        if (response?.status === 401 && config && !config._retry) {
+          // refreshToken请求本身失败，不再重试
+          if (config.url?.includes('/auth/refreshToken')) {
+            this.handleRefreshFailure()
+            return Promise.reject(error)
+          }
+
+          if (this.isRefreshing) {
+            // 正在刷新，将请求加入等待队列
+            return new Promise((resolve) => {
+              this.pendingRequests.push((newToken: string) => {
+                config.headers.Authorization = `Bearer ${newToken}`
+                config._retry = true
+                resolve(this.instance.request(config))
+              })
+            })
+          }
+
+          config._retry = true
+          this.isRefreshing = true
+
+          try {
+            const newToken = await this.doRefreshToken()
+            // 通知队列中所有等待的请求
+            this.pendingRequests.forEach(cb => cb(newToken))
+            this.pendingRequests = []
+            // 重试原请求
+            config.headers.Authorization = `Bearer ${newToken}`
+            return this.instance.request(config)
+          } catch (refreshError) {
+            this.handleRefreshFailure()
+            return Promise.reject(refreshError)
+          } finally {
+            this.isRefreshing = false
+          }
+        }
+
+        // 其他错误处理
         if (response) {
           switch (response.status) {
-            case 401:
-              ElMessage.error('未授权，请重新登录')
-              localStorage.removeItem('token')
-              window.location.href = '/login'
-              break
             case 403:
               ElMessage.error('拒绝访问')
               break
@@ -65,7 +102,7 @@ class Request {
               ElMessage.error('服务器内部错误')
               break
             default:
-              ElMessage.error(response.data?.message || '请求失败')
+              ElMessage.error(response.data?.msg || response.data?.message || '请求失败')
           }
         } else if (error.code === 'ECONNABORTED') {
           ElMessage.error('请求超时')
@@ -75,6 +112,27 @@ class Request {
         return Promise.reject(error)
       }
     )
+  }
+
+  private async doRefreshToken(): Promise<string> {
+    const { data } = await axios.post(
+      `${this.baseURL}/auth/refreshToken`,
+      {},
+      { withCredentials: true }
+    )
+    const newToken = data.data
+    if (newToken) {
+      localStorage.setItem('token', newToken)
+      return newToken
+    }
+    throw new Error('刷新Token失败')
+  }
+
+  private handleRefreshFailure() {
+    this.pendingRequests = []
+    localStorage.removeItem('token')
+    ElMessage.error('登录已过期，请重新登录')
+    window.location.href = '/login'
   }
 
   public request<T = any>(config: RequestConfig): Promise<T> {
