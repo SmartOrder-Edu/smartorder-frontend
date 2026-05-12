@@ -22,7 +22,7 @@ const routes: Array<RouteRecordRaw> = [
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard/index.vue'),
-    meta: { title: '总学习指挥台 - 知序智学', requiresAuth: true }
+    meta: { title: '学习指挥台 - 知序智学', requiresAuth: true }
   },
   {
     path: '/daily-plan',

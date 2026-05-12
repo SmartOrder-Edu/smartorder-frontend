@@ -116,21 +116,16 @@
                     </svg>
                     复制
                   </button>
-                  <button class="msg-action-btn" @click="regenerateResponse(msg)">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                      <path d="M1 4v6h6"/><path d="M23 20v-6h-6"/>
-                      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
-                    </svg>
-                    重新生成
-                  </button>
                 </div>
 
-                <span class="message-time">{{ msg.time }}</span>
+                <!-- 计划创建卡片 -->
+                <PlanCreatedCard v-if="msg.planSummary" :plan="msg.planSummary" />
+                <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
               </div>
             </div>
 
-            <!-- 加载指示器 -->
-            <div class="message-wrapper ai loading-wrapper" v-if="isLoading">
+            <!-- 流式加载指示器 -->
+            <div class="message-wrapper ai loading-wrapper" v-if="isStreaming || currentAiText">
               <div class="message-avatar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -140,7 +135,10 @@
                 </svg>
               </div>
               <div class="message-content">
-                <div class="message-bubble loading-bubble">
+                <div class="message-bubble" v-if="currentAiText">
+                  <p class="message-text">{{ currentAiText }}</p>
+                </div>
+                <div class="message-bubble loading-bubble" v-if="isStreaming && !currentAiText">
                   <div class="loading-dots">
                     <span></span><span></span><span></span>
                   </div>
@@ -173,7 +171,7 @@
                 @input="autoResize"
                 ref="inputRef"
               ></textarea>
-              <button class="send-btn" :disabled="!inputMessage.trim() || isLoading" @click="sendMessage">
+              <button class="send-btn" :disabled="!inputMessage.trim() || isStreaming" @click="sendMessage">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="22" y1="2" x2="11" y2="13"/>
                   <polygon points="22,2 15,22 11,13 2,9"/>
@@ -239,19 +237,36 @@
 import { ref, computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { useAgentChat } from '@/composables/useAgentChat'
+import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 
 const userStore = useUserStore()
 
 const inputMessage = ref('')
-const isLoading = ref(false)
-const messages = ref<any[]>([])
 const chatContainer = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const tutorMode = ref('smart')
 const showUploadDialog = ref(false)
 const showContextDialog = ref(false)
 const activeContext = ref('global')
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatContainer.value) {
+      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    }
+  })
+}
+
+const {
+  messages,
+  isStreaming,
+  currentAiText,
+  sendMessage: agentSend,
+  stopStreaming: agentStop,
+  clearChat: agentClear
+} = useAgentChat(scrollToBottom)
 
 const contextOptions = ref([
   { id: 'global', label: '全局学习', color: '#6b7280' },
@@ -283,14 +298,6 @@ const greetingText = computed(() => {
   return `${timeGreeting}，${name}。我是你的 AI 学习伙伴`
 })
 
-interface Message {
-  role: 'ai' | 'user'
-  content: string
-  time: string
-  resources?: any[]
-  code?: string
-}
-
 const welcomeFeatures = [
   {
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
@@ -315,8 +322,8 @@ const welcomeFeatures = [
 ]
 
 const quickHints = [
+  '帮我制定一个学习计划',
   '我今天应该重点学什么？',
-  '把高数和英语今天的任务压缩到1小时内',
   '生成一组洛必达法则的练习题',
   '软件工程项目帮我拆一下任务',
   '帮我分析最近的薄弱点'
@@ -395,14 +402,6 @@ const chatHistory = ref([
   }
 ])
 
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-    }
-  })
-}
-
 const autoResize = () => {
   if (inputRef.value) {
     inputRef.value.style.height = 'auto'
@@ -411,26 +410,9 @@ const autoResize = () => {
 }
 
 const sendMessage = () => {
-  if (!inputMessage.value.trim() || isLoading.value) return
-
-  const userMsg: Message = {
-    role: 'user',
-    content: inputMessage.value,
-    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-  }
-  messages.value.push(userMsg)
-  const question = inputMessage.value
+  if (!inputMessage.value.trim() || isStreaming.value) return
+  agentSend(inputMessage.value)
   inputMessage.value = ''
-  isLoading.value = true
-  scrollToBottom()
-
-  // 模拟 AI 响应
-  setTimeout(() => {
-    const aiResp = generateResponse(question)
-    messages.value.push(aiResp)
-    isLoading.value = false
-    scrollToBottom()
-  }, 1500)
 }
 
 const sendQuickMessage = (msg: string) => {
@@ -438,100 +420,16 @@ const sendQuickMessage = (msg: string) => {
   sendMessage()
 }
 
-const generateResponse = (question: string): Message => {
-  const q = question.toLowerCase()
-
-  if (q.includes('进程') && q.includes('线程') && (q.includes('区别') || q.includes('不同'))) {
-    return {
-      role: 'ai',
-      content: '好的，让我从多个维度为你对比进程和线程的区别：\n\n**1. 基本概念**\n• 进程：程序的一次执行实例，是资源分配的基本单位\n• 线程：CPU调度的最小单位，是进程中的一个执行流\n\n**2. 资源占用**\n• 进程：拥有独立的地址空间，资源开销大\n• 线程：共享进程的地址空间，资源开销小\n\n**3. 并发性**\n• 进程：进程间切换开销大\n• 线程：线程间切换开销小，并发性更好\n\n**4. 通信方式**\n• 进程：需要 IPC（管道、消息队列、共享内存等）\n• 线程：可直接读写共享数据\n\n结合你的学习画像，我发现你更适合通过图解来理解这个概念。',
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      resources: [
-        { type: 'mind', title: '进程与线程对比图', minutes: 8 },
-        { type: 'video', title: '线程概念动画讲解', minutes: 10 }
-      ]
-    }
-  } else if (q.includes('练习') || q.includes('题')) {
-    return {
-      role: 'ai',
-      content: '已为你生成 10 道进程同步与互斥专项练习题：\n\n1. PV 操作用于解决什么问题的？\n2. 当信号量 S > 0 时表示？\n3. P 操作的本质是？\n4. V 操作的本质是？\n5. 二值信号量的取值范围？\n6. 临界区必须满足哪三个条件？\n7. 互斥锁与二元信号量的区别？\n8. 哲学家就餐问题中死锁的成因？\n9. 什么是忙等待？如何避免？\n10. 管程机制的主要特点？',
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      resources: [
-        { type: 'quiz', title: '完整练习题集（含解析）', minutes: 20 }
-      ]
-    }
-  } else if (q.includes('思维导图') || q.includes('导图')) {
-    return {
-      role: 'ai',
-      content: '正在为你生成"线程同步"知识思维导图...\n\n**核心节点：**\n\n线程同步\n├── 同步机制\n│   ├── 互斥锁（Mutex）\n│   ├── 信号量（Semaphore）\n│   ├── 条件变量\n│   └── 管程\n├── 互斥与同步\n│   ├── 互斥：独占资源\n│   └── 同步：协调执行顺序\n├── 经典问题\n│   ├── 生产者-消费者\n│   ├── 哲学家就餐\n│   ├── 读者-写者\n│   └── 吸烟者问题\n└── 实现技术\n    ├── 软件方法\n    ├── 硬件方法\n    └── 操作系统支持',
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      resources: [
-        { type: 'mind', title: '完整思维导图（可编辑）', minutes: 12 }
-      ]
-    }
-  } else if (q.includes('笔记') || q.includes('总结')) {
-    return {
-      role: 'ai',
-      content: '已为你整理"线程同步与互斥"学习笔记：\n\n## 核心概念\n\n### 进程同步\n进程同步是指多个进程在执行过程中，为协调彼此而建立的一种制约关系。\n\n### 临界区\n进程中访问共享资源的代码区域，必须互斥访问。\n\n### PV 操作\n• P(wait)：申请资源，S--，若 S<0 则阻塞\n• V(signal)：释放资源，S++，若 S<=0 则唤醒\n\n### 重要公式\n`S.value >= 0` 表示可用资源数\n`S.value < 0` 表示等待队列长度\n\n**记忆口诀：** P 是"拿"（减少资源），V 是"还"（增加资源）',
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      code: `# PV操作Python实现
-import threading
-
-class Semaphore:
-    def __init__(self, value=1):
-        self.value = value
-        self.lock = threading.Lock()
-        self.queue = []
-
-    def wait(self):
-        with self.lock:
-            self.value -= 1
-            if self.value < 0:
-                # 阻塞当前线程
-                self.queue.append(threading.current_thread())
-                self.lock.release()
-                # ... 阻塞逻辑
-
-    def signal(self):
-        with self.lock:
-            self.value += 1
-            if self.value <= 0 and self.queue:
-                # 唤醒一个等待线程
-                thread = self.queue.pop(0)
-                # ... 唤醒逻辑`
-    }
-  }
-
-  return {
-    role: 'ai',
-    content: '我理解你的问题。让我结合你的学习画像为你详细解答。\n\n根据你的学习记录，你目前在"线程同步"章节的掌握度为 56%，在 PV 操作相关题目上的正确率为 65%，低于平均水平。\n\n我的建议是：\n1. 先理解 PV 操作的核心原理\n2. 结合生活实例记忆（比如停车场的例子）\n3. 多做针对性练习\n\n如果需要，我可以为你生成专项练习题，或者推荐一些可视化讲解资源。',
-    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-    resources: [
-      { type: 'doc', title: 'PV操作详解', minutes: 15 },
-      { type: 'video', title: '信号量动画演示', minutes: 10 }
-    ]
-  }
+const clearChat = () => {
+  agentClear()
 }
 
-const clearChat = () => {
-  messages.value = []
+const formatTime = (ts: number) => {
+  return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
 const copyMessage = (content: string) => {
   navigator.clipboard.writeText(content)
-}
-
-const regenerateResponse = (msg: any) => {
-  const index = messages.value.indexOf(msg)
-  if (index > -1) {
-    messages.value.splice(index, 1)
-    isLoading.value = true
-    setTimeout(() => {
-      const newResp = generateResponse('regenerate')
-      messages.value.splice(index, 0, newResp)
-      isLoading.value = false
-    }, 1500)
-  }
 }
 
 const loadSession = (session: any) => {
