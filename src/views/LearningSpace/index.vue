@@ -1,6 +1,23 @@
 <template>
   <AppLayout>
-    <div class="learning-space-page">
+    <!-- 加载状态 -->
+    <div v-if="spaceStore.detailLoading" class="loading-state">
+      <div class="space-hero skeleton">
+        <div class="hero-content skeleton-inside">
+          <div class="skeleton-block hero-skel"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 错误/不存在 -->
+    <div v-else-if="!spaceData" class="error-state">
+      <el-empty description="学习空间不存在或加载失败" :image-size="120">
+        <el-button type="primary" @click="$router.push('/dashboard')">返回仪表盘</el-button>
+      </el-empty>
+    </div>
+
+    <!-- 正常内容 -->
+    <div v-else class="learning-space-page">
     <!-- 空间头部 -->
     <section class="space-hero">
       <div class="hero-bg" :style="{ background: spaceData.colorGradient }"></div>
@@ -13,19 +30,19 @@
           </button>
           <div class="hero-info">
             <h1 class="hero-title">{{ spaceData.name }}</h1>
-            <p class="hero-goal">目标：{{ spaceData.goal }}</p>
+            <p class="hero-goal" v-if="spaceData.goal">目标：{{ spaceData.goal }}</p>
           </div>
         </div>
         <div class="hero-right">
           <div class="hero-stat">
-            <span class="hero-stat-value">{{ spaceData.progress }}%</span>
+            <span class="hero-stat-value">{{ Math.round(spaceData.progress) }}%</span>
             <span class="hero-stat-label">完成进度</span>
           </div>
           <div class="hero-stat">
             <span class="hero-stat-value">{{ spaceData.streakDays }} 天</span>
             <span class="hero-stat-label">连续学习</span>
           </div>
-          <div class="hero-stat warning" v-if="spaceData.status === 'warning'">
+          <div class="hero-stat warning" v-if="spaceData.healthStatus === 'warning'">
             <span class="hero-stat-value">关注</span>
             <span class="hero-stat-label">正确率下降</span>
           </div>
@@ -65,7 +82,8 @@
             </div>
           </div>
           <div class="agent-card-body">
-            <p class="agent-insight-text" v-html="spaceData.agentInsight"></p>
+            <p v-if="spaceData.agentInsight" class="agent-insight-text" v-html="spaceData.agentInsight"></p>
+            <p v-else class="agent-insight-text">该学习空间的 Agent 正在分析你的学习数据，详情即将上线。</p>
           </div>
           <div class="agent-card-actions">
             <button class="agent-quick-btn" @click="askAgent('我最近哪里学得不好？')">我最近哪里学得不好？</button>
@@ -83,35 +101,23 @@
         <!-- Agent 近期提醒 -->
         <div class="agent-alerts">
           <h3 class="panel-title">Agent 近期提醒</h3>
-          <div class="alert-list">
-            <div class="alert-item warning">
+          <div class="alert-list" v-if="spaceData.healthStatus !== 'normal'">
+            <div class="alert-item warning" v-if="spaceData.healthStatus === 'warning' || spaceData.healthStatus === 'danger'">
               <div class="alert-dot"></div>
               <div class="alert-content">
-                <p class="alert-text">你在"洛必达法则适用条件"上连续 3 次出错，建议今天集中练习</p>
-                <span class="alert-time">2 小时前</span>
-              </div>
-            </div>
-            <div class="alert-item info">
-              <div class="alert-dot"></div>
-              <div class="alert-content">
-                <p class="alert-text">本周学习时长比上周下降了 20%，注意保持节奏</p>
-                <span class="alert-time">昨天</span>
-              </div>
-            </div>
-            <div class="alert-item success">
-              <div class="alert-dot"></div>
-              <div class="alert-content">
-                <p class="alert-text">连续 5 天完成学习任务，继续保持！</p>
+                <p class="alert-text" v-if="spaceData.alert">{{ spaceData.alert }}</p>
+                <p class="alert-text" v-else>该空间需要关注，请查看学习进度并及时调整计划</p>
                 <span class="alert-time">今天</span>
               </div>
             </div>
           </div>
+          <el-empty v-else description="暂无提醒" :image-size="60" />
         </div>
       </div>
 
       <!-- 当前路径 -->
       <div v-if="activeTab === 'path'" class="tab-panel">
-        <div class="path-timeline">
+        <div class="path-timeline" v-if="spaceData.pathNodes.length > 0">
           <div
             class="path-node"
             v-for="(node, idx) in spaceData.pathNodes"
@@ -133,11 +139,12 @@
             </div>
           </div>
         </div>
+        <el-empty v-else description="学习路径即将由 Agent 生成" :image-size="100" />
       </div>
 
-      <!-- 今日任务 (此空间内) -->
+      <!-- 今日任务 -->
       <div v-if="activeTab === 'tasks'" class="tab-panel">
-        <div class="space-task-list">
+        <div class="space-task-list" v-if="spaceData.tasks.length > 0">
           <div
             class="space-task-card"
             v-for="task in spaceData.tasks"
@@ -159,11 +166,12 @@
             </div>
           </div>
         </div>
+        <el-empty v-else description="暂无任务，等待 Agent 生成" :image-size="100" />
       </div>
 
       <!-- 资源 -->
       <div v-if="activeTab === 'resources'" class="tab-panel">
-        <div class="resource-grid">
+        <div class="resource-grid" v-if="spaceData.resources.length > 0">
           <div class="resource-card" v-for="r in spaceData.resources" :key="r.id">
             <div class="resource-type-icon" :class="r.type">
               <svg v-if="r.type === 'doc'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -177,6 +185,7 @@
             </div>
           </div>
         </div>
+        <el-empty v-else description="暂无资源，等待 Agent 生成" :image-size="100" />
       </div>
 
       <!-- 测评 / 错题 / 知识图谱 / 记录 占位 -->
@@ -200,112 +209,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useLearningSpaceStore } from '@/stores/learningSpace'
 import AppLayout from '@/components/layout/AppLayout.vue'
 
 const route = useRoute()
+const spaceStore = useLearningSpaceStore()
 const activeTab = ref('agent')
 
-const spaceDataMap: Record<string, any> = {
-  math: {
-    id: 'math', name: '高等数学', goal: '三周内掌握极限与连续',
-    progress: 42, streakDays: 5, status: 'warning',
-    colorGradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-    agentInsight: '你在<b>洛必达法则适用条件</b>上连续出错，正确率降至 40%。<br/>建议今天优先完成 10 道极限专项练习题。我注意到你在<b>证明题</b>上也有畏难倾向，后续可以调整为<b>例题驱动</b>的学习方式。',
-    pathNodes: [
-      { id: 'p1', week: 1, name: '函数与极限', description: '函数定义、极限概念、左右极限', duration: '3天', status: 'completed' },
-      { id: 'p2', week: 2, name: '极限运算法则', description: '四则运算法则、夹逼准则、两个重要极限', duration: '4天', status: 'completed' },
-      { id: 'p3', week: 2, name: '无穷小与无穷大', description: '无穷小比较、等价无穷小替换', duration: '2天', status: 'current' },
-      { id: 'p4', week: 3, name: '洛必达法则', description: '0/0型、∞/∞型、适用条件判断', duration: '4天', status: 'locked' },
-      { id: 'p5', week: 3, name: '连续性与间断点', description: '连续定义、间断点分类、闭区间连续性质', duration: '3天', status: 'locked' },
-      { id: 'p6', week: 3, name: '章节综合练习', description: '综合题训练、易错点回顾', duration: '2天', status: 'locked' }
-    ],
-    tasks: [
-      { id: 'm1', title: '洛必达法则 10 道专项练习', type: 'practice', minutes: 35, agentReason: '你在此知识点连续出错，需针对性巩固', status: 'todo' },
-      { id: 'm2', title: '无穷小比较方法复习', type: 'review', minutes: 20, agentReason: '等价无穷小替换是解题关键技巧', status: 'todo' },
-      { id: 'm3', title: '极限综合应用题', type: 'practice', minutes: 30, agentReason: '检验前两周学习效果', status: 'todo' }
-    ],
-    resources: [
-      { id: 'r1', title: '洛必达法则详解与适用条件', type: 'doc' },
-      { id: 'r2', title: '极限专项练习 20 题', type: 'quiz' },
-      { id: 'r3', title: '极限与连续思维导图', type: 'mindmap' },
-      { id: 'r4', title: '高等数学上·错题回顾', type: 'doc' }
-    ]
-  },
-  english: {
-    id: 'english', name: '英语四级', goal: '12月通过四级考试',
-    progress: 61, streakDays: 12, status: 'normal',
-    colorGradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    agentInsight: '词汇保持稳定，但<b>听力</b>持续偏弱。建议每天保持 20 分钟精听训练。<br/>最近阅读理解正确率提升了 8%，继续保持！',
-    pathNodes: [
-      { id: 'e1', week: 1, name: '核心词汇 800 词', description: '高频词汇 + 词根词缀', duration: '2周', status: 'completed' },
-      { id: 'e2', week: 3, name: '听力基础训练', description: '短对话精听、听写练习', duration: '2周', status: 'current' },
-      { id: 'e3', week: 5, name: '阅读理解强化', description: '快速阅读技巧、长难句分析', duration: '2周', status: 'locked' },
-      { id: 'e4', week: 7, name: '写作模板训练', description: '作文模板、常用句式', duration: '2周', status: 'locked' },
-      { id: 'e5', week: 9, name: '真题模拟', description: '全套真题模拟 + 分析', duration: '3周', status: 'locked' }
-    ],
-    tasks: [
-      { id: 'e1', title: '核心词汇 40 个复习', type: 'review', minutes: 15, agentReason: '保持每日词汇输入', status: 'todo' },
-      { id: 'e2', title: '听力精听练习', type: 'practice', minutes: 20, agentReason: '听力偏弱，需每日训练', status: 'todo' },
-      { id: 'e3', title: '阅读理解 2 篇', type: 'practice', minutes: 25, agentReason: '阅读正确率提升期，加大训练', status: 'done' }
-    ],
-    resources: [
-      { id: 'er1', title: '四级核心词根词缀整理', type: 'mindmap' },
-      { id: 'er2', title: '听力精听材料精选', type: 'doc' },
-      { id: 'er3', title: '阅读理解题型技巧', type: 'doc' },
-      { id: 'er4', title: '四级翻译模板', type: 'doc' }
-    ]
-  },
-  se: {
-    id: 'se', name: '软件工程', goal: '完成课程项目需求分析与原型设计',
-    progress: 35, streakDays: 3, status: 'danger',
-    colorGradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-    agentInsight: '项目任务已<b>延期 1 天</b>，需求分析阶段还没完成。<br/>建议今天集中完成用户故事与用例图，否则后续原型设计无法开展。',
-    pathNodes: [
-      { id: 's1', week: 1, name: '需求获取方法', description: '访谈、问卷、观察法', duration: '3天', status: 'completed' },
-      { id: 's2', week: 1, name: '用户故事编写', description: '用户角色、故事模板、验收标准', duration: '3天', status: 'current' },
-      { id: 's3', week: 2, name: '用例建模', description: '用例图、用例描述、活动图', duration: '4天', status: 'locked' },
-      { id: 's4', week: 2, name: '原型设计', description: '低保真/高保真原型、原型工具', duration: '5天', status: 'locked' },
-      { id: 's5', week: 3, name: '需求评审与迭代', description: '评审会议、需求变更管理', duration: '3天', status: 'locked' }
-    ],
-    tasks: [
-      { id: 's1', title: '补齐用户故事与验收标准', type: 'project', minutes: 45, agentReason: '延期任务，优先完成', status: 'todo' },
-      { id: 's2', title: '绘制用例图', type: 'project', minutes: 30, agentReason: '用户故事完成后可开始', status: 'todo' },
-      { id: 's3', title: '复习需求工程理论', type: 'review', minutes: 20, agentReason: '巩固理论基础', status: 'todo' }
-    ],
-    resources: [
-      { id: 'sr1', title: '用户故事模板与示例', type: 'doc' },
-      { id: 'sr2', title: 'UML 用例图绘制指南', type: 'doc' },
-      { id: 'sr3', title: '需求文档模板', type: 'doc' }
-    ]
-  },
-  os: {
-    id: 'os', name: '操作系统', goal: '操作系统期末复习',
-    progress: 70, streakDays: 8, status: 'good',
-    colorGradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-    agentInsight: '概念理解不错，但<b>同步互斥 PV 操作</b>题错误率偏高。<br/>昨天已完成重点复习，今天可以暂缓，把时间分给高数和软件工程。',
-    pathNodes: [
-      { id: 'o1', week: 1, name: '进程与线程', description: '进程概念、线程模型、状态转换', duration: '3天', status: 'completed' },
-      { id: 'o2', week: 1, name: '进程调度', description: '调度算法与评价指标', duration: '2天', status: 'completed' },
-      { id: 'o3', week: 2, name: '进程同步与互斥', description: '临界区、信号量、PV操作', duration: '4天', status: 'current' },
-      { id: 'o4', week: 2, name: '经典同步问题', description: '生产者消费者、读者写者、哲学家', duration: '3天', status: 'locked' },
-      { id: 'o5', week: 3, name: '死锁', description: '死锁条件、预防、避免、检测', duration: '2天', status: 'locked' }
-    ],
-    tasks: [
-      { id: 'o1', title: 'PV 操作经典题型回顾', type: 'review', minutes: 20, agentReason: '昨日已完成重点复习，今日可选做', status: 'todo' }
-    ],
-    resources: [
-      { id: 'or1', title: '进程同步与互斥图解', type: 'mindmap' },
-      { id: 'or2', title: 'PV 操作经典题集', type: 'quiz' },
-      { id: 'or3', title: '生产者消费者问题详解', type: 'doc' }
-    ]
+const spaceId = computed(() => Number(route.params.spaceId))
+
+function loadSpace() {
+  const id = spaceId.value
+  if (id && !isNaN(id)) {
+    spaceStore.fetchSpaceDetail(id)
   }
 }
 
-const spaceId = computed(() => route.params.spaceId as string)
-const spaceData = computed(() => spaceDataMap[spaceId.value] || spaceDataMap.math)
+onMounted(loadSpace)
+watch(() => route.params.spaceId, loadSpace)
+
+const spaceData = computed(() => spaceStore.currentSpace)
 
 const spaceTabs = [
   { id: 'agent', label: '空间 Agent', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
@@ -834,5 +760,38 @@ const doTask = (task: any) => { ElMessage.success(`开始任务：${task.title}`
 @keyframes pulse-ring {
   0%, 100% { box-shadow: 0 0 0 1px var(--primary-color); }
   50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
+}
+
+/* Loading skeleton */
+.loading-state {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.skeleton {
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.skeleton-inside {
+  min-height: 120px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.error-state {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  padding: 80px 0;
 }
 </style>
