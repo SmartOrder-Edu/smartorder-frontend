@@ -116,6 +116,16 @@
                     </svg>
                     复制
                   </button>
+                  <button
+                    class="msg-action-btn trace-btn"
+                    v-if="msg.traceId && hasTraceEvents(msg.traceId)"
+                    @click="agentStore.openTracePanel(msg.traceId)"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                      <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+                    </svg>
+                    思考过程
+                  </button>
                 </div>
 
                 <!-- 计划创建卡片 -->
@@ -125,7 +135,7 @@
             </div>
 
             <!-- 流式加载指示器 -->
-            <div class="message-wrapper ai loading-wrapper" v-if="isStreaming || currentAiText">
+            <div class="message-wrapper ai loading-wrapper" v-if="agentStore.loading">
               <div class="message-avatar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -135,10 +145,10 @@
                 </svg>
               </div>
               <div class="message-content">
-                <div class="message-bubble" v-if="currentAiText">
-                  <p class="message-text">{{ currentAiText }}</p>
+                <div class="message-bubble" v-if="agentStore.answerText">
+                  <p class="message-text">{{ agentStore.answerText }}</p>
                 </div>
-                <div class="message-bubble loading-bubble" v-if="isStreaming && !currentAiText">
+                <div class="message-bubble loading-bubble" v-if="!agentStore.answerText">
                   <div class="loading-dots">
                     <span></span><span></span><span></span>
                   </div>
@@ -171,7 +181,7 @@
                 @input="autoResize"
                 ref="inputRef"
               ></textarea>
-              <button class="send-btn" :disabled="!inputMessage.trim() || isStreaming" @click="sendMessage">
+              <button class="send-btn" :disabled="!inputMessage.trim() || agentStore.loading" @click="sendMessage">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="22" y1="2" x2="11" y2="13"/>
                   <polygon points="22,2 15,22 11,13 2,9"/>
@@ -230,6 +240,11 @@
         </aside>
       </div>
     </div>
+    <!-- 追踪面板（抽屉式） -->
+    <AgentTracePanel />
+
+    <!-- 规划确认弹窗 -->
+    <PlanConfirmDialog @confirm="confirmPlan" @cancel="cancelPlan" />
   </AppLayout>
 </template>
 
@@ -238,10 +253,14 @@ import { ref, computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAgentChat } from '@/composables/useAgentChat'
+import { useAgentStore } from '@/stores/agent'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
+import AgentTracePanel from '@/components/AgentTracePanel.vue'
+import PlanConfirmDialog from '@/components/PlanConfirmDialog.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 
 const userStore = useUserStore()
+const agentStore = useAgentStore()
 
 const inputMessage = ref('')
 const chatContainer = ref<HTMLElement>()
@@ -261,11 +280,10 @@ const scrollToBottom = () => {
 
 const {
   messages,
-  isStreaming,
-  currentAiText,
   sendMessage: agentSend,
-  stopStreaming: agentStop,
-  clearChat: agentClear
+  confirmPlan,
+  cancelPlan,
+  clearMessages: agentClear
 } = useAgentChat(scrollToBottom)
 
 const contextOptions = ref([
@@ -409,10 +427,11 @@ const autoResize = () => {
   }
 }
 
-const sendMessage = () => {
-  if (!inputMessage.value.trim() || isStreaming.value) return
-  agentSend(inputMessage.value)
+const sendMessage = async () => {
+  if (!inputMessage.value.trim() || agentStore.loading) return
+  const msg = inputMessage.value
   inputMessage.value = ''
+  await agentSend(msg)
 }
 
 const sendQuickMessage = (msg: string) => {
@@ -434,6 +453,10 @@ const copyMessage = (content: string) => {
 
 const loadSession = (session: any) => {
   inputMessage.value = `查看之前的对话：${session.title}`
+}
+
+const hasTraceEvents = (traceId: string) => {
+  return agentStore.traceEvents.some(e => e.traceId === traceId)
 }
 </script>
 

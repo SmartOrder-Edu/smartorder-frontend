@@ -30,7 +30,7 @@
             <span class="time-label">今日可用时间</span>
           </div>
           <div class="hero-space-stat">
-            <span class="space-count">4</span>
+            <span class="space-count">{{ spaceStore.spaceCount }}</span>
             <span class="space-label">进行中的学习空间</span>
           </div>
         </div>

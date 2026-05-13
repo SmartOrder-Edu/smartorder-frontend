@@ -1,119 +1,186 @@
-import { ref, nextTick } from 'vue'
-import { streamAgentChat, type PlanSummary } from '@/api/agent'
+import { ref } from 'vue'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { useAgentStore, type AgentTraceEvent } from '@/stores/agent'
+
+export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT'
 
 export interface ChatMessage {
   role: 'user' | 'ai'
   content: string
-  planSummary?: PlanSummary
+  traceId?: string
   timestamp: number
 }
 
 export function useAgentChat(scrollCallback?: () => void) {
+  const agentStore = useAgentStore()
   const messages = ref<ChatMessage[]>([])
-  const isStreaming = ref(false)
-  const currentAiText = ref('')
-  const conversationId = ref<string | null>(null)
-  const abortController = ref<AbortController | null>(null)
 
-  function sendMessage(text: string) {
-    if (isStreaming.value) return
+  /**
+   * 发送消息给 Agent（使用 fetch-event-source POST SSE）
+   */
+  const sendMessage = async (message: string) => {
+    if (!message.trim() || agentStore.loading) return
 
-    // 添加用户消息
+    // 添加用户消息到本地列表
     messages.value.push({
       role: 'user',
-      content: text,
-      timestamp: Date.now()
+      content: message,
+      timestamp: Date.now(),
     })
 
-    currentAiText.value = ''
-    isStreaming.value = true
+    agentStore.startNewTurn()
 
-    const ctrl = streamAgentChat(
-      { message: text, conversationId: conversationId.value || undefined },
-      (token) => {
-        currentAiText.value += token
-        if (scrollCallback) nextTick(scrollCallback)
-      },
-      (plan) => {
-        // Plan created — 在消息末尾添加 PlanSummary
-        // 先完成当前 AI 消息，再附加 Plan 卡片
-        if (currentAiText.value) {
-          messages.value.push({
-            role: 'ai',
-            content: currentAiText.value,
-            planSummary: plan,
-            timestamp: Date.now()
-          })
-          currentAiText.value = ''
-        } else {
-          messages.value.push({
-            role: 'ai',
-            content: '学习计划已生成！',
-            planSummary: plan,
-            timestamp: Date.now()
-          })
-        }
-        if (scrollCallback) nextTick(scrollCallback)
-      },
-      (cid) => {
-        // Done — 将剩余的 AI 文本作为消息提交
-        if (currentAiText.value) {
-          messages.value.push({
-            role: 'ai',
-            content: currentAiText.value,
-            timestamp: Date.now()
-          })
-          currentAiText.value = ''
-        }
-        if (cid) conversationId.value = cid
-        isStreaming.value = false
-        if (scrollCallback) nextTick(scrollCallback)
-      },
-      (error) => {
-        // Error
-        if (currentAiText.value) {
-          currentAiText.value += `\n\n[错误: ${error}]`
-        } else {
-          messages.value.push({
-            role: 'ai',
-            content: `[错误: ${error}]`,
-            timestamp: Date.now()
-          })
-        }
-        isStreaming.value = false
-        if (scrollCallback) nextTick(scrollCallback)
-      }
-    )
+    const token = localStorage.getItem('token') || ''
+    const base = import.meta.env.VITE_API_BASE_URL || '/api'
 
-    abortController.value = ctrl
-  }
+    try {
+      await fetchEventSource(`${base}/agent/chat/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message,
+          conversationId: agentStore.currentConversationId || undefined,
+        }),
+        openWhenHidden: true,
 
-  function stopStreaming() {
-    abortController.value?.abort()
-    isStreaming.value = false
-    if (currentAiText.value) {
-      messages.value.push({
-        role: 'ai',
-        content: currentAiText.value,
-        timestamp: Date.now()
+        onmessage(event) {
+          if (!event.data) return
+
+          if (event.event === 'done') {
+            // 将 AI 回复添加到消息列表
+            if (agentStore.answerText) {
+              messages.value.push({
+                role: 'ai',
+                content: agentStore.answerText,
+                traceId: agentStore.currentTraceId,
+                timestamp: Date.now(),
+              })
+            }
+            agentStore.finishTurn()
+            scrollCallback?.()
+            return
+          }
+
+          try {
+            const data = JSON.parse(event.data) as AgentTraceEvent
+            agentStore.handleEvent(event.event, data)
+
+            // plan.created 时立即推送 AI 消息占位
+            if (event.event === 'agent.plan.created') {
+              if (agentStore.answerText) {
+                messages.value.push({
+                  role: 'ai',
+                  content: agentStore.answerText,
+                  traceId: agentStore.currentTraceId,
+                  timestamp: Date.now(),
+                })
+                agentStore.answerText = ''
+              }
+            }
+          } catch {
+            // 非 JSON 忽略
+          }
+        },
+
+        onerror(err) {
+          console.error('[useAgentChat] SSE error:', err)
+          agentStore.finishTurn()
+          scrollCallback?.()
+          throw err
+        },
       })
-      currentAiText.value = ''
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('[useAgentChat] fetch error:', err)
+        agentStore.finishTurn()
+      }
     }
   }
 
-  function clearChat() {
-    stopStreaming()
+  /**
+   * 确认学习规划
+   */
+  const confirmPlan = async (draftId: string) => {
+    agentStore.planConfirmLoading = true
+    const token = localStorage.getItem('token') || ''
+    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+
+    try {
+      await fetchEventSource(`${base}/agent/plan/confirm`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          draftId,
+          conversationId: agentStore.currentConversationId,
+        }),
+        openWhenHidden: true,
+
+        onmessage(event) {
+          if (!event.data) return
+
+          if (event.event === 'done') {
+            agentStore.planConfirmLoading = false
+            agentStore.planDialogVisible = false
+            // 添加执行结果消息
+            if (agentStore.answerText) {
+              messages.value.push({
+                role: 'ai',
+                content: agentStore.answerText,
+                traceId: agentStore.currentTraceId,
+                timestamp: Date.now(),
+              })
+              agentStore.answerText = ''
+            }
+            agentStore.finishTurn()
+            scrollCallback?.()
+            return
+          }
+
+          try {
+            const data = JSON.parse(event.data) as AgentTraceEvent
+            agentStore.handleEvent(event.event, data)
+          } catch {
+            // ignore
+          }
+        },
+
+        onerror(err) {
+          console.error('[confirmPlan] SSE error:', err)
+          agentStore.planConfirmLoading = false
+          throw err
+        },
+      })
+    } catch (err: any) {
+      console.error('[confirmPlan] error:', err)
+      agentStore.planConfirmLoading = false
+    }
+  }
+
+  /**
+   * 取消规划
+   */
+  const cancelPlan = () => {
+    agentStore.planDialogVisible = false
+    agentStore.currentDraftId = ''
+    agentStore.currentPlan = null
+  }
+
+  const clearMessages = () => {
     messages.value = []
-    conversationId.value = null
+    agentStore.reset()
   }
 
   return {
     messages,
-    isStreaming,
-    currentAiText,
-    conversationId,
     sendMessage,
-    stopStreaming,
-    clearChat
+    confirmPlan,
+    cancelPlan,
+    clearMessages,
   }
 }

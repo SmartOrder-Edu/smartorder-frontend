@@ -1,0 +1,170 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+
+export interface AgentTraceEvent<T = any> {
+  traceId: string
+  conversationId: string
+  userId: number
+  mode: string
+  eventType: string
+  seq: number
+  timestamp: number
+  payload: T
+}
+
+export interface TraceNode {
+  seq: number
+  eventType: string
+  mode: string
+  payload: any
+  timestamp: number
+}
+
+/**
+ * Agent 对话状态管理
+ */
+export const useAgentStore = defineStore('agent', () => {
+  // 当前对话 ID
+  const currentConversationId = ref<string>('')
+
+  // 当前追踪 ID
+  const currentTraceId = ref<string>('')
+
+  // 当前运行模式
+  const currentMode = ref<string>('')
+
+  // AI 回答文本（累积）
+  const answerText = ref('')
+
+  // 追溯事件列表
+  const traceEvents = ref<AgentTraceEvent[]>([])
+
+  // 是否正在加载
+  const loading = ref(false)
+
+  // === 规划相关状态 ===
+  const planDialogVisible = ref(false)
+  const currentDraftId = ref('')
+  const currentPlan = ref<any>(null)
+  const planConfirmLoading = ref(false)
+
+  // === 追踪面板状态 ===
+  const tracePanelVisible = ref(false)
+  const activeTraceId = ref<string>('')
+
+  /**
+   * 开始新的对话轮次
+   */
+  function startNewTurn() {
+    answerText.value = ''
+    traceEvents.value = []
+    loading.value = true
+    planDialogVisible.value = false
+    currentDraftId.value = ''
+    currentPlan.value = null
+    tracePanelVisible.value = false
+  }
+
+  /**
+   * 处理 SSE 事件
+   */
+  function handleEvent(eventName: string, data: AgentTraceEvent) {
+    traceEvents.value.push(data)
+    // 按 seq 排序
+    traceEvents.value.sort((a, b) => a.seq - b.seq)
+
+    if (data.traceId) {
+      currentTraceId.value = data.traceId
+    }
+    if (data.conversationId) {
+      currentConversationId.value = data.conversationId
+    }
+    if (data.mode) {
+      currentMode.value = data.mode
+    }
+
+    switch (eventName) {
+      case 'agent.text.delta':
+        if (data.payload?.text) {
+          answerText.value += data.payload.text
+        }
+        break
+
+      case 'agent.plan.created':
+        currentDraftId.value = data.payload?.draftId || ''
+        currentPlan.value = data.payload?.plan || null
+        planDialogVisible.value = true
+        break
+
+      case 'agent.error':
+        if (data.payload?.message) {
+          answerText.value += `\n\n[错误] ${data.payload.message}`
+        }
+        break
+    }
+  }
+
+  /**
+   * 完成当前轮次
+   */
+  function finishTurn() {
+    loading.value = false
+  }
+
+  /**
+   * 打开追踪面板
+   */
+  function openTracePanel(traceId?: string) {
+    activeTraceId.value = traceId || currentTraceId.value
+    tracePanelVisible.value = true
+  }
+
+  /**
+   * 关闭追踪面板
+   */
+  function closeTracePanel() {
+    tracePanelVisible.value = false
+  }
+
+  /**
+   * 获取当前 AI 消息关联的追踪事件
+   */
+  function getCurrentMessageTraceEvents(): AgentTraceEvent[] {
+    return traceEvents.value.filter(e => e.traceId === currentTraceId.value)
+  }
+
+  function reset() {
+    currentConversationId.value = ''
+    currentTraceId.value = ''
+    currentMode.value = ''
+    answerText.value = ''
+    traceEvents.value = []
+    loading.value = false
+    planDialogVisible.value = false
+    currentDraftId.value = ''
+    currentPlan.value = null
+    tracePanelVisible.value = false
+  }
+
+  return {
+    currentConversationId,
+    currentTraceId,
+    currentMode,
+    answerText,
+    traceEvents,
+    loading,
+    planDialogVisible,
+    currentDraftId,
+    currentPlan,
+    planConfirmLoading,
+    tracePanelVisible,
+    activeTraceId,
+    startNewTurn,
+    handleEvent,
+    finishTurn,
+    openTracePanel,
+    closeTracePanel,
+    getCurrentMessageTraceEvents,
+    reset,
+  }
+})
