@@ -67,6 +67,18 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '资源中心 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/knowledge-base',
+    name: 'KnowledgeBase',
+    component: () => import('@/views/KnowledgeBase/index.vue'),
+    meta: { title: '知识库管理 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/knowledge-base/:id',
+    name: 'KnowledgeBaseDetail',
+    component: () => import('@/views/KnowledgeBase/Detail.vue'),
+    meta: { title: '知识库详情 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/knowledge-graph',
     name: 'KnowledgeGraph',
     component: () => import('@/views/KnowledgeGraph/index.vue'),

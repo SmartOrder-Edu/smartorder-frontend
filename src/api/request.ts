@@ -43,6 +43,12 @@ class Request {
     this.instance.interceptors.response.use(
       (response: AxiosResponse) => {
         const { data } = response
+        
+        // 兼容后端直接返回非标准结构数据（如上传图片直接返回 OSS URL 字符串）
+        if (typeof data === 'string' || (data && data.code === undefined)) {
+          return data
+        }
+
         if (data.code !== 200 && data.code !== 0) {
           ElMessage.error(data.msg || data.message || '请求失败')
           return Promise.reject(new Error(data.msg || data.message || '请求失败'))
