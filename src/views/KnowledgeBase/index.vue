@@ -7,16 +7,41 @@
           <p class="page-desc">建立专属你的知识大脑，支持各种文档、笔记的智能解析与检索</p>
         </div>
         <div class="header-right">
-          <el-button type="primary" @click="openCreateDialog">
+          <el-button type="primary" @click="openCreateDialog" size="large">
             <el-icon><Plus /></el-icon>
-            新建知识库
+            <span style="margin-left: 4px;">新建知识库</span>
           </el-button>
+        </div>
+      </div>
+
+      <!-- 数据概览面板 -->
+      <div class="overview-cards">
+        <div class="stat-card">
+          <div class="stat-icon bg-blue"><el-icon><DataBoard /></el-icon></div>
+          <div class="stat-info">
+            <span class="stat-label">知识库总数</span>
+            <span class="stat-value">{{ kbList.length }}</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon bg-green"><el-icon><Document /></el-icon></div>
+          <div class="stat-info">
+            <span class="stat-label">累计文件数</span>
+            <span class="stat-value">{{ totalFiles }}</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon bg-orange"><el-icon><DataAnalysis /></el-icon></div>
+          <div class="stat-info">
+            <span class="stat-label">总知识切片</span>
+            <span class="stat-value">{{ totalChunks }}</span>
+          </div>
         </div>
       </div>
 
       <!-- 搜索与筛选 -->
       <div class="filter-bar">
-        <el-input v-model="searchKeyword" placeholder="搜索知识库名称..." prefix-icon="Search" clearable style="max-width: 300px;" />
+        <el-input v-model="searchKeyword" placeholder="搜索知识库名称..." prefix-icon="Search" clearable class="search-input" />
         <div class="filter-tags">
           <span 
             v-for="cat in categories" 
@@ -32,17 +57,17 @@
 
       <!-- 知识库列表 -->
       <div class="kb-grid">
-        <el-card shadow="hover" class="kb-card" v-for="kb in filteredKBs" :key="kb.id" :style="{ '--kb-color': kb.color || '#409EFF' }">
+        <el-card shadow="hover" class="kb-card" v-for="kb in filteredKBs" :key="kb.id" :style="{ '--kb-color': '#409EFF' }" @click="goToDetail(kb.id)">
           <div class="kb-card-header">
-            <div class="kb-icon" :style="{ backgroundColor: (kb.color || '#409EFF') + '20', color: kb.color || '#409EFF' }">
-              <el-icon v-if="!kb.icon"><Folder /></el-icon>
-              <span v-else>{{ kb.icon }}</span>
+            <div class="kb-icon" :style="kb.coverUrl ? {} : { backgroundColor: '#409EFF20', color: '#409EFF' }">
+              <img v-if="kb.coverUrl" :src="kb.coverUrl" alt="cover" class="kb-cover-img" />
+              <el-icon v-else><Folder /></el-icon>
             </div>
             <div class="kb-actions">
               <el-dropdown trigger="click" @command="handleCommand($event, kb)">
-                <span class="el-dropdown-link" @click.stop>
-                  <el-icon class="more-icon"><MoreFilled /></el-icon>
-                </span>
+                <el-button class="kb-settings-btn" circle size="default" @click.stop>
+                  <el-icon><MoreFilled /></el-icon>
+                </el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
                     <el-dropdown-item command="edit">
@@ -60,27 +85,27 @@
             </div>
           </div>
           
-          <div class="kb-card-body" @click="goToDetail(kb.id)">
+          <div class="kb-card-body">
             <h3 class="kb-name">{{ kb.name }}</h3>
             <p class="kb-desc">{{ kb.description || '暂无描述' }}</p>
           </div>
 
-          <div class="kb-card-footer">
+          <div class="kb-card-footer" @click.stop>
             <div class="kb-stats">
               <el-tooltip content="文件数量" placement="top">
                 <span class="stat-item">
-                  <el-icon><Document /></el-icon> {{ kb.file_count || 0 }}
+                  <el-icon><Document /></el-icon> {{ kb.fileCount || 0 }}
                 </span>
               </el-tooltip>
               <el-tooltip content="文档切片" placement="top">
                 <span class="stat-item">
-                  <el-icon><Grid /></el-icon> {{ kb.chunk_count || 0 }}
+                  <el-icon><Grid /></el-icon> {{ kb.documentCount || 0 }}
                 </span>
               </el-tooltip>
-              <el-tag size="small" :type="kb.status === 'active' ? 'success' : 'info'" round>{{ kb.status === 'active' ? '正常' : '已归档' }}</el-tag>
             </div>
-            <div class="kb-time">
-              更新于 {{ formatDate(kb.updated_at) }}
+            
+            <div class="kb-time" v-if="kb.updatedAt">
+              更新于 {{ formatDate(kb.updatedAt) }}
             </div>
           </div>
         </el-card>
@@ -124,53 +149,28 @@
           </el-form-item>
 
           <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="主题色">
-                <el-color-picker v-model="kbForm.color" :predefine="predefineColors" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="图标标识">
-                <el-input v-model="kbForm.icon" placeholder="输入 Emoji，例如 📚" />
+            <el-col :span="24">
+              <el-form-item label="封面图片">
+                <el-upload
+                  class="cover-uploader"
+                  action="#"
+                  :http-request="handleCoverUpload"
+                  :before-upload="beforeCoverUpload"
+                  :show-file-list="false"
+                  accept="image/*"
+                >
+                  <template v-if="kbForm.coverUrl">
+                    <img :src="kbForm.coverUrl" class="cover-image" />
+                    <div class="cover-hover-mask">
+                      <el-icon><Camera /></el-icon>
+                      <span>更换封面</span>
+                    </div>
+                  </template>
+                  <el-icon v-else class="cover-uploader-icon"><Plus /></el-icon>
+                </el-upload>
               </el-form-item>
             </el-col>
           </el-row>
-
-          <el-collapse class="advanced-settings">
-            <el-collapse-item title="高级 AI 配置 (RAG)" name="1">
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-form-item label="向量模型">
-                    <el-select v-model="kbForm.embedding_model">
-                      <el-option label="bge-m3 (推荐)" value="bge-m3" />
-                      <el-option label="text-embedding-3-small" value="text-embedding-3-small" />
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="分块策略">
-                    <el-select v-model="kbForm.chunk_strategy">
-                      <el-option label="递归分块 (Recursive)" value="recursive" />
-                      <el-option label="按标题分块 (Markdown)" value="markdown" />
-                      <el-option label="按句子分块 (Sentence)" value="sentence" />
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-form-item label="默认召回数量 (Top K)">
-                    <el-input-number v-model="kbForm.retrieval_top_k" :min="1" :max="20" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="相似度阈值">
-                    <el-slider v-model="kbForm.score_threshold" :step="0.05" :min="0" :max="1" show-stops />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-collapse-item>
-          </el-collapse>
         </el-form>
         <template #footer>
           <div class="dialog-footer">
@@ -184,89 +184,40 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { uploadKnowledgeBaseCover, createKnowledgeBase, updateKnowledgeBase, getKnowledgeBaseList, KnowledgeBaseListRespVO } from '@/api/knowledgeBase'
 
 const router = useRouter()
 
-import { Plus, Search, MoreFilled, Edit, Upload, Delete, Folder, FolderAdd, Document, Grid } from '@element-plus/icons-vue'
+import { Plus, Search, MoreFilled, Edit, Upload, Delete, Folder, FolderAdd, Document, Grid, Camera, DataBoard, DataAnalysis } from '@element-plus/icons-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
-
-// 模拟数据接口
-interface KnowledgeBase {
-  id: number
-  name: string
-  description: string
-  category: string
-  icon: string
-  color: string
-  embedding_model: string
-  chunk_strategy: string
-  retrieval_top_k: number
-  score_threshold: number
-  file_count: number
-  chunk_count: number
-  status: string
-  updated_at: string
-}
 
 // 模拟状态
 const searchKeyword = ref('')
 const activeCategory = ref('全部')
 const categories = ['全部', '课程学习', '项目资料', '论文阅读', '个人笔记']
-const predefineColors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#8A2BE2', '#722ED1']
 
-const kbList = ref<KnowledgeBase[]>([
-  {
-    id: 1,
-    name: '计算机网络核心笔记',
-    description: '考研复习使用的计网知识点汇总，包含谢希仁版教材总结。',
-    category: '课程学习',
-    icon: '🌐',
-    color: '#409EFF',
-    embedding_model: 'bge-m3',
-    chunk_strategy: 'recursive',
-    retrieval_top_k: 5,
-    score_threshold: 0.3,
-    file_count: 12,
-    chunk_count: 350,
-    status: 'active',
-    updated_at: '2026-05-12T10:00:00Z'
-  },
-  {
-    id: 2,
-    name: '英语六级真题阅读',
-    description: '历年六级阅读真题文章和解析，用于RAG辅助翻译与长难句分析。',
-    category: '课程学习',
-    icon: '📖',
-    color: '#67C23A',
-    embedding_model: 'text-embedding-3-small',
-    chunk_strategy: 'sentence',
-    retrieval_top_k: 8,
-    score_threshold: 0.4,
-    file_count: 35,
-    chunk_count: 1200,
-    status: 'active',
-    updated_at: '2026-05-10T14:30:00Z'
-  },
-  {
-    id: 3,
-    name: 'Vue3与前端工程化',
-    description: '收集的前端开发规范、组件库文档及个人最佳实践总结。',
-    category: '项目资料',
-    icon: '⚡',
-    color: '#E6A23C',
-    embedding_model: 'bge-m3',
-    chunk_strategy: 'markdown',
-    retrieval_top_k: 5,
-    score_threshold: 0.3,
-    file_count: 8,
-    chunk_count: 180,
-    status: 'active',
-    updated_at: '2026-05-08T09:15:00Z'
+const kbList = ref<KnowledgeBaseListRespVO[]>([])
+
+// 统计计算
+const totalFiles = computed(() => kbList.value.reduce((sum, item) => sum + (item.fileCount || 0), 0))
+const totalChunks = computed(() => kbList.value.reduce((sum, item) => sum + (item.documentCount || 0), 0))
+
+// 获取列表数据
+const fetchKbList = async () => {
+  try {
+    const list = await getKnowledgeBaseList()
+    kbList.value = list || []
+  } catch (error) {
+    console.error('获取知识库列表失败:', error)
   }
-])
+}
+
+onMounted(() => {
+  fetchKbList()
+})
 
 const filteredKBs = computed(() => {
   return kbList.value.filter(kb => {
@@ -289,6 +240,7 @@ const initialForm = {
   description: '',
   category: '课程学习',
   icon: '📚',
+  coverUrl: '',
   color: '#409EFF',
   embedding_model: 'bge-m3',
   chunk_strategy: 'recursive',
@@ -310,7 +262,7 @@ const openCreateDialog = () => {
   dialogVisible.value = true
 }
 
-const handleCommand = (command: string, kb: KnowledgeBase) => {
+const handleCommand = (command: string, kb: KnowledgeBaseListRespVO) => {
   if (command === 'edit') {
     dialogTitle.value = '编辑知识库'
     Object.assign(kbForm, kb)
@@ -334,34 +286,67 @@ const handleCommand = (command: string, kb: KnowledgeBase) => {
   }
 }
 
-const submitForm = () => {
+// 图片上传前的拦截
+const beforeCoverUpload = (file: File) => {
+  if (!file.type.startsWith('image/')) {
+    ElMessage.error('只能上传图片文件！')
+    return false
+  }
+  if (file.size / 1024 / 1024 > 5) {
+    ElMessage.error('图片大小不能超过 5MB！')
+    return false
+  }
+  return true
+}
+
+// 自定义上传行为，调用我们配置的接口
+const handleCoverUpload = async (options: any) => {
+  try {
+    const file = options.file as File
+    const url = await uploadKnowledgeBaseCover(file)
+    // 接口返回成功的阿里云 OSS 链接，赋值给表单，这样界面就会显示出图片
+    kbForm.coverUrl = url
+    ElMessage.success('封面上传成功')
+  } catch (error) {
+    ElMessage.error('封面上传失败，请重试')
+  }
+}
+
+const submitForm = async () => {
   if (!formRef.value) return
-  formRef.value.validate((valid: boolean) => {
+  await formRef.value.validate(async (valid: boolean) => {
     if (valid) {
       saving.value = true
-      setTimeout(() => {
+      try {
         if (kbForm.id === 0) {
-          // 新建
-          kbList.value.unshift({
-            ...kbForm,
-            id: Date.now(),
-            file_count: 0,
-            chunk_count: 0,
-            status: 'active',
-            updated_at: new Date().toISOString()
-          } as KnowledgeBase)
-          ElMessage.success('创建成功')
+          // 调用后端创建接口
+          await createKnowledgeBase({
+            name: kbForm.name,
+            category: kbForm.category,
+            description: kbForm.description,
+            coverUrl: kbForm.coverUrl
+          })
+          ElMessage.success('知识库创建成功')
+          
+          fetchKbList() // 刷新列表
         } else {
-          // 编辑
-          const index = kbList.value.findIndex(k => k.id === kbForm.id)
-          if (index !== -1) {
-            kbList.value[index] = { ...kbList.value[index], ...kbForm }
-            ElMessage.success('保存成功')
-          }
+          // 调用后端更新接口
+          await updateKnowledgeBase({
+            id: kbForm.id,
+            name: kbForm.name,
+            category: kbForm.category,
+            description: kbForm.description,
+            coverUrl: kbForm.coverUrl
+          })
+          ElMessage.success('知识库保存成功')
+          fetchKbList() // 刷新列表
         }
-        saving.value = false
         dialogVisible.value = false
-      }, 500)
+      } catch (error: any) {
+        console.error(error)
+      } finally {
+        saving.value = false
+      }
     }
   })
 }
@@ -370,7 +355,8 @@ const goToDetail = (id: number) => {
   router.push(`/knowledge-base/${id}`)
 }
 
-const formatDate = (dateStr: string) => {
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '未知时间'
   const date = new Date(dateStr)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
@@ -404,11 +390,76 @@ const formatDate = (dateStr: string) => {
   }
 }
 
+/* 概览统计面板 */
+.overview-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+
+  .stat-card {
+    background-color: var(--el-bg-color);
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transition: box-shadow 0.3s ease;
+
+    &:hover {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    
+    .stat-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #fff;
+      
+      &.bg-blue { background-color: var(--el-color-primary); }
+      &.bg-green { background-color: var(--el-color-success); }
+      &.bg-orange { background-color: var(--el-color-warning); }
+    }
+    
+    .stat-info {
+      display: flex;
+      flex-direction: column;
+      
+      .stat-label {
+        font-size: 14px;
+        color: var(--el-text-color-secondary);
+        margin-bottom: 4px;
+      }
+      .stat-value {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--el-text-color-primary);
+      }
+    }
+  }
+}
+
 .filter-bar {
   display: flex;
   gap: 20px;
   align-items: center;
   margin-bottom: 24px;
+  background-color: var(--el-bg-color);
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+
+  ::v-deep .search-input {
+    max-width: 300px;
+    .el-input__wrapper {
+      border-radius: 8px;
+    }
+  }
 
   .filter-tags {
     display: flex;
@@ -475,18 +526,27 @@ const formatDate = (dateStr: string) => {
       align-items: center;
       justify-content: center;
       font-size: 24px;
+      overflow: hidden;
+      
+      .kb-cover-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
     }
 
-    .more-icon {
-      font-size: 18px;
+    /* 优化的编辑按钮 */
+    .kb-settings-btn {
+      border: none;
+      background: transparent;
       color: var(--el-text-color-secondary);
-      padding: 4px;
-      border-radius: 4px;
-      transition: background-color 0.2s;
+      font-size: 16px;
+      transition: all 0.3s;
       
       &:hover {
         background-color: var(--el-fill-color);
-        color: var(--el-text-color-primary);
+        color: var(--el-color-primary);
+        transform: rotate(90deg);
       }
     }
   }
@@ -585,6 +645,63 @@ const formatDate = (dateStr: string) => {
       color: var(--el-text-color-regular);
       margin: 0 0 16px 0;
     }
+  }
+}
+
+.cover-uploader {
+  border: 1px dashed var(--el-border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: var(--el-transition-duration-fast);
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    border-color: var(--el-color-primary);
+    .cover-hover-mask {
+      opacity: 1;
+    }
+  }
+
+  .cover-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .cover-hover-mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.3s;
+    
+    .el-icon {
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+    
+    span {
+      font-size: 12px;
+    }
+  }
+
+  .cover-uploader-icon {
+    font-size: 28px;
+    color: #8c939d;
   }
 }
 
