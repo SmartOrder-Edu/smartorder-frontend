@@ -94,13 +94,13 @@ const routes: Array<RouteRecordRaw> = [
     path: '/profile',
     name: 'Profile',
     component: () => import('@/views/Profile/index.vue'),
-    meta: { title: '学习画像 - 知序智学', requiresAuth: true }
+    meta: { title: '成长画像 - 知序智学', requiresAuth: true }
   },
   {
-    path: '/about',
-    name: 'About',
-    component: () => import('@/views/About/index.vue'),
-    meta: { title: '关于' }
+    path: '/cloud-drive',
+    name: 'CloudDrive',
+    component: () => import('@/views/CloudDrive/index.vue'),
+    meta: { title: '个人云盘 - 知序智学', requiresAuth: true }
   },
   {
     path: '/:pathMatch(.*)*',

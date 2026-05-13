@@ -1,178 +1,113 @@
-# Vue 3 + TypeScript + Webpack 项目模板
+# 知序智学 - 前端
 
-一个基于 Vue 3、TypeScript 和 Webpack 的前端项目模板，集成 Element Plus UI 组件库和 Pinia 状态管理。
+基于 Vue 3 + TypeScript + Vite 构建的 **Agent 驱动学习 OS** 前端应用。
 
 ## 技术栈
 
-- **Vue 3.4+** - 渐进式 JavaScript 框架
-- **TypeScript 5.3+** - JavaScript 的超集
-- **Webpack 5.89+** - 模块打包工具
-- **Vue Router 4.2+** - Vue.js 官方路由
-- **Pinia 2.1+** - Vue 3 状态管理库
-- **Element Plus 2.5+** - Vue 3 UI 组件库
-- **Axios 1.6+** - HTTP 客户端
-- **Sass** - CSS 预处理器
-- **ESLint + Prettier** - 代码规范
-
-## 项目结构
-
-```
-vue3-ts-webpack/
-├── public/                    # 静态资源
-│   ├── index.html
-│   └── favicon.ico
-├── src/
-│   ├── api/                   # API 接口
-│   │   ├── request.ts         # Axios 封装
-│   │   └── user.ts            # 用户相关接口
-│   ├── assets/                # 资源文件
-│   │   ├── images/
-│   │   ├── styles/
-│   │   │   ├── index.scss     # 全局样式
-│   │   │   └── variables.scss # SCSS 变量
-│   │   └── fonts/
-│   ├── components/            # 公共组件
-│   ├── composables/           # 组合式函数
-│   │   └── useWindowSize.ts
-│   ├── directives/            # 自定义指令
-│   │   ├── index.ts
-│   │   ├── loading.ts
-│   │   ├── permission.ts
-│   │   └── debounce.ts
-│   ├── layouts/               # 布局组件
-│   ├── router/                # 路由配置
-│   │   ├── index.ts
-│   │   └── types.ts
-│   ├── stores/                # 状态管理
-│   │   ├── app.ts
-│   │   └── user.ts
-│   ├── types/                 # TypeScript 类型定义
-│   │   ├── global.d.ts
-│   │   └── env.d.ts
-│   ├── utils/                 # 工具函数
-│   │   ├── index.ts
-│   │   ├── format.ts
-│   │   ├── validate.ts
-│   │   ├── common.ts
-│   │   └── dom.ts
-│   ├── views/                 # 页面组件
-│   │   ├── Home/
-│   │   ├── About/
-│   │   └── NotFound/
-│   ├── App.vue                # 根组件
-│   ├── main.ts                # 入口文件
-│   └── env.d.ts               # 环境变量类型
-├── tests/                     # 测试文件
-├── .eslintrc.js              # ESLint 配置
-├── .prettierrc               # Prettier 配置
-├── .gitignore
-├── .env.development          # 开发环境变量
-├── .env.production           # 生产环境变量
-├── package.json
-├── tsconfig.json             # TypeScript 配置
-├── webpack.config.js         # Webpack 配置
-└── README.md
-```
+| 类别 | 技术 |
+|---|---|
+| 框架 | Vue 3.4 (Composition API) |
+| 语言 | TypeScript 5.3 |
+| 构建 | Vite 6 |
+| UI 库 | Element Plus 2.5 |
+| 状态管理 | Pinia 2.1 |
+| 路由 | Vue Router 4.2 |
+| 样式 | SCSS |
+| HTTP | Axios |
 
 ## 快速开始
 
-### 安装依赖
-
 ```bash
+# 安装依赖
 npm install
+
+# 启动开发服务器 (端口 5172)
+npm run dev
+
+# 生产构建
+npm run build
+
+# 预览构建结果
+npm run preview
 ```
 
-### 开发
+## 目录结构
+
+```
+src/
+├── api/              # API 请求层
+│   ├── request.ts    # 请求封装 (JWT 自动注入, 401 自动刷新)
+│   └── user.ts       # 用户相关接口
+├── assets/           # 静态资源
+├── components/       # 公共组件
+│   └── layout/       # 布局组件 (AppLayout)
+├── composables/      # 组合式函数
+├── directives/       # 自定义指令
+├── hooks/            # 工具 hooks
+├── router/           # 路由配置 (lazy-load)
+├── stores/           # Pinia 状态 (app, user)
+├── types/            # TypeScript 类型
+├── utils/            # 工具函数
+├── views/            # 页面视图 (15 个页面)
+├── App.vue           # 根组件
+└── main.ts           # 入口文件
+```
+
+## 路径别名
+
+| 别名 | 路径 |
+|---|---|
+| `@` | `src/` |
+| `@/api` | `src/api/` |
+| `@/views` | `src/views/` |
+| `@/components` | `src/components/` |
+| `@/stores` | `src/stores/` |
+| `@/router` | `src/router/` |
+| `@/utils` | `src/utils/` |
+
+## 开发代理
+
+开发服务器 (`:5172`) 将 `/api` 请求代理到后端 `http://localhost:9015`。
+
+## 页面路由
+
+| 路由 | 页面 | 说明 |
+|---|---|---|
+| `/login` | Login | 登录 |
+| `/register` | Register | 注册 |
+| `/dashboard` | Dashboard | 总学习指挥台 |
+| `/daily-plan` | DailyPlan | 今日总计划 |
+| `/ai-tutor` | AITutor | AI 总学习伙伴 |
+| `/space/:spaceId` | LearningSpace | 学习空间 |
+| `/tasks` | Tasks | 任务中心 |
+| `/resources` | Resources | 资源广场 |
+| `/knowledge-graph` | KnowledgeGraph | 知识图谱 |
+| `/exam` | Exam | 练习测评 |
+| `/profile` | Profile | 成长画像 |
+| `/cloud-drive` | CloudDrive | 个人云盘 |
+| `/study/:taskId` | StudyExecution | 学习执行 |
+
+## 代码规范
 
 ```bash
-npm run dev
+npm run lint        # ESLint 检查
+npm run lint:fix    # ESLint 自动修复
+npm run format      # Prettier 格式化
+npm run type-check  # TypeScript 类型检查
 ```
 
-### 构建
+## 环境变量
+
+开发环境变量文件：`.env.development`
+
+```env
+VITE_API_BASE_URL=/api
+```
+
+## 构建部署
 
 ```bash
 npm run build
 ```
 
-### 代码检查
-
-```bash
-npm run lint
-```
-
-### 代码格式化
-
-```bash
-npm run format
-```
-
-### 类型检查
-
-```bash
-npm run type-check
-```
-
-## 特性
-
-### TypeScript 支持
-
-- 完整的 TypeScript 类型定义
-- 路由类型扩展
-- 组件类型推导
-
-### 路径别名
-
-已配置以下路径别名，可在项目中直接使用：
-
-```typescript
-import Component from '@/components/Component.vue'
-import { useUserStore } from '@/stores/user'
-import { formatDate } from '@/utils/format'
-```
-
-### API 封装
-
-基于 Axios 的请求封装，支持：
-
-- 请求/响应拦截器
-- 统一错误处理
-- Token 自动注入
-- 请求取消
-
-### 状态管理
-
-使用 Pinia 进行状态管理，支持：
-
-- TypeScript 完整支持
-- 组合式 API 风格
-- 模块化状态管理
-
-### 自定义指令
-
-- `v-loading` - 加载状态
-- `v-permission` - 权限控制
-- `v-debounce` - 防抖指令
-
-### 工具函数
-
-提供常用工具函数：
-
-- `formatDate` - 日期格式化
-- `formatNumber` - 数字格式化
-- `formatFileSize` - 文件大小格式化
-- `isEmail` - 邮箱验证
-- `isPhoneNumber` - 手机号验证
-- `debounce` / `throttle` - 防抖节流
-- `deepClone` - 深拷贝
-- 更多...
-
-## 浏览器支持
-
-- Chrome >= 87
-- Firefox >= 78
-- Safari >= 14
-- Edge >= 88
-
-## License
-
-MIT
+构建产物输出到 `dist/`，直接部署到 Nginx 或 CDN。

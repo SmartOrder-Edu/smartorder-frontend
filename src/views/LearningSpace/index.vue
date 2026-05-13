@@ -335,7 +335,8 @@ const doTask = (task: any) => { ElMessage.success(`开始任务：${task.title}`
 
 <style scoped lang="scss">
 .learning-space-page {
-  max-width: 960px;
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;

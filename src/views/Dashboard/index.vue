@@ -295,7 +295,8 @@ const startSpaceToday = (space: LearningSpace) => {
 
 <style scoped lang="scss">
 .dashboard-page {
-  max-width: 1020px;
+  width: 100%;
+  max-width: 1400px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;

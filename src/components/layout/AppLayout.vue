@@ -146,46 +146,44 @@
 
       <!-- 主内容区 -->
       <main class="main-content">
-        <!-- 顶部通知栏 -->
-        <div class="top-bar">
-          <div class="top-bar-left"></div>
-          <div class="top-bar-right">
-            <button class="top-notif-btn has-badge" @click="showNotifications = !showNotifications">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-              </svg>
-              <span class="badge">3</span>
-            </button>
-            <!-- 通知面板 -->
-            <transition name="slide-down">
-              <div class="top-notif-panel" v-if="showNotifications">
-                <div class="notif-panel-header">
-                  <span>通知</span>
-                  <button class="mark-read-btn">全部已读</button>
-                </div>
-                <div class="notif-panel-list">
-                  <div class="notif-panel-item unread">
-                    <p class="notif-panel-text">规划助理已为你调整本周任务</p>
-                    <span class="notif-panel-time">10分钟前</span>
-                  </div>
-                  <div class="notif-panel-item unread">
-                    <p class="notif-panel-text">资源生成完成</p>
-                    <span class="notif-panel-time">30分钟前</span>
-                  </div>
-                  <div class="notif-panel-item">
-                    <p class="notif-panel-text">测评报告已生成：本周正确率提升 8%</p>
-                    <span class="notif-panel-time">2小时前</span>
-                  </div>
-                </div>
-              </div>
-            </transition>
-          </div>
-        </div>
         <div class="page-container">
           <slot />
         </div>
       </main>
+    </div>
+
+    <!-- 通知悬浮按钮 -->
+    <div class="notif-fab" :class="{ 'has-unread': unreadCount > 0 }">
+      <button class="notif-fab-btn" @click="showNotifications = !showNotifications" :title="unreadCount > 0 ? `${unreadCount} 条未读通知` : '通知'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span class="notif-fab-badge" v-if="unreadCount > 0">{{ unreadCount }}</span>
+      </button>
+      <!-- 通知面板 -->
+      <transition name="notif-panel">
+        <div class="notif-fab-panel" v-if="showNotifications">
+          <div class="notif-panel-header">
+            <span>通知</span>
+            <button class="mark-read-btn" @click="markAllRead">全部已读</button>
+          </div>
+          <div class="notif-panel-list">
+            <div class="notif-panel-item unread">
+              <p class="notif-panel-text">规划助理已为你调整本周任务</p>
+              <span class="notif-panel-time">10分钟前</span>
+            </div>
+            <div class="notif-panel-item unread">
+              <p class="notif-panel-text">资源生成完成</p>
+              <span class="notif-panel-time">30分钟前</span>
+            </div>
+            <div class="notif-panel-item">
+              <p class="notif-panel-text">测评报告已生成：本周正确率提升 8%</p>
+              <span class="notif-panel-time">2小时前</span>
+            </div>
+          </div>
+        </div>
+      </transition>
     </div>
 
     <!-- AI 助手悬浮框 -->
@@ -267,7 +265,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
@@ -284,6 +282,30 @@ const assistantExpanded = ref(true)
 const chatMessage = ref('')
 const showNotifications = ref(false)
 const showUserMenu = ref(false)
+const unreadCount = ref(2)
+
+const markAllRead = () => {
+  unreadCount.value = 0
+}
+
+// 点击外部关闭通知面板
+const handleClickOutside = (e: MouseEvent) => {
+  const fab = document.querySelector('.notif-fab')
+  if (showNotifications.value && fab && !fab.contains(e.target as Node)) {
+    showNotifications.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+  if (userStore.isLogin && !userStore.userInfo) {
+    userStore.fetchUserInfo().catch(() => {})
+  }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 interface LearningSpace {
   id: string
@@ -368,6 +390,12 @@ const bottomMenuItems = [
     label: '成长画像',
     path: '/profile',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+  },
+  {
+    id: 'cloud-drive',
+    label: '个人云盘',
+    path: '/cloud-drive',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'
   }
 ]
 
@@ -436,12 +464,6 @@ const handleLogout = async () => {
   }
   router.push('/login')
 }
-
-onMounted(() => {
-  if (userStore.isLogin && !userStore.userInfo) {
-    userStore.fetchUserInfo().catch(() => {})
-  }
-})
 
 const handleQuickAction = (_action: any, _e?: any) => {
   chatMessage.value = _action.label
@@ -844,61 +866,73 @@ const sendMessage = (_e?: any) => {
   cursor: pointer;
 }
 
-/* 顶部通知栏 */
-.top-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin-bottom: var(--spacing-md);
+/* 通知悬浮按钮 */
+.notif-fab {
+  position: fixed;
+  top: var(--spacing-sm);
+  right: var(--spacing-lg);
+  z-index: 95;
 }
 
-.top-bar-right {
+.notif-fab-btn {
   position: relative;
-}
-
-.top-notif-btn {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  border: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-full);
+  background: white;
+  border: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text-muted);
-  transition: all var(--transition-fast);
-
-  &:hover {
-    background: rgba(59, 91, 219, 0.08);
-    color: var(--primary-color);
-  }
-
-  &.has-badge .badge {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    min-width: 14px;
-    height: 14px;
-    padding: 0 3px;
-    background: var(--danger-color);
-    border-radius: var(--radius-full);
-    font-size: 9px;
-    font-weight: 600;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+  color: var(--text-secondary);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  transition: all var(--transition-base);
 }
 
-/* 顶部通知面板 */
-.top-notif-panel {
+.notif-fab-btn:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  color: var(--primary-color);
+  border-color: rgba(59, 91, 219, 0.3);
+  transform: scale(1.05);
+}
+
+/* 未读状态脉冲动画 */
+.notif-fab.has-unread .notif-fab-btn {
+  color: var(--primary-color);
+  border-color: rgba(59, 91, 219, 0.3);
+  animation: notif-pulse 2s ease-in-out infinite;
+}
+
+@keyframes notif-pulse {
+  0%, 100% { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06), 0 0 0 0 rgba(59, 91, 219, 0.3); }
+  50% { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06), 0 0 0 6px rgba(59, 91, 219, 0); }
+}
+
+.notif-fab-badge {
   position: absolute;
-  top: calc(100% + 8px);
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--danger-color);
+  border-radius: var(--radius-full);
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+}
+
+/* 通知面板 */
+.notif-fab-panel {
+  position: absolute;
+  top: calc(100% + 10px);
   right: 0;
-  width: 340px;
+  width: 360px;
   background: white;
   border-radius: var(--radius-lg);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
@@ -907,16 +941,17 @@ const sendMessage = (_e?: any) => {
   z-index: 300;
 }
 
-/* 下滑动画 */
-.slide-down-enter-active,
-.slide-down-leave-active {
-  transition: all 0.2s ease;
+/* 面板弹出动画 */
+.notif-panel-enter-active,
+.notif-panel-leave-active {
+  transition: all 0.25s ease;
 }
 
-.slide-down-enter-from,
-.slide-down-leave-to {
+.notif-panel-enter-from,
+.notif-panel-leave-to {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-8px) scale(0.96);
+  transform-origin: top right;
 }
 
 .notif-panel-header {
@@ -1022,28 +1057,54 @@ const sendMessage = (_e?: any) => {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--spacing-sm) var(--spacing-2xl) var(--spacing-xl);
+  padding: var(--spacing-xl) var(--spacing-2xl) var(--spacing-xl);
 }
 
 .layout-container.sidebar-collapsed .main-content {
   margin-left: var(--sidebar-collapsed-width);
 }
 
-/* AI 助手悬浮框 */
+/* AI 助手悬浮框 — 展开态为基础样式 */
 .ai-assistant {
   position: fixed;
   bottom: var(--spacing-xl);
   right: var(--spacing-xl);
   width: 340px;
-  background: white;
-  border-radius: var(--radius-xl);
+  border-radius: 16px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
   overflow: hidden;
   z-index: 100;
   border: 1px solid var(--border-light);
-  transition: all var(--transition-base);
+  background: white;
+  /* 展开：横向无延迟立即开始；收起：延迟等 body 先收 */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s,
+              border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s,
+              box-shadow 0.25s ease,
+              transform 0.2s ease;
 }
 
+/* 收起状态：紧凑小圆按钮 */
+.ai-assistant:not(.expanded) {
+  width: 48px;
+  border-radius: 24px;
+  box-shadow: 0 4px 16px rgba(59, 91, 219, 0.3);
+  /* 收起：横向延迟等 body 先收完 */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.18s,
+              border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.18s,
+              box-shadow 0.25s ease,
+              transform 0.2s ease;
+}
+
+.ai-assistant:not(.expanded):hover {
+  box-shadow: 0 6px 24px rgba(59, 91, 219, 0.4);
+  transform: scale(1.06);
+}
+
+.ai-assistant:not(.expanded):active {
+  transform: scale(0.95);
+}
+
+/* header 条 */
 .ai-assistant .assistant-header {
   display: flex;
   align-items: center;
@@ -1051,59 +1112,99 @@ const sendMessage = (_e?: any) => {
   padding: var(--spacing-md) var(--spacing-lg);
   background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
   cursor: pointer;
+  transition: gap 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.ai-assistant:not(.expanded) .assistant-header {
+  gap: 0;
+  padding: 8px;
+  justify-content: center;
+}
+
+/* 头像 */
 .assistant-avatar {
   position: relative;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-lg);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .assistant-avatar .avatar-svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   color: white;
   stroke-width: 2;
 }
 
 .assistant-avatar .online-dot {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 10px;
-  height: 10px;
+  bottom: -1px;
+  right: -1px;
+  width: 9px;
+  height: 9px;
   background: #22c55e;
-  border: 2px solid white;
+  border: 2px solid #5c7cfa;
   border-radius: 50%;
+  transition: opacity 0.2s ease;
 }
 
+.ai-assistant:not(.expanded) .assistant-avatar .online-dot {
+  opacity: 0;
+}
+
+/* 信息区 */
 .assistant-info {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  /* 展开：等宽度撑完再显现 */
+  transition: opacity 0.2s ease 0.3s, max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
+}
+
+.ai-assistant:not(.expanded) .assistant-info {
+  opacity: 0;
+  max-width: 0;
+  /* 收起：立即消失 */
+  transition: opacity 0.1s ease, max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
 }
 
 .assistant-info .assistant-name {
   font-size: 0.875rem;
   font-weight: 600;
   color: white;
+  white-space: nowrap;
 }
 
 .assistant-info .assistant-status {
   font-size: 0.6875rem;
   color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
 }
 
+/* 展开箭头 */
 .expand-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   color: rgba(255, 255, 255, 0.8);
-  transition: transform var(--transition-base);
+  flex-shrink: 0;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.15s ease,
+              width 0.25s ease,
+              margin 0.25s ease;
+}
+
+.ai-assistant:not(.expanded) .expand-icon {
+  opacity: 0;
+  width: 0;
+  margin: 0;
 }
 
 .ai-assistant.expanded .expand-icon {
@@ -1112,7 +1213,6 @@ const sendMessage = (_e?: any) => {
 
 .assistant-body {
   border-top: 1px solid var(--border-light);
-  transition: all var(--transition-base);
 }
 
 /* 聊天消息 */
@@ -1268,16 +1368,23 @@ const sendMessage = (_e?: any) => {
   transform: scale(1.1);
 }
 
-/* 过渡动画 */
-.expand-enter-active,
+/* 过渡动画 — body 面板 */
+/* 展开：横向先撑开（0.3s），body 等宽度到位后再纵向展开 */
+.expand-enter-active {
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s,
+              opacity 0.2s ease 0.32s;
+}
+/* 收起：body 立即纵向收起，收完后再让横向收缩（见上方 .ai-assistant:not(.expanded) delay） */
 .expand-leave-active {
-  transition: all 0.3s ease;
+  transition: max-height 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.1s ease;
 }
 
 .expand-enter-from,
 .expand-leave-to {
   max-height: 0;
   opacity: 0;
+  overflow: hidden;
 }
 
 @media (max-width: 992px) {
