@@ -106,8 +106,8 @@
   --transition-bounce: 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
   // === 布局 ===
-  --sidebar-width: 220px;
-  --sidebar-collapsed-width: 64px;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
   --header-height: 64px;
   --content-max-width: 1400px;
 
@@ -257,12 +257,13 @@ ol {
 // 卡片
 .el-card {
   border-radius: var(--radius-xl) !important;
-  border: 1px solid var(--border-light) !important;
+  border: 1px solid var(--border-soft) !important;
   box-shadow: var(--shadow-sm) !important;
-  transition: all var(--transition-base);
+  transition: transform var(--transition-base), box-shadow var(--transition-base) !important;
 
   &:hover {
-    box-shadow: var(--shadow-md) !important;
+    box-shadow: var(--shadow-lg) !important;
+    transform: translateY(-2px);
   }
 }
 
@@ -584,19 +585,19 @@ ol {
 
 .bento-card {
   background: var(--bg-card);
-  border-radius: var(--radius-xl);
+  border-radius: 20px;
   padding: var(--spacing-xl);
   border: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-base);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
 
   &:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+    transform: translateY(-4px);
   }
 
   &.highlight {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.04) 0%, rgba(16, 185, 129, 0.04) 100%);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(16, 185, 129, 0.03) 100%);
     border-color: var(--border-primary);
   }
 }

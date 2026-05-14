@@ -187,80 +187,7 @@
     </div>
 
     <!-- AI 助手悬浮框 -->
-    <div class="ai-assistant" :class="{ expanded: assistantExpanded }">
-      <div class="assistant-header" @click="toggleAssistant">
-        <div class="assistant-avatar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="avatar-svg">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" y1="9" x2="9.01" y2="9"/>
-            <line x1="15" y1="9" x2="15.01" y2="9"/>
-          </svg>
-          <span class="online-dot"></span>
-        </div>
-        <div class="assistant-info" v-if="assistantExpanded">
-          <span class="assistant-name">学习助手</span>
-          <span class="assistant-status">在线 · 随时帮你</span>
-        </div>
-        <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="18,15 12,9 6,15"/>
-        </svg>
-      </div>
-
-      <transition name="expand">
-        <div class="assistant-body" v-if="assistantExpanded">
-          <div class="chat-messages" ref="chatContainer">
-            <div
-              v-for="(msg, index) in chatMessages"
-              :key="index"
-              class="chat-message"
-              :class="msg.role"
-            >
-              <div class="msg-avatar" v-if="msg.role === 'ai'">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                  <line x1="9" y1="9" x2="9.01" y2="9"/>
-                  <line x1="15" y1="9" x2="15.01" y2="9"/>
-                </svg>
-              </div>
-              <div class="msg-bubble">
-                <p class="msg-text">{{ msg.content }}</p>
-                <span class="msg-time" v-if="msg.time">{{ msg.time }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="quick-actions">
-            <button
-              v-for="action in quickActions"
-              :key="action.id"
-              class="quick-action-btn"
-              @click="handleQuickAction(action)"
-            >
-              <span class="action-icon" v-html="action.icon"></span>
-              {{ action.label }}
-            </button>
-          </div>
-
-          <div class="chat-input-wrapper">
-            <input
-              type="text"
-              class="chat-input"
-              :placeholder="chatPlaceholder"
-              v-model="chatMessage"
-              @keyup.enter="sendMessage"
-            />
-            <button class="send-btn" @click="sendMessage">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="22" y1="2" x2="11" y2="13"/>
-                <polygon points="22,2 15,22 11,13 2,9"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </transition>
-    </div>
+    <AIAssistant />
   </div>
 </template>
 
@@ -270,29 +197,26 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { chatWebSocket } from '@/utils/websocket'
+import AIAssistant from '@/components/common/AIAssistant.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
 onMounted(() => {
-  // 组件挂载时，尝试建立长连接，如果已经建立则内部会忽略
   if (userStore.isLogin) {
     chatWebSocket.connect()
   }
 })
 
 onBeforeUnmount(() => {
-  // 不在此处断开连接，因为跳转其他页面可能也会挂载新的 Layout 
-  // 可以在实际登出操作时调用 chatWebSocket.disconnect()
 })
 
 const sidebarCollapsed = ref(localStorage.getItem('sidebarCollapsed') === 'true')
 watch(() => sidebarCollapsed.value, (val) => {
   localStorage.setItem('sidebarCollapsed', String(val))
 })
-const assistantExpanded = ref(true)
-const chatMessage = ref('')
+
 const showNotifications = ref(false)
 const showUserMenu = ref(false)
 const unreadCount = ref(2)
@@ -338,20 +262,6 @@ const learningSpaces = ref<LearningSpace[]>([
 
 const showCreateSpace = ref(false)
 
-interface ChatMessage {
-  role: 'ai' | 'user'
-  content: string
-  time?: string
-}
-
-const chatMessages = ref<ChatMessage[]>([
-  {
-    role: 'ai',
-    content: '你好！我是你的 AI 学习伙伴。有什么不懂的知识点或者需要帮助的地方，随时告诉我。',
-    time: '刚刚'
-  }
-])
-
 const topMenuItems = [
   {
     id: 'dashboard',
@@ -390,7 +300,7 @@ const bottomMenuItems = [
     id: 'knowledge-base',
     label: '知识库管理',
     path: '/knowledge-base',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>'
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>'
   },
   {
     id: 'exam',
@@ -408,41 +318,9 @@ const bottomMenuItems = [
     id: 'cloud-drive',
     label: '个人云盘',
     path: '/cloud-drive',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>'
   }
 ]
-
-const quickActions = [
-  {
-    id: 1,
-    label: '解释当前知识点',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
-  },
-  {
-    id: 2,
-    label: '生成练习题',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>'
-  },
-  {
-    id: 3,
-    label: '帮我总结笔记',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>'
-  },
-  {
-    id: 4,
-    label: '生成思维导图',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>'
-  }
-]
-
-const chatPlaceholder = computed(() => {
-  const placeholders = [
-    '告诉我你卡在哪里...',
-    '帮我解释这个概念...',
-    '生成一些练习题...'
-  ]
-  return placeholders[Math.floor(Math.random() * placeholders.length)]
-})
 
 const isActive = (path: string) => {
   return route.path === path || route.path.startsWith(path + '/')
@@ -465,7 +343,6 @@ const goFeedback = () => {
   showUserMenu.value = false
   ElMessage.info('问题反馈页面开发中')
 }
-const toggleAssistant = () => { assistantExpanded.value = !assistantExpanded.value }
 
 const handleLogout = async () => {
   showUserMenu.value = false
@@ -476,46 +353,6 @@ const handleLogout = async () => {
     // 即使接口失败也清除本地状态
   }
   router.push('/login')
-}
-
-const handleQuickAction = (_action: any, _e?: any) => {
-  chatMessage.value = _action.label
-  sendMessage()
-}
-
-const sendMessage = (_e?: any) => {
-  if (!chatMessage.value.trim()) return
-
-  chatMessages.value.push({
-    role: 'user',
-    content: chatMessage.value,
-    time: '刚刚'
-  })
-
-  const userMsg = chatMessage.value
-  chatMessage.value = ''
-
-  // 模拟 AI 响应
-  setTimeout(() => {
-    let response = ''
-    if (userMsg.includes('解释') || userMsg.includes('概念')) {
-      response = '好的，让我为你详细解释这个知识点。进程是程序的一次执行实例，是操作系统进行资源分配和调度的基本单位；线程是CPU调度的最小单位，同一进程内的线程共享进程的地址空间和资源。'
-    } else if (userMsg.includes('练习') || userMsg.includes('题')) {
-      response = '我已为你生成了5道专项练习题，涵盖进程同步、互斥、PV操作等核心考点。点击"开始练习"按钮即可开始。'
-    } else if (userMsg.includes('笔记') || userMsg.includes('总结')) {
-      response = '正在为你整理笔记... 已根据你的学习记录提取了本节核心知识点，包括：1. 进程与线程的区别 2. 同步与互斥 3. PV操作原理。'
-    } else if (userMsg.includes('思维导图')) {
-      response = '正在为你生成"线程与同步"的知识思维导图，预计需要10秒生成完毕。'
-    } else {
-      response = '我理解你的问题。让我结合你的学习画像为你详细解答。如果你有具体的知识点不理解，可以直接描述出来，我会针对性地帮你讲解。'
-    }
-
-    chatMessages.value.push({
-      role: 'ai',
-      content: response,
-      time: '刚刚'
-    })
-  }, 800)
 }
 </script>
 
@@ -539,13 +376,14 @@ const sendMessage = (_e?: any) => {
   left: 0;
   bottom: 0;
   width: var(--sidebar-width);
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
   display: flex;
   flex-direction: column;
-  background: white;
-  border-right: 1px solid var(--border-light);
+  background: var(--bg-card);
+  border-right: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-sm);
   overflow: visible;
-  transition: width var(--transition-base);
+  transition: width var(--transition-base), padding var(--transition-base);
   z-index: 90;
 }
 
@@ -554,22 +392,22 @@ const sendMessage = (_e?: any) => {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: 0 var(--spacing-sm) var(--spacing-xs);
-  margin-bottom: 0;
-  border-bottom: 1px solid var(--border-light);
+  padding: var(--spacing-sm) 0 var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--border-soft);
   cursor: pointer;
 }
 
 .sidebar.collapsed .sidebar-logo {
   flex-direction: column;
   justify-content: center;
-  padding: var(--spacing-xs) 0 var(--spacing-md);
+  padding: var(--spacing-md) 0;
   gap: var(--spacing-sm);
 }
 
 .sidebar-logo-img {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -580,9 +418,12 @@ const sendMessage = (_e?: any) => {
 }
 
 .sidebar-logo-title {
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 1.125rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .sidebar-logo-subtitle {
@@ -623,22 +464,24 @@ const sendMessage = (_e?: any) => {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-lg);
-  color: var(--text-secondary);
+  gap: var(--spacing-md);
+  padding: 10px 14px;
+  border-radius: var(--radius-xl);
+  color: var(--text-regular);
   text-decoration: none;
   transition: all var(--transition-base);
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .nav-item .nav-icon {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: transform var(--transition-fast);
 }
 
 .nav-item .nav-icon svg {
@@ -647,19 +490,30 @@ const sendMessage = (_e?: any) => {
 }
 
 .nav-item .nav-label {
-  font-size: 0.8125rem;
-  font-weight: 500;
+  font-size: 0.9375rem;
+  letter-spacing: 0.02em;
 }
 
 .nav-item:hover {
-  background: rgba(59, 91, 219, 0.06);
+  background: var(--bg-secondary);
   color: var(--primary-color);
+  transform: translateX(4px);
+}
+
+.nav-item:hover .nav-icon {
+  transform: scale(1.1) translateY(-2px);
+  animation: float 2s ease-in-out infinite;
 }
 
 .nav-item.active {
-  background: rgba(59, 91, 219, 0.1);
-  color: var(--primary-color);
+  background: var(--primary-color);
+  color: #fff;
   font-weight: 600;
+  box-shadow: var(--shadow-md);
+}
+
+.nav-item.active .nav-icon {
+  color: #fff;
 }
 
 /* 导航分隔线 */
@@ -910,6 +764,20 @@ const sendMessage = (_e?: any) => {
   transform: scale(1.05);
 }
 
+.notif-fab-btn:hover svg {
+  animation: bell-swing 1s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+@keyframes bell-swing {
+  0% { transform: rotate(0); }
+  20% { transform: rotate(15deg); }
+  40% { transform: rotate(-10deg); }
+  60% { transform: rotate(5deg); }
+  80% { transform: rotate(-2deg); }
+  100% { transform: rotate(0); }
+}
+
 /* 未读状态脉冲动画 */
 .notif-fab.has-unread .notif-fab-btn {
   color: var(--primary-color);
@@ -1075,329 +943,6 @@ const sendMessage = (_e?: any) => {
 
 .layout-container.sidebar-collapsed .main-content {
   margin-left: var(--sidebar-collapsed-width);
-}
-
-/* AI 助手悬浮框 — 展开态为基础样式 */
-.ai-assistant {
-  position: fixed;
-  bottom: var(--spacing-xl);
-  right: var(--spacing-xl);
-  width: 340px;
-  border-radius: 16px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-  z-index: 100;
-  border: 1px solid var(--border-light);
-  background: white;
-  /* 展开：横向无延迟立即开始；收起：延迟等 body 先收 */
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s,
-              border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0s,
-              box-shadow 0.25s ease,
-              transform 0.2s ease;
-}
-
-/* 收起状态：紧凑小圆按钮 */
-.ai-assistant:not(.expanded) {
-  width: 48px;
-  border-radius: 24px;
-  box-shadow: 0 4px 16px rgba(59, 91, 219, 0.3);
-  /* 收起：横向延迟等 body 先收完 */
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.18s,
-              border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.18s,
-              box-shadow 0.25s ease,
-              transform 0.2s ease;
-}
-
-.ai-assistant:not(.expanded):hover {
-  box-shadow: 0 6px 24px rgba(59, 91, 219, 0.4);
-  transform: scale(1.06);
-}
-
-.ai-assistant:not(.expanded):active {
-  transform: scale(0.95);
-}
-
-/* header 条 */
-.ai-assistant .assistant-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
-  cursor: pointer;
-  transition: gap 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-              padding 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.ai-assistant:not(.expanded) .assistant-header {
-  gap: 0;
-  padding: 8px;
-  justify-content: center;
-}
-
-/* 头像 */
-.assistant-avatar {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.assistant-avatar .avatar-svg {
-  width: 20px;
-  height: 20px;
-  color: white;
-  stroke-width: 2;
-}
-
-.assistant-avatar .online-dot {
-  position: absolute;
-  bottom: -1px;
-  right: -1px;
-  width: 9px;
-  height: 9px;
-  background: #22c55e;
-  border: 2px solid #5c7cfa;
-  border-radius: 50%;
-  transition: opacity 0.2s ease;
-}
-
-.ai-assistant:not(.expanded) .assistant-avatar .online-dot {
-  opacity: 0;
-}
-
-/* 信息区 */
-.assistant-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  /* 展开：等宽度撑完再显现 */
-  transition: opacity 0.2s ease 0.3s, max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
-}
-
-.ai-assistant:not(.expanded) .assistant-info {
-  opacity: 0;
-  max-width: 0;
-  /* 收起：立即消失 */
-  transition: opacity 0.1s ease, max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.05s;
-}
-
-.assistant-info .assistant-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: white;
-  white-space: nowrap;
-}
-
-.assistant-info .assistant-status {
-  font-size: 0.6875rem;
-  color: rgba(255, 255, 255, 0.8);
-  white-space: nowrap;
-}
-
-/* 展开箭头 */
-.expand-icon {
-  width: 18px;
-  height: 18px;
-  color: rgba(255, 255, 255, 0.8);
-  flex-shrink: 0;
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.15s ease,
-              width 0.25s ease,
-              margin 0.25s ease;
-}
-
-.ai-assistant:not(.expanded) .expand-icon {
-  opacity: 0;
-  width: 0;
-  margin: 0;
-}
-
-.ai-assistant.expanded .expand-icon {
-  transform: rotate(180deg);
-}
-
-.assistant-body {
-  border-top: 1px solid var(--border-light);
-}
-
-/* 聊天消息 */
-.chat-messages {
-  max-height: 350px;
-  overflow-y: auto;
-  padding: var(--spacing-md) var(--spacing-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.chat-message {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
-}
-
-.chat-message.user {
-  flex-direction: row-reverse;
-}
-
-.msg-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: rgba(59, 91, 219, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.875rem;
-  flex-shrink: 0;
-}
-
-.msg-bubble {
-  max-width: 220px;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border-radius: var(--radius-lg);
-}
-
-.chat-message.ai .msg-bubble {
-  background: var(--background-color-base);
-  border-bottom-left-radius: 4px;
-}
-
-.chat-message.user .msg-bubble {
-  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
-  color: white;
-  border-bottom-right-radius: 4px;
-}
-
-.msg-text {
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.msg-time {
-  display: block;
-  font-size: 0.625rem;
-  color: var(--text-muted);
-  margin-top: 4px;
-}
-
-.chat-message.user .msg-time {
-  color: rgba(255, 255, 255, 0.6);
-  text-align: right;
-}
-
-/* 快捷操作 */
-.quick-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-lg);
-}
-
-.quick-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: var(--spacing-sm);
-  background: var(--background-color-base);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  font-size: 0.6875rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.quick-action-btn .action-icon {
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.quick-action-btn .action-icon svg {
-  width: 100%;
-  height: 100%;
-}
-
-.quick-action-btn:hover {
-  background: rgba(59, 91, 219, 0.08);
-  color: var(--primary-color);
-  border-color: rgba(59, 91, 219, 0.2);
-}
-
-.chat-input-wrapper {
-  display: flex;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-top: 1px solid var(--border-light);
-}
-
-.chat-input {
-  flex: 1;
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--background-color-base);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-full);
-  font-size: 0.8125rem;
-}
-
-.chat-input:focus {
-  outline: none;
-  border-color: var(--primary-color);
-}
-
-.send-btn {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
-  border: none;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-base);
-  flex-shrink: 0;
-}
-
-.send-btn svg {
-  width: 14px;
-  height: 14px;
-  color: white;
-}
-
-.send-btn:hover {
-  transform: scale(1.1);
-}
-
-/* 过渡动画 — body 面板 */
-/* 展开：横向先撑开（0.3s），body 等宽度到位后再纵向展开 */
-.expand-enter-active {
-  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1) 0.3s,
-              opacity 0.2s ease 0.32s;
-}
-/* 收起：body 立即纵向收起，收完后再让横向收缩（见上方 .ai-assistant:not(.expanded) delay） */
-.expand-leave-active {
-  transition: max-height 0.18s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.1s ease;
-}
-
-.expand-enter-from,
-.expand-leave-to {
-  max-height: 0;
-  opacity: 0;
-  overflow: hidden;
 }
 
 @media (max-width: 992px) {
