@@ -269,10 +269,23 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { chatWebSocket } from '@/utils/websocket'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+
+onMounted(() => {
+  // 组件挂载时，尝试建立长连接，如果已经建立则内部会忽略
+  if (userStore.isLogin) {
+    chatWebSocket.connect()
+  }
+})
+
+onBeforeUnmount(() => {
+  // 不在此处断开连接，因为跳转其他页面可能也会挂载新的 Layout 
+  // 可以在实际登出操作时调用 chatWebSocket.disconnect()
+})
 
 const sidebarCollapsed = ref(localStorage.getItem('sidebarCollapsed') === 'true')
 watch(() => sidebarCollapsed.value, (val) => {

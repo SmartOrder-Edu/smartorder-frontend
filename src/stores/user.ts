@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { userApi } from '@/api/user'
 import type { UserInfoResponse, UpdateUserParams } from '@/api/user'
+import { chatWebSocket } from '@/utils/websocket'
 
 const TOKEN_KEY = 'token'
 const ACCOUNT_KEY = 'remembered_account'
@@ -60,6 +61,7 @@ export const useUserStore = defineStore('user', () => {
     token.value = ''
     userInfo.value = null
     localStorage.removeItem(TOKEN_KEY)
+    chatWebSocket.disconnect()
   }
 
   function saveRememberedAccount(account: string) {
