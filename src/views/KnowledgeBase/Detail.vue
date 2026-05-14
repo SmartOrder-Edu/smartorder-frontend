@@ -126,13 +126,15 @@
       </div>
 
       <!-- 上传弹窗模拟 -->
-      <el-dialog v-model="uploadDialogVisible" title="上传文件到知识库" width="500px">
+      <el-dialog v-model="uploadDialogVisible" title="上传文件到知识库" width="500px" @closed="onDialogClosed">
         <el-upload
           class="upload-demo"
           drag
-          action="https://run.mocky.io/v3/9d059bf9-4660-45f2-925d-ce80ad6c4d15"
-          multiple
-          :on-success="onUploadSuccess"
+          action="#"
+          :auto-upload="true"
+          :http-request="customUploadRequest"
+          :show-file-list="false"
+          :disabled="isUploading"
         >
           <el-icon class="el-icon--upload"><upload-filled /></el-icon>
           <div class="el-upload__text">
@@ -141,6 +143,13 @@
           <template #tip>
             <div class="el-upload__tip">
               支持 PDF, DOCX, TXT, MD, PPTX 格式，单个文件不超过 50MB
+            </div>
+            <!-- 自定义进度条 -->
+            <div v-if="isUploading || uploadProgress.percentage > 0" style="margin-top: 15px;">
+              <el-progress :percentage="uploadProgress.percentage" :status="uploadProgress.status === 'exception' ? 'exception' : (uploadProgress.percentage === 100 ? 'success' : undefined)"></el-progress>
+              <div style="font-size: 12px; color: #666; margin-top: 5px; text-align: center;">
+                {{ uploadProgress.statusText }}
+              </div>
             </div>
           </template>
         </el-upload>
@@ -153,13 +162,55 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { UploadRequestOptions } from 'element-plus'
 import { ArrowLeft, Search, Upload, Document, Grid, CircleCheckFilled, View, Delete, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { useChunkUpload } from '@/composables/useChunkUpload'
 
 const route = useRoute()
 const kbId = route.params.id
 
-// 模拟知识库基本信息
+const { doUpload, uploadProgress } = useChunkUpload(Number(kbId))
+const isUploading = ref(false)
+
+const onDialogClosed = () => {
+  if (!isUploading.value) {
+    uploadProgress.value.percentage = 0
+    uploadProgress.value.statusText = ''
+  }
+}
+
+const customUploadRequest = async (options: UploadRequestOptions) => {
+  try {
+    isUploading.value = true
+    const url = await doUpload(options.file)
+    ElMessage.success('文件上传成功并已加入处理队列')
+    
+    // 模拟添加新文件
+    fileList.value.unshift({
+      id: Date.now(),
+      original_name: options.file.name,
+      file_extension: options.file.name.split('.').pop()?.toLowerCase() || '',
+      file_size: options.file.size,
+      page_count: null,
+      word_count: null,
+      parse_status: 'pending',
+      chunk_status: 'pending',
+      embedding_status: 'pending',
+      chunk_count: 0,
+      created_at: new Date().toISOString()
+    })
+    
+    setTimeout(() => {
+      uploadDialogVisible.value = false
+      isUploading.value = false
+    }, 1500)
+    
+  } catch (error: any) {
+    ElMessage.error(error?.message || '文件上传失败')
+    isUploading.value = false
+  }
+}
 const kbInfo = ref({
   id: Number(kbId),
   name: '计算机网络核心笔记',
@@ -317,25 +368,6 @@ const handleImgError = (e: Event) => {
 // 交互操作
 const handleUpload = () => {
   uploadDialogVisible.value = true
-}
-
-const onUploadSuccess = () => {
-  ElMessage.success('文件上传成功并已加入处理队列')
-  uploadDialogVisible.value = false
-  // 模拟添加新文件
-  fileList.value.unshift({
-    id: Date.now(),
-    original_name: '新上传的文件.pdf',
-    file_extension: 'pdf',
-    file_size: 1024000,
-    page_count: 10,
-    word_count: null,
-    parse_status: 'pending',
-    chunk_status: 'pending',
-    embedding_status: 'pending',
-    chunk_count: 0,
-    created_at: new Date().toISOString()
-  })
 }
 
 const previewFile = (file: KnowledgeFile) => {
