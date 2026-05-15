@@ -458,50 +458,49 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useUserStore } from '@/stores/user'
+import { useLearningSpaceStore } from '@/stores/learningSpace'
+import { studentProfileApi } from '@/api/studentProfile'
 import type { UserInfo } from '@/stores/user'
+import type { StudentProfileData } from '@/api/studentProfile'
 
 const userStore = useUserStore()
+const spaceStore = useLearningSpaceStore()
 const showEditDialog = ref(false)
+const profileLoading = ref(false)
+const profileData = ref<StudentProfileData | null>(null)
 
-// 各学习空间画像
-const spaceProfiles = ref([
-  {
-    id: 'math', name: '高等数学', icon: '📐', status: 'warning', statusLabel: '需关注',
-    mastery: 42, color: '#3b82f6',
-    strengths: ['函数概念', '极限计算'],
-    weaknesses: ['洛必达法则', '证明题'],
-    preference: '例题驱动、分步讲解',
-    pace: '中速，需要反复练习',
-    alert: '洛必达法则适用条件连续出错，正确率降至40%'
-  },
-  {
-    id: 'english', name: '英语四级', icon: '📝', status: 'normal', statusLabel: '稳定',
-    mastery: 61, color: '#10b981',
-    strengths: ['词汇记忆', '阅读理解'],
-    weaknesses: ['听力理解', '写作'],
-    preference: '短时高频、碎片化复习',
-    pace: '匀速，每日坚持',
-    alert: ''
-  },
-  {
-    id: 'se', name: '软件工程', icon: '💻', status: 'danger', statusLabel: '有风险',
-    mastery: 35, color: '#f59e0b',
-    strengths: ['实践能力', '团队协作'],
-    weaknesses: ['需求文档', 'UML建模'],
-    preference: '案例驱动、动手实践',
-    pace: '偏慢，项目型推进',
-    alert: '项目延期1天'
-  },
-  {
-    id: 'os', name: '操作系统', icon: '⚙️', status: 'good', statusLabel: '良好',
-    mastery: 70, color: '#8b5cf6',
-    strengths: ['进程概念', '内存管理'],
-    weaknesses: ['PV操作', '同步互斥'],
-    preference: '图解辅助、对比记忆',
-    pace: '较快，概念理解强',
-    alert: ''
-  }
-])
+const spaceTypeIcons: Record<string, string> = {
+  course: '📚', exam: '📝', project: '💻', career: '🎯', competition: '🏆'
+}
+
+const spaceColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899']
+
+// 各学习空间画像——从API数据动态生成
+const spaceProfiles = computed(() => {
+  const spaces = spaceStore.spaces || []
+  return spaces.map((space: any, idx: number) => {
+    const progress = space.progress || 0
+    let status = 'normal', statusLabel = '正常'
+    if (progress < 30) { status = 'danger'; statusLabel = '有风险' }
+    else if (progress < 50) { status = 'warning'; statusLabel = '需关注' }
+    else if (progress >= 70) { status = 'good'; statusLabel = '良好' }
+
+    return {
+      id: space.id,
+      name: space.name,
+      icon: spaceTypeIcons[space.type] || '📚',
+      status,
+      statusLabel,
+      mastery: progress,
+      color: spaceColors[idx % spaceColors.length],
+      strengths: ['学习中'],
+      weaknesses: ['待评估'],
+      preference: space.description || '学习中',
+      pace: '按计划推进',
+      alert: ''
+    }
+  })
+})
 const uploading = ref(false)
 
 const editData = reactive({
@@ -513,6 +512,7 @@ const editData = reactive({
 
 const userInfo = computed(() => {
   const u = userStore.userInfo
+  const p = profileData.value
   if (!u) {
     return {
       name: '未登录',
@@ -527,27 +527,33 @@ const userInfo = computed(() => {
       overallMastery: 0
     }
   }
+  const spaceMasteryAvg = spaceProfiles.value.length > 0
+    ? Math.round(spaceProfiles.value.reduce((sum: number, s: any) => sum + s.mastery, 0) / spaceProfiles.value.length)
+    : 0
   return {
     name: u.username || '用户',
     avatar: u.avatarUrl || '',
     identity: u.role === 1 ? '教师' : '学生',
-    direction: '',
-    level: '',
+    direction: p?.major || '',
+    level: p?.academicLevel || (p?.semester ? `第${p.semester}学期` : ''),
     goal: u.bio || '还没有填写个人简介',
     joinDays: 0,
     completedTasks: 0,
     totalHours: 0,
-    overallMastery: 0
+    overallMastery: spaceMasteryAvg
   }
 })
 
-const preferences = ref({
-  contentStyle: '可视化优先（图解 > 视频 > 纯文字）',
-  contentTags: ['思维导图', '动画演示', '代码示例', '生活类比'],
-  learningTime: '晚上 8-10 点',
-  learningPace: '稳扎稳打型（每天30-60分钟）',
-  depthPreference: '理解原理 + 注重应用',
-  weeklyActivity: [65, 45, 80, 30, 70, 90, 55]
+const preferences = computed(() => {
+  const p = profileData.value
+  return {
+    contentStyle: p?.learningStylePreference || '可视化优先（图解 > 视频 > 纯文字）',
+    contentTags: p?.strengths ? p.strengths.split(/[,，、]/).filter(Boolean) : ['思维导图', '动画演示', '代码示例', '生活类比'],
+    learningTime: p?.preferredTimeSlots || '晚上 8-10 点',
+    learningPace: p?.dailyAvailableMinutes ? `每天${p.dailyAvailableMinutes}分钟` : '稳扎稳打型（每天30-60分钟）',
+    depthPreference: p?.subjectsOfInterest || '理解原理 + 注重应用',
+    weeklyActivity: [65, 45, 80, 30, 70, 90, 55]
+  }
 })
 
 const radarAxes = ref([
@@ -567,11 +573,14 @@ const weakPoints = ref([
   { id: 5, name: '调度算法', rate: 58, wrongCount: 3, lastAppear: '1周前', suggestion: '计算练习' }
 ])
 
-const behaviorStats = ref({
-  streak: 12,
-  avgDaily: '45分钟',
-  tasksThisWeek: 8,
-  completionRate: 85
+const behaviorStats = computed(() => {
+  const p = profileData.value
+  return {
+    streak: 12,
+    avgDaily: p?.dailyAvailableMinutes ? `${p.dailyAvailableMinutes}分钟` : '45分钟',
+    tasksThisWeek: 8,
+    completionRate: 85
+  }
 })
 
 // 生成学习趋势数据
@@ -680,6 +689,22 @@ const openEditDialog = () => {
 onMounted(async () => {
   try {
     await userStore.fetchUserInfo()
+  } catch {}
+  // 获取学生画像数据
+  try {
+    profileLoading.value = true
+    const data = await studentProfileApi.getProfile()
+    if (data) {
+      profileData.value = data
+    }
+  } catch {
+    // 画像数据获取失败时使用默认mock数据
+  } finally {
+    profileLoading.value = false
+  }
+  // 获取学习空间列表
+  try {
+    await spaceStore.fetchSpaces('active')
   } catch {}
 })
 </script>
