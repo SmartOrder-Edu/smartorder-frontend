@@ -20,6 +20,13 @@ class Request {
       headers: {
         'Content-Type': 'application/json;charset=UTF-8'
       },
+      transformResponse: [(data) => {
+        if (typeof data === 'string') {
+          // 将超出JS安全整数范围的数字转为字符串，防止精度丢失
+          data = data.replace(/([:(,]\s*)(-?\d{16,})(\s*[,})])/g, '$1"$2"$3')
+        }
+        try { return JSON.parse(data) } catch { return data }
+      }],
       ...config
     })
 

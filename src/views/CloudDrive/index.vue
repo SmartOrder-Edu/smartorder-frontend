@@ -380,6 +380,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { getFolderContent, createFolder as apiCreateFolder, updateFolder as apiUpdateFolder, deleteFolder as apiDeleteFolder } from '@/api/resource'
 
 // ==================== 类型定义 ====================
 interface DriveItem {
@@ -424,117 +425,14 @@ interface UploadItem {
   file: File
 }
 const uploadQueue = ref<UploadItem[]>([])
+const isLoading = ref(false)
+const folderIdMap = new Map<string, string>()
 
 const totalStorage = 10 * 1024 * 1024 * 1024 // 10GB
 
-// ==================== 模拟数据 ====================
-const rootFiles = ref<DriveItem[]>([
-  {
-    id: 'f1',
-    name: '课件资料',
-    type: 'folder',
-    extension: '',
-    size: 0,
-    createdAt: '2026-04-15',
-    updatedAt: '2026-05-10',
-    fileCount: 8
-  },
-  {
-    id: 'f2',
-    name: '课后作业',
-    type: 'folder',
-    extension: '',
-    size: 0,
-    createdAt: '2026-03-20',
-    updatedAt: '2026-05-08',
-    fileCount: 5
-  },
-  {
-    id: 'f3',
-    name: '笔记整理',
-    type: 'folder',
-    extension: '',
-    size: 0,
-    createdAt: '2026-04-01',
-    updatedAt: '2026-05-09',
-    fileCount: 3
-  },
-  {
-    id: 'f4',
-    name: '复习资料',
-    type: 'folder',
-    extension: '',
-    size: 0,
-    createdAt: '2026-02-10',
-    updatedAt: '2026-04-28',
-    fileCount: 12
-  },
-  {
-    id: 'd1',
-    name: '操作系统第一章笔记.pdf',
-    type: 'file',
-    extension: 'pdf',
-    size: 2945600,
-    createdAt: '2026-05-01',
-    updatedAt: '2026-05-10',
-    thumbnail: ''
-  },
-  {
-    id: 'd2',
-    name: '进程同步思维导图.png',
-    type: 'file',
-    extension: 'png',
-    size: 1824300,
-    createdAt: '2026-05-03',
-    updatedAt: '2026-05-03',
-    thumbnail: ''
-  },
-  {
-    id: 'd3',
-    name: 'PV操作习题集.docx',
-    type: 'file',
-    extension: 'docx',
-    size: 856200,
-    createdAt: '2026-05-05',
-    updatedAt: '2026-05-09',
-    thumbnail: ''
-  },
-  {
-    id: 'd4',
-    name: '信号量机制讲解.pptx',
-    type: 'file',
-    extension: 'pptx',
-    size: 4200000,
-    createdAt: '2026-04-28',
-    updatedAt: '2026-04-28',
-    thumbnail: ''
-  }
-])
-
-// 文件夹内容映射
-const folderContents: Record<string, DriveItem[]> = {
-  f1: [
-    { id: 'f1_1', name: '第一章_操作系统概述.pptx', type: 'file', extension: 'pptx', size: 5600000, createdAt: '2026-04-10', updatedAt: '2026-04-15' },
-    { id: 'f1_2', name: '第二章_进程管理.pdf', type: 'file', extension: 'pdf', size: 3200000, createdAt: '2026-04-12', updatedAt: '2026-04-20' },
-    { id: 'f1_3', name: '第三章_内存管理.pdf', type: 'file', extension: 'pdf', size: 2800000, createdAt: '2026-04-15', updatedAt: '2026-05-01' },
-    { id: 'f1_4', name: '实验指导书.docx', type: 'file', extension: 'docx', size: 1200000, createdAt: '2026-04-08', updatedAt: '2026-04-08' },
-    { id: 'f1_5', name: '进程调度动画.mp4', type: 'file', extension: 'mp4', size: 45000000, createdAt: '2026-04-20', updatedAt: '2026-04-20' }
-  ],
-  f2: [
-    { id: 'f2_1', name: '第一次作业_进程同步.docx', type: 'file', extension: 'docx', size: 450000, createdAt: '2026-03-20', updatedAt: '2026-04-05' },
-    { id: 'f2_2', name: '第二次作业_内存管理.docx', type: 'file', extension: 'docx', size: 520000, createdAt: '2026-04-01', updatedAt: '2026-04-15' },
-    { id: 'f2_3', name: '实验报告_进程调度.pdf', type: 'file', extension: 'pdf', size: 1800000, createdAt: '2026-04-08', updatedAt: '2026-04-20' }
-  ],
-  f3: [
-    { id: 'f3_1', name: '操作系统期末笔记.md', type: 'file', extension: 'md', size: 28000, createdAt: '2026-05-01', updatedAt: '2026-05-09' },
-    { id: 'f3_2', name: '死锁知识点总结.png', type: 'file', extension: 'png', size: 890000, createdAt: '2026-05-05', updatedAt: '2026-05-05' }
-  ],
-  f4: [
-    { id: 'f4_1', name: '操作系统期末真题2019.pdf', type: 'file', extension: 'pdf', size: 4200000, createdAt: '2026-04-20', updatedAt: '2026-04-20' },
-    { id: 'f4_2', name: '操作系统期末真题2020.pdf', type: 'file', extension: 'pdf', size: 3800000, createdAt: '2026-04-20', updatedAt: '2026-04-20' },
-    { id: 'f4_3', name: '高频考点汇总.docx', type: 'file', extension: 'docx', size: 680000, createdAt: '2026-04-25', updatedAt: '2026-04-28' }
-  ]
-}
+// ==================== 数据 ====================
+const rootFiles = ref<DriveItem[]>([])
+const folderContents = ref<Record<string, DriveItem[]>>({})
 
 // ==================== 计算属性 ====================
 const currentFolderId = computed(() => {
@@ -545,7 +443,7 @@ const currentFolderId = computed(() => {
 const currentFiles = computed(() => {
   const fid = currentFolderId.value
   if (!fid) return rootFiles.value
-  return folderContents[fid] || []
+  return folderContents.value[fid] || []
 })
 
 const displayItems = computed(() => {
@@ -570,7 +468,7 @@ const usedStorage = computed(() => {
       if (item.type === 'file') {
         total += item.size
       } else {
-        const children = folderContents[item.id]
+        const children = folderContents.value[item.id]
         if (children) total += calcSize(children)
       }
     }
@@ -590,6 +488,45 @@ const storageClass = computed(() => {
 })
 
 // ==================== 方法 ====================
+const loadFolderFromApi = async (parentId: string) => {
+  isLoading.value = true
+  try {
+    const data = await getFolderContent(parentId)
+    console.log('loadFolderFromApi response:', data)
+    const folders: DriveItem[] = data.folders.map(f => {
+      folderIdMap.set(f.folderId, f.folderId)
+      return {
+        id: f.folderId,
+        name: f.folderName,
+        type: 'folder' as const,
+        extension: '',
+        size: 0,
+        createdAt: f.updateTime,
+        updatedAt: f.updateTime,
+        fileCount: 0
+      }
+    })
+    const files: DriveItem[] = data.files.map(f => ({
+      id: f.fileId,
+      name: f.fileName,
+      type: 'file' as const,
+      extension: f.fileType || f.fileName.split('.').pop()?.toLowerCase() || '',
+      size: f.fileSize,
+      createdAt: f.updateTime,
+      updatedAt: f.updateTime
+    }))
+    if (parentId === '0') {
+      rootFiles.value = [...folders, ...files]
+    } else {
+      folderContents.value[data.folderId] = [...folders, ...files]
+    }
+  } catch (err) {
+    console.error('loadFolderFromApi failed:', err)
+  } finally {
+    isLoading.value = false
+  }
+}
+
 const formatSize = (bytes: number): string => {
   if (bytes === 0) return '--'
   const units = ['B', 'KB', 'MB', 'GB']
@@ -647,6 +584,11 @@ const enterFolder = (item: DriveItem) => {
   if (item.type !== 'folder') return
   currentPath.value = [...currentPath.value, item]
   searchKeyword.value = ''
+  const folderRealId = folderIdMap.get(item.id)
+  console.log('enterFolder:', item.id, '→ folderRealId:', folderRealId, 'mapSize:', folderIdMap.size)
+  if (folderRealId !== undefined) {
+    loadFolderFromApi(folderRealId)
+  }
 }
 
 const openContextMenu = (e: MouseEvent, item: DriveItem) => {
@@ -666,31 +608,20 @@ const handleNewFolder = () => {
   showNewFolderDialog.value = true
 }
 
-const confirmNewFolder = () => {
+const confirmNewFolder = async () => {
   const name = newFolderName.value.trim()
   if (!name) return
-  const newFolder: DriveItem = {
-    id: 'nf_' + Date.now(),
-    name,
-    type: 'folder',
-    extension: '',
-    size: 0,
-    createdAt: new Date().toISOString().split('T')[0],
-    updatedAt: new Date().toISOString().split('T')[0],
-    fileCount: 0
+  const parentRealId = currentFolderId.value
+    ? (folderIdMap.get(currentFolderId.value) ?? '0')
+    : '0'
+  try {
+    await apiCreateFolder({ folderName: name, parentId: parentRealId })
+    showNewFolderDialog.value = false
+    ElMessage.success('文件夹已创建')
+    await loadFolderFromApi(parentRealId)
+  } catch {
+    // API 报错由 request 拦截器处理
   }
-  if (currentFolderId.value) {
-    const children = folderContents[currentFolderId.value]
-    if (children) {
-      children.push(newFolder)
-    } else {
-      folderContents[currentFolderId.value] = [newFolder]
-    }
-  } else {
-    rootFiles.value.push(newFolder)
-  }
-  showNewFolderDialog.value = false
-  ElMessage.success('文件夹已创建')
 }
 
 const handleRename = (item: DriveItem | null) => {
@@ -700,10 +631,30 @@ const handleRename = (item: DriveItem | null) => {
   showRenameDialog.value = true
 }
 
-const confirmRename = () => {
+const confirmRename = async () => {
   if (!renameTarget.value || !renameValue.value.trim()) return
-  renameTarget.value.name = renameValue.value.trim()
-  renameTarget.value.updatedAt = new Date().toISOString().split('T')[0]
+  const item = renameTarget.value
+  const newName = renameValue.value.trim()
+  if (item.type === 'folder') {
+    const folderRealId = folderIdMap.get(item.id)
+    if (folderRealId !== undefined) {
+      try {
+        await apiUpdateFolder(folderRealId, newName)
+        showRenameDialog.value = false
+        ElMessage.success('重命名成功')
+        const parentRealId = currentFolderId.value
+          ? (folderIdMap.get(currentFolderId.value) ?? '0')
+          : '0'
+        await loadFolderFromApi(parentRealId)
+      } catch {
+        // API 报错由 request 拦截器处理
+      }
+      return
+    }
+  }
+  // 文件暂不支持重命名
+  item.name = newName
+  item.updatedAt = new Date().toISOString().split('T')[0]
   showRenameDialog.value = false
   ElMessage.success('重命名成功')
 }
@@ -714,17 +665,21 @@ const handleDelete = (item: DriveItem | null) => {
     confirmButtonText: '确定删除',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    if (currentFolderId.value) {
-      const children = folderContents[currentFolderId.value]
-      if (children) {
-        const idx = children.findIndex(f => f.id === item.id)
-        if (idx > -1) children.splice(idx, 1)
+  }).then(async () => {
+    if (item.type === 'folder') {
+      const folderRealId = folderIdMap.get(item.id)
+      if (folderRealId !== undefined) {
+        try {
+          await apiDeleteFolder(folderRealId)
+        } catch {
+          return
+        }
       }
-    } else {
-      const idx = rootFiles.value.findIndex(f => f.id === item.id)
-      if (idx > -1) rootFiles.value.splice(idx, 1)
     }
+    const parentRealId = currentFolderId.value
+      ? (folderIdMap.get(currentFolderId.value) ?? '0')
+      : '0'
+    await loadFolderFromApi(parentRealId)
     ElMessage.success('已删除')
   }).catch(() => {})
 }
@@ -833,6 +788,7 @@ const onGlobalClick = () => {
 
 onMounted(() => {
   document.addEventListener('click', onGlobalClick)
+  loadFolderFromApi('0')
 })
 
 onBeforeUnmount(() => {

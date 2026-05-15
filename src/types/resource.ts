@@ -1,15 +1,15 @@
 /** 创建文件夹请求体 */
 export interface CreateFolderDTO {
   folderName: string
-  parentId: number | null
+  parentId: string | number | null
 }
 // ==================== FileFolderVO ====================
 /** 文件夹基本信息（树节点） */
 export interface FileFolderVO {
   /** 文件夹ID */
-  folderId: number
+  folderId: string
   /** 父文件夹ID */
-  folderParentId: number | null
+  folderParentId: string | null
   /** 文件夹名称 */
   folderName: string
   /** 排序 */
@@ -22,7 +22,7 @@ export interface FileFolderVO {
 /** 文件资源 */
 export interface FileResourceVO {
   /** 文件ID */
-  fileId: number
+  fileId: string
   /** 文件名称 */
   fileName: string
   /** 文件URL */
@@ -43,11 +43,11 @@ export interface FileResourceVO {
 /** 文件夹内容（包含子文件夹列表 + 文件列表） */
 export interface FileFolderContentVO {
   /** 文件夹ID */
-  folderId: number
+  folderId: string
   /** 文件夹名称 */
   folderName: string
   /** 父文件夹ID */
-  folderParentId: number | null
+  folderParentId: string | null
   /** 子文件夹列表 */
   folders: FileFolderVO[]
   /** 文件列表 */
