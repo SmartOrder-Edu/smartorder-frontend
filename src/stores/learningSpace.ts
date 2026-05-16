@@ -5,6 +5,7 @@ import type {
   LearningSpaceVO,
   LearningSpaceDTO,
   LearningSpaceDisplay,
+  LearningSpaceStatus,
   SpaceHealthStatus
 } from '@/api/learningSpace'
 
@@ -44,6 +45,22 @@ const TYPE_COLORS: Record<string, { color: string; gradient: string; icon: strin
   competition: { color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', icon: '🏆' },
 }
 
+function deriveTodaySuggestion(space: LearningSpaceVO): string {
+  if (space.progress === 0) return '开始你的第一次学习'
+  if (space.progress < 30) return '继续推进基础内容学习'
+  if (space.progress < 70) return '进入核心知识点深度学习'
+  if (space.progress < 100) return '查漏补缺，冲刺收尾'
+  return '目标已完成！'
+}
+
+function deriveAlert(space: LearningSpaceVO): string {
+  if (space.status !== 'active') return ''
+  const h = deriveHealthStatus(space)
+  if (h === 'danger') return '进度严重滞后，需立即跟进'
+  if (h === 'warning') return '进度偏慢，建议增加学习时间'
+  return ''
+}
+
 function toDisplaySpace(space: LearningSpaceVO): LearningSpaceDisplay {
   const theme = TYPE_COLORS[space.type] || TYPE_COLORS.course
   return {
@@ -54,8 +71,8 @@ function toDisplaySpace(space: LearningSpaceVO): LearningSpaceDisplay {
     colorGradient: theme.gradient,
     goal: extractPrimaryGoal(space.goals),
     streakDays: 0,
-    todaySuggestion: '',
-    alert: '',
+    todaySuggestion: deriveTodaySuggestion(space),
+    alert: deriveAlert(space),
     agentInsight: '',
     pathNodes: [],
     tasks: [],
@@ -124,6 +141,15 @@ export const useLearningSpaceStore = defineStore('learningSpace', () => {
     if (currentSpace.value?.id === id) currentSpace.value = null
   }
 
+  async function changeSpaceStatus(id: number, status: LearningSpaceStatus) {
+    const vo = await learningSpaceApi.changeStatus(id, status)
+    const display = toDisplaySpace(vo)
+    const idx = spaces.value.findIndex(s => s.id === id)
+    if (idx !== -1) spaces.value[idx] = display
+    if (currentSpace.value?.id === id) currentSpace.value = display
+    return display
+  }
+
   return {
     spaces,
     currentSpace,
@@ -137,5 +163,6 @@ export const useLearningSpaceStore = defineStore('learningSpace', () => {
     createSpace,
     updateSpace,
     deleteSpace,
+    changeSpaceStatus,
   }
 })

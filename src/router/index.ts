@@ -67,6 +67,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '资源中心 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/spaces',
+    name: 'Spaces',
+    component: () => import('@/views/Spaces/index.vue'),
+    meta: { title: '学习空间管理 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/knowledge-base',
     name: 'KnowledgeBase',
     component: () => import('@/views/KnowledgeBase/index.vue'),

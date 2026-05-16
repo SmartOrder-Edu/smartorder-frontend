@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent } from '@/stores/agent'
+import { refreshAccessToken } from '@/api/request'
 
 export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT'
 
@@ -30,8 +31,15 @@ export function useAgentChat(scrollCallback?: () => void) {
 
     agentStore.startNewTurn()
 
-    const token = localStorage.getItem('token') || ''
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
+
+    // SSE 请求前主动刷新 accessToken，确保长连接期间 token 不会过期
+    let token: string
+    try {
+      token = await refreshAccessToken()
+    } catch {
+      return // refresh 内部已处理跳转登录页
+    }
 
     try {
       await fetchEventSource(`${base}/agent/chat/stream`, {
@@ -105,8 +113,16 @@ export function useAgentChat(scrollCallback?: () => void) {
    */
   const confirmPlan = async (draftId: string) => {
     agentStore.planConfirmLoading = true
-    const token = localStorage.getItem('token') || ''
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
+
+    // SSE 请求前主动刷新 accessToken
+    let token: string
+    try {
+      token = await refreshAccessToken()
+    } catch {
+      agentStore.planConfirmLoading = false
+      return
+    }
 
     try {
       await fetchEventSource(`${base}/agent/plan/confirm`, {

@@ -110,6 +110,13 @@ export const learningSpaceApi = {
   /** 删除学习空间（逻辑删除） */
   remove(id: number) {
     return request.delete<string>(`/learning-spaces/${id}`)
+  },
+
+  /** 变更学习空间状态 */
+  changeStatus(id: number, status: LearningSpaceStatus) {
+    return request.patch<LearningSpaceVO>(`/learning-spaces/${id}/status`, null, {
+      params: { status }
+    })
   }
 }
 
