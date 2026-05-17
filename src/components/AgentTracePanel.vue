@@ -61,7 +61,7 @@
             {{ subAgentStatusText(item.eventType) }}
           </el-tag>
           <span v-if="item.payload?.summary" class="sub-summary">
-            — {{ item.payload?.summary }}
+            &mdash; {{ item.payload?.summary }}
           </span>
         </div>
 
@@ -90,7 +90,19 @@
         </div>
       </div>
     </div>
-    <el-empty v-else description="暂无追踪数据" />
+    <div v-else class="trace-empty">
+      <el-empty description="暂无追踪数据">
+        <template #description>
+          <p>该消息没有可用的执行追踪数据</p>
+          <p class="trace-empty-hint">追踪数据在以下情况不可用：</p>
+          <ul class="trace-empty-reasons">
+            <li>消息来自历史记录加载（历史消息未保存追踪）</li>
+            <li>Agent 尚未开始执行任务</li>
+            <li>追踪数据已在新一轮对话中被清除</li>
+          </ul>
+        </template>
+      </el-empty>
+    </div>
   </el-drawer>
 </template>
 
@@ -234,5 +246,24 @@ function formatJson(obj: any): string {
 .event-type {
   font-family: monospace;
   font-size: 11px;
+}
+
+/* 空状态 */
+.trace-empty {
+  padding-top: 40px;
+}
+.trace-empty-hint {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  font-weight: 500;
+}
+.trace-empty-reasons {
+  margin-top: 8px;
+  padding-left: 20px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.8;
 }
 </style>

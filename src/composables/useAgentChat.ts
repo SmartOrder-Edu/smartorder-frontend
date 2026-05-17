@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent } from '@/stores/agent'
 import { agentApi } from '@/api/agent'
@@ -10,6 +10,7 @@ export interface ChatMessage {
   role: 'user' | 'ai'
   content: string
   traceId?: string
+  traceEvents?: AgentTraceEvent[]
   timestamp: number
 }
 
@@ -17,6 +18,39 @@ export function useAgentChat(scrollCallback?: () => void) {
   const agentStore = useAgentStore()
   const messages = ref<ChatMessage[]>([])
   const loadingHistory = ref(false)
+  let abortController: AbortController | null = null
+
+  // 流式输出时自动滚动
+  watch(
+    () => agentStore.answerText,
+    () => {
+      if (agentStore.loading) {
+        scrollCallback?.()
+      }
+    },
+  )
+
+  /**
+   * 停止当前生成
+   */
+  const stopGeneration = () => {
+    if (abortController) {
+      abortController.abort()
+      abortController = null
+    }
+    // 将当前已累积的文本保存为消息
+    if (agentStore.answerText) {
+      messages.value.push({
+        role: 'ai',
+        content: agentStore.answerText + '\n\n*[已停止生成]*',
+        traceId: agentStore.currentTraceId,
+        traceEvents: [...agentStore.traceEvents],
+        timestamp: Date.now(),
+      })
+    }
+    agentStore.finishTurn()
+    scrollCallback?.()
+  }
 
   /**
    * 发送消息给 Agent（使用 fetch-event-source POST SSE）
@@ -43,6 +77,9 @@ export function useAgentChat(scrollCallback?: () => void) {
       return // refresh 内部已处理跳转登录页
     }
 
+    // 创建新的 AbortController
+    abortController = new AbortController()
+
     try {
       await fetchEventSource(`${base}/agent/chat/stream`, {
         method: 'POST',
@@ -55,6 +92,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           conversationId: agentStore.currentConversationId || undefined,
         }),
         openWhenHidden: true,
+        signal: abortController.signal,
 
         onmessage(event) {
           if (!event.data) return
@@ -66,10 +104,12 @@ export function useAgentChat(scrollCallback?: () => void) {
                 role: 'ai',
                 content: agentStore.answerText,
                 traceId: agentStore.currentTraceId,
+                traceEvents: [...agentStore.traceEvents],
                 timestamp: Date.now(),
               })
             }
             agentStore.finishTurn()
+            abortController = null
             scrollCallback?.()
             return
           }
@@ -85,6 +125,7 @@ export function useAgentChat(scrollCallback?: () => void) {
                   role: 'ai',
                   content: agentStore.answerText,
                   traceId: agentStore.currentTraceId,
+                  traceEvents: [...agentStore.traceEvents],
                   timestamp: Date.now(),
                 })
                 agentStore.answerText = ''
@@ -98,6 +139,7 @@ export function useAgentChat(scrollCallback?: () => void) {
         onerror(err) {
           console.error('[useAgentChat] SSE error:', err)
           agentStore.finishTurn()
+          abortController = null
           scrollCallback?.()
           throw err
         },
@@ -107,6 +149,7 @@ export function useAgentChat(scrollCallback?: () => void) {
         console.error('[useAgentChat] fetch error:', err)
         agentStore.finishTurn()
       }
+      abortController = null
     }
   }
 
@@ -126,6 +169,8 @@ export function useAgentChat(scrollCallback?: () => void) {
       return
     }
 
+    abortController = new AbortController()
+
     try {
       await fetchEventSource(`${base}/agent/plan/confirm`, {
         method: 'POST',
@@ -138,6 +183,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           conversationId: agentStore.currentConversationId,
         }),
         openWhenHidden: true,
+        signal: abortController.signal,
 
         onmessage(event) {
           if (!event.data) return
@@ -151,11 +197,13 @@ export function useAgentChat(scrollCallback?: () => void) {
                 role: 'ai',
                 content: agentStore.answerText,
                 traceId: agentStore.currentTraceId,
+                traceEvents: [...agentStore.traceEvents],
                 timestamp: Date.now(),
               })
               agentStore.answerText = ''
             }
             agentStore.finishTurn()
+            abortController = null
             scrollCallback?.()
             return
           }
@@ -171,12 +219,14 @@ export function useAgentChat(scrollCallback?: () => void) {
         onerror(err) {
           console.error('[confirmPlan] SSE error:', err)
           agentStore.planConfirmLoading = false
+          abortController = null
           throw err
         },
       })
     } catch (err: any) {
       console.error('[confirmPlan] error:', err)
       agentStore.planConfirmLoading = false
+      abortController = null
     }
   }
 
@@ -229,6 +279,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     messages,
     loadingHistory,
     sendMessage,
+    stopGeneration,
     confirmPlan,
     cancelPlan,
     loadConversation,

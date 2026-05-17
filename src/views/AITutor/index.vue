@@ -1,23 +1,6 @@
 <template>
   <AppLayout>
     <div class="ai-tutor-page">
-      <!-- 页面标题 + 上下文选择器 -->
-      <div class="page-header">
-        <div class="header-left">
-          <h1 class="page-title">AI 总学习伙伴</h1>
-          <p class="page-desc">Agent 驱动的多空间学习助手——不只是回答问题，更能制定计划、生成资源、推动学习</p>
-        </div>
-        <div class="header-right">
-          <el-button @click="clearChat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polyline points="3,6 5,6 21,6"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            </svg>
-            清除对话
-          </el-button>
-        </div>
-      </div>
-
       <!-- 对话上下文选择器 -->
       <div class="context-switcher">
         <span class="context-label">当前对话范围：</span>
@@ -36,11 +19,59 @@
       </div>
 
       <div class="tutor-container">
+        <!-- 左侧：历史会话侧边栏 -->
+        <aside class="history-sidebar" :class="{ open: historySidebarOpen }">
+          <div class="history-sidebar-header">
+            <span class="history-sidebar-title">对话历史</span>
+            <button class="new-chat-btn-sidebar" @click="handleNewChat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              新对话
+            </button>
+          </div>
+          <div class="history-sidebar-list">
+            <div class="history-loading" v-if="agentStore.conversationsLoading">加载中...</div>
+            <div class="history-empty" v-else-if="agentStore.conversations.length === 0">
+              <p class="empty-text">暂无对话记录</p>
+              <p class="empty-hint">发送一条消息开始对话</p>
+            </div>
+            <div
+              v-for="conv in agentStore.conversations"
+              :key="conv.conversationId"
+              class="history-item"
+              :class="{ active: conv.conversationId === agentStore.currentConversationId }"
+              @click="loadConversationFromSidebar(conv)"
+            >
+              <div class="history-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <div class="history-info">
+                <span class="history-title">{{ conv.title || '未命名对话' }}</span>
+                <span class="history-date">{{ formatDate(conv.lastActiveTime) }}</span>
+              </div>
+              <span class="history-count" v-if="conv.messageCount > 0">{{ conv.messageCount }}</span>
+            </div>
+          </div>
+        </aside>
+
         <!-- 聊天区域 -->
         <main class="chat-area">
+          <div class="chat-area-top-bar">
+            <button class="history-toggle-btn" @click="historySidebarOpen = !historySidebarOpen" :title="historySidebarOpen ? '收起历史' : '展开历史'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+            <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
+          </div>
           <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
             <!-- 欢迎消息 -->
-            <div class="welcome-message" v-if="messages.length === 0">
+            <div class="welcome-message" v-if="messages.length === 0 && !agentStore.loading">
               <div class="welcome-avatar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -52,8 +83,8 @@
               <div class="welcome-content">
                 <h3>{{ greetingText }}</h3>
                 <p class="welcome-summary">
-                  我正在管理你的 <strong>4 个学习空间</strong>。今天你预计可用 <strong>2小时30分钟</strong>。
-                  高数和软件工程今天是重点，操作系统昨天已完成复习可以暂缓。
+                  我正在管理你的 <strong>{{ learningSpaceCount }} 个学习空间</strong>。今天你预计可用 <strong>{{ todayAvailableHours }}</strong>。
+                  {{ todayFocusText }}
                 </p>
                 <div class="welcome-features">
                   <div class="feature-item" v-for="f in welcomeFeatures" :key="f.label" @click="sendQuickMessage(f.label)">
@@ -84,8 +115,10 @@
                 </svg>
               </div>
               <div class="message-content">
-                <div class="message-bubble">
-                  <p class="message-text">{{ msg.content }}</p>
+                <div class="message-bubble" :class="{ 'user-bubble': msg.role === 'user' }">
+                  <!-- AI 消息使用 Markdown 渲染 -->
+                  <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
+                  <p v-else class="message-text">{{ msg.content }}</p>
 
                   <!-- 资源卡片 -->
                   <div v-if="msg.resources" class="message-resources">
@@ -103,7 +136,7 @@
                     </div>
                   </div>
 
-                  <!-- 代码块 -->
+                  <!-- 代码块（向后兼容旧数据结构） -->
                   <pre v-if="msg.code" class="message-code"><code>{{ msg.code }}</code></pre>
                 </div>
 
@@ -114,12 +147,12 @@
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                     </svg>
-                    复制
+                    {{ copiedIndex === index ? '已复制' : '复制' }}
                   </button>
                   <button
                     class="msg-action-btn trace-btn"
-                    v-if="msg.traceId && hasTraceEvents(msg.traceId)"
-                    @click="agentStore.openTracePanel(msg.traceId)"
+                    v-if="msg.traceId && hasTraceEventsForMsg(msg)"
+                    @click="openMsgTrace(msg)"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                       <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
@@ -146,9 +179,10 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble" v-if="agentStore.answerText">
-                  <p class="message-text">{{ agentStore.answerText }}</p>
+                  <MarkdownRenderer :content="agentStore.answerText" />
+                  <span class="streaming-cursor"></span>
                 </div>
-                <div class="message-bubble loading-bubble" v-if="!agentStore.answerText">
+                <div class="message-bubble loading-bubble" v-else>
                   <div class="loading-dots">
                     <span></span><span></span><span></span>
                   </div>
@@ -160,12 +194,12 @@
           <!-- 底部输入 -->
           <div class="chat-input-area">
             <div class="input-tools">
-              <button class="tool-btn" @click="showUploadDialog = true" title="上传文件">
+              <button class="tool-btn" @click="handleUploadClick" title="上传文件（即将上线）">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                 </svg>
               </button>
-              <button class="tool-btn" @click="showContextDialog = true" title="设置上下文">
+              <button class="tool-btn" @click="handleContextClick" title="设置上下文（即将上线）">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
@@ -181,7 +215,18 @@
                 @input="autoResize"
                 ref="inputRef"
               ></textarea>
-              <button class="send-btn" :disabled="!inputMessage.trim() || agentStore.loading" @click="sendMessage">
+              <!-- 停止生成按钮 -->
+              <button
+                v-if="agentStore.loading"
+                class="stop-btn"
+                @click="handleStopGeneration"
+                title="停止生成"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                  <rect x="6" y="6" width="12" height="12" rx="1"/>
+                </svg>
+              </button>
+              <button v-else class="send-btn" :disabled="!inputMessage.trim()" @click="sendMessage">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="22" y1="2" x2="11" y2="13"/>
                   <polygon points="22,2 15,22 11,13 2,9"/>
@@ -202,7 +247,7 @@
           </div>
         </main>
 
-        <!-- 右侧：快捷工具和历史 -->
+        <!-- 右侧：快捷工具 -->
         <aside class="tutor-sidebar">
           <div class="sidebar-section">
             <h3 class="section-title">快捷工具</h3>
@@ -219,48 +264,10 @@
               </button>
             </div>
           </div>
-
-          <div class="sidebar-section">
-            <div class="section-header">
-              <h3 class="section-title">对话历史</h3>
-              <button class="new-chat-btn" @click="startNewConversation">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-                新对话
-              </button>
-            </div>
-            <div class="history-list">
-              <!-- 加载中 -->
-              <div class="history-loading" v-if="agentStore.conversationsLoading">加载中...</div>
-              <!-- 空状态 -->
-              <div class="history-empty" v-else-if="agentStore.conversations.length === 0">
-                <p class="empty-text">暂无对话记录</p>
-                <p class="empty-hint">发送一条消息开始对话</p>
-              </div>
-              <!-- 对话列表 -->
-              <div
-                v-for="conv in agentStore.conversations"
-                :key="conv.conversationId"
-                class="history-item"
-                :class="{ active: conv.conversationId === agentStore.currentConversationId }"
-                @click="loadConversationFromSidebar(conv)"
-              >
-                <div class="history-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                </div>
-                <div class="history-info">
-                  <span class="history-title">{{ conv.title || '未命名对话' }}</span>
-                  <span class="history-date">{{ formatDate(conv.lastActiveTime) }}</span>
-                </div>
-                <span class="history-count" v-if="conv.messageCount > 0">{{ conv.messageCount }}</span>
-              </div>
-            </div>
-          </div>
         </aside>
       </div>
+      <!-- 移动端历史侧边栏遮罩 -->
+      <div class="history-overlay" v-if="historySidebarOpen && isMobile" @click="historySidebarOpen = false"></div>
     </div>
     <!-- 追踪面板（抽屉式） -->
     <AgentTracePanel />
@@ -271,16 +278,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAgentChat } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationVO } from '@/api/agent'
+import type { AgentTraceEvent } from '@/stores/agent'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import PlanConfirmDialog from '@/components/PlanConfirmDialog.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import { useWindowSize } from '@/composables/useWindowSize'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
@@ -288,10 +298,20 @@ const agentStore = useAgentStore()
 const inputMessage = ref('')
 const chatContainer = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
-const tutorMode = ref('smart')
-const showUploadDialog = ref(false)
-const showContextDialog = ref(false)
 const activeContext = ref('global')
+const historySidebarOpen = ref(true)
+const copiedIndex = ref<number | null>(null)
+
+const { width: windowWidth } = useWindowSize()
+const isMobile = computed(() => windowWidth.value < 768)
+
+const currentConvTitle = computed(() => {
+  if (!agentStore.currentConversationId) return ''
+  const conv = agentStore.conversations.find(
+    c => c.conversationId === agentStore.currentConversationId
+  )
+  return conv?.title || ''
+})
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -305,6 +325,7 @@ const {
   messages,
   loadingHistory,
   sendMessage: agentSend,
+  stopGeneration,
   confirmPlan,
   cancelPlan,
   loadConversation,
@@ -340,6 +361,20 @@ const greetingText = computed(() => {
   else if (hour < 18) timeGreeting = '下午好'
   else timeGreeting = '晚上好'
   return `${timeGreeting}，${name}。我是你的 AI 学习伙伴`
+})
+
+// 动态欢迎数据（后续接入 API 后可实时更新）
+const learningSpaceCount = computed(() => {
+  // TODO: 从 learningSpace store 获取真实数量
+  return 4
+})
+const todayAvailableHours = computed(() => {
+  // TODO: 从每日计划 API 获取真实数据
+  return '2小时30分钟'
+})
+const todayFocusText = computed(() => {
+  // TODO: 从学习计划 API 获取真实重点
+  return '高等数学和软件工程今天是重点，操作系统昨天已完成复习可以暂缓。'
 })
 
 const welcomeFeatures = [
@@ -437,8 +472,21 @@ const sendQuickMessage = (msg: string) => {
   sendMessage()
 }
 
-const clearChat = () => {
+const handleNewChat = async () => {
   startNewConversation()
+  await agentStore.fetchConversations()
+}
+
+const handleStopGeneration = () => {
+  stopGeneration()
+}
+
+const handleUploadClick = () => {
+  ElMessage.info('文件上传功能即将上线，敬请期待')
+}
+
+const handleContextClick = () => {
+  ElMessage.info('上下文设置功能即将上线，敬请期待')
 }
 
 const formatTime = (ts: number) => {
@@ -461,20 +509,46 @@ const formatDate = (isoString: string) => {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
-const copyMessage = (content: string) => {
-  navigator.clipboard.writeText(content)
+const copyMessage = async (content: string) => {
+  try {
+    await navigator.clipboard.writeText(content)
+    // 找到当前 AI 消息的索引
+    const idx = messages.value.findLastIndex(m => m.role === 'ai' && m.content === content)
+    copiedIndex.value = idx
+    setTimeout(() => { copiedIndex.value = null }, 2000)
+  } catch {
+    ElMessage.error('复制失败，请手动复制')
+  }
 }
 
 const loadConversationFromSidebar = async (conv: ConversationVO) => {
   await loadConversation(conv.conversationId)
+  if (isMobile.value) {
+    historySidebarOpen.value = false
+  }
 }
 
-const hasTraceEvents = (traceId: string) => {
-  return agentStore.traceEvents.some(e => e.traceId === traceId)
+const hasTraceEventsForMsg = (msg: any): boolean => {
+  return !!(msg.traceEvents && msg.traceEvents.length > 0)
+}
+
+const openMsgTrace = (msg: any) => {
+  // 将消息的 trace 数据临时注入 store 供面板展示
+  agentStore.traceEvents = msg.traceEvents || []
+  agentStore.openTracePanel(msg.traceId)
 }
 
 onMounted(() => {
   agentStore.fetchConversations()
+  if (window.innerWidth < 768) {
+    historySidebarOpen.value = false
+  }
+})
+
+watch(windowWidth, (newWidth) => {
+  if (newWidth < 768) {
+    historySidebarOpen.value = false
+  }
 })
 </script>
 
@@ -484,38 +558,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-}
-
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: var(--spacing-sm);
-  gap: var(--spacing-lg);
-}
-
-.page-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text-dark);
-  margin: 0 0 2px;
-}
-
-.page-desc {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.header-right {
-  display: flex;
-  gap: var(--spacing-sm);
-}
-
-.header-right .el-button {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
+  margin: calc(var(--spacing-xl) * -0.6) calc(var(--spacing-2xl) * -1) 0;
+  padding: calc(var(--spacing-xl) * 0.4) var(--spacing-2xl) 0;
 }
 
 /* 上下文选择器 */
@@ -523,7 +567,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-lg);
   background: white;
   border-radius: var(--radius-lg);
@@ -567,22 +611,76 @@ onMounted(() => {
   }
 }
 
-/* 欢迎摘要 */
-.welcome-summary {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin: var(--spacing-sm) 0 var(--spacing-lg);
-  strong { color: var(--text-dark); font-weight: 600; }
-}
-
 .tutor-container {
   display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: var(--spacing-lg);
+  grid-template-columns: auto 1fr 280px;
+  gap: var(--spacing-md);
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* 历史会话侧边栏 */
+.history-sidebar {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-light);
+}
+
+.history-sidebar.open {
+  width: 260px;
+  opacity: 1;
+  overflow: hidden;
+}
+
+.history-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.history-sidebar-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.new-chat-btn-sidebar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--primary-color);
+  background: rgba(59, 91, 219, 0.06);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.new-chat-btn-sidebar:hover {
+  background: rgba(59, 91, 219, 0.12);
+}
+
+.history-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* 聊天区域 */
@@ -594,6 +692,48 @@ onMounted(() => {
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
+}
+
+.chat-area-top-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+  background: white;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.history-toggle-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+}
+
+.history-toggle-btn:hover {
+  background: var(--background-color-base);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.history-toggle-btn svg { width: 16px; height: 16px; }
+
+.current-conv-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-messages {
@@ -646,6 +786,14 @@ onMounted(() => {
   margin: 0 0 var(--spacing-sm);
 }
 
+.welcome-summary {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: var(--spacing-sm) 0 var(--spacing-lg);
+  strong { color: var(--text-dark); font-weight: 600; }
+}
+
 .welcome-features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -682,9 +830,7 @@ onMounted(() => {
   animation: fadeInUp 0.3s ease;
 }
 
-.message-wrapper.user {
-  flex-direction: row-reverse;
-}
+.message-wrapper.user { flex-direction: row-reverse; }
 
 .message-avatar {
   width: 36px;
@@ -698,15 +844,9 @@ onMounted(() => {
   color: var(--primary-color);
 }
 
-.message-avatar svg {
-  width: 20px;
-  height: 20px;
-  stroke-width: 2;
-}
+.message-avatar svg { width: 20px; height: 20px; stroke-width: 2; }
 
-.message-wrapper.user .message-avatar {
-  background: rgba(59, 91, 219, 0.15);
-}
+.message-wrapper.user .message-avatar { background: rgba(59, 91, 219, 0.15); }
 
 .message-content {
   max-width: 85%;
@@ -719,8 +859,6 @@ onMounted(() => {
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-xl);
   font-size: 0.9375rem;
-  line-height: 1.7;
-  color: var(--text-dark);
 }
 
 .message-wrapper.ai .message-bubble {
@@ -728,7 +866,7 @@ onMounted(() => {
   border-bottom-left-radius: 4px;
 }
 
-.message-wrapper.user .message-bubble {
+.user-bubble {
   background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
   color: white;
   border-bottom-right-radius: 4px;
@@ -737,6 +875,22 @@ onMounted(() => {
 .message-text {
   white-space: pre-wrap;
   margin: 0;
+}
+
+/* 流式光标 */
+.streaming-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: var(--primary-color);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .message-resources {
@@ -757,13 +911,7 @@ onMounted(() => {
 }
 
 .res-icon { font-size: 1rem; }
-
-.res-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
+.res-info { flex: 1; display: flex; flex-direction: column; }
 .res-title { font-size: 0.8125rem; color: var(--text-dark); }
 .res-meta { font-size: 0.625rem; color: var(--text-muted); }
 
@@ -788,10 +936,7 @@ onMounted(() => {
   line-height: 1.6;
 }
 
-.message-code code {
-  color: #d4d4d4;
-  white-space: pre;
-}
+.message-code code { color: #d4d4d4; white-space: pre; }
 
 .message-actions {
   display: flex;
@@ -901,9 +1046,7 @@ onMounted(() => {
   transition: border-color var(--transition-fast);
 }
 
-.input-wrapper:focus-within {
-  border-color: var(--primary-color);
-}
+.input-wrapper:focus-within { border-color: var(--primary-color); }
 
 .input-wrapper textarea {
   flex: 1;
@@ -918,9 +1061,7 @@ onMounted(() => {
   font-family: inherit;
 }
 
-.input-wrapper textarea::placeholder {
-  color: var(--text-muted);
-}
+.input-wrapper textarea::placeholder { color: var(--text-muted); }
 
 .send-btn {
   width: 36px;
@@ -939,6 +1080,27 @@ onMounted(() => {
 .send-btn svg { width: 16px; height: 16px; color: white; }
 .send-btn:hover:not(:disabled) { transform: scale(1.1); }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 停止按钮 */
+.stop-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  flex-shrink: 0;
+  color: white;
+}
+
+.stop-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
+}
 
 .input-hints {
   display: flex;
@@ -1017,11 +1179,7 @@ onMounted(() => {
 .tool-label { font-size: 0.6875rem; font-weight: 600; color: var(--text-dark); }
 .tool-desc { font-size: 0.5625rem; color: var(--text-muted); }
 
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.history-list { display: flex; flex-direction: column; gap: 2px; }
 
 .history-item {
   display: flex;
@@ -1043,21 +1201,8 @@ onMounted(() => {
 .history-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--primary-color); flex-shrink: 0; }
 .history-icon :deep(svg) { width: 100%; height: 100%; }
 
-.history-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.history-title {
-  font-size: 0.75rem;
-  color: var(--text-dark);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+.history-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.history-title { font-size: 0.75rem; color: var(--text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history-date { font-size: 0.5625rem; color: var(--text-muted); }
 
 .history-count {
@@ -1076,30 +1221,7 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
-.empty-hint {
-  font-size: 0.6875rem;
-  margin-top: 4px;
-  color: var(--text-muted);
-}
-
-.new-chat-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-light);
-  background: white;
-  font-size: 0.6875rem;
-  color: var(--primary-color);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.new-chat-btn:hover {
-  background: rgba(59, 91, 219, 0.06);
-  border-color: var(--primary-color);
-}
+.empty-hint { font-size: 0.6875rem; margin-top: 4px; color: var(--text-muted); }
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(10px); }
@@ -1107,10 +1229,31 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .tutor-container {
-    grid-template-columns: 1fr;
-  }
+  .tutor-container { grid-template-columns: 1fr; }
   .tutor-sidebar { display: none; }
+  .history-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px !important;
+    z-index: 200;
+    border-radius: 0;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+    opacity: 1;
+  }
+  .history-sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+  }
+  .history-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 199;
+  }
   .welcome-features { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
