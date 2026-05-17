@@ -22,7 +22,7 @@ const routes: Array<RouteRecordRaw> = [
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard/index.vue'),
-    meta: { title: '总学习指挥台 - 知序智学', requiresAuth: true }
+    meta: { title: '学习指挥台 - 知序智学', requiresAuth: true }
   },
   {
     path: '/daily-plan',
@@ -65,6 +65,12 @@ const routes: Array<RouteRecordRaw> = [
     name: 'Resources',
     component: () => import('@/views/Resources/index.vue'),
     meta: { title: '资源中心 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/spaces',
+    name: 'Spaces',
+    component: () => import('@/views/Spaces/index.vue'),
+    meta: { title: '学习空间管理 - 知序智学', requiresAuth: true }
   },
   {
     path: '/knowledge-base',

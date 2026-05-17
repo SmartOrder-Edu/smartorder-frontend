@@ -36,24 +36,36 @@
           <!-- 学习空间 -->
           <div class="nav-section" v-if="!sidebarCollapsed">
             <div class="nav-section-header">
-              <span class="nav-section-title">学习空间</span>
+              <router-link to="/spaces" class="nav-section-title-link">学习空间</router-link>
               <button class="nav-section-action" @click="showCreateSpace = true" title="新建学习空间">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </button>
             </div>
+            <div class="nav-space-list">
+              <router-link
+                v-for="space in displayedSpaces"
+                :key="space.id"
+                :to="`/space/${space.id}`"
+                class="nav-item nav-space-item"
+                :class="{ active: isActiveSpace(space.id) }"
+                :title="space.name"
+              >
+                <span class="space-indicator" :class="space.healthStatus" :style="{ background: space.color }"></span>
+                <span class="nav-label nav-space-label">{{ space.name }}</span>
+                <span class="space-progress-text">{{ Math.round(space.progress) }}%</span>
+              </router-link>
+            </div>
             <router-link
-              v-for="space in learningSpaces"
-              :key="space.id"
-              :to="`/space/${space.id}`"
-              class="nav-item nav-space-item"
-              :class="{ active: isActiveSpace(space.id) }"
-              :title="space.name"
+              v-if="spaceStore.activeSpaces.length > maxVisibleSpaces"
+              to="/spaces"
+              class="nav-space-more"
             >
-              <span class="space-indicator" :class="space.status" :style="{ background: space.color }"></span>
-              <span class="nav-label nav-space-label">{{ space.name }}</span>
-              <span class="space-progress-text">{{ space.progress }}%</span>
+              还有 {{ spaceStore.activeSpaces.length - maxVisibleSpaces }} 个空间
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <polyline points="9,6 15,12 9,18"/>
+              </svg>
             </router-link>
             <button class="nav-item nav-add-space" @click="showCreateSpace = true">
               <span class="nav-icon">
@@ -66,14 +78,14 @@
           </div>
           <div class="nav-section-mini" v-else>
             <div
-              v-for="space in learningSpaces"
+              v-for="space in spaceStore.activeSpaces"
               :key="space.id"
               class="nav-item"
               :class="{ active: isActiveSpace(space.id) }"
               :title="space.name"
               @click="$router.push(`/space/${space.id}`)"
             >
-              <span class="space-mini-dot" :class="space.status" :style="{ background: space.color }"></span>
+              <span class="space-mini-dot" :class="space.healthStatus" :style="{ background: space.color }"></span>
             </div>
             <div class="nav-item" title="新建学习空间" @click="showCreateSpace = true">
               <span class="nav-icon" style="width:18px;height:18px">
@@ -196,12 +208,14 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { useLearningSpaceStore } from '@/stores/learningSpace'
 import { chatWebSocket } from '@/utils/websocket'
 import AIAssistant from '@/components/common/AIAssistant.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const spaceStore = useLearningSpaceStore()
 
 onMounted(() => {
   if (userStore.isLogin) {
@@ -238,29 +252,33 @@ onMounted(() => {
   if (userStore.isLogin && !userStore.userInfo) {
     userStore.fetchUserInfo().catch(() => {})
   }
+  spaceStore.fetchSpaces('active')
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 
-interface LearningSpace {
-  id: string
-  name: string
-  icon: string
-  progress: number
-  status: 'normal' | 'warning' | 'danger' | 'good'
-  color: string
-}
-
-const learningSpaces = ref<LearningSpace[]>([
-  { id: 'math', name: '高等数学', icon: '📐', progress: 42, status: 'warning', color: '#3b82f6' },
-  { id: 'english', name: '英语四级', icon: '📝', progress: 61, status: 'normal', color: '#10b981' },
-  { id: 'se', name: '软件工程', icon: '💻', progress: 35, status: 'danger', color: '#f59e0b' },
-  { id: 'os', name: '操作系统', icon: '⚙️', progress: 70, status: 'good', color: '#8b5cf6' }
-])
-
 const showCreateSpace = ref(false)
+const maxVisibleSpaces = 5
+
+const displayedSpaces = computed(() => {
+  const all = spaceStore.activeSpaces
+  if (all.length <= maxVisibleSpaces) {
+    return all
+  }
+  // 显示前 N 个，但确保当前空间可见
+  const currentSpaceId = route.params.spaceId
+  const visible = all.slice(0, maxVisibleSpaces)
+  if (currentSpaceId && !visible.some(s => String(s.id) === String(currentSpaceId))) {
+    const currentSpace = all.find(s => String(s.id) === String(currentSpaceId))
+    if (currentSpace) {
+      visible.pop()
+      visible.push(currentSpace)
+    }
+  }
+  return visible
+})
 
 const topMenuItems = [
   {
@@ -326,8 +344,9 @@ const isActive = (path: string) => {
   return route.path === path || route.path.startsWith(path + '/')
 }
 
-const isActiveSpace = (spaceId: string) => {
-  return route.path === `/space/${spaceId}` || route.path.startsWith(`/space/${spaceId}/`)
+const isActiveSpace = (spaceId: number) => {
+  const pathId = Number(route.params.spaceId)
+  return pathId === spaceId
 }
 
 const goHome = () => router.push('/ai-tutor')
@@ -537,12 +556,20 @@ const handleLogout = async () => {
   padding: var(--spacing-xs) var(--spacing-sm);
 }
 
-.nav-section-title {
+.nav-section-title,
+.nav-section-title-link {
   font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
   font-weight: 600;
+}
+.nav-section-title-link {
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.nav-section-title-link:hover {
+  color: var(--primary-color, #3b5bdb);
 }
 
 .nav-section-action {
@@ -561,6 +588,33 @@ const handleLogout = async () => {
 
 .nav-section-action:hover {
   background: rgba(59, 91, 219, 0.08);
+  color: var(--primary-color);
+}
+
+/* 学习空间列表：独立滚动区域 */
+.nav-space-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: calc(5 * 40px);
+  overflow-y: auto;
+}
+
+/* 查看更多空间 */
+.nav-space-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: var(--spacing-xs) 0;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.nav-space-more:hover {
   color: var(--primary-color);
 }
 

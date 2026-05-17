@@ -1,23 +1,6 @@
 <template>
   <AppLayout>
     <div class="ai-tutor-page">
-      <!-- 页面标题 + 上下文选择器 -->
-      <div class="page-header">
-        <div class="header-left">
-          <h1 class="page-title">AI 总学习伙伴</h1>
-          <p class="page-desc">Agent 驱动的多空间学习助手——不只是回答问题，更能制定计划、生成资源、推动学习</p>
-        </div>
-        <div class="header-right">
-          <el-button @click="clearChat">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polyline points="3,6 5,6 21,6"/>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            </svg>
-            清除对话
-          </el-button>
-        </div>
-      </div>
-
       <!-- 对话上下文选择器 -->
       <div class="context-switcher">
         <span class="context-label">当前对话范围：</span>
@@ -36,11 +19,59 @@
       </div>
 
       <div class="tutor-container">
+        <!-- 左侧：历史会话侧边栏 -->
+        <aside class="history-sidebar" :class="{ open: historySidebarOpen }">
+          <div class="history-sidebar-header">
+            <span class="history-sidebar-title">对话历史</span>
+            <button class="new-chat-btn-sidebar" @click="handleNewChat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              新对话
+            </button>
+          </div>
+          <div class="history-sidebar-list">
+            <div class="history-loading" v-if="agentStore.conversationsLoading">加载中...</div>
+            <div class="history-empty" v-else-if="agentStore.conversations.length === 0">
+              <p class="empty-text">暂无对话记录</p>
+              <p class="empty-hint">发送一条消息开始对话</p>
+            </div>
+            <div
+              v-for="conv in agentStore.conversations"
+              :key="conv.conversationId"
+              class="history-item"
+              :class="{ active: conv.conversationId === agentStore.currentConversationId }"
+              @click="loadConversationFromSidebar(conv)"
+            >
+              <div class="history-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <div class="history-info">
+                <span class="history-title">{{ conv.title || '未命名对话' }}</span>
+                <span class="history-date">{{ formatDate(conv.lastActiveTime) }}</span>
+              </div>
+              <span class="history-count" v-if="conv.messageCount > 0">{{ conv.messageCount }}</span>
+            </div>
+          </div>
+        </aside>
+
         <!-- 聊天区域 -->
         <main class="chat-area">
-          <div class="chat-messages" ref="chatContainer">
+          <div class="chat-area-top-bar">
+            <button class="history-toggle-btn" @click="historySidebarOpen = !historySidebarOpen" :title="historySidebarOpen ? '收起历史' : '展开历史'">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+            <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
+          </div>
+          <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
             <!-- 欢迎消息 -->
-            <div class="welcome-message" v-if="messages.length === 0">
+            <div class="welcome-message" v-if="messages.length === 0 && !agentStore.loading">
               <div class="welcome-avatar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -52,8 +83,8 @@
               <div class="welcome-content">
                 <h3>{{ greetingText }}</h3>
                 <p class="welcome-summary">
-                  我正在管理你的 <strong>4 个学习空间</strong>。今天你预计可用 <strong>2小时30分钟</strong>。
-                  高数和软件工程今天是重点，操作系统昨天已完成复习可以暂缓。
+                  我正在管理你的 <strong>{{ learningSpaceCount }} 个学习空间</strong>。今天你预计可用 <strong>{{ todayAvailableHours }}</strong>。
+                  {{ todayFocusText }}
                 </p>
                 <div class="welcome-features">
                   <div class="feature-item" v-for="f in welcomeFeatures" :key="f.label" @click="sendQuickMessage(f.label)">
@@ -84,8 +115,24 @@
                 </svg>
               </div>
               <div class="message-content">
-                <div class="message-bubble">
-                  <p class="message-text">{{ msg.content }}</p>
+                <div class="message-bubble" :class="{ 'user-bubble': msg.role === 'user' }">
+                  <!-- 思考块 -->
+                  <ThinkingBlock
+                    v-if="msg.role === 'ai' && msg.thinkingText"
+                    :text="msg.thinkingText"
+                    :duration-ms="msg.thinkingDurationMs"
+                  />
+                  <!-- 工具调用卡片 -->
+                  <div v-if="msg.role === 'ai' && msg.toolCalls?.length" class="inline-tool-calls">
+                    <ToolCallCard
+                      v-for="tc in msg.toolCalls"
+                      :key="tc.toolName + tc.startedAt"
+                      v-bind="tc"
+                    />
+                  </div>
+                  <!-- AI 消息使用 Markdown 渲染 -->
+                  <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
+                  <p v-else class="message-text">{{ msg.content }}</p>
 
                   <!-- 资源卡片 -->
                   <div v-if="msg.resources" class="message-resources">
@@ -103,7 +150,7 @@
                     </div>
                   </div>
 
-                  <!-- 代码块 -->
+                  <!-- 代码块（向后兼容旧数据结构） -->
                   <pre v-if="msg.code" class="message-code"><code>{{ msg.code }}</code></pre>
                 </div>
 
@@ -114,23 +161,28 @@
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                     </svg>
-                    复制
+                    {{ copiedIndex === index ? '已复制' : '复制' }}
                   </button>
-                  <button class="msg-action-btn" @click="regenerateResponse(msg)">
+                  <button
+                    class="msg-action-btn trace-btn"
+                    v-if="msg.traceId && hasTraceEventsForMsg(msg)"
+                    @click="openMsgTrace(msg)"
+                  >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
-                      <path d="M1 4v6h6"/><path d="M23 20v-6h-6"/>
-                      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
+                      <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
                     </svg>
-                    重新生成
+                    查看详细执行过程
                   </button>
                 </div>
 
-                <span class="message-time">{{ msg.time }}</span>
+                <!-- 计划创建卡片 -->
+                <PlanCreatedCard v-if="msg.planSummary" :plan="msg.planSummary" />
+                <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
               </div>
             </div>
 
-            <!-- 加载指示器 -->
-            <div class="message-wrapper ai loading-wrapper" v-if="isLoading">
+            <!-- 流式加载指示器 -->
+            <div class="message-wrapper ai loading-wrapper" v-if="agentStore.loading">
               <div class="message-avatar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -140,8 +192,26 @@
                 </svg>
               </div>
               <div class="message-content">
-                <div class="message-bubble loading-bubble">
-                  <div class="loading-dots">
+                <div class="message-bubble">
+                  <!-- 思考块（流式） -->
+                  <ThinkingBlock
+                    v-if="agentStore.thinkingText"
+                    :text="agentStore.thinkingText"
+                    :streaming="true"
+                  />
+                  <!-- 工具调用卡片（流式） -->
+                  <div v-if="agentStore.toolCalls.length" class="inline-tool-calls">
+                    <ToolCallCard
+                      v-for="tc in agentStore.toolCalls"
+                      :key="tc.toolName + tc.startedAt"
+                      v-bind="tc"
+                    />
+                  </div>
+                  <!-- 回答内容（流式） -->
+                  <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
+                  <span class="streaming-cursor" v-if="agentStore.answerText"></span>
+                  <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
+                  <div v-if="!agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText" class="loading-dots">
                     <span></span><span></span><span></span>
                   </div>
                 </div>
@@ -151,50 +221,68 @@
 
           <!-- 底部输入 -->
           <div class="chat-input-area">
-            <div class="input-tools">
-              <button class="tool-btn" @click="showUploadDialog = true" title="上传文件">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                </svg>
-              </button>
-              <button class="tool-btn" @click="showContextDialog = true" title="设置上下文">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-              </button>
-            </div>
-
-            <div class="input-wrapper">
-              <textarea
-                v-model="inputMessage"
-                placeholder="输入你的问题，AI 会结合你的学习画像给出个性化回答..."
-                rows="1"
-                @keydown.enter.exact.prevent="sendMessage"
-                @input="autoResize"
-                ref="inputRef"
-              ></textarea>
-              <button class="send-btn" :disabled="!inputMessage.trim() || isLoading" @click="sendMessage">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="22" y1="2" x2="11" y2="13"/>
-                  <polygon points="22,2 15,22 11,13 2,9"/>
-                </svg>
-              </button>
-            </div>
-
-            <div class="input-hints">
-              <span
-                v-for="hint in quickHints"
-                :key="hint"
-                class="hint-chip"
-                @click="sendQuickMessage(hint)"
-              >
-                {{ hint }}
-              </span>
+            <div class="input-composer">
+              <div class="composer-toolbar">
+                <button class="toolbar-btn" @click="handleUploadClick" title="上传文件（即将上线）">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                  <span>上传</span>
+                </button>
+                <button class="toolbar-btn" @click="handleContextClick" title="设置上下文（即将上线）">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                  <span>上下文</span>
+                </button>
+              </div>
+              <div class="composer-body">
+                <textarea
+                  v-model="inputMessage"
+                  placeholder="输入你的问题，AI 会结合你的学习画像给出个性化回答…"
+                  rows="1"
+                  @keydown.enter.exact.prevent="sendMessage"
+                  @keydown.enter.shift.exact.stop
+                  @input="autoResize"
+                  ref="inputRef"
+                ></textarea>
+                <div class="composer-actions">
+                  <button
+                    v-if="agentStore.loading"
+                    class="action-btn stop-action"
+                    @click="handleStopGeneration"
+                    title="停止生成"
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                      <rect x="6" y="6" width="12" height="12" rx="2"/>
+                    </svg>
+                  </button>
+                  <button v-else class="action-btn send-action" :class="{ active: inputMessage.trim() }" :disabled="!inputMessage.trim()" @click="sendMessage">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="22" y1="2" x2="11" y2="13"/>
+                      <polygon points="22,2 15,22 11,13 2,9"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="composer-footer">
+                <span class="footer-tip">Enter 发送 · Shift+Enter 换行</span>
+                <div class="footer-hints">
+                  <span
+                    v-for="hint in quickHints"
+                    :key="hint"
+                    class="hint-chip"
+                    @click="sendQuickMessage(hint)"
+                  >
+                    {{ hint }}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </main>
 
-        <!-- 右侧：快捷工具和历史 -->
+        <!-- 右侧：快捷工具 -->
         <aside class="tutor-sidebar">
           <div class="sidebar-section">
             <h3 class="section-title">快捷工具</h3>
@@ -211,47 +299,77 @@
               </button>
             </div>
           </div>
-
-          <div class="sidebar-section">
-            <h3 class="section-title">对话历史</h3>
-            <div class="history-list">
-              <div
-                v-for="(session, idx) in chatHistory"
-                :key="idx"
-                class="history-item"
-                @click="loadSession(session)"
-              >
-                <div class="history-icon" v-html="session.icon"></div>
-                <div class="history-info">
-                  <span class="history-title">{{ session.title }}</span>
-                  <span class="history-date">{{ session.date }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </aside>
       </div>
+      <!-- 移动端历史侧边栏遮罩 -->
+      <div class="history-overlay" v-if="historySidebarOpen && isMobile" @click="historySidebarOpen = false"></div>
     </div>
+    <!-- 追踪面板（抽屉式） -->
+    <AgentTracePanel />
+
+    <!-- 规划确认弹窗 -->
+    <PlanConfirmDialog @confirm="confirmPlan" @cancel="cancelPlan" />
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { useAgentChat } from '@/composables/useAgentChat'
+import { useAgentStore } from '@/stores/agent'
+import type { ConversationVO } from '@/api/agent'
+import { agentApi } from '@/api/agent'
+import type { AgentTraceEvent } from '@/stores/agent'
+import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
+import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
+import ToolCallCard from '@/components/agent/ToolCallCard.vue'
+import AgentTracePanel from '@/components/AgentTracePanel.vue'
+import PlanConfirmDialog from '@/components/PlanConfirmDialog.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import { useWindowSize } from '@/composables/useWindowSize'
 
 const userStore = useUserStore()
+const agentStore = useAgentStore()
 
 const inputMessage = ref('')
-const isLoading = ref(false)
-const messages = ref<any[]>([])
 const chatContainer = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
-const tutorMode = ref('smart')
-const showUploadDialog = ref(false)
-const showContextDialog = ref(false)
 const activeContext = ref('global')
+const historySidebarOpen = ref(false)
+const copiedIndex = ref<number | null>(null)
+
+const { width: windowWidth } = useWindowSize()
+const isMobile = computed(() => windowWidth.value < 768)
+
+const currentConvTitle = computed(() => {
+  if (!agentStore.currentConversationId) return ''
+  const conv = agentStore.conversations.find(
+    c => c.conversationId === agentStore.currentConversationId
+  )
+  return conv?.title || ''
+})
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatContainer.value) {
+      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    }
+  })
+}
+
+const {
+  messages,
+  loadingHistory,
+  sendMessage: agentSend,
+  stopGeneration,
+  confirmPlan,
+  cancelPlan,
+  loadConversation,
+  startNewConversation,
+  clearMessages: agentClear
+} = useAgentChat(scrollToBottom)
 
 const contextOptions = ref([
   { id: 'global', label: '全局学习', color: '#6b7280' },
@@ -283,13 +401,19 @@ const greetingText = computed(() => {
   return `${timeGreeting}，${name}。我是你的 AI 学习伙伴`
 })
 
-interface Message {
-  role: 'ai' | 'user'
-  content: string
-  time: string
-  resources?: any[]
-  code?: string
-}
+// 动态欢迎数据（后续接入 API 后可实时更新）
+const learningSpaceCount = computed(() => {
+  // TODO: 从 learningSpace store 获取真实数量
+  return 4
+})
+const todayAvailableHours = computed(() => {
+  // TODO: 从每日计划 API 获取真实数据
+  return '2小时30分钟'
+})
+const todayFocusText = computed(() => {
+  // TODO: 从学习计划 API 获取真实重点
+  return '高等数学和软件工程今天是重点，操作系统昨天已完成复习可以暂缓。'
+})
 
 const welcomeFeatures = [
   {
@@ -315,8 +439,8 @@ const welcomeFeatures = [
 ]
 
 const quickHints = [
+  '帮我制定一个学习计划',
   '我今天应该重点学什么？',
-  '把高数和英语今天的任务压缩到1小时内',
   '生成一组洛必达法则的练习题',
   '软件工程项目帮我拆一下任务',
   '帮我分析最近的薄弱点'
@@ -367,70 +491,18 @@ const quickTools = [
   }
 ]
 
-const chatHistory = ref([
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
-    title: '进程与线程的区别',
-    date: '今天 14:30'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-    title: 'PV操作练习题',
-    date: '今天 11:20'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
-    title: '内存管理思维导图',
-    date: '昨天 20:15'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
-    title: '操作系统笔记整理',
-    date: '昨天 16:45'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-    title: '薄弱点分析报告',
-    date: '5月7日'
-  }
-])
-
-const scrollToBottom = () => {
-  nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-    }
-  })
-}
-
 const autoResize = () => {
   if (inputRef.value) {
     inputRef.value.style.height = 'auto'
-    inputRef.value.style.height = Math.min(inputRef.value.scrollHeight, 120) + 'px'
+    inputRef.value.style.height = Math.min(inputRef.value.scrollHeight, 160) + 'px'
   }
 }
 
-const sendMessage = () => {
-  if (!inputMessage.value.trim() || isLoading.value) return
-
-  const userMsg: Message = {
-    role: 'user',
-    content: inputMessage.value,
-    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-  }
-  messages.value.push(userMsg)
-  const question = inputMessage.value
+const sendMessage = async () => {
+  if (!inputMessage.value.trim() || agentStore.loading) return
+  const msg = inputMessage.value
   inputMessage.value = ''
-  isLoading.value = true
-  scrollToBottom()
-
-  // 模拟 AI 响应
-  setTimeout(() => {
-    const aiResp = generateResponse(question)
-    messages.value.push(aiResp)
-    isLoading.value = false
-    scrollToBottom()
-  }, 1500)
+  await agentSend(msg)
 }
 
 const sendQuickMessage = (msg: string) => {
@@ -438,145 +510,104 @@ const sendQuickMessage = (msg: string) => {
   sendMessage()
 }
 
-const generateResponse = (question: string): Message => {
-  const q = question.toLowerCase()
+const handleNewChat = async () => {
+  startNewConversation()
+  await agentStore.fetchConversations()
+}
 
-  if (q.includes('进程') && q.includes('线程') && (q.includes('区别') || q.includes('不同'))) {
-    return {
-      role: 'ai',
-      content: '好的，让我从多个维度为你对比进程和线程的区别：\n\n**1. 基本概念**\n• 进程：程序的一次执行实例，是资源分配的基本单位\n• 线程：CPU调度的最小单位，是进程中的一个执行流\n\n**2. 资源占用**\n• 进程：拥有独立的地址空间，资源开销大\n• 线程：共享进程的地址空间，资源开销小\n\n**3. 并发性**\n• 进程：进程间切换开销大\n• 线程：线程间切换开销小，并发性更好\n\n**4. 通信方式**\n• 进程：需要 IPC（管道、消息队列、共享内存等）\n• 线程：可直接读写共享数据\n\n结合你的学习画像，我发现你更适合通过图解来理解这个概念。',
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      resources: [
-        { type: 'mind', title: '进程与线程对比图', minutes: 8 },
-        { type: 'video', title: '线程概念动画讲解', minutes: 10 }
-      ]
-    }
-  } else if (q.includes('练习') || q.includes('题')) {
-    return {
-      role: 'ai',
-      content: '已为你生成 10 道进程同步与互斥专项练习题：\n\n1. PV 操作用于解决什么问题的？\n2. 当信号量 S > 0 时表示？\n3. P 操作的本质是？\n4. V 操作的本质是？\n5. 二值信号量的取值范围？\n6. 临界区必须满足哪三个条件？\n7. 互斥锁与二元信号量的区别？\n8. 哲学家就餐问题中死锁的成因？\n9. 什么是忙等待？如何避免？\n10. 管程机制的主要特点？',
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      resources: [
-        { type: 'quiz', title: '完整练习题集（含解析）', minutes: 20 }
-      ]
-    }
-  } else if (q.includes('思维导图') || q.includes('导图')) {
-    return {
-      role: 'ai',
-      content: '正在为你生成"线程同步"知识思维导图...\n\n**核心节点：**\n\n线程同步\n├── 同步机制\n│   ├── 互斥锁（Mutex）\n│   ├── 信号量（Semaphore）\n│   ├── 条件变量\n│   └── 管程\n├── 互斥与同步\n│   ├── 互斥：独占资源\n│   └── 同步：协调执行顺序\n├── 经典问题\n│   ├── 生产者-消费者\n│   ├── 哲学家就餐\n│   ├── 读者-写者\n│   └── 吸烟者问题\n└── 实现技术\n    ├── 软件方法\n    ├── 硬件方法\n    └── 操作系统支持',
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      resources: [
-        { type: 'mind', title: '完整思维导图（可编辑）', minutes: 12 }
-      ]
-    }
-  } else if (q.includes('笔记') || q.includes('总结')) {
-    return {
-      role: 'ai',
-      content: '已为你整理"线程同步与互斥"学习笔记：\n\n## 核心概念\n\n### 进程同步\n进程同步是指多个进程在执行过程中，为协调彼此而建立的一种制约关系。\n\n### 临界区\n进程中访问共享资源的代码区域，必须互斥访问。\n\n### PV 操作\n• P(wait)：申请资源，S--，若 S<0 则阻塞\n• V(signal)：释放资源，S++，若 S<=0 则唤醒\n\n### 重要公式\n`S.value >= 0` 表示可用资源数\n`S.value < 0` 表示等待队列长度\n\n**记忆口诀：** P 是"拿"（减少资源），V 是"还"（增加资源）',
-      time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      code: `# PV操作Python实现
-import threading
+const handleStopGeneration = () => {
+  stopGeneration()
+}
 
-class Semaphore:
-    def __init__(self, value=1):
-        self.value = value
-        self.lock = threading.Lock()
-        self.queue = []
+const handleUploadClick = () => {
+  ElMessage.info('文件上传功能即将上线，敬请期待')
+}
 
-    def wait(self):
-        with self.lock:
-            self.value -= 1
-            if self.value < 0:
-                # 阻塞当前线程
-                self.queue.append(threading.current_thread())
-                self.lock.release()
-                # ... 阻塞逻辑
+const handleContextClick = () => {
+  ElMessage.info('上下文设置功能即将上线，敬请期待')
+}
 
-    def signal(self):
-        with self.lock:
-            self.value += 1
-            if self.value <= 0 and self.queue:
-                # 唤醒一个等待线程
-                thread = self.queue.pop(0)
-                # ... 唤醒逻辑`
-    }
-  }
+const formatTime = (ts: number) => {
+  return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+}
 
-  return {
-    role: 'ai',
-    content: '我理解你的问题。让我结合你的学习画像为你详细解答。\n\n根据你的学习记录，你目前在"线程同步"章节的掌握度为 56%，在 PV 操作相关题目上的正确率为 65%，低于平均水平。\n\n我的建议是：\n1. 先理解 PV 操作的核心原理\n2. 结合生活实例记忆（比如停车场的例子）\n3. 多做针对性练习\n\n如果需要，我可以为你生成专项练习题，或者推荐一些可视化讲解资源。',
-    time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-    resources: [
-      { type: 'doc', title: 'PV操作详解', minutes: 15 },
-      { type: 'video', title: '信号量动画演示', minutes: 10 }
-    ]
+const formatDate = (isoString: string) => {
+  if (!isoString) return ''
+  const date = new Date(isoString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  const diffHour = Math.floor(diffMs / 3600000)
+  const diffDay = Math.floor(diffMs / 86400000)
+
+  if (diffMin < 1) return '刚刚'
+  if (diffMin < 60) return `${diffMin}分钟前`
+  if (diffHour < 24) return `${diffHour}小时前`
+  if (diffDay < 7) return `${diffDay}天前`
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
+const copyMessage = async (content: string) => {
+  try {
+    await navigator.clipboard.writeText(content)
+    // 找到当前 AI 消息的索引
+    const idx = messages.value.findLastIndex(m => m.role === 'ai' && m.content === content)
+    copiedIndex.value = idx
+    setTimeout(() => { copiedIndex.value = null }, 2000)
+  } catch {
+    ElMessage.error('复制失败，请手动复制')
   }
 }
 
-const clearChat = () => {
-  messages.value = []
-}
-
-const copyMessage = (content: string) => {
-  navigator.clipboard.writeText(content)
-}
-
-const regenerateResponse = (msg: any) => {
-  const index = messages.value.indexOf(msg)
-  if (index > -1) {
-    messages.value.splice(index, 1)
-    isLoading.value = true
-    setTimeout(() => {
-      const newResp = generateResponse('regenerate')
-      messages.value.splice(index, 0, newResp)
-      isLoading.value = false
-    }, 1500)
+const loadConversationFromSidebar = async (conv: ConversationVO) => {
+  await loadConversation(conv.conversationId)
+  if (isMobile.value) {
+    historySidebarOpen.value = false
   }
 }
 
-const loadSession = (session: any) => {
-  inputMessage.value = `查看之前的对话：${session.title}`
+const hasTraceEventsForMsg = (msg: any): boolean => {
+  return !!(msg.traceEvents?.length) || !!msg.traceId
 }
+
+const openMsgTrace = async (msg: any) => {
+  if (msg.traceEvents?.length) {
+    agentStore.traceEvents = msg.traceEvents
+  } else if (msg.traceId) {
+    try {
+      const events = await agentApi.getTraceEvents(msg.traceId)
+      agentStore.traceEvents = events || []
+      msg.traceEvents = events || [] // 缓存
+    } catch (e) {
+      console.error('[AITutor] 获取 trace 失败:', e)
+      agentStore.traceEvents = []
+    }
+  }
+  agentStore.openTracePanel(msg.traceId)
+}
+
+onMounted(() => {
+  agentStore.fetchConversations()
+  if (window.innerWidth < 768) {
+    historySidebarOpen.value = false
+  }
+})
+
+watch(windowWidth, (newWidth) => {
+  if (newWidth < 768) {
+    historySidebarOpen.value = false
+  }
+})
 </script>
 
 <style scoped>
 .ai-tutor-page {
-  max-width: 1400px;
+  max-width: 1680px;
   display: flex;
   flex-direction: column;
   height: 100%;
-}
-
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: var(--spacing-sm);
-  gap: var(--spacing-lg);
-}
-
-.page-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text-dark);
-  margin: 0 0 2px;
-}
-
-.page-desc {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.header-right {
-  display: flex;
-  gap: var(--spacing-sm);
-}
-
-.header-right .el-button {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
+  margin: calc(var(--spacing-xl) * -0.6) calc(var(--spacing-2xl) * -1) 0;
+  padding: calc(var(--spacing-xl) * 0.4) var(--spacing-2xl) 0;
 }
 
 /* 上下文选择器 */
@@ -584,7 +615,7 @@ const loadSession = (session: any) => {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-lg);
   background: white;
   border-radius: var(--radius-lg);
@@ -628,22 +659,76 @@ const loadSession = (session: any) => {
   }
 }
 
-/* 欢迎摘要 */
-.welcome-summary {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin: var(--spacing-sm) 0 var(--spacing-lg);
-  strong { color: var(--text-dark); font-weight: 600; }
-}
-
 .tutor-container {
   display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: var(--spacing-lg);
+  grid-template-columns: auto 1fr 280px;
+  gap: var(--spacing-md);
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+/* 历史会话侧边栏 */
+.history-sidebar {
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-light);
+}
+
+.history-sidebar.open {
+  width: 260px;
+  opacity: 1;
+  overflow: hidden;
+}
+
+.history-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.history-sidebar-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.new-chat-btn-sidebar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--primary-color);
+  background: rgba(59, 91, 219, 0.06);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.new-chat-btn-sidebar:hover {
+  background: rgba(59, 91, 219, 0.12);
+}
+
+.history-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* 聊天区域 */
@@ -655,6 +740,48 @@ const loadSession = (session: any) => {
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
+}
+
+.chat-area-top-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+  background: white;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+.history-toggle-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  border: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+}
+
+.history-toggle-btn:hover {
+  background: var(--background-color-base);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.history-toggle-btn svg { width: 16px; height: 16px; }
+
+.current-conv-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-messages {
@@ -707,6 +834,14 @@ const loadSession = (session: any) => {
   margin: 0 0 var(--spacing-sm);
 }
 
+.welcome-summary {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: var(--spacing-sm) 0 var(--spacing-lg);
+  strong { color: var(--text-dark); font-weight: 600; }
+}
+
 .welcome-features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -743,9 +878,7 @@ const loadSession = (session: any) => {
   animation: fadeInUp 0.3s ease;
 }
 
-.message-wrapper.user {
-  flex-direction: row-reverse;
-}
+.message-wrapper.user { flex-direction: row-reverse; }
 
 .message-avatar {
   width: 36px;
@@ -759,15 +892,9 @@ const loadSession = (session: any) => {
   color: var(--primary-color);
 }
 
-.message-avatar svg {
-  width: 20px;
-  height: 20px;
-  stroke-width: 2;
-}
+.message-avatar svg { width: 20px; height: 20px; stroke-width: 2; }
 
-.message-wrapper.user .message-avatar {
-  background: rgba(59, 91, 219, 0.15);
-}
+.message-wrapper.user .message-avatar { background: rgba(59, 91, 219, 0.15); }
 
 .message-content {
   max-width: 85%;
@@ -780,8 +907,6 @@ const loadSession = (session: any) => {
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-xl);
   font-size: 0.9375rem;
-  line-height: 1.7;
-  color: var(--text-dark);
 }
 
 .message-wrapper.ai .message-bubble {
@@ -789,7 +914,7 @@ const loadSession = (session: any) => {
   border-bottom-left-radius: 4px;
 }
 
-.message-wrapper.user .message-bubble {
+.user-bubble {
   background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
   color: white;
   border-bottom-right-radius: 4px;
@@ -798,6 +923,22 @@ const loadSession = (session: any) => {
 .message-text {
   white-space: pre-wrap;
   margin: 0;
+}
+
+/* 流式光标 */
+.streaming-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background: var(--primary-color);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .message-resources {
@@ -818,13 +959,7 @@ const loadSession = (session: any) => {
 }
 
 .res-icon { font-size: 1rem; }
-
-.res-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
+.res-info { flex: 1; display: flex; flex-direction: column; }
 .res-title { font-size: 0.8125rem; color: var(--text-dark); }
 .res-meta { font-size: 0.625rem; color: var(--text-muted); }
 
@@ -849,10 +984,7 @@ const loadSession = (session: any) => {
   line-height: 1.6;
 }
 
-.message-code code {
-  color: #d4d4d4;
-  white-space: pre;
-}
+.message-code code { color: #d4d4d4; white-space: pre; }
 
 .message-actions {
   display: flex;
@@ -891,6 +1023,11 @@ const loadSession = (session: any) => {
   padding-right: var(--spacing-sm);
 }
 
+/* 内联工具调用卡片列表 */
+.inline-tool-calls {
+  margin-bottom: 6px;
+}
+
 /* 加载 */
 .loading-bubble {
   min-width: 60px;
@@ -923,105 +1060,163 @@ const loadSession = (session: any) => {
 
 /* 输入区域 */
 .chat-input-area {
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
   border-top: 1px solid var(--border-light);
-  background: var(--background-color-base);
-}
-
-.input-tools {
-  display: flex;
-  gap: var(--spacing-xs);
-  margin-bottom: var(--spacing-xs);
-}
-
-.tool-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-md);
   background: white;
-  border: 1px solid var(--border-light);
+}
+
+.input-composer {
+  background: #f7f8fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.input-composer:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.08);
+}
+
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px 0;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.toolbar-btn svg { width: 14px; height: 14px; }
+.toolbar-btn:hover {
+  background: rgba(59, 91, 219, 0.06);
+  color: var(--primary-color);
+}
+
+.composer-body {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-xs);
+  padding: 4px 8px 4px 12px;
+}
+
+.composer-body textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text-dark);
+  background: transparent;
+  max-height: 160px;
+  min-height: 24px;
+  padding: 6px 0;
+  font-family: inherit;
+}
+
+.composer-body textarea::placeholder { color: #b0b8c9; }
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  padding-bottom: 4px;
+}
+
+.action-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition-fast);
-}
-
-.tool-btn svg { width: 14px; height: 14px; color: var(--text-muted); }
-.tool-btn:hover { border-color: var(--primary-color); }
-.tool-btn:hover svg { color: var(--primary-color); }
-
-.input-wrapper {
-  display: flex;
-  gap: var(--spacing-xs);
-  align-items: flex-end;
-  background: white;
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  padding: 6px var(--spacing-sm);
-  transition: border-color var(--transition-fast);
-}
-
-.input-wrapper:focus-within {
-  border-color: var(--primary-color);
-}
-
-.input-wrapper textarea {
-  flex: 1;
-  border: none;
-  outline: none;
-  resize: none;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--text-dark);
-  background: transparent;
-  max-height: 120px;
-  font-family: inherit;
-}
-
-.input-wrapper textarea::placeholder {
-  color: var(--text-muted);
-}
-
-.send-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-base);
   flex-shrink: 0;
 }
 
-.send-btn svg { width: 16px; height: 16px; color: white; }
-.send-btn:hover:not(:disabled) { transform: scale(1.1); }
-.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.action-btn svg { width: 18px; height: 18px; }
 
-.input-hints {
+.send-action {
+  background: #d1d5db;
+  color: white;
+}
+
+.send-action.active {
+  background: var(--primary-color);
+  color: white;
+}
+
+.send-action.active:hover {
+  background: #2c4fcc;
+  transform: scale(1.05);
+}
+
+.send-action:disabled {
+  cursor: not-allowed;
+}
+
+.stop-action {
+  background: #ef4444;
+  color: white;
+}
+
+.stop-action:hover {
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: 2px 12px 8px;
+}
+
+.footer-tip {
+  font-size: 0.6875rem;
+  color: #b0b8c9;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.footer-hints {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-xs);
-  margin-top: var(--spacing-xs);
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .hint-chip {
   padding: 2px 10px;
   background: white;
-  border: 1px solid var(--border-light);
+  border: 1px solid #e5e7eb;
   border-radius: var(--radius-full);
   font-size: 0.6875rem;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 .hint-chip:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
+  background: rgba(59, 91, 219, 0.04);
 }
 
 /* 侧边栏 */
@@ -1078,11 +1273,7 @@ const loadSession = (session: any) => {
 .tool-label { font-size: 0.6875rem; font-weight: 600; color: var(--text-dark); }
 .tool-desc { font-size: 0.5625rem; color: var(--text-muted); }
 
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.history-list { display: flex; flex-direction: column; gap: 2px; }
 
 .history-item {
   display: flex;
@@ -1096,16 +1287,35 @@ const loadSession = (session: any) => {
 
 .history-item:hover { background: var(--background-color-base); }
 
-.history-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--primary-color); }
-.history-icon :deep(svg) { width: 100%; height: 100%; }
-
-.history-info {
-  display: flex;
-  flex-direction: column;
+.history-item.active {
+  background: rgba(59, 91, 219, 0.08);
+  border: 1px solid rgba(59, 91, 219, 0.15);
 }
 
-.history-title { font-size: 0.75rem; color: var(--text-dark); }
+.history-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--primary-color); flex-shrink: 0; }
+.history-icon :deep(svg) { width: 100%; height: 100%; }
+
+.history-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.history-title { font-size: 0.75rem; color: var(--text-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history-date { font-size: 0.5625rem; color: var(--text-muted); }
+
+.history-count {
+  font-size: 0.5625rem;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--background-color-base);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.history-loading, .history-empty {
+  padding: var(--spacing-lg) var(--spacing-sm);
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.empty-hint { font-size: 0.6875rem; margin-top: 4px; color: var(--text-muted); }
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(10px); }
@@ -1113,10 +1323,41 @@ const loadSession = (session: any) => {
 }
 
 @media (max-width: 768px) {
-  .tutor-container {
-    grid-template-columns: 1fr;
-  }
+  .tutor-container { grid-template-columns: 1fr; }
   .tutor-sidebar { display: none; }
+  .history-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px !important;
+    z-index: 200;
+    border-radius: 0;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+    opacity: 1;
+  }
+  .history-sidebar.open {
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+  }
+  .history-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 199;
+  }
   .welcome-features { grid-template-columns: repeat(2, 1fr); }
+  .composer-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .footer-hints {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>
