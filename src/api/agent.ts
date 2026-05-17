@@ -34,6 +34,7 @@ export interface MessageVO {
   role: string
   content: string | null
   toolName: string | null
+  traceId?: string
   createTime: string
 }
 

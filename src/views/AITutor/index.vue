@@ -116,6 +116,20 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble" :class="{ 'user-bubble': msg.role === 'user' }">
+                  <!-- 思考块 -->
+                  <ThinkingBlock
+                    v-if="msg.role === 'ai' && msg.thinkingText"
+                    :text="msg.thinkingText"
+                    :duration-ms="msg.thinkingDurationMs"
+                  />
+                  <!-- 工具调用卡片 -->
+                  <div v-if="msg.role === 'ai' && msg.toolCalls?.length" class="inline-tool-calls">
+                    <ToolCallCard
+                      v-for="tc in msg.toolCalls"
+                      :key="tc.toolName + tc.startedAt"
+                      v-bind="tc"
+                    />
+                  </div>
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
                   <p v-else class="message-text">{{ msg.content }}</p>
@@ -157,7 +171,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                       <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
                     </svg>
-                    思考过程
+                    查看详细执行过程
                   </button>
                 </div>
 
@@ -178,12 +192,26 @@
                 </svg>
               </div>
               <div class="message-content">
-                <div class="message-bubble" v-if="agentStore.answerText">
-                  <MarkdownRenderer :content="agentStore.answerText" />
-                  <span class="streaming-cursor"></span>
-                </div>
-                <div class="message-bubble loading-bubble" v-else>
-                  <div class="loading-dots">
+                <div class="message-bubble">
+                  <!-- 思考块（流式） -->
+                  <ThinkingBlock
+                    v-if="agentStore.thinkingText"
+                    :text="agentStore.thinkingText"
+                    :streaming="true"
+                  />
+                  <!-- 工具调用卡片（流式） -->
+                  <div v-if="agentStore.toolCalls.length" class="inline-tool-calls">
+                    <ToolCallCard
+                      v-for="tc in agentStore.toolCalls"
+                      :key="tc.toolName + tc.startedAt"
+                      v-bind="tc"
+                    />
+                  </div>
+                  <!-- 回答内容（流式） -->
+                  <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
+                  <span class="streaming-cursor" v-if="agentStore.answerText"></span>
+                  <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
+                  <div v-if="!agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText" class="loading-dots">
                     <span></span><span></span><span></span>
                   </div>
                 </div>
@@ -291,8 +319,11 @@ import { useUserStore } from '@/stores/user'
 import { useAgentChat } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationVO } from '@/api/agent'
+import { agentApi } from '@/api/agent'
 import type { AgentTraceEvent } from '@/stores/agent'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
+import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
+import ToolCallCard from '@/components/agent/ToolCallCard.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import PlanConfirmDialog from '@/components/PlanConfirmDialog.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -536,12 +567,22 @@ const loadConversationFromSidebar = async (conv: ConversationVO) => {
 }
 
 const hasTraceEventsForMsg = (msg: any): boolean => {
-  return !!(msg.traceEvents && msg.traceEvents.length > 0)
+  return !!(msg.traceEvents?.length) || !!msg.traceId
 }
 
-const openMsgTrace = (msg: any) => {
-  // 将消息的 trace 数据临时注入 store 供面板展示
-  agentStore.traceEvents = msg.traceEvents || []
+const openMsgTrace = async (msg: any) => {
+  if (msg.traceEvents?.length) {
+    agentStore.traceEvents = msg.traceEvents
+  } else if (msg.traceId) {
+    try {
+      const events = await agentApi.getTraceEvents(msg.traceId)
+      agentStore.traceEvents = events || []
+      msg.traceEvents = events || [] // 缓存
+    } catch (e) {
+      console.error('[AITutor] 获取 trace 失败:', e)
+      agentStore.traceEvents = []
+    }
+  }
   agentStore.openTracePanel(msg.traceId)
 }
 
@@ -980,6 +1021,11 @@ watch(windowWidth, (newWidth) => {
   text-align: right;
   padding-left: 0;
   padding-right: var(--spacing-sm);
+}
+
+/* 内联工具调用卡片列表 */
+.inline-tool-calls {
+  margin-bottom: 6px;
 }
 
 /* 加载 */

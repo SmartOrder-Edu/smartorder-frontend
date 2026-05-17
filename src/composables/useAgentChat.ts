@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
-import { useAgentStore, type AgentTraceEvent } from '@/stores/agent'
+import { useAgentStore, type AgentTraceEvent, type ToolCallState } from '@/stores/agent'
 import { agentApi } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
 
@@ -11,6 +11,10 @@ export interface ChatMessage {
   content: string
   traceId?: string
   traceEvents?: AgentTraceEvent[]
+  thinkingText?: string
+  thinkingDurationMs?: number | null
+  toolCalls?: ToolCallState[]
+  routeResult?: any
   timestamp: number
 }
 
@@ -45,6 +49,10 @@ export function useAgentChat(scrollCallback?: () => void) {
         content: agentStore.answerText + '\n\n*[已停止生成]*',
         traceId: agentStore.currentTraceId,
         traceEvents: [...agentStore.traceEvents],
+        thinkingText: agentStore.thinkingText || undefined,
+        thinkingDurationMs: agentStore.thinkingDurationMs,
+        toolCalls: agentStore.toolCalls.length ? [...agentStore.toolCalls] : undefined,
+        routeResult: agentStore.routeResult || undefined,
         timestamp: Date.now(),
       })
     }
@@ -105,6 +113,10 @@ export function useAgentChat(scrollCallback?: () => void) {
                 content: agentStore.answerText,
                 traceId: agentStore.currentTraceId,
                 traceEvents: [...agentStore.traceEvents],
+                thinkingText: agentStore.thinkingText || undefined,
+                thinkingDurationMs: agentStore.thinkingDurationMs,
+                toolCalls: agentStore.toolCalls.length ? [...agentStore.toolCalls] : undefined,
+                routeResult: agentStore.routeResult || undefined,
                 timestamp: Date.now(),
               })
             }
@@ -249,7 +261,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       const msgs = result.list.map((msg) => ({
         role: (msg.role === 'user' ? 'user' : 'ai') as 'user' | 'ai',
         content: msg.content || '',
-        traceId: undefined,
+        traceId: msg.traceId || undefined,
         timestamp: new Date(msg.createTime).getTime(),
       }))
       messages.value = msgs

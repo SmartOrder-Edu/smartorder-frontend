@@ -21,6 +21,15 @@ export interface TraceNode {
   timestamp: number
 }
 
+export interface ToolCallState {
+  toolName: string
+  status: 'running' | 'completed' | 'failed'
+  arguments?: any
+  result?: any
+  durationMs?: number
+  startedAt: number
+}
+
 /**
  * Agent 对话状态管理
  */
@@ -36,6 +45,17 @@ export const useAgentStore = defineStore('agent', () => {
 
   // AI 回答文本（累积）
   const answerText = ref('')
+
+  // 思考文本（累积 agent.think.delta）
+  const thinkingText = ref('')
+  const thinkingStartTime = ref<number | null>(null)
+  const thinkingDurationMs = ref<number | null>(null)
+
+  // 工具调用状态（合并 started/completed/failed）
+  const toolCalls = ref<ToolCallState[]>([])
+
+  // 路由结果
+  const routeResult = ref<any>(null)
 
   // 追溯事件列表
   const traceEvents = ref<AgentTraceEvent[]>([])
@@ -62,6 +82,11 @@ export const useAgentStore = defineStore('agent', () => {
    */
   function startNewTurn() {
     answerText.value = ''
+    thinkingText.value = ''
+    thinkingStartTime.value = null
+    thinkingDurationMs.value = null
+    toolCalls.value = []
+    routeResult.value = null
     traceEvents.value = []
     loading.value = true
     planDialogVisible.value = false
@@ -95,6 +120,51 @@ export const useAgentStore = defineStore('agent', () => {
         }
         break
 
+      case 'agent.think.delta':
+        if (data.payload?.text) {
+          if (!thinkingStartTime.value) {
+            thinkingStartTime.value = Date.now()
+          }
+          thinkingText.value += data.payload.text
+        }
+        break
+
+      case 'agent.tool.started':
+        toolCalls.value.push({
+          toolName: data.payload?.toolName || '未知工具',
+          status: 'running',
+          arguments: data.payload?.arguments,
+          startedAt: Date.now(),
+        })
+        break
+
+      case 'agent.tool.completed': {
+        const tc = toolCalls.value.find(
+          t => t.toolName === data.payload?.toolName && t.status === 'running'
+        )
+        if (tc) {
+          tc.status = 'completed'
+          tc.result = data.payload?.result
+          tc.durationMs = data.payload?.durationMs
+        }
+        break
+      }
+
+      case 'agent.tool.failed': {
+        const tf = toolCalls.value.find(
+          t => t.toolName === data.payload?.toolName && t.status === 'running'
+        )
+        if (tf) {
+          tf.status = 'failed'
+          tf.durationMs = data.payload?.durationMs
+        }
+        break
+      }
+
+      case 'agent.route.completed':
+        routeResult.value = data.payload
+        break
+
       case 'agent.plan.created':
         currentDraftId.value = data.payload?.draftId || ''
         currentPlan.value = data.payload?.plan || null
@@ -114,6 +184,9 @@ export const useAgentStore = defineStore('agent', () => {
    */
   function finishTurn() {
     loading.value = false
+    if (thinkingStartTime.value) {
+      thinkingDurationMs.value = Date.now() - thinkingStartTime.value
+    }
   }
 
   /**
@@ -158,6 +231,11 @@ export const useAgentStore = defineStore('agent', () => {
     currentTraceId.value = ''
     currentMode.value = ''
     answerText.value = ''
+    thinkingText.value = ''
+    thinkingStartTime.value = null
+    thinkingDurationMs.value = null
+    toolCalls.value = []
+    routeResult.value = null
     traceEvents.value = []
     loading.value = false
     planDialogVisible.value = false
@@ -171,6 +249,11 @@ export const useAgentStore = defineStore('agent', () => {
     currentTraceId,
     currentMode,
     answerText,
+    thinkingText,
+    thinkingStartTime,
+    thinkingDurationMs,
+    toolCalls,
+    routeResult,
     traceEvents,
     loading,
     planDialogVisible,
