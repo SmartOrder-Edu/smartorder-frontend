@@ -69,3 +69,58 @@ export const updateKnowledgeBase = (data: KnowledgeBaseReqDTO) => {
 export const getKnowledgeBaseList = () => {
   return request.get<KnowledgeBaseListRespVO[]>('/knowledge/base/list')
 }
+
+// ======================= 文件分片上传 DTO =======================
+
+export interface ChunkUploadInitReqDTO {
+  fileHash: string
+  fileName: string
+  fileSize: number
+  knowledgeBaseId: number
+}
+
+export interface ChunkUploadInitRespDTO {
+  isFinished: boolean
+  fileUrl?: string
+  uploadId?: string
+  uploadedParts?: number[]
+}
+
+export interface ChunkUploadMergeReqDTO {
+  uploadId: string
+  fileHash: string
+  fileName: string
+  fileSize: number
+  knowledgeBaseId: number
+  totalParts: number
+}
+
+/**
+ * 1. 检查并初始化分片上传 (支持秒传和断点检查)
+ */
+export const initUpload = (data: ChunkUploadInitReqDTO) => {
+  return request.post<ChunkUploadInitRespDTO>('/knowledge/file/upload/init', data)
+}
+
+/**
+ * 2. 上传文件分片
+ */
+export const uploadChunk = (uploadId: string, partNumber: number, fileChunk: Blob) => {
+  const formData = new FormData()
+  formData.append('uploadId', uploadId)
+  formData.append('partNumber', partNumber.toString())
+  formData.append('file', fileChunk)
+  
+  return request.post<boolean>('/knowledge/file/upload/chunk', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+/**
+ * 3. 所有分片上传完成，请求合并
+ */
+export const mergeChunks = (data: ChunkUploadMergeReqDTO) => {
+  return request.post<string>('/knowledge/file/upload/merge', data)
+}
