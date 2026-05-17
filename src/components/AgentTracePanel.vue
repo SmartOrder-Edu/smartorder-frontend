@@ -464,7 +464,7 @@ function formatJson(obj: any): string {
   line-height: 1.6;
   color: var(--el-text-color-secondary);
   white-space: pre-wrap;
-  max-height: 120px;
+  max-height: 300px;
   overflow-y: auto;
 }
 

@@ -127,5 +127,7 @@ function toggleExpand() {
   line-height: 1.6;
   color: var(--text-muted);
   white-space: pre-wrap;
+  max-height: 300px;
+  overflow-y: auto;
 }
 </style>
