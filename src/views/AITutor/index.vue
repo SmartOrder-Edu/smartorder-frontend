@@ -38,7 +38,7 @@
       <div class="tutor-container">
         <!-- 聊天区域 -->
         <main class="chat-area">
-          <div class="chat-messages" ref="chatContainer">
+          <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
             <!-- 欢迎消息 -->
             <div class="welcome-message" v-if="messages.length === 0">
               <div class="welcome-avatar">
@@ -221,19 +221,41 @@
           </div>
 
           <div class="sidebar-section">
-            <h3 class="section-title">对话历史</h3>
+            <div class="section-header">
+              <h3 class="section-title">对话历史</h3>
+              <button class="new-chat-btn" @click="startNewConversation">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                新对话
+              </button>
+            </div>
             <div class="history-list">
+              <!-- 加载中 -->
+              <div class="history-loading" v-if="agentStore.conversationsLoading">加载中...</div>
+              <!-- 空状态 -->
+              <div class="history-empty" v-else-if="agentStore.conversations.length === 0">
+                <p class="empty-text">暂无对话记录</p>
+                <p class="empty-hint">发送一条消息开始对话</p>
+              </div>
+              <!-- 对话列表 -->
               <div
-                v-for="(session, idx) in chatHistory"
-                :key="idx"
+                v-for="conv in agentStore.conversations"
+                :key="conv.conversationId"
                 class="history-item"
-                @click="loadSession(session)"
+                :class="{ active: conv.conversationId === agentStore.currentConversationId }"
+                @click="loadConversationFromSidebar(conv)"
               >
-                <div class="history-icon" v-html="session.icon"></div>
-                <div class="history-info">
-                  <span class="history-title">{{ session.title }}</span>
-                  <span class="history-date">{{ session.date }}</span>
+                <div class="history-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
                 </div>
+                <div class="history-info">
+                  <span class="history-title">{{ conv.title || '未命名对话' }}</span>
+                  <span class="history-date">{{ formatDate(conv.lastActiveTime) }}</span>
+                </div>
+                <span class="history-count" v-if="conv.messageCount > 0">{{ conv.messageCount }}</span>
               </div>
             </div>
           </div>
@@ -249,11 +271,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAgentChat } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
+import type { ConversationVO } from '@/api/agent'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import PlanConfirmDialog from '@/components/PlanConfirmDialog.vue'
@@ -280,9 +303,12 @@ const scrollToBottom = () => {
 
 const {
   messages,
+  loadingHistory,
   sendMessage: agentSend,
   confirmPlan,
   cancelPlan,
+  loadConversation,
+  startNewConversation,
   clearMessages: agentClear
 } = useAgentChat(scrollToBottom)
 
@@ -392,34 +418,6 @@ const quickTools = [
   }
 ]
 
-const chatHistory = ref([
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
-    title: '进程与线程的区别',
-    date: '今天 14:30'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-    title: 'PV操作练习题',
-    date: '今天 11:20'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
-    title: '内存管理思维导图',
-    date: '昨天 20:15'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
-    title: '操作系统笔记整理',
-    date: '昨天 16:45'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-    title: '薄弱点分析报告',
-    date: '5月7日'
-  }
-])
-
 const autoResize = () => {
   if (inputRef.value) {
     inputRef.value.style.height = 'auto'
@@ -440,24 +438,44 @@ const sendQuickMessage = (msg: string) => {
 }
 
 const clearChat = () => {
-  agentClear()
+  startNewConversation()
 }
 
 const formatTime = (ts: number) => {
   return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
+const formatDate = (isoString: string) => {
+  if (!isoString) return ''
+  const date = new Date(isoString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  const diffHour = Math.floor(diffMs / 3600000)
+  const diffDay = Math.floor(diffMs / 86400000)
+
+  if (diffMin < 1) return '刚刚'
+  if (diffMin < 60) return `${diffMin}分钟前`
+  if (diffHour < 24) return `${diffHour}小时前`
+  if (diffDay < 7) return `${diffDay}天前`
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
 const copyMessage = (content: string) => {
   navigator.clipboard.writeText(content)
 }
 
-const loadSession = (session: any) => {
-  inputMessage.value = `查看之前的对话：${session.title}`
+const loadConversationFromSidebar = async (conv: ConversationVO) => {
+  await loadConversation(conv.conversationId)
 }
 
 const hasTraceEvents = (traceId: string) => {
   return agentStore.traceEvents.some(e => e.traceId === traceId)
 }
+
+onMounted(() => {
+  agentStore.fetchConversations()
+})
 </script>
 
 <style scoped>
@@ -1017,16 +1035,71 @@ const hasTraceEvents = (traceId: string) => {
 
 .history-item:hover { background: var(--background-color-base); }
 
-.history-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--primary-color); }
+.history-item.active {
+  background: rgba(59, 91, 219, 0.08);
+  border: 1px solid rgba(59, 91, 219, 0.15);
+}
+
+.history-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--primary-color); flex-shrink: 0; }
 .history-icon :deep(svg) { width: 100%; height: 100%; }
 
 .history-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
-.history-title { font-size: 0.75rem; color: var(--text-dark); }
+.history-title {
+  font-size: 0.75rem;
+  color: var(--text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .history-date { font-size: 0.5625rem; color: var(--text-muted); }
+
+.history-count {
+  font-size: 0.5625rem;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--background-color-base);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.history-loading, .history-empty {
+  padding: var(--spacing-lg) var(--spacing-sm);
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.empty-hint {
+  font-size: 0.6875rem;
+  margin-top: 4px;
+  color: var(--text-muted);
+}
+
+.new-chat-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  background: white;
+  font-size: 0.6875rem;
+  color: var(--primary-color);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.new-chat-btn:hover {
+  background: rgba(59, 91, 219, 0.06);
+  border-color: var(--primary-color);
+}
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(10px); }

@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent } from '@/stores/agent'
+import { agentApi } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
 
 export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT'
@@ -15,6 +16,7 @@ export interface ChatMessage {
 export function useAgentChat(scrollCallback?: () => void) {
   const agentStore = useAgentStore()
   const messages = ref<ChatMessage[]>([])
+  const loadingHistory = ref(false)
 
   /**
    * 发送消息给 Agent（使用 fetch-event-source POST SSE）
@@ -187,6 +189,37 @@ export function useAgentChat(scrollCallback?: () => void) {
     agentStore.currentPlan = null
   }
 
+  /**
+   * 加载指定对话的历史消息
+   */
+  const loadConversation = async (conversationId: string) => {
+    loadingHistory.value = true
+    try {
+      const result = await agentApi.getConversationMessages(conversationId, 1, 200)
+      const msgs = result.list.map((msg) => ({
+        role: (msg.role === 'user' ? 'user' : 'ai') as 'user' | 'ai',
+        content: msg.content || '',
+        traceId: undefined,
+        timestamp: new Date(msg.createTime).getTime(),
+      }))
+      messages.value = msgs
+      agentStore.currentConversationId = conversationId
+      scrollCallback?.()
+    } catch (e) {
+      console.error('[useAgentChat] 加载对话消息失败:', e)
+    } finally {
+      loadingHistory.value = false
+    }
+  }
+
+  /**
+   * 开始新一轮对话
+   */
+  const startNewConversation = () => {
+    messages.value = []
+    agentStore.reset()
+  }
+
   const clearMessages = () => {
     messages.value = []
     agentStore.reset()
@@ -194,9 +227,12 @@ export function useAgentChat(scrollCallback?: () => void) {
 
   return {
     messages,
+    loadingHistory,
     sendMessage,
     confirmPlan,
     cancelPlan,
+    loadConversation,
+    startNewConversation,
     clearMessages,
   }
 }

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { agentApi, type ConversationVO } from '@/api/agent'
 
 export interface AgentTraceEvent<T = any> {
   traceId: string
@@ -51,6 +52,10 @@ export const useAgentStore = defineStore('agent', () => {
   // === 追踪面板状态 ===
   const tracePanelVisible = ref(false)
   const activeTraceId = ref<string>('')
+
+  // === 对话历史列表 ===
+  const conversations = ref<ConversationVO[]>([])
+  const conversationsLoading = ref(false)
 
   /**
    * 开始新的对话轮次
@@ -133,6 +138,21 @@ export const useAgentStore = defineStore('agent', () => {
     return traceEvents.value.filter(e => e.traceId === currentTraceId.value)
   }
 
+  /**
+   * 获取对话列表
+   */
+  async function fetchConversations() {
+    conversationsLoading.value = true
+    try {
+      const data = await agentApi.getConversations()
+      conversations.value = data || []
+    } catch (e) {
+      console.error('[AgentStore] 获取对话列表失败:', e)
+    } finally {
+      conversationsLoading.value = false
+    }
+  }
+
   function reset() {
     currentConversationId.value = ''
     currentTraceId.value = ''
@@ -159,12 +179,15 @@ export const useAgentStore = defineStore('agent', () => {
     planConfirmLoading,
     tracePanelVisible,
     activeTraceId,
+    conversations,
+    conversationsLoading,
     startNewTurn,
     handleEvent,
     finishTurn,
     openTracePanel,
     closeTracePanel,
     getCurrentMessageTraceEvents,
+    fetchConversations,
     reset,
   }
 })
