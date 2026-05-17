@@ -43,17 +43,29 @@
                 </svg>
               </button>
             </div>
+            <div class="nav-space-list">
+              <router-link
+                v-for="space in displayedSpaces"
+                :key="space.id"
+                :to="`/space/${space.id}`"
+                class="nav-item nav-space-item"
+                :class="{ active: isActiveSpace(space.id) }"
+                :title="space.name"
+              >
+                <span class="space-indicator" :class="space.healthStatus" :style="{ background: space.color }"></span>
+                <span class="nav-label nav-space-label">{{ space.name }}</span>
+                <span class="space-progress-text">{{ Math.round(space.progress) }}%</span>
+              </router-link>
+            </div>
             <router-link
-              v-for="space in spaceStore.activeSpaces"
-              :key="space.id"
-              :to="`/space/${space.id}`"
-              class="nav-item nav-space-item"
-              :class="{ active: isActiveSpace(space.id) }"
-              :title="space.name"
+              v-if="spaceStore.activeSpaces.length > maxVisibleSpaces"
+              to="/spaces"
+              class="nav-space-more"
             >
-              <span class="space-indicator" :class="space.healthStatus" :style="{ background: space.color }"></span>
-              <span class="nav-label nav-space-label">{{ space.name }}</span>
-              <span class="space-progress-text">{{ Math.round(space.progress) }}%</span>
+              还有 {{ spaceStore.activeSpaces.length - maxVisibleSpaces }} 个空间
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <polyline points="9,6 15,12 9,18"/>
+              </svg>
             </router-link>
             <button class="nav-item nav-add-space" @click="showCreateSpace = true">
               <span class="nav-icon">
@@ -311,6 +323,25 @@ onBeforeUnmount(() => {
 })
 
 const showCreateSpace = ref(false)
+const maxVisibleSpaces = 5
+
+const displayedSpaces = computed(() => {
+  const all = spaceStore.activeSpaces
+  if (all.length <= maxVisibleSpaces) {
+    return all
+  }
+  // 显示前 N 个，但确保当前空间可见
+  const currentSpaceId = route.params.spaceId
+  const visible = all.slice(0, maxVisibleSpaces)
+  if (currentSpaceId && !visible.some(s => String(s.id) === String(currentSpaceId))) {
+    const currentSpace = all.find(s => String(s.id) === String(currentSpaceId))
+    if (currentSpace) {
+      visible.pop()
+      visible.push(currentSpace)
+    }
+  }
+  return visible
+})
 
 interface ChatMessage {
   role: 'ai' | 'user'
@@ -690,6 +721,33 @@ const sendMessage = (_e?: any) => {
 
 .nav-section-action:hover {
   background: rgba(59, 91, 219, 0.08);
+  color: var(--primary-color);
+}
+
+/* 学习空间列表：独立滚动区域 */
+.nav-space-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: calc(5 * 40px);
+  overflow-y: auto;
+}
+
+/* 查看更多空间 */
+.nav-space-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: var(--spacing-xs) 0;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.nav-space-more:hover {
   color: var(--primary-color);
 }
 
