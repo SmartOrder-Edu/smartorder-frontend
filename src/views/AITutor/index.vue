@@ -193,56 +193,63 @@
 
           <!-- 底部输入 -->
           <div class="chat-input-area">
-            <div class="input-tools">
-              <button class="tool-btn" @click="handleUploadClick" title="上传文件（即将上线）">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-                </svg>
-              </button>
-              <button class="tool-btn" @click="handleContextClick" title="设置上下文（即将上线）">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                </svg>
-              </button>
-            </div>
-
-            <div class="input-wrapper">
-              <textarea
-                v-model="inputMessage"
-                placeholder="输入你的问题，AI 会结合你的学习画像给出个性化回答..."
-                rows="1"
-                @keydown.enter.exact.prevent="sendMessage"
-                @input="autoResize"
-                ref="inputRef"
-              ></textarea>
-              <!-- 停止生成按钮 -->
-              <button
-                v-if="agentStore.loading"
-                class="stop-btn"
-                @click="handleStopGeneration"
-                title="停止生成"
-              >
-                <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                  <rect x="6" y="6" width="12" height="12" rx="1"/>
-                </svg>
-              </button>
-              <button v-else class="send-btn" :disabled="!inputMessage.trim()" @click="sendMessage">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="22" y1="2" x2="11" y2="13"/>
-                  <polygon points="22,2 15,22 11,13 2,9"/>
-                </svg>
-              </button>
-            </div>
-
-            <div class="input-hints">
-              <span
-                v-for="hint in quickHints"
-                :key="hint"
-                class="hint-chip"
-                @click="sendQuickMessage(hint)"
-              >
-                {{ hint }}
-              </span>
+            <div class="input-composer">
+              <div class="composer-toolbar">
+                <button class="toolbar-btn" @click="handleUploadClick" title="上传文件（即将上线）">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                  </svg>
+                  <span>上传</span>
+                </button>
+                <button class="toolbar-btn" @click="handleContextClick" title="设置上下文（即将上线）">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                  <span>上下文</span>
+                </button>
+              </div>
+              <div class="composer-body">
+                <textarea
+                  v-model="inputMessage"
+                  placeholder="输入你的问题，AI 会结合你的学习画像给出个性化回答…"
+                  rows="1"
+                  @keydown.enter.exact.prevent="sendMessage"
+                  @keydown.enter.shift.exact.stop
+                  @input="autoResize"
+                  ref="inputRef"
+                ></textarea>
+                <div class="composer-actions">
+                  <button
+                    v-if="agentStore.loading"
+                    class="action-btn stop-action"
+                    @click="handleStopGeneration"
+                    title="停止生成"
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                      <rect x="6" y="6" width="12" height="12" rx="2"/>
+                    </svg>
+                  </button>
+                  <button v-else class="action-btn send-action" :class="{ active: inputMessage.trim() }" :disabled="!inputMessage.trim()" @click="sendMessage">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="22" y1="2" x2="11" y2="13"/>
+                      <polygon points="22,2 15,22 11,13 2,9"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="composer-footer">
+                <span class="footer-tip">Enter 发送 · Shift+Enter 换行</span>
+                <div class="footer-hints">
+                  <span
+                    v-for="hint in quickHints"
+                    :key="hint"
+                    class="hint-chip"
+                    @click="sendQuickMessage(hint)"
+                  >
+                    {{ hint }}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </main>
@@ -299,7 +306,7 @@ const inputMessage = ref('')
 const chatContainer = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const activeContext = ref('global')
-const historySidebarOpen = ref(true)
+const historySidebarOpen = ref(false)
 const copiedIndex = ref<number | null>(null)
 
 const { width: windowWidth } = useWindowSize()
@@ -456,7 +463,7 @@ const quickTools = [
 const autoResize = () => {
   if (inputRef.value) {
     inputRef.value.style.height = 'auto'
-    inputRef.value.style.height = Math.min(inputRef.value.scrollHeight, 120) + 'px'
+    inputRef.value.style.height = Math.min(inputRef.value.scrollHeight, 160) + 'px'
   }
 }
 
@@ -554,7 +561,7 @@ watch(windowWidth, (newWidth) => {
 
 <style scoped>
 .ai-tutor-page {
-  max-width: 1400px;
+  max-width: 1680px;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -1007,122 +1014,163 @@ watch(windowWidth, (newWidth) => {
 
 /* 输入区域 */
 .chat-input-area {
-  padding: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
   border-top: 1px solid var(--border-light);
-  background: var(--background-color-base);
-}
-
-.input-tools {
-  display: flex;
-  gap: var(--spacing-xs);
-  margin-bottom: var(--spacing-xs);
-}
-
-.tool-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-md);
   background: white;
-  border: 1px solid var(--border-light);
+}
+
+.input-composer {
+  background: #f7f8fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.input-composer:focus-within {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.08);
+}
+
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px 0;
+}
+
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.toolbar-btn svg { width: 14px; height: 14px; }
+.toolbar-btn:hover {
+  background: rgba(59, 91, 219, 0.06);
+  color: var(--primary-color);
+}
+
+.composer-body {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-xs);
+  padding: 4px 8px 4px 12px;
+}
+
+.composer-body textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text-dark);
+  background: transparent;
+  max-height: 160px;
+  min-height: 24px;
+  padding: 6px 0;
+  font-family: inherit;
+}
+
+.composer-body textarea::placeholder { color: #b0b8c9; }
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  padding-bottom: 4px;
+}
+
+.action-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition-fast);
-}
-
-.tool-btn svg { width: 14px; height: 14px; color: var(--text-muted); }
-.tool-btn:hover { border-color: var(--primary-color); }
-.tool-btn:hover svg { color: var(--primary-color); }
-
-.input-wrapper {
-  display: flex;
-  gap: var(--spacing-xs);
-  align-items: flex-end;
-  background: white;
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  padding: 6px var(--spacing-sm);
-  transition: border-color var(--transition-fast);
-}
-
-.input-wrapper:focus-within { border-color: var(--primary-color); }
-
-.input-wrapper textarea {
-  flex: 1;
-  border: none;
-  outline: none;
-  resize: none;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--text-dark);
-  background: transparent;
-  max-height: 120px;
-  font-family: inherit;
-}
-
-.input-wrapper textarea::placeholder { color: var(--text-muted); }
-
-.send-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-base);
   flex-shrink: 0;
 }
 
-.send-btn svg { width: 16px; height: 16px; color: white; }
-.send-btn:hover:not(:disabled) { transform: scale(1.1); }
-.send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.action-btn svg { width: 18px; height: 18px; }
 
-/* 停止按钮 */
-.stop-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #ef4444;
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-base);
-  flex-shrink: 0;
+.send-action {
+  background: #d1d5db;
   color: white;
 }
 
-.stop-btn:hover {
-  background: #dc2626;
-  transform: scale(1.1);
+.send-action.active {
+  background: var(--primary-color);
+  color: white;
 }
 
-.input-hints {
+.send-action.active:hover {
+  background: #2c4fcc;
+  transform: scale(1.05);
+}
+
+.send-action:disabled {
+  cursor: not-allowed;
+}
+
+.stop-action {
+  background: #ef4444;
+  color: white;
+}
+
+.stop-action:hover {
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: 2px 12px 8px;
+}
+
+.footer-tip {
+  font-size: 0.6875rem;
+  color: #b0b8c9;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.footer-hints {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-xs);
-  margin-top: var(--spacing-xs);
+  gap: 6px;
+  justify-content: flex-end;
 }
 
 .hint-chip {
   padding: 2px 10px;
   background: white;
-  border: 1px solid var(--border-light);
+  border: 1px solid #e5e7eb;
   border-radius: var(--radius-full);
   font-size: 0.6875rem;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 .hint-chip:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
+  background: rgba(59, 91, 219, 0.04);
 }
 
 /* 侧边栏 */
@@ -1255,5 +1303,15 @@ watch(windowWidth, (newWidth) => {
     z-index: 199;
   }
   .welcome-features { grid-template-columns: repeat(2, 1fr); }
+  .composer-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .footer-hints {
+    justify-content: flex-start;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>
