@@ -1,21 +1,25 @@
 import request from './request'
 
+/** 学生画像 JSON 维度数据 */
 export interface StudentProfileData {
   id?: number
   userId?: number
-  learningStylePreference?: string
-  strengths?: string
-  weaknesses?: string
-  dailyAvailableMinutes?: number
-  preferredTimeSlots?: string
-  concentrationDurationMinutes?: number
-  subjectsOfInterest?: string
-  academicLevel?: string
-  major?: string
-  semester?: string
-  gpa?: number
+  subjectId?: number | null
   profileVersion?: number
-  lastAnalyzedAt?: string
+  // 8 个 JSON 画像维度
+  basicProfile?: Record<string, any>
+  knowledgeProfile?: Record<string, any>
+  abilityProfile?: Record<string, any>
+  preferenceProfile?: Record<string, any>
+  cognitiveProfile?: Record<string, any>
+  weaknessProfile?: Record<string, any>
+  behaviorProfile?: Record<string, any>
+  emotionProfile?: Record<string, any>
+  profileSummary?: string
+  confidenceScore?: number
+  lastUpdateReason?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export const studentProfileApi = {

@@ -13,6 +13,16 @@ export interface RegisterParams {
   password: string
   confirmPassword: string
   verificationCode: string
+  /** 身份：undergraduate|graduate|self|career */
+  identity?: string
+  /** 学习方向：ai|cs|os|ds|ee|other */
+  direction?: string
+  /** 当前基础：beginner|some|course|advanced */
+  level?: string
+  /** 近期目标：exam|project|skill|competition */
+  goal?: string
+  /** 自由文本自我描述（最长500字符） */
+  selfDescription?: string
 }
 
 export interface UpdateUserParams {

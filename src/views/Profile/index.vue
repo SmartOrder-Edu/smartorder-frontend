@@ -513,6 +513,7 @@ const editData = reactive({
 const userInfo = computed(() => {
   const u = userStore.userInfo
   const p = profileData.value
+  const basic = p?.basicProfile || {}
   if (!u) {
     return {
       name: '未登录',
@@ -530,13 +531,25 @@ const userInfo = computed(() => {
   const spaceMasteryAvg = spaceProfiles.value.length > 0
     ? Math.round(spaceProfiles.value.reduce((sum: number, s: any) => sum + s.mastery, 0) / spaceProfiles.value.length)
     : 0
+  const identityLabels: Record<string, string> = {
+    undergraduate: '本科生', graduate: '研究生', self: '自学者', career: '转专业学习'
+  }
+  const directionLabels: Record<string, string> = {
+    ai: '人工智能', cs: '计算机基础', os: '操作系统', ds: '数据结构', ee: '电子信息', other: '其他方向'
+  }
+  const levelLabels: Record<string, string> = {
+    beginner: '刚入门', some: '学过一点', course: '有课程基础', advanced: '想系统进阶'
+  }
+  const goalLabels: Record<string, string> = {
+    exam: '通过考试', project: '完成课程项目', skill: '掌握一门技术', competition: '准备竞赛/科研'
+  }
   return {
     name: u.username || '用户',
     avatar: u.avatarUrl || '',
-    identity: u.role === 1 ? '教师' : '学生',
-    direction: p?.major || '',
-    level: p?.academicLevel || (p?.semester ? `第${p.semester}学期` : ''),
-    goal: u.bio || '还没有填写个人简介',
+    identity: identityLabels[basic.identity_type as string] || (u.role === 1 ? '教师' : '学生'),
+    direction: directionLabels[basic.target_direction as string] || basic.target_direction || '',
+    level: levelLabels[basic.current_level as string] || basic.current_level || '',
+    goal: goalLabels[basic.primary_goal as string] || basic.self_description || u.bio || '还没有填写个人简介',
     joinDays: 0,
     completedTasks: 0,
     totalHours: 0,
@@ -546,12 +559,19 @@ const userInfo = computed(() => {
 
 const preferences = computed(() => {
   const p = profileData.value
+  const basic = p?.basicProfile || {}
+  const pref = p?.preferenceProfile || {}
+  const summary = p?.profileSummary
   return {
-    contentStyle: p?.learningStylePreference || '可视化优先（图解 > 视频 > 纯文字）',
-    contentTags: p?.strengths ? p.strengths.split(/[,，、]/).filter(Boolean) : ['思维导图', '动画演示', '代码示例', '生活类比'],
-    learningTime: p?.preferredTimeSlots || '晚上 8-10 点',
-    learningPace: p?.dailyAvailableMinutes ? `每天${p.dailyAvailableMinutes}分钟` : '稳扎稳打型（每天30-60分钟）',
-    depthPreference: p?.subjectsOfInterest || '理解原理 + 注重应用',
+    contentStyle: (pref.preferred_formats as string[])?.join('、') || summary || '学习中',
+    contentTags: (pref.preferred_formats as string[]) || ['学习中'],
+    learningTime: (basic.daily_available_time_minutes as number)
+      ? `每天${basic.daily_available_time_minutes}分钟`
+      : '学习中',
+    learningPace: (basic.weekly_available_days as number)
+      ? `每周${basic.weekly_available_days}天`
+      : '稳扎稳打型',
+    depthPreference: summary || '理解原理 + 注重应用',
     weeklyActivity: [65, 45, 80, 30, 70, 90, 55]
   }
 })
@@ -575,11 +595,17 @@ const weakPoints = ref([
 
 const behaviorStats = computed(() => {
   const p = profileData.value
+  const basic = p?.basicProfile || {}
+  const behavior = p?.behaviorProfile || {}
   return {
-    streak: 12,
-    avgDaily: p?.dailyAvailableMinutes ? `${p.dailyAvailableMinutes}分钟` : '45分钟',
+    streak: (behavior.question_frequency as string) === 'high' ? 15 : 12,
+    avgDaily: basic.daily_available_time_minutes
+      ? `${basic.daily_available_time_minutes}分钟`
+      : '45分钟',
     tasksThisWeek: 8,
-    completionRate: 85
+    completionRate: behavior.quiz_completion_rate
+      ? Math.round((behavior.quiz_completion_rate as number) * 100)
+      : 85
   }
 })
 

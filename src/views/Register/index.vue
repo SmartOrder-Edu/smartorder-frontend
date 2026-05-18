@@ -286,6 +286,26 @@
                 </div>
               </div>
 
+              <!-- 自由描述 -->
+              <div class="question-block">
+                <h3 class="question-title">
+                  <span class="question-num">5</span>
+                  或者，用一段话介绍你自己（选填）
+                </h3>
+                <p class="question-hint">
+                  告诉AI你的专业背景、每天学习时间、擅长和不擅长的领域……系统会根据你的描述，为你构建更精准的学习画像。
+                </p>
+                <el-input
+                  v-model="profileData.selfDescription"
+                  type="textarea"
+                  :rows="4"
+                  maxlength="500"
+                  show-word-limit
+                  placeholder="例如：我是计算机专业大三学生，每天有2小时学习时间，Python比较熟但对算法不太熟悉，最近在准备操作系统考试..."
+                  class="self-description-input"
+                />
+              </div>
+
               <!-- 按钮组 -->
               <div class="btn-group">
                 <el-button size="large" class="back-btn" @click="currentStep = 1">
@@ -345,7 +365,8 @@ const profileData = reactive({
   identity: '',
   direction: '',
   level: '',
-  goal: ''
+  goal: '',
+  selfDescription: ''
 })
 
 const validateConfirmPassword = (_rule: any, value: string, callback: any) => {
@@ -463,7 +484,12 @@ const handleRegister = async () => {
       email: formData.email,
       password: formData.password,
       confirmPassword: formData.confirmPassword,
-      verificationCode: formData.verificationCode
+      verificationCode: formData.verificationCode,
+      identity: profileData.identity || undefined,
+      direction: profileData.direction || undefined,
+      level: profileData.level || undefined,
+      goal: profileData.goal || undefined,
+      selfDescription: profileData.selfDescription || undefined
     })
     ElMessage.success('注册成功，正在登录...')
     // 注册成功后自动登录
@@ -975,6 +1001,40 @@ const handleRegister = async () => {
   background: var(--primary-color);
   border-color: var(--primary-color);
   color: white;
+}
+
+/* 自由描述输入 */
+.question-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: var(--spacing-sm);
+  line-height: 1.5;
+}
+
+.self-description-input :deep(.el-textarea__inner) {
+  border-radius: var(--radius-lg);
+  background: var(--background-color-base);
+  border: 2px solid transparent;
+  transition: all var(--transition-base);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.self-description-input :deep(.el-textarea__inner:focus) {
+  background: white;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1);
+}
+
+.self-description-input :deep(.el-textarea__inner:hover) {
+  background: white;
+  border-color: var(--border-light);
+}
+
+.self-description-input :deep(.el-input__count) {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 /* 按钮组 */
