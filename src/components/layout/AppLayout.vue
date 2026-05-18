@@ -78,7 +78,7 @@
           </div>
           <div class="nav-section-mini" v-else>
             <div
-              v-for="space in spaceStore.activeSpaces"
+              v-for="space in displayedSpaces"
               :key="space.id"
               class="nav-item"
               :class="{ active: isActiveSpace(space.id) }"
@@ -87,6 +87,14 @@
             >
               <span class="space-mini-dot" :class="space.healthStatus" :style="{ background: space.color }"></span>
             </div>
+            <router-link
+              v-if="spaceStore.activeSpaces.length > maxVisibleSpaces"
+              to="/spaces"
+              class="nav-item space-mini-more"
+              title="查看全部学习空间"
+            >
+              <span class="space-mini-more-text">+{{ spaceStore.activeSpaces.length - maxVisibleSpaces }}</span>
+            </router-link>
             <div class="nav-item" title="新建学习空间" @click="showCreateSpace = true">
               <span class="nav-icon" style="width:18px;height:18px">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
@@ -459,7 +467,7 @@ const handleLogout = async () => {
 
 .sidebar.collapsed .nav-item {
   justify-content: center;
-  padding: var(--spacing-sm);
+  padding: 6px;
 }
 
 .sidebar.collapsed .nav-label {
@@ -478,13 +486,14 @@ const handleLogout = async () => {
   gap: var(--spacing-xs);
   position: relative;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  padding: 10px 14px;
+  padding: 7px 14px;
   border-radius: var(--radius-xl);
   color: var(--text-regular);
   text-decoration: none;
@@ -598,6 +607,7 @@ const handleLogout = async () => {
   gap: var(--spacing-xs);
   max-height: calc(5 * 40px);
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 /* 查看更多空间 */
@@ -636,16 +646,16 @@ const handleLogout = async () => {
 .space-indicator.danger { animation: blink-warn 1s ease-in-out infinite; }
 .space-indicator.good { box-shadow: 0 0 6px currentColor; }
 
-.nav-space-label {
+.nav-item .nav-space-label {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .space-progress-text {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: var(--text-muted);
   font-weight: 500;
   flex-shrink: 0;
@@ -682,6 +692,18 @@ const handleLogout = async () => {
 }
 
 .space-mini-dot.danger { animation: blink-warn 1s ease-in-out infinite; }
+
+.space-mini-more {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.space-mini-more-text {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary, #94a3b8);
+  line-height: 1;
+}
 
 @keyframes blink-warn {
   0%, 100% { opacity: 0.3; }
