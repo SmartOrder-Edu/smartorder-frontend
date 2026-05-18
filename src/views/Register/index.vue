@@ -199,7 +199,7 @@
 
           <!-- 步骤2：学习画像初始化 -->
           <div v-show="currentStep === 2" class="step-content">
-            <div class="card-header">
+            <div class="card-header profile-header">
               <h2 class="card-title">先让我了解一下你</h2>
               <p class="card-subtitle">知序智学会根据你的目标，为你生成第一版学习路径</p>
             </div>
@@ -293,12 +293,12 @@
                   或者，用一段话介绍你自己（选填）
                 </h3>
                 <p class="question-hint">
-                  告诉AI你的专业背景、每天学习时间、擅长和不擅长的领域……系统会根据你的描述，为你构建更精准的学习画像。
+                  用自然语言告诉AI你的专业背景、每天学习时间、擅长与不擅长的领域，系统会据此构建更精准的学习画像。
                 </p>
                 <el-input
                   v-model="profileData.selfDescription"
                   type="textarea"
-                  :rows="4"
+                  :rows="3"
                   maxlength="500"
                   show-word-limit
                   placeholder="例如：我是计算机专业大三学生，每天有2小时学习时间，Python比较熟但对算法不太熟悉，最近在准备操作系统考试..."
@@ -321,7 +321,7 @@
                   class="create-btn"
                   @click="handleRegister"
                 >
-                  生成我的学习路径
+                  完成注册，开始学习
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M5 12h14M12 5l7 7-7 7"/>
                   </svg>
@@ -511,7 +511,8 @@ const handleRegister = async () => {
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
 }
 
@@ -888,33 +889,38 @@ const handleRegister = async () => {
 
 /* 画像表单 */
 .profile-form .question-block {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
 }
 
 .profile-form .question-block:last-of-type {
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.profile-header {
+  margin-bottom: var(--spacing-lg) !important;
 }
 
 .question-title {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  font-size: 0.875rem;
+  gap: var(--spacing-xs);
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-dark);
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
 }
 
 .question-title .question-num {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
   color: white;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 /* 选项卡片 */
@@ -929,7 +935,7 @@ const handleRegister = async () => {
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-xs);
-  padding: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
   background: var(--background-color-base);
   border: 2px solid transparent;
   border-radius: var(--radius-lg);
@@ -938,8 +944,8 @@ const handleRegister = async () => {
 }
 
 .option-card .option-icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -952,7 +958,7 @@ const handleRegister = async () => {
 }
 
 .option-card .option-label {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-regular);
 }
@@ -981,11 +987,11 @@ const handleRegister = async () => {
 }
 
 .option-chip {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 6px var(--spacing-md);
   background: var(--background-color-base);
   border: 1px solid transparent;
   border-radius: var(--radius-full);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--text-regular);
   cursor: pointer;
   transition: all var(--transition-base);
@@ -1005,10 +1011,10 @@ const handleRegister = async () => {
 
 /* 自由描述输入 */
 .question-hint {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
-  margin-bottom: var(--spacing-sm);
-  line-height: 1.5;
+  margin-bottom: var(--spacing-xs);
+  line-height: 1.4;
 }
 
 .self-description-input :deep(.el-textarea__inner) {
@@ -1041,7 +1047,7 @@ const handleRegister = async () => {
 .btn-group {
   display: flex;
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-lg);
+  margin-top: var(--spacing-md);
 }
 
 .btn-group .el-button {
