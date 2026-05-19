@@ -5,6 +5,27 @@ export interface RequestConfig extends AxiosRequestConfig {
   showError?: boolean
 }
 
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+
+/**
+ * 独立 token 刷新函数，供 Axios 拦截器和 SSE（fetchEventSource）共用。
+ * @returns 新的 accessToken
+ * @throws 刷新失败时抛出异常
+ */
+export async function refreshAccessToken(): Promise<string> {
+  const { data } = await axios.post(
+    `${BASE_URL}/auth/refreshToken`,
+    {},
+    { withCredentials: true }
+  )
+  const newToken = data.data
+  if (newToken) {
+    localStorage.setItem('token', newToken)
+    return newToken
+  }
+  throw new Error('刷新Token失败')
+}
+
 class Request {
   private instance: AxiosInstance
   private baseURL: string
@@ -12,7 +33,7 @@ class Request {
   private pendingRequests: Array<(token: string) => void> = []
 
   constructor(config: AxiosRequestConfig = {}) {
-    this.baseURL = config.baseURL || import.meta.env.VITE_API_BASE_URL || '/api'
+    this.baseURL = BASE_URL
     this.instance = axios.create({
       baseURL: this.baseURL,
       timeout: 15000,
@@ -121,17 +142,7 @@ class Request {
   }
 
   private async doRefreshToken(): Promise<string> {
-    const { data } = await axios.post(
-      `${this.baseURL}/auth/refreshToken`,
-      {},
-      { withCredentials: true }
-    )
-    const newToken = data.data
-    if (newToken) {
-      localStorage.setItem('token', newToken)
-      return newToken
-    }
-    throw new Error('刷新Token失败')
+    return refreshAccessToken()
   }
 
   private handleRefreshFailure() {

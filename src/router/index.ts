@@ -19,10 +19,16 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '注册 - 知序智学', guest: true }
   },
   {
+    path: '/onboarding',
+    name: 'Onboarding',
+    component: () => import('@/views/Onboarding/index.vue'),
+    meta: { title: '学习画像引导 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard/index.vue'),
-    meta: { title: '总学习指挥台 - 知序智学', requiresAuth: true }
+    meta: { title: '学习指挥台 - 知序智学', requiresAuth: true }
   },
   {
     path: '/daily-plan',
@@ -65,6 +71,12 @@ const routes: Array<RouteRecordRaw> = [
     name: 'Resources',
     component: () => import('@/views/Resources/index.vue'),
     meta: { title: '资源中心 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/spaces',
+    name: 'Spaces',
+    component: () => import('@/views/Spaces/index.vue'),
+    meta: { title: '学习空间管理 - 知序智学', requiresAuth: true }
   },
   {
     path: '/knowledge-base',
@@ -130,6 +142,15 @@ router.beforeEach((to, _from, next) => {
   } else if (to.meta.guest && isLoggedIn) {
     // 已登录访问游客页，跳转 AI 总学习伙伴
     next({ name: 'AITutor' })
+  } else if (
+    to.meta.requiresAuth &&
+    isLoggedIn &&
+    userStore.userInfo &&
+    !userStore.profileInitialized &&
+    to.name !== 'Onboarding'
+  ) {
+    // 已登录但未初始化画像，引导至画像引导页
+    next({ name: 'Onboarding' })
   } else {
     next()
   }

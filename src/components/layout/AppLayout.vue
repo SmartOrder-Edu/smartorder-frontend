@@ -36,24 +36,36 @@
           <!-- 学习空间 -->
           <div class="nav-section" v-if="!sidebarCollapsed">
             <div class="nav-section-header">
-              <span class="nav-section-title">学习空间</span>
+              <router-link to="/spaces" class="nav-section-title-link">学习空间</router-link>
               <button class="nav-section-action" @click="showCreateSpace = true" title="新建学习空间">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </button>
             </div>
+            <div class="nav-space-list">
+              <router-link
+                v-for="space in displayedSpaces"
+                :key="space.id"
+                :to="`/space/${space.id}`"
+                class="nav-item nav-space-item"
+                :class="{ active: isActiveSpace(space.id) }"
+                :title="space.name"
+              >
+                <span class="space-indicator" :class="space.healthStatus" :style="{ background: space.color }"></span>
+                <span class="nav-label nav-space-label">{{ space.name }}</span>
+                <span class="space-progress-text">{{ Math.round(space.progress) }}%</span>
+              </router-link>
+            </div>
             <router-link
-              v-for="space in learningSpaces"
-              :key="space.id"
-              :to="`/space/${space.id}`"
-              class="nav-item nav-space-item"
-              :class="{ active: isActiveSpace(space.id) }"
-              :title="space.name"
+              v-if="spaceStore.activeSpaces.length > maxVisibleSpaces"
+              to="/spaces"
+              class="nav-space-more"
             >
-              <span class="space-indicator" :class="space.status" :style="{ background: space.color }"></span>
-              <span class="nav-label nav-space-label">{{ space.name }}</span>
-              <span class="space-progress-text">{{ space.progress }}%</span>
+              还有 {{ spaceStore.activeSpaces.length - maxVisibleSpaces }} 个空间
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <polyline points="9,6 15,12 9,18"/>
+              </svg>
             </router-link>
             <button class="nav-item nav-add-space" @click="showCreateSpace = true">
               <span class="nav-icon">
@@ -66,15 +78,23 @@
           </div>
           <div class="nav-section-mini" v-else>
             <div
-              v-for="space in learningSpaces"
+              v-for="space in displayedSpaces"
               :key="space.id"
               class="nav-item"
               :class="{ active: isActiveSpace(space.id) }"
               :title="space.name"
               @click="$router.push(`/space/${space.id}`)"
             >
-              <span class="space-mini-dot" :class="space.status" :style="{ background: space.color }"></span>
+              <span class="space-mini-dot" :class="space.healthStatus" :style="{ background: space.color }"></span>
             </div>
+            <router-link
+              v-if="spaceStore.activeSpaces.length > maxVisibleSpaces"
+              to="/spaces"
+              class="nav-item space-mini-more"
+              title="查看全部学习空间"
+            >
+              <span class="space-mini-more-text">+{{ spaceStore.activeSpaces.length - maxVisibleSpaces }}</span>
+            </router-link>
             <div class="nav-item" title="新建学习空间" @click="showCreateSpace = true">
               <span class="nav-icon" style="width:18px;height:18px">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
@@ -103,17 +123,33 @@
           <!-- 用户区 -->
           <div class="sidebar-user" v-if="!sidebarCollapsed">
             <div class="sidebar-user-info" @click="showUserMenu = !showUserMenu">
-              <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar" />
+              <div class="sidebar-avatar-wrap">
+                <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar" />
+                <span v-if="!userStore.profileInitialized" class="profile-dot" title="画像未完善"></span>
+              </div>
               <span class="sidebar-username">{{ userStore.userName || '用户' }}</span>
             </div>
           </div>
           <div class="sidebar-user-mini" v-else>
-            <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar-mini" @click="showUserMenu = !showUserMenu" />
+            <div class="sidebar-avatar-wrap">
+              <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar-mini" @click="showUserMenu = !showUserMenu" />
+              <span v-if="!userStore.profileInitialized" class="profile-dot-mini" title="画像未完善"></span>
+            </div>
           </div>
 
           <!-- 用户下拉菜单 -->
           <transition name="slide-up">
             <div class="sidebar-user-menu" v-if="showUserMenu && !sidebarCollapsed">
+              <button
+                v-if="!userStore.profileInitialized"
+                class="user-menu-item profile-init-item"
+                @click="goOnboarding"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+                完善学习画像
+              </button>
               <button class="user-menu-item" @click="goProfile">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -196,12 +232,14 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { useLearningSpaceStore } from '@/stores/learningSpace'
 import { chatWebSocket } from '@/utils/websocket'
 import AIAssistant from '@/components/common/AIAssistant.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const spaceStore = useLearningSpaceStore()
 
 onMounted(() => {
   if (userStore.isLogin) {
@@ -238,29 +276,33 @@ onMounted(() => {
   if (userStore.isLogin && !userStore.userInfo) {
     userStore.fetchUserInfo().catch(() => {})
   }
+  spaceStore.fetchSpaces('active')
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
 })
 
-interface LearningSpace {
-  id: string
-  name: string
-  icon: string
-  progress: number
-  status: 'normal' | 'warning' | 'danger' | 'good'
-  color: string
-}
-
-const learningSpaces = ref<LearningSpace[]>([
-  { id: 'math', name: '高等数学', icon: '📐', progress: 42, status: 'warning', color: '#3b82f6' },
-  { id: 'english', name: '英语四级', icon: '📝', progress: 61, status: 'normal', color: '#10b981' },
-  { id: 'se', name: '软件工程', icon: '💻', progress: 35, status: 'danger', color: '#f59e0b' },
-  { id: 'os', name: '操作系统', icon: '⚙️', progress: 70, status: 'good', color: '#8b5cf6' }
-])
-
 const showCreateSpace = ref(false)
+const maxVisibleSpaces = 5
+
+const displayedSpaces = computed(() => {
+  const all = spaceStore.activeSpaces
+  if (all.length <= maxVisibleSpaces) {
+    return all
+  }
+  // 显示前 N 个，但确保当前空间可见
+  const currentSpaceId = route.params.spaceId
+  const visible = all.slice(0, maxVisibleSpaces)
+  if (currentSpaceId && !visible.some(s => String(s.id) === String(currentSpaceId))) {
+    const currentSpace = all.find(s => String(s.id) === String(currentSpaceId))
+    if (currentSpace) {
+      visible.pop()
+      visible.push(currentSpace)
+    }
+  }
+  return visible
+})
 
 const topMenuItems = [
   {
@@ -326,11 +368,16 @@ const isActive = (path: string) => {
   return route.path === path || route.path.startsWith(path + '/')
 }
 
-const isActiveSpace = (spaceId: string) => {
-  return route.path === `/space/${spaceId}` || route.path.startsWith(`/space/${spaceId}/`)
+const isActiveSpace = (spaceId: number) => {
+  const pathId = Number(route.params.spaceId)
+  return pathId === spaceId
 }
 
 const goHome = () => router.push('/ai-tutor')
+const goOnboarding = () => {
+  showUserMenu.value = false
+  router.push('/onboarding')
+}
 const goProfile = () => {
   showUserMenu.value = false
   router.push('/profile')
@@ -440,7 +487,7 @@ const handleLogout = async () => {
 
 .sidebar.collapsed .nav-item {
   justify-content: center;
-  padding: var(--spacing-sm);
+  padding: 6px;
 }
 
 .sidebar.collapsed .nav-label {
@@ -459,13 +506,14 @@ const handleLogout = async () => {
   gap: var(--spacing-xs);
   position: relative;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  padding: 10px 14px;
+  padding: 7px 14px;
   border-radius: var(--radius-xl);
   color: var(--text-regular);
   text-decoration: none;
@@ -537,12 +585,20 @@ const handleLogout = async () => {
   padding: var(--spacing-xs) var(--spacing-sm);
 }
 
-.nav-section-title {
+.nav-section-title,
+.nav-section-title-link {
   font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
   font-weight: 600;
+}
+.nav-section-title-link {
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.nav-section-title-link:hover {
+  color: var(--primary-color, #3b5bdb);
 }
 
 .nav-section-action {
@@ -564,6 +620,34 @@ const handleLogout = async () => {
   color: var(--primary-color);
 }
 
+/* 学习空间列表：独立滚动区域 */
+.nav-space-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: calc(5 * 40px);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* 查看更多空间 */
+.nav-space-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: var(--spacing-xs) 0;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.nav-space-more:hover {
+  color: var(--primary-color);
+}
+
 /* 学习空间导航项 */
 .nav-space-item {
   padding: var(--spacing-xs) var(--spacing-sm);
@@ -582,16 +666,16 @@ const handleLogout = async () => {
 .space-indicator.danger { animation: blink-warn 1s ease-in-out infinite; }
 .space-indicator.good { box-shadow: 0 0 6px currentColor; }
 
-.nav-space-label {
+.nav-item .nav-space-label {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .space-progress-text {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: var(--text-muted);
   font-weight: 500;
   flex-shrink: 0;
@@ -628,6 +712,18 @@ const handleLogout = async () => {
 }
 
 .space-mini-dot.danger { animation: blink-warn 1s ease-in-out infinite; }
+
+.space-mini-more {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.space-mini-more-text {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary, #94a3b8);
+  line-height: 1;
+}
 
 @keyframes blink-warn {
   0%, 100% { opacity: 0.3; }
@@ -699,6 +795,34 @@ const handleLogout = async () => {
   transition: background var(--transition-fast);
 
   &:hover { background: var(--background-color-base); }
+}
+
+.sidebar-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.profile-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 2px solid white;
+}
+
+.profile-dot-mini {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 2px solid white;
 }
 
 .sidebar-avatar {
@@ -904,6 +1028,10 @@ const handleLogout = async () => {
   &:hover { background: var(--background-color-base); }
   &.logout { color: var(--danger-color); }
   &.logout:hover { background: rgba(239, 68, 68, 0.06); }
+  &.profile-init-item {
+    color: #f59e0b;
+    &:hover { background: rgba(245, 158, 11, 0.06); }
+  }
 }
 
 .user-menu-divider {

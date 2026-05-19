@@ -7,7 +7,35 @@
       <div class="bg-blob blob-2"></div>
     </div>
 
+    <!-- 注册成功过渡动画 -->
+    <transition name="fade">
+      <div v-if="showTransition" class="transition-overlay">
+        <div class="transition-content">
+          <div class="transition-agent-avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+              <line x1="9" y1="9" x2="9.01" y2="9"/>
+              <line x1="15" y1="9" x2="15.01" y2="9"/>
+            </svg>
+          </div>
+          <h2 class="transition-title">欢迎加入知序智学！</h2>
+          <p class="transition-text">正在为你准备个性化学习体验...</p>
+          <div class="transition-dots">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <div class="register-container">
+      <!-- 移动端顶部简栏 -->
+      <div class="mobile-header">
+        <img src="/logo.png" alt="知序智学" class="mobile-logo" />
+      </div>
+
       <!-- 左侧品牌区域 -->
       <div class="brand-section animate-fade-in">
         <div class="brand-content">
@@ -20,42 +48,23 @@
             </div>
           </div>
 
-          <!-- 标题 -->
+          <!-- 品牌文案 -->
           <h2 class="main-title">
             开始你的<br/>
             <span class="accent">智能学习之旅</span>
           </h2>
-
           <p class="description">
-            创建账号后，我们将通过简单的问答为你构建专属的学习画像，
-            让 AI 更懂你，提供更精准的学习规划。
+            快速创建账号，开启 AI 驱动的个性化学习体验。
+            注册后只需简单几步，AI 就能更懂你。
           </p>
-
-          <!-- 步骤指示 -->
-          <div class="steps-indicator">
-            <div class="step-item" :class="{ active: currentStep >= 1, completed: currentStep > 1 }">
-              <div class="step-number">
-                <svg v-if="currentStep > 1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <polyline points="20,6 9,17 4,12"/>
-                </svg>
-                <span v-else>1</span>
-              </div>
-              <span class="step-label">创建账户</span>
-            </div>
-            <div class="step-line" :class="{ active: currentStep > 1 }"></div>
-            <div class="step-item" :class="{ active: currentStep >= 2 }">
-              <div class="step-number">2</div>
-              <span class="step-label">学习画像</span>
-            </div>
-          </div>
         </div>
       </div>
 
       <!-- 右侧表单区域 -->
       <div class="form-section">
         <div class="register-card animate-fade-in-scale">
-          <!-- 步骤1：基础注册 -->
-          <div v-show="currentStep === 1" class="step-content">
+          <!-- 注册表单 -->
+          <div class="step-content">
             <div class="card-header">
               <div class="card-header-row">
                 <router-link to="/login" class="back-link">
@@ -110,28 +119,28 @@
 
               <!-- 验证码 -->
               <el-form-item prop="verificationCode" class="form-item">
-                <el-input
-                  v-model="formData.verificationCode"
-                  placeholder="输入邮箱验证码"
-                  size="large"
-                  maxlength="6"
-                >
-                  <template #prefix>
-                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                  </template>
-                  <template #append>
-                    <button
-                      type="button"
-                      class="send-code-btn"
-                      :disabled="countdown > 0 || codeLoading"
-                      @click="sendCode"
-                    >
-                      {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
-                    </button>
-                  </template>
-                </el-input>
+                <div class="code-input-row">
+                  <el-input
+                    v-model="formData.verificationCode"
+                    placeholder="输入邮箱验证码"
+                    size="large"
+                    maxlength="6"
+                  >
+                    <template #prefix>
+                      <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                      </svg>
+                    </template>
+                  </el-input>
+                  <button
+                    type="button"
+                    class="send-code-btn"
+                    :disabled="countdown > 0 || codeLoading"
+                    @click="sendCode"
+                  >
+                    {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
+                  </button>
+                </div>
               </el-form-item>
 
               <!-- 密码 -->
@@ -150,6 +159,31 @@
                     </svg>
                   </template>
                 </el-input>
+                <!-- 密码强度指示器 -->
+                <div v-if="formData.password" class="password-strength">
+                  <div class="strength-bar">
+                    <div
+                      class="strength-fill"
+                      :class="passwordStrength.level"
+                      :style="{ width: passwordStrength.percent + '%' }"
+                    ></div>
+                  </div>
+                  <span class="strength-text" :class="passwordStrength.level">{{ passwordStrength.label }}</span>
+                </div>
+                <div v-if="formData.password" class="password-checks">
+                  <span class="check-item" :class="{ passed: passwordChecks.length }">
+                    {{ passwordChecks.length ? '✓' : '○' }} 至少8位
+                  </span>
+                  <span class="check-item" :class="{ passed: passwordChecks.upper }">
+                    {{ passwordChecks.upper ? '✓' : '○' }} 含大写字母
+                  </span>
+                  <span class="check-item" :class="{ passed: passwordChecks.lower }">
+                    {{ passwordChecks.lower ? '✓' : '○' }} 含小写字母
+                  </span>
+                  <span class="check-item" :class="{ passed: passwordChecks.digit }">
+                    {{ passwordChecks.digit ? '✓' : '○' }} 含数字
+                  </span>
+                </div>
               </el-form-item>
 
               <!-- 确认密码 -->
@@ -182,14 +216,15 @@
                 </el-checkbox>
               </div>
 
-              <!-- 下一步按钮 -->
+              <!-- 注册按钮 -->
               <el-button
                 type="primary"
                 size="large"
                 class="next-btn"
-                native-type="submit"
+                :loading="loading"
+                @click="handleRegister"
               >
-                下一步：初始化学习画像
+                立即注册
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M5 12h14M12 5l7 7-7 7"/>
                 </svg>
@@ -197,118 +232,6 @@
             </el-form>
           </div>
 
-          <!-- 步骤2：学习画像初始化 -->
-          <div v-show="currentStep === 2" class="step-content">
-            <div class="card-header">
-              <h2 class="card-title">先让我了解一下你</h2>
-              <p class="card-subtitle">知序智学会根据你的目标，为你生成第一版学习路径</p>
-            </div>
-
-            <div class="profile-form">
-              <!-- 身份选择 -->
-              <div class="question-block">
-                <h3 class="question-title">
-                  <span class="question-num">1</span>
-                  你目前的身份是？
-                </h3>
-                <div class="option-cards">
-                  <button
-                    v-for="item in identityOptions"
-                    :key="item.value"
-                    type="button"
-                    class="option-card"
-                    :class="{ selected: profileData.identity === item.value }"
-                    @click="profileData.identity = item.value"
-                  >
-                    <span class="option-icon" v-html="item.icon"></span>
-                    <span class="option-label">{{ item.label }}</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- 学习方向 -->
-              <div class="question-block">
-                <h3 class="question-title">
-                  <span class="question-num">2</span>
-                  你想学习的方向是？
-                </h3>
-                <div class="option-chips">
-                  <button
-                    v-for="item in directionOptions"
-                    :key="item.value"
-                    type="button"
-                    class="option-chip"
-                    :class="{ selected: profileData.direction === item.value }"
-                    @click="profileData.direction = item.value"
-                  >
-                    {{ item.label }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- 当前基础 -->
-              <div class="question-block">
-                <h3 class="question-title">
-                  <span class="question-num">3</span>
-                  你的当前基础如何？
-                </h3>
-                <div class="option-chips">
-                  <button
-                    v-for="item in levelOptions"
-                    :key="item.value"
-                    type="button"
-                    class="option-chip"
-                    :class="{ selected: profileData.level === item.value }"
-                    @click="profileData.level = item.value"
-                  >
-                    {{ item.label }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- 近期目标 -->
-              <div class="question-block">
-                <h3 class="question-title">
-                  <span class="question-num">4</span>
-                  你近期目标是什么？
-                </h3>
-                <div class="option-chips">
-                  <button
-                    v-for="item in goalOptions"
-                    :key="item.value"
-                    type="button"
-                    class="option-chip"
-                    :class="{ selected: profileData.goal === item.value }"
-                    @click="profileData.goal = item.value"
-                  >
-                    {{ item.label }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- 按钮组 -->
-              <div class="btn-group">
-                <el-button size="large" class="back-btn" @click="currentStep = 1">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
-                  </svg>
-                  上一步
-                </el-button>
-                <el-button
-                  type="primary"
-                  size="large"
-                  :loading="loading"
-                  class="create-btn"
-                  @click="handleRegister"
-                >
-                  生成我的学习路径
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                  </svg>
-                </el-button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -316,7 +239,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -326,11 +249,12 @@ import { userApi } from '@/api/user'
 const router = useRouter()
 const userStore = useUserStore()
 
-const currentStep = ref(1)
 const loading = ref(false)
 const codeLoading = ref(false)
 const countdown = ref(0)
 const formRef = ref<FormInstance>()
+const showTransition = ref(false)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 const formData = reactive({
   nickname: '',
@@ -341,11 +265,21 @@ const formData = reactive({
   agreeTerms: false
 })
 
-const profileData = reactive({
-  identity: '',
-  direction: '',
-  level: '',
-  goal: ''
+// 密码强度计算
+const passwordChecks = computed(() => ({
+  length: formData.password.length >= 8,
+  upper: /[A-Z]/.test(formData.password),
+  lower: /[a-z]/.test(formData.password),
+  digit: /\d/.test(formData.password)
+}))
+
+const passwordStrength = computed(() => {
+  const checks = passwordChecks.value
+  const score = [checks.length, checks.upper, checks.lower, checks.digit].filter(Boolean).length
+  if (score <= 1) return { level: 'weak', label: '弱', percent: 25 }
+  if (score === 2) return { level: 'weak', label: '较弱', percent: 50 }
+  if (score === 3) return { level: 'medium', label: '中等', percent: 75 }
+  return { level: 'strong', label: '强', percent: 100 }
 })
 
 const validateConfirmPassword = (_rule: any, value: string, callback: any) => {
@@ -389,36 +323,6 @@ const rules: FormRules = {
   ]
 }
 
-const identityOptions = [
-  { value: 'undergraduate', label: '本科生', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>' },
-  { value: 'graduate', label: '研究生', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>' },
-  { value: 'self', label: '自学者', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg>' },
-  { value: 'career', label: '转专业学习', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>' }
-]
-
-const directionOptions = [
-  { value: 'ai', label: '人工智能' },
-  { value: 'cs', label: '计算机基础' },
-  { value: 'os', label: '操作系统' },
-  { value: 'ds', label: '数据结构' },
-  { value: 'ee', label: '电子信息' },
-  { value: 'other', label: '其他方向' }
-]
-
-const levelOptions = [
-  { value: 'beginner', label: '刚入门' },
-  { value: 'some', label: '学过一点' },
-  { value: 'course', label: '有课程基础' },
-  { value: 'advanced', label: '想系统进阶' }
-]
-
-const goalOptions = [
-  { value: 'exam', label: '通过考试' },
-  { value: 'project', label: '完成课程项目' },
-  { value: 'skill', label: '掌握一门技术' },
-  { value: 'competition', label: '准备竞赛/科研' }
-]
-
 const sendCode = async () => {
   if (!formData.email) {
     ElMessage.warning('请先输入邮箱')
@@ -434,11 +338,16 @@ const sendCode = async () => {
     await userApi.sendEmailCode(formData.email)
     ElMessage.success('验证码已发送到您的邮箱')
     countdown.value = 60
-    const timer = setInterval(() => {
+    countdownTimer = setInterval(() => {
       countdown.value--
-      if (countdown.value <= 0) clearInterval(timer)
+      if (countdown.value <= 0) {
+        if (countdownTimer) clearInterval(countdownTimer)
+        countdownTimer = null
+      }
     }, 1000)
-  } catch {} finally {
+  } catch (error: any) {
+    ElMessage.error(error?.message || '验证码发送失败，请稍后重试')
+  } finally {
     codeLoading.value = false
   }
 }
@@ -451,7 +360,7 @@ const handleNext = async () => {
       ElMessage.warning('请先同意服务条款')
       return
     }
-    currentStep.value = 2
+    handleRegister()
   } catch {}
 }
 
@@ -465,17 +374,29 @@ const handleRegister = async () => {
       confirmPassword: formData.confirmPassword,
       verificationCode: formData.verificationCode
     })
-    ElMessage.success('注册成功，正在登录...')
+    // 显示过渡动画
+    showTransition.value = true
     // 注册成功后自动登录
     await userStore.login(formData.email, formData.password)
     await userStore.fetchUserInfo()
-    router.push('/dashboard')
+    // 延迟跳转，让过渡动画展示
+    setTimeout(() => {
+      router.push('/onboarding')
+    }, 2000)
   } catch (error: any) {
+    showTransition.value = false
     ElMessage.error(error?.message || '注册失败，请重试')
   } finally {
     loading.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+})
 </script>
 
 <style scoped>
@@ -485,7 +406,8 @@ const handleRegister = async () => {
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
 }
 
@@ -529,6 +451,157 @@ const handleRegister = async () => {
   left: -50px;
 }
 
+/* 注册过渡动画 */
+.transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+}
+
+.transition-content {
+  text-align: center;
+}
+
+.transition-agent-avatar {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--spacing-lg);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.transition-agent-avatar svg {
+  width: 48px;
+  height: 48px;
+  color: white;
+}
+
+.transition-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: var(--spacing-sm);
+}
+
+.transition-text {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xl);
+}
+
+.transition-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+.transition-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+
+.transition-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.transition-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* 移动端顶部简栏 */
+.mobile-header {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  padding: var(--spacing-sm) var(--spacing-md);
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.mobile-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.mobile-steps {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.mobile-step {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-color-base);
+  border: 2px solid var(--border-light);
+  color: var(--text-muted);
+  transition: all var(--transition-base);
+}
+
+.mobile-step.active {
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.mobile-step.completed {
+  background: #12b886;
+  border-color: #12b886;
+  color: white;
+}
+
+.mobile-step-line {
+  width: 20px;
+  height: 2px;
+  background: var(--border-light);
+  transition: background var(--transition-base);
+}
+
+.mobile-step-line.active {
+  background: linear-gradient(90deg, #12b886 0%, #3b5bdb 100%);
+}
+
+@media (max-width: 992px) {
+  .mobile-header {
+    display: flex;
+  }
+}
+
 /* 容器 */
 .register-container {
   display: flex;
@@ -545,6 +618,7 @@ const handleRegister = async () => {
   .register-container {
     flex-direction: column;
     padding: var(--spacing-md);
+    padding-top: 60px;
     align-items: center;
     justify-content: center;
   }
@@ -586,6 +660,20 @@ const handleRegister = async () => {
 }
 
 .back-link:hover {
+  color: var(--primary-color);
+}
+
+/* 跳过画像入口 */
+.skip-profile-link {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-left: auto;
+  transition: color var(--transition-base);
+}
+
+.skip-profile-link:hover {
   color: var(--primary-color);
 }
 
@@ -763,6 +851,7 @@ const handleRegister = async () => {
 .card-header-row {
   display: flex;
   justify-content: flex-start;
+  align-items: center;
   margin-bottom: var(--spacing-md);
 }
 
@@ -776,6 +865,75 @@ const handleRegister = async () => {
 .card-subtitle {
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+/* 密码强度指示器 */
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.strength-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.strength-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.strength-fill.weak {
+  background: #ef4444;
+}
+
+.strength-fill.medium {
+  background: #f59e0b;
+}
+
+.strength-fill.strong {
+  background: #12b886;
+}
+
+.strength-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.strength-text.weak {
+  color: #ef4444;
+}
+
+.strength-text.medium {
+  color: #f59e0b;
+}
+
+.strength-text.strong {
+  color: #12b886;
+}
+
+.password-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.check-item {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  transition: color var(--transition-base);
+}
+
+.check-item.passed {
+  color: #12b886;
 }
 
 /* 表单 */
@@ -794,24 +952,52 @@ const handleRegister = async () => {
   color: var(--text-muted);
 }
 
+/* 验证码输入行 */
+.code-input-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.code-input-row .el-input {
+  flex: 1;
+}
+
+@media (max-width: 480px) {
+  .code-input-row {
+    flex-direction: column;
+  }
+  .send-code-btn {
+    width: 100%;
+  }
+}
+
 /* 发送验证码按钮 */
 .send-code-btn {
+  flex-shrink: 0;
   padding: 0 var(--spacing-md);
-  font-size: 0.875rem;
+  height: 40px;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--primary-color);
-  background: transparent;
-  border: none;
+  background: white;
+  border: 2px solid var(--primary-color);
+  border-radius: var(--radius-lg);
   cursor: pointer;
   white-space: nowrap;
+  transition: all var(--transition-base);
 }
 
 .send-code-btn:disabled {
   color: var(--text-muted);
+  border-color: var(--border-light);
+  background: var(--background-color-base);
   cursor: not-allowed;
 }
 
 .send-code-btn:hover:not(:disabled) {
-  color: var(--primary-light);
+  background: var(--primary-color);
+  color: white;
 }
 
 /* 服务条款 */
@@ -860,35 +1046,189 @@ const handleRegister = async () => {
   box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
 }
 
+/* Agent 引导 */
+.agent-greeting {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  text-align: left;
+}
+
+.agent-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+
+.agent-avatar svg {
+  width: 100%;
+  height: 100%;
+  color: white;
+}
+
+.agent-bubble {
+  background: #f0f4ff;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  position: relative;
+}
+
+.agent-bubble p {
+  margin: 0;
+}
+
+/* 进度指示器 (步进点) */
+.profile-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.progress-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.progress-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border-light);
+  background: white;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: all var(--transition-base);
+  padding: 0;
+}
+
+.progress-dot svg {
+  width: 14px;
+  height: 14px;
+}
+
+.progress-dot.completed {
+  background: #12b886;
+  border-color: #12b886;
+  color: white;
+  cursor: pointer;
+}
+
+.progress-dot.active {
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.progress-dot.upcoming {
+  opacity: 0.5;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 /* 画像表单 */
 .profile-form .question-block {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
 }
 
 .profile-form .question-block:last-of-type {
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.profile-header {
+  margin-bottom: var(--spacing-lg) !important;
 }
 
 .question-title {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  font-size: 0.875rem;
+  gap: var(--spacing-xs);
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-dark);
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
 }
 
 .question-title .question-num {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
   color: white;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+}
+
+/* 问题操作区（下一步 + 跳过） */
+.question-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+}
+
+.skip-btn {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color var(--transition-base);
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.skip-btn:hover {
+  color: var(--primary-color);
+}
+
+/* 子问题（年级、截止时间） */
+.sub-question {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px dashed var(--border-light);
+}
+
+.sub-question-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.optional-tag {
+  display: inline-block;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  background: var(--background-color-base);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  margin-left: var(--spacing-xs);
+  font-weight: 400;
 }
 
 /* 选项卡片 */
@@ -898,12 +1238,18 @@ const handleRegister = async () => {
   gap: var(--spacing-sm);
 }
 
+@media (max-width: 480px) {
+  .option-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
 .option-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-xs);
-  padding: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm);
   background: var(--background-color-base);
   border: 2px solid transparent;
   border-radius: var(--radius-lg);
@@ -926,7 +1272,7 @@ const handleRegister = async () => {
 }
 
 .option-card .option-label {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-regular);
 }
@@ -955,14 +1301,21 @@ const handleRegister = async () => {
 }
 
 .option-chip {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 6px var(--spacing-md);
   background: var(--background-color-base);
   border: 1px solid transparent;
   border-radius: var(--radius-full);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--text-regular);
   cursor: pointer;
   transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-emoji {
+  font-size: 0.875rem;
 }
 
 .option-chip:hover {
@@ -977,11 +1330,88 @@ const handleRegister = async () => {
   color: white;
 }
 
+/* 带描述的选项胶囊 */
+.option-chips--described {
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.option-chip--described {
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.chip-main {
+  font-weight: 500;
+}
+
+.chip-desc {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.option-chip--described.selected .chip-desc {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 时间选项 */
+.option-chip--time {
+  min-width: 100px;
+  justify-content: center;
+}
+
+/* Q6 提示标签 */
+.hint-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.hint-tag {
+  font-size: 0.6875rem;
+  color: var(--primary-color);
+  background: #f0f4ff;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-weight: 500;
+}
+
+/* 自由描述输入 */
+.self-description-input :deep(.el-textarea__inner) {
+  border-radius: var(--radius-lg);
+  background: var(--background-color-base);
+  border: 2px solid transparent;
+  transition: all var(--transition-base);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.self-description-input :deep(.el-textarea__inner:focus) {
+  background: white;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1);
+}
+
+.self-description-input :deep(.el-textarea__inner:hover) {
+  background: white;
+  border-color: var(--border-light);
+}
+
+.self-description-input :deep(.el-input__count) {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 /* 按钮组 */
 .btn-group {
   display: flex;
   gap: var(--spacing-sm);
-  margin-top: var(--spacing-lg);
+  margin-top: var(--spacing-md);
 }
 
 .btn-group .el-button {
@@ -1020,6 +1450,125 @@ const handleRegister = async () => {
 .btn-group .create-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+}
+
+/* 补充说明输入框（视觉降级） */
+.detail-input-wrapper {
+  margin-top: var(--spacing-md);
+}
+
+.detail-input-wrapper :deep(.el-input__wrapper) {
+  border-radius: var(--radius-lg);
+  background: rgba(248, 250, 252, 0.6);
+  border: 1px solid var(--border-light);
+  box-shadow: none !important;
+  transition: all var(--transition-base);
+}
+
+.detail-input-wrapper :deep(.el-input__wrapper:hover) {
+  background: white;
+  border-color: var(--primary-color);
+}
+
+.detail-input-wrapper :deep(.el-input__wrapper.is-focus) {
+  background: white;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1) !important;
+}
+
+.detail-input-wrapper :deep(.el-input__count) {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.detail-input-wrapper.is-required :deep(.el-input__wrapper) {
+  border-color: var(--border-light);
+}
+
+/* 下一题按钮 */
+.next-question-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  height: 44px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.next-question-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.next-question-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+}
+
+.next-question-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* 画像进度条 (保留旧样式兼容) */
+.profile-progress-bar {
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  margin-top: 1.5rem;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary-color);
+  transition: width 0.3s ease;
+}
+
+.slide-fade-enter-active {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.slide-fade-leave-active {
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.slide-fade-enter-from {
+  transform: translateX(15px);
+  opacity: 0;
+}
+
+.slide-fade-leave-to {
+  transform: translateX(-15px);
+  opacity: 0;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.4s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.submit-btn-group {
+  margin-top: 2rem;
+}
+
+.full-width {
+  width: 100%;
 }
 
 /* 动画 */

@@ -47,6 +47,7 @@ export interface UserInfoResponse {
   vipStartTime?: string
   vipExpireTime?: string
   status?: number
+  profileInitialized?: boolean
 }
 
 export const userApi = {

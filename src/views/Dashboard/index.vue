@@ -15,10 +15,12 @@
           </div>
           <div class="agent-hero-text">
             <h1 class="agent-greeting">早上好，{{ userName }}</h1>
-            <p class="agent-summary">
-              我已经检查了你正在进行的 <strong>4 个学习空间</strong>。
-              今天建议优先处理<strong>高等数学</strong>和<strong>软件工程</strong>，
-              <strong>操作系统</strong>可以暂缓，因为距离截止还有 6 天且昨天已完成复习。
+            <p class="agent-summary" v-if="spaceStore.spaceCount > 0">
+              我已经检查了你正在进行的 <strong>{{ spaceStore.spaceCount }} 个学习空间</strong>。
+              点击空间卡片进入学习，或与 Agent 对话制定今日计划。
+            </p>
+            <p class="agent-summary" v-else>
+              你还没有进行中的学习空间，点击<strong>新建学习空间</strong>开始你的学习之旅。
             </p>
           </div>
         </div>
@@ -28,7 +30,7 @@
             <span class="time-label">今日可用时间</span>
           </div>
           <div class="hero-space-stat">
-            <span class="space-count">4</span>
+            <span class="space-count">{{ spaceStore.spaceCount }}</span>
             <span class="space-label">进行中的学习空间</span>
           </div>
         </div>
@@ -47,12 +49,12 @@
         </button>
       </div>
 
-      <div class="space-cards-grid">
+      <div v-loading="spaceStore.loading" class="space-cards-grid">
         <div
-          v-for="space in learningSpaces"
+          v-for="space in spaceStore.spaces"
           :key="space.id"
           class="space-card"
-          :class="space.status"
+          :class="space.healthStatus"
           @click="$router.push(`/space/${space.id}`)"
         >
           <div class="space-card-top">
@@ -60,24 +62,24 @@
               <span class="space-card-icon">{{ space.icon }}</span>
               <div class="space-card-title-group">
                 <h3 class="space-card-name">{{ space.name }}</h3>
-                <span class="space-card-status" :class="space.status">{{ statusLabel(space.status) }}</span>
+                <span class="space-card-status" :class="space.healthStatus">{{ healthStatusLabel(space.healthStatus) }}</span>
               </div>
             </div>
-            <p class="space-card-goal">目标：{{ space.goal }}</p>
+            <p class="space-card-goal" v-if="space.goal">目标：{{ space.goal }}</p>
 
             <div class="space-card-progress">
               <div class="progress-header">
                 <span>完成进度</span>
-                <span class="progress-value">{{ space.progress }}%</span>
+                <span class="progress-value">{{ Math.round(space.progress) }}%</span>
               </div>
               <div class="progress-track">
-                <div class="progress-fill" :style="{ width: space.progress + '%', background: space.color }"></div>
+                <div class="progress-fill" :style="{ width: Math.round(space.progress) + '%', background: space.color }"></div>
               </div>
             </div>
           </div>
 
           <div class="space-card-bottom">
-            <div class="space-card-today">
+            <div class="space-card-today" v-if="space.todaySuggestion">
               <span class="today-label">今日建议</span>
               <p class="today-suggestion">{{ space.todaySuggestion }}</p>
             </div>
@@ -97,6 +99,36 @@
             </div>
           </div>
         </div>
+
+        <!-- 空状态 -->
+        <el-empty
+          v-if="!spaceStore.loading && spaceStore.spaces.length === 0"
+          description="暂无学习空间"
+          :image-size="120"
+          style="grid-column: 1 / -1"
+        >
+          <el-button type="primary" @click="$router.push('/ai-tutor')">新建学习空间</el-button>
+        </el-empty>
+      </div>
+    </section>
+
+    <!-- 画像未完成提醒横幅 -->
+    <section
+      v-if="!userStore.profileInitialized && showProfileReminder"
+      class="profile-reminder-banner"
+    >
+      <div class="banner-content">
+        <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4M12 8h.01"/>
+        </svg>
+        <span class="banner-text">完善学习画像，让 AI 更懂你</span>
+        <button class="banner-action" @click="$router.push('/onboarding')">去完善</button>
+        <button class="banner-close" @click="showProfileReminder = false" title="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
       </div>
     </section>
 
@@ -207,53 +239,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { useLearningSpaceStore } from '@/stores/learningSpace'
 import AppLayout from '@/components/layout/AppLayout.vue'
 
 const userStore = useUserStore()
+const spaceStore = useLearningSpaceStore()
 const userName = ref(userStore.userName || '谢同学')
 const showWhyDialog = ref(false)
+const showProfileReminder = ref(true)
 
-interface LearningSpace {
-  id: string
-  name: string
-  icon: string
-  goal: string
-  progress: number
-  status: 'normal' | 'warning' | 'danger' | 'good'
-  color: string
-  todaySuggestion: string
-  alert: string
-}
-
-const learningSpaces = ref<LearningSpace[]>([
-  {
-    id: 'math', name: '高等数学', icon: '📐', goal: '三周内掌握极限与连续',
-    progress: 42, status: 'warning', color: '#3b82f6',
-    todaySuggestion: '完成 10 道极限专项练习题，重点攻克洛必达法则适用条件',
-    alert: '你在"洛必达法则适用条件"上连续出错'
-  },
-  {
-    id: 'english', name: '英语四级', icon: '📝', goal: '12月通过四级考试',
-    progress: 61, status: 'normal', color: '#10b981',
-    todaySuggestion: '20分钟听力精听 + 40个核心词汇复习',
-    alert: ''
-  },
-  {
-    id: 'se', name: '软件工程', icon: '💻', goal: '完成项目需求分析与原型设计',
-    progress: 35, status: 'danger', color: '#f59e0b',
-    todaySuggestion: '补齐用户故事与用例图，需求分析阶段收尾',
-    alert: '项目任务已延期 1 天'
-  },
-  {
-    id: 'os', name: '操作系统', icon: '⚙️', goal: '操作系统期末复习',
-    progress: 70, status: 'good', color: '#8b5cf6',
-    todaySuggestion: '选做 PV 操作题型回顾，今日可暂缓',
-    alert: ''
-  }
-])
+onMounted(() => {
+  spaceStore.fetchSpaces('active')
+})
 
 const priorityTasks = ref([
   { id: 't1', spaceName: '高等数学', spaceColor: '#3b82f6', title: '洛必达法则 10 道专项练习', typeName: '练习', minutes: 35, reason: '连续 3 次出错，正确率降至 40%，今日是最佳巩固窗口' },
@@ -282,13 +282,15 @@ const rankingReasons = ref([
   { spaceId: 'os', spaceName: '操作系统', color: '#8b5cf6', level: 'low', levelLabel: '低优先', reason: '昨日已完成进程同步与 PV 操作复习，距离截止还有 6 天，今日可暂缓。' }
 ])
 
-const statusLabel = (s: string) => {
+import type { LearningSpaceDisplay } from '@/api/learningSpace'
+
+const healthStatusLabel = (s: string) => {
   const m: Record<string, string> = { normal: '正常', warning: '需关注', danger: '有风险', good: '良好' }
   return m[s] || s
 }
 
 const doTask = (task: any) => ElMessage.success(`开始任务：${task.title}`)
-const startSpaceToday = (space: LearningSpace) => {
+const startSpaceToday = (space: LearningSpaceDisplay) => {
   ElMessage.success(`开始 ${space.name} 的今日任务`)
 }
 </script>
@@ -301,6 +303,71 @@ const startSpaceToday = (space: LearningSpace) => {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xl);
+}
+
+/* 画像提醒横幅 */
+.profile-reminder-banner {
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.08) 0%, rgba(59, 91, 219, 0.08) 100%);
+  border: 1px solid rgba(18, 184, 134, 0.2);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.banner-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.banner-text {
+  flex: 1;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+.banner-action {
+  padding: 6px var(--spacing-lg);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #12b886 0%, #38d9a9 100%);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  white-space: nowrap;
+}
+
+.banner-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(18, 184, 134, 0.3);
+}
+
+.banner-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.banner-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-regular);
 }
 
 /* Agent 总学习伙伴问候 */
