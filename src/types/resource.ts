@@ -16,6 +16,8 @@ export interface FileFolderVO {
   sort: number
   /** 更新时间 */
   updateTime: string
+  /** 子文件夹（树形结构） */
+  children?: FileFolderVO[]
 }
 
 // ==================== FileResourceVO ====================
