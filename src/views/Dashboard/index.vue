@@ -112,6 +112,26 @@
       </div>
     </section>
 
+    <!-- 画像未完成提醒横幅 -->
+    <section
+      v-if="!userStore.profileInitialized && showProfileReminder"
+      class="profile-reminder-banner"
+    >
+      <div class="banner-content">
+        <svg class="banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4M12 8h.01"/>
+        </svg>
+        <span class="banner-text">完善学习画像，让 AI 更懂你</span>
+        <button class="banner-action" @click="$router.push('/onboarding')">去完善</button>
+        <button class="banner-close" @click="showProfileReminder = false" title="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
     <!-- 双列布局 -->
     <div class="two-column">
       <!-- 今日优先任务（跨空间） -->
@@ -229,6 +249,7 @@ const userStore = useUserStore()
 const spaceStore = useLearningSpaceStore()
 const userName = ref(userStore.userName || '谢同学')
 const showWhyDialog = ref(false)
+const showProfileReminder = ref(true)
 
 onMounted(() => {
   spaceStore.fetchSpaces('active')
@@ -282,6 +303,71 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xl);
+}
+
+/* 画像提醒横幅 */
+.profile-reminder-banner {
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.08) 0%, rgba(59, 91, 219, 0.08) 100%);
+  border: 1px solid rgba(18, 184, 134, 0.2);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.banner-icon {
+  width: 22px;
+  height: 22px;
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.banner-text {
+  flex: 1;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+.banner-action {
+  padding: 6px var(--spacing-lg);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #12b886 0%, #38d9a9 100%);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  white-space: nowrap;
+}
+
+.banner-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(18, 184, 134, 0.3);
+}
+
+.banner-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.banner-close:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-regular);
 }
 
 /* Agent 总学习伙伴问候 */

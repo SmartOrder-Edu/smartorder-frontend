@@ -19,6 +19,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '注册 - 知序智学', guest: true }
   },
   {
+    path: '/onboarding',
+    name: 'Onboarding',
+    component: () => import('@/views/Onboarding/index.vue'),
+    meta: { title: '学习画像引导 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard/index.vue'),
@@ -136,6 +142,15 @@ router.beforeEach((to, _from, next) => {
   } else if (to.meta.guest && isLoggedIn) {
     // 已登录访问游客页，跳转 AI 总学习伙伴
     next({ name: 'AITutor' })
+  } else if (
+    to.meta.requiresAuth &&
+    isLoggedIn &&
+    userStore.userInfo &&
+    !userStore.profileInitialized &&
+    to.name !== 'Onboarding'
+  ) {
+    // 已登录但未初始化画像，引导至画像引导页
+    next({ name: 'Onboarding' })
   } else {
     next()
   }

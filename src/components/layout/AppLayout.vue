@@ -123,17 +123,33 @@
           <!-- 用户区 -->
           <div class="sidebar-user" v-if="!sidebarCollapsed">
             <div class="sidebar-user-info" @click="showUserMenu = !showUserMenu">
-              <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar" />
+              <div class="sidebar-avatar-wrap">
+                <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar" />
+                <span v-if="!userStore.profileInitialized" class="profile-dot" title="画像未完善"></span>
+              </div>
               <span class="sidebar-username">{{ userStore.userName || '用户' }}</span>
             </div>
           </div>
           <div class="sidebar-user-mini" v-else>
-            <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar-mini" @click="showUserMenu = !showUserMenu" />
+            <div class="sidebar-avatar-wrap">
+              <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar-mini" @click="showUserMenu = !showUserMenu" />
+              <span v-if="!userStore.profileInitialized" class="profile-dot-mini" title="画像未完善"></span>
+            </div>
           </div>
 
           <!-- 用户下拉菜单 -->
           <transition name="slide-up">
             <div class="sidebar-user-menu" v-if="showUserMenu && !sidebarCollapsed">
+              <button
+                v-if="!userStore.profileInitialized"
+                class="user-menu-item profile-init-item"
+                @click="goOnboarding"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                </svg>
+                完善学习画像
+              </button>
               <button class="user-menu-item" @click="goProfile">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -358,6 +374,10 @@ const isActiveSpace = (spaceId: number) => {
 }
 
 const goHome = () => router.push('/ai-tutor')
+const goOnboarding = () => {
+  showUserMenu.value = false
+  router.push('/onboarding')
+}
 const goProfile = () => {
   showUserMenu.value = false
   router.push('/profile')
@@ -777,6 +797,34 @@ const handleLogout = async () => {
   &:hover { background: var(--background-color-base); }
 }
 
+.sidebar-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.profile-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 2px solid white;
+}
+
+.profile-dot-mini {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f59e0b;
+  border: 2px solid white;
+}
+
 .sidebar-avatar {
   width: 28px;
   height: 28px;
@@ -980,6 +1028,10 @@ const handleLogout = async () => {
   &:hover { background: var(--background-color-base); }
   &.logout { color: var(--danger-color); }
   &.logout:hover { background: rgba(239, 68, 68, 0.06); }
+  &.profile-init-item {
+    color: #f59e0b;
+    &:hover { background: rgba(245, 158, 11, 0.06); }
+  }
 }
 
 .user-menu-divider {

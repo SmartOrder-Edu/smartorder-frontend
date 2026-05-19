@@ -13,28 +13,6 @@ export interface RegisterParams {
   password: string
   confirmPassword: string
   verificationCode: string
-  /** 身份：undergraduate|graduate|self|career */
-  identity?: string
-  /** 年级：freshman|sophomore|junior|senior|g1|g2|g3 */
-  grade?: string
-  /** 学习方向：ai|cs|ds|ee|business|humanities|design|other */
-  direction?: string
-  /** 学习方向补充说明（选"其他"时必填） */
-  directionDetail?: string
-  /** 当前基础：beginner|some|course|advanced */
-  level?: string
-  /** 当前基础补充说明 */
-  levelDetail?: string
-  /** 近期目标：exam|project|skill|grad|competition */
-  goal?: string
-  /** 近期目标补充说明 */
-  goalDetail?: string
-  /** 目标截止时间：1week|1month|semester|longterm */
-  goalDeadline?: string
-  /** 每日学习时间：lt30|30to60|1to2|2to3|gt3 */
-  dailyStudyTime?: string
-  /** 自由文本自我描述（最长500字符） */
-  selfDescription?: string
 }
 
 export interface UpdateUserParams {
@@ -69,6 +47,7 @@ export interface UserInfoResponse {
   vipStartTime?: string
   vipExpireTime?: string
   status?: number
+  profileInitialized?: boolean
 }
 
 export const userApi = {
