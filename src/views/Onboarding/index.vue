@@ -313,7 +313,16 @@ const timeOptions = [
 
 // ---- Actions ----
 
-const handleSkip = () => {
+const handleSkip = async () => {
+  try {
+    await studentProfileApi.initProfile({})
+    await userStore.fetchUserInfo()
+  } catch {
+    // 如果接口失败，设置本地标志以绕过路由守卫
+    if (userStore.userInfo) {
+      userStore.userInfo.profileInitialized = true
+    }
+  }
   router.push('/dashboard')
 }
 
