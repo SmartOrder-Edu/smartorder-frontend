@@ -200,133 +200,149 @@
           <!-- 步骤2：学习画像初始化 -->
           <div v-show="currentStep === 2" class="step-content">
             <div class="card-header profile-header">
-              <h2 class="card-title">先让我了解一下你</h2>
-              <p class="card-subtitle">知序智学会根据你的目标，为你生成第一版学习路径</p>
-            </div>
-
-            <div class="profile-form">
-              <!-- 身份选择 -->
-              <div class="question-block">
-                <h3 class="question-title">
-                  <span class="question-num">1</span>
-                  你目前的身份是？
-                </h3>
-                <div class="option-cards">
-                  <button
-                    v-for="item in identityOptions"
-                    :key="item.value"
-                    type="button"
-                    class="option-card"
-                    :class="{ selected: profileData.identity === item.value }"
-                    @click="profileData.identity = item.value"
-                  >
-                    <span class="option-icon" v-html="item.icon"></span>
-                    <span class="option-label">{{ item.label }}</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- 学习方向 -->
-              <div class="question-block">
-                <h3 class="question-title">
-                  <span class="question-num">2</span>
-                  你想学习的方向是？
-                </h3>
-                <div class="option-chips">
-                  <button
-                    v-for="item in directionOptions"
-                    :key="item.value"
-                    type="button"
-                    class="option-chip"
-                    :class="{ selected: profileData.direction === item.value }"
-                    @click="profileData.direction = item.value"
-                  >
-                    {{ item.label }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- 当前基础 -->
-              <div class="question-block">
-                <h3 class="question-title">
-                  <span class="question-num">3</span>
-                  你的当前基础如何？
-                </h3>
-                <div class="option-chips">
-                  <button
-                    v-for="item in levelOptions"
-                    :key="item.value"
-                    type="button"
-                    class="option-chip"
-                    :class="{ selected: profileData.level === item.value }"
-                    @click="profileData.level = item.value"
-                  >
-                    {{ item.label }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- 近期目标 -->
-              <div class="question-block">
-                <h3 class="question-title">
-                  <span class="question-num">4</span>
-                  你近期目标是什么？
-                </h3>
-                <div class="option-chips">
-                  <button
-                    v-for="item in goalOptions"
-                    :key="item.value"
-                    type="button"
-                    class="option-chip"
-                    :class="{ selected: profileData.goal === item.value }"
-                    @click="profileData.goal = item.value"
-                  >
-                    {{ item.label }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- 自由描述 -->
-              <div class="question-block">
-                <h3 class="question-title">
-                  <span class="question-num">5</span>
-                  或者，用一段话介绍你自己（选填）
-                </h3>
-                <p class="question-hint">
-                  用自然语言告诉AI你的专业背景、每天学习时间、擅长与不擅长的领域，系统会据此构建更精准的学习画像。
-                </p>
-                <el-input
-                  v-model="profileData.selfDescription"
-                  type="textarea"
-                  :rows="3"
-                  maxlength="500"
-                  show-word-limit
-                  placeholder="例如：我是计算机专业大三学生，每天有2小时学习时间，Python比较熟但对算法不太熟悉，最近在准备操作系统考试..."
-                  class="self-description-input"
-                />
-              </div>
-
-              <!-- 按钮组 -->
-              <div class="btn-group">
-                <el-button size="large" class="back-btn" @click="currentStep = 1">
+              <div class="card-header-row" v-if="profileStep === 1">
+                <a href="javascript:void(0)" class="back-link" @click="currentStep = 1">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M19 12H5M12 19l-7-7 7-7"/>
                   </svg>
-                  上一步
-                </el-button>
-                <el-button
-                  type="primary"
-                  size="large"
-                  :loading="loading"
-                  class="create-btn"
-                  @click="handleRegister"
-                >
-                  完成注册，开始学习
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                  </svg>
-                </el-button>
+                  返回账号注册
+                </a>
               </div>
+              <div class="card-header-row" v-else>
+                <a href="javascript:void(0)" class="back-link" @click="profileStep--">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7"/>
+                  </svg>
+                  上一题
+                </a>
+              </div>
+              <h2 class="card-title">先让我了解一下你</h2>
+              <p class="card-subtitle">知序智学会根据你的目标，为你生成第一版学习路径</p>
+              
+              <!-- 进度条 -->
+              <div class="profile-progress-bar">
+                <div class="progress-fill" :style="{ width: `${(profileStep / 5) * 100}%` }"></div>
+              </div>
+            </div>
+
+            <div class="profile-form">
+              <transition name="slide-fade" mode="out-in">
+                <!-- 身份选择 -->
+                <div v-if="profileStep === 1" key="q1" class="question-block">
+                  <h3 class="question-title">
+                    <span class="question-num">1</span>
+                    你目前的身份是？
+                  </h3>
+                  <div class="option-cards">
+                    <button
+                      v-for="item in identityOptions"
+                      :key="item.value"
+                      type="button"
+                      class="option-card"
+                      :class="{ selected: profileData.identity === item.value }"
+                      @click="selectOption('identity', item.value)"
+                    >
+                      <span class="option-icon" v-html="item.icon"></span>
+                      <span class="option-label">{{ item.label }}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 学习方向 -->
+                <div v-else-if="profileStep === 2" key="q2" class="question-block">
+                  <h3 class="question-title">
+                    <span class="question-num">2</span>
+                    你想学习的方向是？
+                  </h3>
+                  <div class="option-chips">
+                    <button
+                      v-for="item in directionOptions"
+                      :key="item.value"
+                      type="button"
+                      class="option-chip"
+                      :class="{ selected: profileData.direction === item.value }"
+                      @click="selectOption('direction', item.value)"
+                    >
+                      {{ item.label }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 当前基础 -->
+                <div v-else-if="profileStep === 3" key="q3" class="question-block">
+                  <h3 class="question-title">
+                    <span class="question-num">3</span>
+                    你的当前基础如何？
+                  </h3>
+                  <div class="option-chips">
+                    <button
+                      v-for="item in levelOptions"
+                      :key="item.value"
+                      type="button"
+                      class="option-chip"
+                      :class="{ selected: profileData.level === item.value }"
+                      @click="selectOption('level', item.value)"
+                    >
+                      {{ item.label }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 近期目标 -->
+                <div v-else-if="profileStep === 4" key="q4" class="question-block">
+                  <h3 class="question-title">
+                    <span class="question-num">4</span>
+                    你近期目标是什么？
+                  </h3>
+                  <div class="option-chips">
+                    <button
+                      v-for="item in goalOptions"
+                      :key="item.value"
+                      type="button"
+                      class="option-chip"
+                      :class="{ selected: profileData.goal === item.value }"
+                      @click="selectOption('goal', item.value)"
+                    >
+                      {{ item.label }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 自由描述 -->
+                <div v-else-if="profileStep === 5" key="q5" class="question-block">
+                  <h3 class="question-title">
+                    <span class="question-num">5</span>
+                    最后，用一段话补充介绍一下自己（选填）
+                  </h3>
+                  <p class="question-hint">
+                    用自然语言告诉AI你的专业背景、每天学习时间、擅长与不擅长的领域，系统会据此构建更精准的学习画像。
+                  </p>
+                  <el-input
+                    v-model="profileData.selfDescription"
+                    type="textarea"
+                    :rows="4"
+                    maxlength="500"
+                    show-word-limit
+                    placeholder="例如：我是计算机专业大三学生，每天有2小时学习时间，Python比较熟但对算法不太熟悉，最近在准备操作系统考试..."
+                    class="self-description-input"
+                  />
+                  <!-- 按钮组（仅最后一步显示） -->
+                  <div class="btn-group submit-btn-group">
+                    <el-button
+                      type="primary"
+                      size="large"
+                      :loading="loading"
+                      class="create-btn full-width"
+                      @click="handleRegister"
+                    >
+                      完成注册，开始学习
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </el-button>
+                  </div>
+                </div>
+              </transition>
             </div>
           </div>
         </div>
@@ -347,6 +363,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const currentStep = ref(1)
+const profileStep = ref(1)
 const loading = ref(false)
 const codeLoading = ref(false)
 const countdown = ref(0)
@@ -439,6 +456,15 @@ const goalOptions = [
   { value: 'skill', label: '掌握一门技术' },
   { value: 'competition', label: '准备竞赛/科研' }
 ]
+
+const selectOption = (type: 'identity' | 'direction' | 'level' | 'goal', val: string) => {
+  profileData[type] = val
+  setTimeout(() => {
+    if (profileStep.value < 5) {
+      profileStep.value++
+    }
+  }, 300)
+}
 
 const sendCode = async () => {
   if (!formData.email) {
@@ -1086,6 +1112,47 @@ const handleRegister = async () => {
 .btn-group .create-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+}
+
+/* 画像进度条 & 动画 */
+.profile-progress-bar {
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  margin-top: 1.5rem;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary-color);
+  transition: width 0.3s ease;
+}
+
+.slide-fade-enter-active {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.slide-fade-leave-active {
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.slide-fade-enter-from {
+  transform: translateX(15px);
+  opacity: 0;
+}
+
+.slide-fade-leave-to {
+  transform: translateX(-15px);
+  opacity: 0;
+}
+
+.submit-btn-group {
+  margin-top: 2rem;
+}
+
+.full-width {
+  width: 100%;
 }
 
 /* 动画 */
