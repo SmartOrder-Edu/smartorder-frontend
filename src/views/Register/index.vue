@@ -110,28 +110,28 @@
 
               <!-- 验证码 -->
               <el-form-item prop="verificationCode" class="form-item">
-                <el-input
-                  v-model="formData.verificationCode"
-                  placeholder="输入邮箱验证码"
-                  size="large"
-                  maxlength="6"
-                >
-                  <template #prefix>
-                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                  </template>
-                  <template #append>
-                    <button
-                      type="button"
-                      class="send-code-btn"
-                      :disabled="countdown > 0 || codeLoading"
-                      @click="sendCode"
-                    >
-                      {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
-                    </button>
-                  </template>
-                </el-input>
+                <div class="code-input-row">
+                  <el-input
+                    v-model="formData.verificationCode"
+                    placeholder="输入邮箱验证码"
+                    size="large"
+                    maxlength="6"
+                  >
+                    <template #prefix>
+                      <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                      </svg>
+                    </template>
+                  </el-input>
+                  <button
+                    type="button"
+                    class="send-code-btn"
+                    :disabled="countdown > 0 || codeLoading"
+                    @click="sendCode"
+                  >
+                    {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
+                  </button>
+                </div>
               </el-form-item>
 
               <!-- 密码 -->
@@ -928,24 +928,43 @@ const handleRegister = async () => {
   color: var(--text-muted);
 }
 
+/* 验证码输入行 */
+.code-input-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.code-input-row .el-input {
+  flex: 1;
+}
+
 /* 发送验证码按钮 */
 .send-code-btn {
+  flex-shrink: 0;
   padding: 0 var(--spacing-md);
-  font-size: 0.875rem;
+  height: 40px;
+  font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--primary-color);
-  background: transparent;
-  border: none;
+  background: white;
+  border: 2px solid var(--primary-color);
+  border-radius: var(--radius-lg);
   cursor: pointer;
   white-space: nowrap;
+  transition: all var(--transition-base);
 }
 
 .send-code-btn:disabled {
   color: var(--text-muted);
+  border-color: var(--border-light);
+  background: var(--background-color-base);
   cursor: not-allowed;
 }
 
 .send-code-btn:hover:not(:disabled) {
-  color: var(--primary-light);
+  background: var(--primary-color);
+  color: white;
 }
 
 /* 服务条款 */
