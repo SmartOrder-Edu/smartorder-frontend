@@ -7,7 +7,40 @@
       <div class="bg-blob blob-2"></div>
     </div>
 
+    <!-- 注册成功过渡动画 -->
+    <transition name="fade">
+      <div v-if="showTransition" class="transition-overlay">
+        <div class="transition-content">
+          <div class="transition-agent-avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+              <line x1="9" y1="9" x2="9.01" y2="9"/>
+              <line x1="15" y1="9" x2="15.01" y2="9"/>
+            </svg>
+          </div>
+          <h2 class="transition-title">欢迎加入知序智学！</h2>
+          <p class="transition-text">AI 导师正在根据你的回答构建学习画像...</p>
+          <div class="transition-dots">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <div class="register-container">
+      <!-- 移动端顶部简栏 -->
+      <div class="mobile-header">
+        <img src="/logo.png" alt="知序智学" class="mobile-logo" />
+        <div class="mobile-steps">
+          <span class="mobile-step" :class="{ active: currentStep >= 1, completed: currentStep > 1 }">1</span>
+          <span class="mobile-step-line" :class="{ active: currentStep > 1 }"></span>
+          <span class="mobile-step" :class="{ active: currentStep >= 2 }">2</span>
+        </div>
+      </div>
+
       <!-- 左侧品牌区域 -->
       <div class="brand-section animate-fade-in">
         <div class="brand-content">
@@ -20,16 +53,29 @@
             </div>
           </div>
 
-          <!-- 标题 -->
-          <h2 class="main-title">
-            开始你的<br/>
-            <span class="accent">智能学习之旅</span>
-          </h2>
+          <!-- Step 1 品牌文案 -->
+          <template v-if="currentStep === 1">
+            <h2 class="main-title">
+              开始你的<br/>
+              <span class="accent">智能学习之旅</span>
+            </h2>
+            <p class="description">
+              创建账号后，我们将通过简单的问答为你构建专属的学习画像，
+              让 AI 更懂你，提供更精准的学习规划。
+            </p>
+          </template>
 
-          <p class="description">
-            创建账号后，我们将通过简单的问答为你构建专属的学习画像，
-            让 AI 更懂你，提供更精准的学习规划。
-          </p>
+          <!-- Step 2 品牌文案 -->
+          <template v-else>
+            <h2 class="main-title">
+              AI 导师正在<br/>
+              <span class="accent">了解你</span>
+            </h2>
+            <p class="description">
+              回答几个简单的问题，AI 就能为你量身定制学习路径和资源推荐。
+              每个问题都可以跳过，之后随时补充。
+            </p>
+          </template>
 
           <!-- 步骤指示 -->
           <div class="steps-indicator">
@@ -150,6 +196,31 @@
                     </svg>
                   </template>
                 </el-input>
+                <!-- 密码强度指示器 -->
+                <div v-if="formData.password" class="password-strength">
+                  <div class="strength-bar">
+                    <div
+                      class="strength-fill"
+                      :class="passwordStrength.level"
+                      :style="{ width: passwordStrength.percent + '%' }"
+                    ></div>
+                  </div>
+                  <span class="strength-text" :class="passwordStrength.level">{{ passwordStrength.label }}</span>
+                </div>
+                <div v-if="formData.password" class="password-checks">
+                  <span class="check-item" :class="{ passed: passwordChecks.length }">
+                    {{ passwordChecks.length ? '✓' : '○' }} 至少8位
+                  </span>
+                  <span class="check-item" :class="{ passed: passwordChecks.upper }">
+                    {{ passwordChecks.upper ? '✓' : '○' }} 含大写字母
+                  </span>
+                  <span class="check-item" :class="{ passed: passwordChecks.lower }">
+                    {{ passwordChecks.lower ? '✓' : '○' }} 含小写字母
+                  </span>
+                  <span class="check-item" :class="{ passed: passwordChecks.digit }">
+                    {{ passwordChecks.digit ? '✓' : '○' }} 含数字
+                  </span>
+                </div>
               </el-form-item>
 
               <!-- 确认密码 -->
@@ -207,6 +278,10 @@
                   </svg>
                   返回账号注册
                 </a>
+                <!-- 跳过画像入口 -->
+                <a href="javascript:void(0)" class="skip-profile-link" @click="skipProfile">
+                  稍后再说
+                </a>
               </div>
               <div class="card-header-row" v-else>
                 <a href="javascript:void(0)" class="back-link" @click="profileStep--">
@@ -216,53 +291,122 @@
                   上一题
                 </a>
               </div>
-              <h2 class="card-title">先让我了解一下你</h2>
-              <p class="card-subtitle">知序智学会根据你的目标，为你生成第一版学习路径</p>
-              
-              <!-- 进度条 -->
-              <div class="profile-progress-bar">
-                <div class="progress-fill" :style="{ width: `${(profileStep / 5) * 100}%` }"></div>
+
+              <!-- Agent 引导 -->
+              <div class="agent-greeting">
+                <div class="agent-avatar">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                    <line x1="9" y1="9" x2="9.01" y2="9"/>
+                    <line x1="15" y1="9" x2="15.01" y2="9"/>
+                  </svg>
+                </div>
+                <div class="agent-bubble">
+                  <p>{{ agentGreetingText }}</p>
+                </div>
+              </div>
+
+              <!-- 进度指示器 -->
+              <div class="profile-progress">
+                <div class="progress-dots">
+                  <button
+                    v-for="i in totalProfileSteps"
+                    :key="i"
+                    class="progress-dot"
+                    :class="{
+                      active: i === profileStep,
+                      completed: i < profileStep,
+                      upcoming: i > profileStep
+                    }"
+                    @click="i < profileStep && (profileStep = i)"
+                    :disabled="i > profileStep"
+                  >
+                    <svg v-if="i < profileStep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                      <polyline points="20,6 9,17 4,12"/>
+                    </svg>
+                    <span v-else>{{ i }}</span>
+                  </button>
+                </div>
+                <span class="progress-text">{{ profileStep }}/{{ totalProfileSteps }}</span>
               </div>
             </div>
 
             <div class="profile-form">
               <transition name="slide-fade" mode="out-in">
-                <!-- 身份选择 -->
+                <!-- Q1: 身份选择 -->
                 <div v-if="profileStep === 1" key="q1" class="question-block">
                   <h3 class="question-title">
                     <span class="question-num">1</span>
                     你目前的身份是？
                   </h3>
-                  <div class="option-cards">
+                  <div class="option-cards" role="radiogroup" aria-label="身份选择">
                     <button
                       v-for="item in identityOptions"
                       :key="item.value"
                       type="button"
                       class="option-card"
                       :class="{ selected: profileData.identity === item.value }"
+                      role="radio"
+                      :aria-checked="profileData.identity === item.value"
                       @click="selectOption('identity', item.value)"
                     >
                       <span class="option-icon" v-html="item.icon"></span>
                       <span class="option-label">{{ item.label }}</span>
                     </button>
                   </div>
+                  <!-- 年级追问 -->
+                  <transition name="slide-fade">
+                    <div v-if="profileData.identity && gradeOptions.length" class="sub-question">
+                      <p class="sub-question-label">你的年级是？<span class="optional-tag">选填</span></p>
+                      <div class="option-chips">
+                        <button
+                          v-for="item in gradeOptions"
+                          :key="item.value"
+                          type="button"
+                          class="option-chip"
+                          :class="{ selected: profileData.grade === item.value }"
+                          @click="profileData.grade = item.value"
+                        >
+                          {{ item.label }}
+                        </button>
+                      </div>
+                    </div>
+                  </transition>
+                  <div class="question-actions">
+                    <button
+                      type="button"
+                      class="next-question-btn"
+                      :disabled="!profileData.identity"
+                      @click="profileStep++"
+                    >
+                      下一步
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+                    <button type="button" class="skip-btn" @click="skipQuestion">跳过</button>
+                  </div>
                 </div>
 
-                <!-- 学习方向 -->
+                <!-- Q2: 学习方向 -->
                 <div v-else-if="profileStep === 2" key="q2" class="question-block">
                   <h3 class="question-title">
                     <span class="question-num">2</span>
                     你想学习的方向是？
                   </h3>
-                  <div class="option-chips">
+                  <div class="option-chips" role="radiogroup" aria-label="学习方向">
                     <button
                       v-for="item in directionOptions"
                       :key="item.value"
                       type="button"
                       class="option-chip"
                       :class="{ selected: profileData.direction === item.value }"
+                      role="radio"
+                      :aria-checked="profileData.direction === item.value"
                       @click="selectOption('direction', item.value)"
                     >
+                      <span class="chip-emoji">{{ item.emoji }}</span>
                       {{ item.label }}
                     </button>
                   </div>
@@ -279,36 +423,41 @@
                       />
                     </div>
                   </transition>
-                  <button
-                    v-if="profileData.direction"
-                    type="button"
-                    class="next-question-btn"
-                    :disabled="profileData.direction === 'other' && !profileData.directionDetail.trim()"
-                    @click="profileStep++"
-                  >
-                    下一步
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                  </button>
+                  <div class="question-actions">
+                    <button
+                      type="button"
+                      class="next-question-btn"
+                      :disabled="!profileData.direction || (profileData.direction === 'other' && !profileData.directionDetail.trim())"
+                      @click="profileStep++"
+                    >
+                      下一步
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+                    <button type="button" class="skip-btn" @click="skipQuestion">跳过</button>
+                  </div>
                 </div>
 
-                <!-- 当前基础 -->
+                <!-- Q3: 当前基础 -->
                 <div v-else-if="profileStep === 3" key="q3" class="question-block">
                   <h3 class="question-title">
                     <span class="question-num">3</span>
                     你的当前基础如何？
                   </h3>
-                  <div class="option-chips">
+                  <div class="option-chips option-chips--described" role="radiogroup" aria-label="当前基础">
                     <button
                       v-for="item in levelOptions"
                       :key="item.value"
                       type="button"
-                      class="option-chip"
+                      class="option-chip option-chip--described"
                       :class="{ selected: profileData.level === item.value }"
+                      role="radio"
+                      :aria-checked="profileData.level === item.value"
                       @click="selectOption('level', item.value)"
                     >
-                      {{ item.label }}
+                      <span class="chip-main">{{ item.label }}</span>
+                      <span class="chip-desc">{{ item.desc }}</span>
                     </button>
                   </div>
                   <!-- 补充说明输入框 -->
@@ -323,37 +472,60 @@
                       />
                     </div>
                   </transition>
-                  <button
-                    v-if="profileData.level"
-                    type="button"
-                    class="next-question-btn"
-                    @click="profileStep++"
-                  >
-                    下一步
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                  </button>
+                  <div class="question-actions">
+                    <button
+                      type="button"
+                      class="next-question-btn"
+                      :disabled="!profileData.level"
+                      @click="profileStep++"
+                    >
+                      下一步
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+                    <button type="button" class="skip-btn" @click="skipQuestion">跳过</button>
+                  </div>
                 </div>
 
-                <!-- 近期目标 -->
+                <!-- Q4: 近期目标 -->
                 <div v-else-if="profileStep === 4" key="q4" class="question-block">
                   <h3 class="question-title">
                     <span class="question-num">4</span>
                     你近期目标是什么？
                   </h3>
-                  <div class="option-chips">
+                  <div class="option-chips" role="radiogroup" aria-label="近期目标">
                     <button
                       v-for="item in goalOptions"
                       :key="item.value"
                       type="button"
                       class="option-chip"
                       :class="{ selected: profileData.goal === item.value }"
+                      role="radio"
+                      :aria-checked="profileData.goal === item.value"
                       @click="selectOption('goal', item.value)"
                     >
                       {{ item.label }}
                     </button>
                   </div>
+                  <!-- 截止时间追问 -->
+                  <transition name="slide-fade">
+                    <div v-if="profileData.goal" class="sub-question">
+                      <p class="sub-question-label">大概什么时候需要达成？<span class="optional-tag">选填</span></p>
+                      <div class="option-chips">
+                        <button
+                          v-for="item in deadlineOptions"
+                          :key="item.value"
+                          type="button"
+                          class="option-chip"
+                          :class="{ selected: profileData.goalDeadline === item.value }"
+                          @click="profileData.goalDeadline = item.value"
+                        >
+                          {{ item.label }}
+                        </button>
+                      </div>
+                    </div>
+                  </transition>
                   <!-- 补充说明输入框 -->
                   <transition name="slide-fade">
                     <div v-if="profileData.goal" class="detail-input-wrapper">
@@ -366,28 +538,67 @@
                       />
                     </div>
                   </transition>
-                  <button
-                    v-if="profileData.goal"
-                    type="button"
-                    class="next-question-btn"
-                    @click="profileStep++"
-                  >
-                    下一步
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                  </button>
+                  <div class="question-actions">
+                    <button
+                      type="button"
+                      class="next-question-btn"
+                      :disabled="!profileData.goal"
+                      @click="profileStep++"
+                    >
+                      下一步
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+                    <button type="button" class="skip-btn" @click="skipQuestion">跳过</button>
+                  </div>
                 </div>
 
-                <!-- 自由描述 -->
+                <!-- Q5: 每日学习时间 -->
                 <div v-else-if="profileStep === 5" key="q5" class="question-block">
                   <h3 class="question-title">
                     <span class="question-num">5</span>
-                    最后，用一段话补充介绍一下自己（选填）
+                    你每天大概能花多少时间学习？
                   </h3>
-                  <p class="question-hint">
-                    用自然语言告诉AI你的专业背景、每天学习时间、擅长与不擅长的领域，系统会据此构建更精准的学习画像。
-                  </p>
+                  <div class="option-chips" role="radiogroup" aria-label="每日学习时间">
+                    <button
+                      v-for="item in studyTimeOptions"
+                      :key="item.value"
+                      type="button"
+                      class="option-chip option-chip--time"
+                      :class="{ selected: profileData.dailyStudyTime === item.value }"
+                      role="radio"
+                      :aria-checked="profileData.dailyStudyTime === item.value"
+                      @click="profileData.dailyStudyTime = item.value"
+                    >
+                      {{ item.label }}
+                    </button>
+                  </div>
+                  <div class="question-actions">
+                    <button
+                      type="button"
+                      class="next-question-btn"
+                      :disabled="!profileData.dailyStudyTime"
+                      @click="profileStep++"
+                    >
+                      下一步
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                      </svg>
+                    </button>
+                    <button type="button" class="skip-btn" @click="skipQuestion">跳过</button>
+                  </div>
+                </div>
+
+                <!-- Q6: 自由描述 -->
+                <div v-else-if="profileStep === 6" key="q6" class="question-block">
+                  <h3 class="question-title">
+                    <span class="question-num">6</span>
+                    最后，用一段话补充介绍一下自己
+                  </h3>
+                  <div class="hint-tags">
+                    <span class="hint-tag" v-for="tag in descriptionHintTags" :key="tag">{{ tag }}</span>
+                  </div>
                   <el-input
                     v-model="profileData.selfDescription"
                     type="textarea"
@@ -397,7 +608,7 @@
                     placeholder="例如：我是计算机专业大三学生，每天有2小时学习时间，Python比较熟但对算法不太熟悉，最近在准备操作系统考试..."
                     class="self-description-input"
                   />
-                  <!-- 按钮组（仅最后一步显示） -->
+                  <!-- 按钮组 -->
                   <div class="btn-group submit-btn-group">
                     <el-button
                       type="primary"
@@ -423,7 +634,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -435,10 +646,13 @@ const userStore = useUserStore()
 
 const currentStep = ref(1)
 const profileStep = ref(1)
+const totalProfileSteps = 6
 const loading = ref(false)
 const codeLoading = ref(false)
 const countdown = ref(0)
 const formRef = ref<FormInstance>()
+const showTransition = ref(false)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
 
 const formData = reactive({
   nickname: '',
@@ -451,14 +665,70 @@ const formData = reactive({
 
 const profileData = reactive({
   identity: '',
+  grade: '',
   direction: '',
   directionDetail: '',
   level: '',
   levelDetail: '',
   goal: '',
   goalDetail: '',
+  goalDeadline: '',
+  dailyStudyTime: '',
   selfDescription: ''
 })
+
+// 密码强度计算
+const passwordChecks = computed(() => ({
+  length: formData.password.length >= 8,
+  upper: /[A-Z]/.test(formData.password),
+  lower: /[a-z]/.test(formData.password),
+  digit: /\d/.test(formData.password)
+}))
+
+const passwordStrength = computed(() => {
+  const checks = passwordChecks.value
+  const score = [checks.length, checks.upper, checks.lower, checks.digit].filter(Boolean).length
+  if (score <= 1) return { level: 'weak', label: '弱', percent: 25 }
+  if (score === 2) return { level: 'weak', label: '较弱', percent: 50 }
+  if (score === 3) return { level: 'medium', label: '中等', percent: 75 }
+  return { level: 'strong', label: '强', percent: 100 }
+})
+
+// Agent 引导文案
+const agentGreetingText = computed(() => {
+  const greetings: Record<number, string> = {
+    1: '你好！我是你的 AI 学习助手，先让我了解一下你~',
+    2: '了解你的方向，才能推荐最合适的学习资源',
+    3: '基础不同，学习路径也会不同哦',
+    4: '目标越清晰，规划越精准',
+    5: '合理的时间安排是高效学习的关键',
+    6: '最后一步！更多信息 = 更懂你的 AI'
+  }
+  return greetings[profileStep.value] || '让我了解一下你'
+})
+
+// 年级选项（根据身份动态生成）
+const gradeOptions = computed(() => {
+  if (profileData.identity === 'undergraduate') {
+    return [
+      { value: 'freshman', label: '大一' },
+      { value: 'sophomore', label: '大二' },
+      { value: 'junior', label: '大三' },
+      { value: 'senior', label: '大四' }
+    ]
+  }
+  if (profileData.identity === 'graduate') {
+    return [
+      { value: 'g1', label: '研一' },
+      { value: 'g2', label: '研二' },
+      { value: 'g3', label: '研三+' }
+    ]
+  }
+  return []
+})
+
+// Q6 结构化提示标签
+const descriptionHintTags = ['专业年级', '每天可用时间', '擅长领域', '薄弱环节', '考试日期']
 
 const validateConfirmPassword = (_rule: any, value: string, callback: any) => {
   if (value !== formData.password) {
@@ -501,47 +771,76 @@ const rules: FormRules = {
   ]
 }
 
+// 身份选项（差异化图标）
 const identityOptions = [
   { value: 'undergraduate', label: '本科生', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>' },
-  { value: 'graduate', label: '研究生', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>' },
-  { value: 'self', label: '自学者', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg>' },
-  { value: 'career', label: '转专业学习', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/></svg>' }
+  { value: 'graduate', label: '研究生', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>' },
+  { value: 'self', label: '自学者', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>' },
+  { value: 'career', label: '转专业学习', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>' }
 ]
 
+// 学习方向（扩展）
 const directionOptions = [
-  { value: 'ai', label: '人工智能' },
-  { value: 'cs', label: '计算机基础' },
-  { value: 'os', label: '操作系统' },
-  { value: 'ds', label: '数据结构' },
-  { value: 'ee', label: '电子信息' },
-  { value: 'other', label: '其他方向' }
+  { value: 'ai', label: '人工智能', emoji: '🤖' },
+  { value: 'cs', label: '计算机基础', emoji: '💻' },
+  { value: 'ds', label: '数据结构与算法', emoji: '🧮' },
+  { value: 'ee', label: '电子信息', emoji: '⚡' },
+  { value: 'business', label: '经济管理', emoji: '📊' },
+  { value: 'humanities', label: '人文社科', emoji: '📖' },
+  { value: 'design', label: '艺术设计', emoji: '🎨' },
+  { value: 'other', label: '其他方向', emoji: '📌' }
 ]
 
+// 当前基础（语义清晰化）
 const levelOptions = [
-  { value: 'beginner', label: '刚入门' },
-  { value: 'some', label: '学过一点' },
-  { value: 'course', label: '有课程基础' },
-  { value: 'advanced', label: '想系统进阶' }
+  { value: 'beginner', label: '零基础', desc: '完全没接触过' },
+  { value: 'some', label: '入门阶段', desc: '了解基本概念' },
+  { value: 'course', label: '有基础', desc: '上过课/做过练习' },
+  { value: 'advanced', label: '较熟练', desc: '有项目/实操经验' }
 ]
 
+// 近期目标（增加升学）
 const goalOptions = [
   { value: 'exam', label: '通过考试' },
   { value: 'project', label: '完成课程项目' },
   { value: 'skill', label: '掌握一门技术' },
+  { value: 'grad', label: '考研/保研' },
   { value: 'competition', label: '准备竞赛/科研' }
+]
+
+// 截止时间
+const deadlineOptions = [
+  { value: '1week', label: '1周内' },
+  { value: '1month', label: '1个月内' },
+  { value: 'semester', label: '本学期内' },
+  { value: 'longterm', label: '长期目标' }
+]
+
+// 每日学习时间
+const studyTimeOptions = [
+  { value: 'lt30', label: '不到30分钟' },
+  { value: '30to60', label: '30-60分钟' },
+  { value: '1to2', label: '1-2小时' },
+  { value: '2to3', label: '2-3小时' },
+  { value: 'gt3', label: '3小时以上' }
 ]
 
 const selectOption = (type: 'identity' | 'direction' | 'level' | 'goal', val: string) => {
   profileData[type] = val
-  // Q1 身份选择后自动进入下一题（无补充输入框）
-  // Q2/Q3/Q4 选完后不自动跳转，用户可能要填补充说明
+  // 切换身份时重置年级
   if (type === 'identity') {
-    setTimeout(() => {
-      if (profileStep.value < 5) {
-        profileStep.value++
-      }
-    }, 300)
+    profileData.grade = ''
   }
+}
+
+const skipQuestion = () => {
+  if (profileStep.value < totalProfileSteps) {
+    profileStep.value++
+  }
+}
+
+const skipProfile = () => {
+  handleRegister()
 }
 
 const sendCode = async () => {
@@ -559,11 +858,16 @@ const sendCode = async () => {
     await userApi.sendEmailCode(formData.email)
     ElMessage.success('验证码已发送到您的邮箱')
     countdown.value = 60
-    const timer = setInterval(() => {
+    countdownTimer = setInterval(() => {
       countdown.value--
-      if (countdown.value <= 0) clearInterval(timer)
+      if (countdown.value <= 0) {
+        if (countdownTimer) clearInterval(countdownTimer)
+        countdownTimer = null
+      }
     }, 1000)
-  } catch {} finally {
+  } catch (error: any) {
+    ElMessage.error(error?.message || '验证码发送失败，请稍后重试')
+  } finally {
     codeLoading.value = false
   }
 }
@@ -590,25 +894,40 @@ const handleRegister = async () => {
       confirmPassword: formData.confirmPassword,
       verificationCode: formData.verificationCode,
       identity: profileData.identity || undefined,
+      grade: profileData.grade || undefined,
       direction: profileData.direction || undefined,
       directionDetail: profileData.directionDetail?.trim() || undefined,
       level: profileData.level || undefined,
       levelDetail: profileData.levelDetail?.trim() || undefined,
       goal: profileData.goal || undefined,
       goalDetail: profileData.goalDetail?.trim() || undefined,
+      goalDeadline: profileData.goalDeadline || undefined,
+      dailyStudyTime: profileData.dailyStudyTime || undefined,
       selfDescription: profileData.selfDescription || undefined
     })
-    ElMessage.success('注册成功，正在登录...')
+    // 显示过渡动画
+    showTransition.value = true
     // 注册成功后自动登录
     await userStore.login(formData.email, formData.password)
     await userStore.fetchUserInfo()
-    router.push('/dashboard')
+    // 延迟跳转，让过渡动画展示
+    setTimeout(() => {
+      router.push('/dashboard')
+    }, 2000)
   } catch (error: any) {
+    showTransition.value = false
     ElMessage.error(error?.message || '注册失败，请重试')
   } finally {
     loading.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+})
 </script>
 
 <style scoped>
@@ -663,6 +982,157 @@ const handleRegister = async () => {
   left: -50px;
 }
 
+/* 注册过渡动画 */
+.transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+}
+
+.transition-content {
+  text-align: center;
+}
+
+.transition-agent-avatar {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto var(--spacing-lg);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.transition-agent-avatar svg {
+  width: 48px;
+  height: 48px;
+  color: white;
+}
+
+.transition-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: var(--spacing-sm);
+}
+
+.transition-text {
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xl);
+}
+
+.transition-dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+.transition-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+
+.transition-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.transition-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* 移动端顶部简栏 */
+.mobile-header {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  padding: var(--spacing-sm) var(--spacing-md);
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.mobile-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.mobile-steps {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.mobile-step {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-color-base);
+  border: 2px solid var(--border-light);
+  color: var(--text-muted);
+  transition: all var(--transition-base);
+}
+
+.mobile-step.active {
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.mobile-step.completed {
+  background: #12b886;
+  border-color: #12b886;
+  color: white;
+}
+
+.mobile-step-line {
+  width: 20px;
+  height: 2px;
+  background: var(--border-light);
+  transition: background var(--transition-base);
+}
+
+.mobile-step-line.active {
+  background: linear-gradient(90deg, #12b886 0%, #3b5bdb 100%);
+}
+
+@media (max-width: 992px) {
+  .mobile-header {
+    display: flex;
+  }
+}
+
 /* 容器 */
 .register-container {
   display: flex;
@@ -679,6 +1149,7 @@ const handleRegister = async () => {
   .register-container {
     flex-direction: column;
     padding: var(--spacing-md);
+    padding-top: 60px;
     align-items: center;
     justify-content: center;
   }
@@ -720,6 +1191,20 @@ const handleRegister = async () => {
 }
 
 .back-link:hover {
+  color: var(--primary-color);
+}
+
+/* 跳过画像入口 */
+.skip-profile-link {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  margin-left: auto;
+  transition: color var(--transition-base);
+}
+
+.skip-profile-link:hover {
   color: var(--primary-color);
 }
 
@@ -897,6 +1382,7 @@ const handleRegister = async () => {
 .card-header-row {
   display: flex;
   justify-content: flex-start;
+  align-items: center;
   margin-bottom: var(--spacing-md);
 }
 
@@ -910,6 +1396,75 @@ const handleRegister = async () => {
 .card-subtitle {
   font-size: 0.875rem;
   color: var(--text-secondary);
+}
+
+/* 密码强度指示器 */
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.strength-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border-light);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.strength-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.strength-fill.weak {
+  background: #ef4444;
+}
+
+.strength-fill.medium {
+  background: #f59e0b;
+}
+
+.strength-fill.strong {
+  background: #12b886;
+}
+
+.strength-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.strength-text.weak {
+  color: #ef4444;
+}
+
+.strength-text.medium {
+  color: #f59e0b;
+}
+
+.strength-text.strong {
+  color: #12b886;
+}
+
+.password-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.check-item {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  transition: color var(--transition-base);
+}
+
+.check-item.passed {
+  color: #12b886;
 }
 
 /* 表单 */
@@ -937,6 +1492,15 @@ const handleRegister = async () => {
 
 .code-input-row .el-input {
   flex: 1;
+}
+
+@media (max-width: 480px) {
+  .code-input-row {
+    flex-direction: column;
+  }
+  .send-code-btn {
+    width: 100%;
+  }
 }
 
 /* 发送验证码按钮 */
@@ -1013,6 +1577,107 @@ const handleRegister = async () => {
   box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
 }
 
+/* Agent 引导 */
+.agent-greeting {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  text-align: left;
+}
+
+.agent-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+}
+
+.agent-avatar svg {
+  width: 100%;
+  height: 100%;
+  color: white;
+}
+
+.agent-bubble {
+  background: #f0f4ff;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  position: relative;
+}
+
+.agent-bubble p {
+  margin: 0;
+}
+
+/* 进度指示器 (步进点) */
+.profile-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.progress-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.progress-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border-light);
+  background: white;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: all var(--transition-base);
+  padding: 0;
+}
+
+.progress-dot svg {
+  width: 14px;
+  height: 14px;
+}
+
+.progress-dot.completed {
+  background: #12b886;
+  border-color: #12b886;
+  color: white;
+  cursor: pointer;
+}
+
+.progress-dot.active {
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.progress-dot.upcoming {
+  opacity: 0.5;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 /* 画像表单 */
 .profile-form .question-block {
   margin-bottom: var(--spacing-md);
@@ -1049,6 +1714,54 @@ const handleRegister = async () => {
   flex-shrink: 0;
 }
 
+/* 问题操作区（下一步 + 跳过） */
+.question-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+}
+
+.skip-btn {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color var(--transition-base);
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.skip-btn:hover {
+  color: var(--primary-color);
+}
+
+/* 子问题（年级、截止时间） */
+.sub-question {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px dashed var(--border-light);
+}
+
+.sub-question-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.optional-tag {
+  display: inline-block;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  background: var(--background-color-base);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  margin-left: var(--spacing-xs);
+  font-weight: 400;
+}
+
 /* 选项卡片 */
 .option-cards {
   display: grid;
@@ -1056,12 +1769,18 @@ const handleRegister = async () => {
   gap: var(--spacing-sm);
 }
 
+@media (max-width: 480px) {
+  .option-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
 .option-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm);
   background: var(--background-color-base);
   border: 2px solid transparent;
   border-radius: var(--radius-lg);
@@ -1070,8 +1789,8 @@ const handleRegister = async () => {
 }
 
 .option-card .option-icon {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1121,6 +1840,13 @@ const handleRegister = async () => {
   color: var(--text-regular);
   cursor: pointer;
   transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chip-emoji {
+  font-size: 0.875rem;
 }
 
 .option-chip:hover {
@@ -1135,14 +1861,57 @@ const handleRegister = async () => {
   color: white;
 }
 
-/* 自由描述输入 */
-.question-hint {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-bottom: var(--spacing-xs);
-  line-height: 1.4;
+/* 带描述的选项胶囊 */
+.option-chips--described {
+  flex-direction: column;
+  gap: var(--spacing-xs);
 }
 
+.option-chip--described {
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.chip-main {
+  font-weight: 500;
+}
+
+.chip-desc {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+.option-chip--described.selected .chip-desc {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* 时间选项 */
+.option-chip--time {
+  min-width: 100px;
+  justify-content: center;
+}
+
+/* Q6 提示标签 */
+.hint-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.hint-tag {
+  font-size: 0.6875rem;
+  color: var(--primary-color);
+  background: #f0f4ff;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-weight: 500;
+}
+
+/* 自由描述输入 */
 .self-description-input :deep(.el-textarea__inner) {
   border-radius: var(--radius-lg);
   background: var(--background-color-base);
@@ -1214,22 +1983,22 @@ const handleRegister = async () => {
   box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
 }
 
-/* 补充说明输入框 */
+/* 补充说明输入框（视觉降级） */
 .detail-input-wrapper {
   margin-top: var(--spacing-md);
 }
 
 .detail-input-wrapper :deep(.el-input__wrapper) {
   border-radius: var(--radius-lg);
-  background: var(--background-color-base);
-  border: 2px solid transparent;
+  background: rgba(248, 250, 252, 0.6);
+  border: 1px solid var(--border-light);
   box-shadow: none !important;
   transition: all var(--transition-base);
 }
 
 .detail-input-wrapper :deep(.el-input__wrapper:hover) {
   background: white;
-  border-color: var(--border-light);
+  border-color: var(--primary-color);
 }
 
 .detail-input-wrapper :deep(.el-input__wrapper.is-focus) {
@@ -1255,7 +2024,6 @@ const handleRegister = async () => {
   gap: var(--spacing-xs);
   width: 100%;
   height: 44px;
-  margin-top: var(--spacing-lg);
   font-size: 0.9375rem;
   font-weight: 600;
   color: white;
@@ -1283,7 +2051,7 @@ const handleRegister = async () => {
   box-shadow: none;
 }
 
-/* 画像进度条 & 动画 */
+/* 画像进度条 (保留旧样式兼容) */
 .profile-progress-bar {
   height: 4px;
   background: var(--border-light);
@@ -1313,6 +2081,16 @@ const handleRegister = async () => {
 
 .slide-fade-leave-to {
   transform: translateX(-15px);
+  opacity: 0;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.4s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
   opacity: 0;
 }
 
