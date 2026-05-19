@@ -605,9 +605,9 @@ watch(windowWidth, (newWidth) => {
   max-width: 1680px;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  margin: calc(var(--spacing-xl) * -0.6) calc(var(--spacing-2xl) * -1) 0;
-  padding: calc(var(--spacing-xl) * 0.4) var(--spacing-2xl) 0;
+  height: 100vh;
+  margin: calc(var(--spacing-xl) * -1) calc(var(--spacing-2xl) * -1) calc(var(--spacing-xl) * -1);
+  padding: var(--spacing-xs) var(--spacing-2xl) 0;
 }
 
 /* 上下文选择器 */

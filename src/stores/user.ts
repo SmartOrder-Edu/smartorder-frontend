@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { userApi } from '@/api/user'
 import type { UserInfoResponse, UpdateUserParams } from '@/api/user'
+import { studentProfileApi } from '@/api/studentProfile'
 import { chatWebSocket } from '@/utils/websocket'
 
 const TOKEN_KEY = 'token'
@@ -21,6 +22,7 @@ export interface UserInfo {
   vipStartTime?: string
   vipExpireTime?: string
   status?: number
+  profileInitialized?: boolean
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -30,6 +32,7 @@ export const useUserStore = defineStore('user', () => {
   const isLogin = computed(() => !!token.value)
   const userName = computed(() => userInfo.value?.username || '')
   const userRoles = computed(() => userInfo.value?.role != null ? [userInfo.value!.role!] : [])
+  const profileInitialized = computed(() => userInfo.value?.profileInitialized ?? false)
 
   function setToken(newToken: string) {
     token.value = newToken
@@ -45,12 +48,21 @@ export const useUserStore = defineStore('user', () => {
     setToken(accessToken)
   }
 
-  async function register(params: { username: string; email: string; password: string; confirmPassword: string; verificationCode: string }) {
+  async function register(params: {
+    username: string; email: string; password: string; confirmPassword: string; verificationCode: string
+  }) {
     await userApi.register(params)
   }
 
   async function fetchUserInfo() {
     const info = await userApi.getUserInfo()
+    // 查询画像状态：confidenceScore > 0 表示已初始化
+    try {
+      const profile = await studentProfileApi.getProfile()
+      info.profileInitialized = !!(profile && profile.confidenceScore && profile.confidenceScore > 0)
+    } catch {
+      info.profileInitialized = false
+    }
     setUserInfo(info as UserInfo)
   }
 
@@ -105,6 +117,7 @@ export const useUserStore = defineStore('user', () => {
     isLogin,
     userName,
     userRoles,
+    profileInitialized,
     setToken,
     setUserInfo,
     login,
