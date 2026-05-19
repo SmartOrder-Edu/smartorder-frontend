@@ -17,10 +17,16 @@ export interface RegisterParams {
   identity?: string
   /** 学习方向：ai|cs|os|ds|ee|other */
   direction?: string
+  /** 学习方向补充说明（选"其他"时必填） */
+  directionDetail?: string
   /** 当前基础：beginner|some|course|advanced */
   level?: string
+  /** 当前基础补充说明 */
+  levelDetail?: string
   /** 近期目标：exam|project|skill|competition */
   goal?: string
+  /** 近期目标补充说明 */
+  goalDetail?: string
   /** 自由文本自我描述（最长500字符） */
   selfDescription?: string
 }

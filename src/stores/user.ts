@@ -45,7 +45,12 @@ export const useUserStore = defineStore('user', () => {
     setToken(accessToken)
   }
 
-  async function register(params: { username: string; email: string; password: string; confirmPassword: string; verificationCode: string }) {
+  async function register(params: {
+    username: string; email: string; password: string; confirmPassword: string; verificationCode: string;
+    identity?: string; direction?: string; directionDetail?: string;
+    level?: string; levelDetail?: string; goal?: string; goalDetail?: string;
+    selfDescription?: string
+  }) {
     await userApi.register(params)
   }
 

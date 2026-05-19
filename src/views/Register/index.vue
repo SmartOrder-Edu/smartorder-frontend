@@ -266,6 +266,31 @@
                       {{ item.label }}
                     </button>
                   </div>
+                  <!-- 补充说明输入框 -->
+                  <transition name="slide-fade">
+                    <div v-if="profileData.direction" class="detail-input-wrapper">
+                      <el-input
+                        v-model="profileData.directionDetail"
+                        :placeholder="profileData.direction === 'other' ? '请输入你感兴趣的学习方向（必填）' : '可以补充说明，比如具体细方向、感兴趣的课程等（选填）'"
+                        size="large"
+                        maxlength="200"
+                        show-word-limit
+                        :class="{ 'is-required': profileData.direction === 'other' }"
+                      />
+                    </div>
+                  </transition>
+                  <button
+                    v-if="profileData.direction"
+                    type="button"
+                    class="next-question-btn"
+                    :disabled="profileData.direction === 'other' && !profileData.directionDetail.trim()"
+                    @click="profileStep++"
+                  >
+                    下一步
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                  </button>
                 </div>
 
                 <!-- 当前基础 -->
@@ -286,6 +311,29 @@
                       {{ item.label }}
                     </button>
                   </div>
+                  <!-- 补充说明输入框 -->
+                  <transition name="slide-fade">
+                    <div v-if="profileData.level" class="detail-input-wrapper">
+                      <el-input
+                        v-model="profileData.levelDetail"
+                        placeholder="可以补充说明，比如学过哪些课、掌握到什么程度等（选填）"
+                        size="large"
+                        maxlength="200"
+                        show-word-limit
+                      />
+                    </div>
+                  </transition>
+                  <button
+                    v-if="profileData.level"
+                    type="button"
+                    class="next-question-btn"
+                    @click="profileStep++"
+                  >
+                    下一步
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                  </button>
                 </div>
 
                 <!-- 近期目标 -->
@@ -306,6 +354,29 @@
                       {{ item.label }}
                     </button>
                   </div>
+                  <!-- 补充说明输入框 -->
+                  <transition name="slide-fade">
+                    <div v-if="profileData.goal" class="detail-input-wrapper">
+                      <el-input
+                        v-model="profileData.goalDetail"
+                        placeholder="可以补充说明，比如具体哪门考试、什么项目等（选填）"
+                        size="large"
+                        maxlength="200"
+                        show-word-limit
+                      />
+                    </div>
+                  </transition>
+                  <button
+                    v-if="profileData.goal"
+                    type="button"
+                    class="next-question-btn"
+                    @click="profileStep++"
+                  >
+                    下一步
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                  </button>
                 </div>
 
                 <!-- 自由描述 -->
@@ -381,8 +452,11 @@ const formData = reactive({
 const profileData = reactive({
   identity: '',
   direction: '',
+  directionDetail: '',
   level: '',
+  levelDetail: '',
   goal: '',
+  goalDetail: '',
   selfDescription: ''
 })
 
@@ -459,11 +533,15 @@ const goalOptions = [
 
 const selectOption = (type: 'identity' | 'direction' | 'level' | 'goal', val: string) => {
   profileData[type] = val
-  setTimeout(() => {
-    if (profileStep.value < 5) {
-      profileStep.value++
-    }
-  }, 300)
+  // Q1 身份选择后自动进入下一题（无补充输入框）
+  // Q2/Q3/Q4 选完后不自动跳转，用户可能要填补充说明
+  if (type === 'identity') {
+    setTimeout(() => {
+      if (profileStep.value < 5) {
+        profileStep.value++
+      }
+    }, 300)
+  }
 }
 
 const sendCode = async () => {
@@ -513,8 +591,11 @@ const handleRegister = async () => {
       verificationCode: formData.verificationCode,
       identity: profileData.identity || undefined,
       direction: profileData.direction || undefined,
+      directionDetail: profileData.directionDetail?.trim() || undefined,
       level: profileData.level || undefined,
+      levelDetail: profileData.levelDetail?.trim() || undefined,
       goal: profileData.goal || undefined,
+      goalDetail: profileData.goalDetail?.trim() || undefined,
       selfDescription: profileData.selfDescription || undefined
     })
     ElMessage.success('注册成功，正在登录...')
@@ -1112,6 +1193,75 @@ const handleRegister = async () => {
 .btn-group .create-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+}
+
+/* 补充说明输入框 */
+.detail-input-wrapper {
+  margin-top: var(--spacing-md);
+}
+
+.detail-input-wrapper :deep(.el-input__wrapper) {
+  border-radius: var(--radius-lg);
+  background: var(--background-color-base);
+  border: 2px solid transparent;
+  box-shadow: none !important;
+  transition: all var(--transition-base);
+}
+
+.detail-input-wrapper :deep(.el-input__wrapper:hover) {
+  background: white;
+  border-color: var(--border-light);
+}
+
+.detail-input-wrapper :deep(.el-input__wrapper.is-focus) {
+  background: white;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1) !important;
+}
+
+.detail-input-wrapper :deep(.el-input__count) {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.detail-input-wrapper.is-required :deep(.el-input__wrapper) {
+  border-color: var(--border-light);
+}
+
+/* 下一题按钮 */
+.next-question-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  width: 100%;
+  height: 44px;
+  margin-top: var(--spacing-lg);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.next-question-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.next-question-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+}
+
+.next-question-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* 画像进度条 & 动画 */
