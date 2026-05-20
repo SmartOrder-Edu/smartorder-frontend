@@ -48,8 +48,36 @@ class Request {
     )
 
     this.instance.interceptors.response.use(
-      (response: AxiosResponse) => {
-        const { data } = response
+      async (response: AxiosResponse) => {
+        let { data } = response
+        
+        // 检测是否是 Blob 或 ArrayBuffer 形态包装的 JSON 错误信息（后端异常流）
+        const contentType = response.headers['content-type'] || ''
+        if (contentType.includes('application/json')) {
+          if (data instanceof Blob) {
+            try {
+              const text = await data.text()
+              const parsed = JSON.parse(text)
+              if (parsed && parsed.code !== undefined && parsed.code !== 200 && parsed.code !== 0) {
+                ElMessage.error(parsed.msg || parsed.message || '请求失败')
+                return Promise.reject(new Error(parsed.msg || parsed.message || '请求失败'))
+              }
+            } catch (e) {
+              // 忽略解析错误，继续按流处理
+            }
+          } else if (data instanceof ArrayBuffer) {
+            try {
+              const text = new TextDecoder('utf-8').decode(new Uint8Array(data))
+              const parsed = JSON.parse(text)
+              if (parsed && parsed.code !== undefined && parsed.code !== 200 && parsed.code !== 0) {
+                ElMessage.error(parsed.msg || parsed.message || '请求失败')
+                return Promise.reject(new Error(parsed.msg || parsed.message || '请求失败'))
+              }
+            } catch (e) {
+              // 忽略解析错误，继续按流处理
+            }
+          }
+        }
         
         // 兼容后端直接返回非标准结构数据（如上传图片直接返回 OSS URL 字符串）
         if (typeof data === 'string' || (data && data.code === undefined)) {
