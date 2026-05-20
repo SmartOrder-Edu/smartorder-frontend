@@ -115,6 +115,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '个人云盘 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/preview',
+    name: 'FilePreview',
+    component: () => import('@/views/CloudDrive/preview.vue'),
+    meta: { title: '在线文件预览 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/views/NotFound/index.vue'),

@@ -149,3 +149,14 @@ export function downloadFile(id: string | undefined, fileName: string) {
   a.click()
   document.body.removeChild(a)
 }
+
+/** 获取文件预览的直链 URL */
+export function getPreviewUrl(id: string | undefined): string {
+  if (!id) {
+    console.error('getPreviewUrl: id is undefined')
+    return ''
+  }
+  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  const token = localStorage.getItem('token')
+  return `${base}/yun-resource/preview/${id}?token=${token}`
+}
