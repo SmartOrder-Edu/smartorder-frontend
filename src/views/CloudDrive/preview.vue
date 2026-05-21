@@ -324,7 +324,13 @@
           </div>
 
           <!-- 右侧浮动文档大纲 TOC -->
-          <div class="markdown-toc-sidebar" v-show="showToc" v-if="!mdSourceMode && markdownToc.length > 0">
+          <div 
+            class="markdown-toc-sidebar" 
+            :class="{ 'is-hover-floating': !showToc && isTocHovered }"
+            v-show="showToc || (!showToc && isTocHovered)" 
+            v-if="!mdSourceMode && markdownToc.length > 0"
+            @mouseleave="handleTocMouseLeave"
+          >
             <div class="toc-sidebar-header">
               <span class="toc-title">大纲</span>
               <div class="toc-actions">
@@ -347,6 +353,22 @@
                 <span class="toc-bullet">▾</span>
                 <span class="toc-text" :title="item.text">{{ item.text }}</span>
               </div>
+            </div>
+          </div>
+
+          <!-- 右侧滑动唤出大纲触发感知带 -->
+          <div 
+            v-if="!showToc && !mdSourceMode && markdownToc.length > 0" 
+            class="markdown-toc-hover-trigger"
+            @mouseenter="isTocHovered = true"
+          >
+            <div class="hover-trigger-bar">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" class="trigger-icon">
+                <line x1="4" y1="6" x2="20" y2="6"></line>
+                <line x1="4" y1="12" x2="20" y2="12"></line>
+                <line x1="4" y1="18" x2="20" y2="18"></line>
+              </svg>
+              <span class="trigger-text">大纲</span>
             </div>
           </div>
         </div>
@@ -691,6 +713,13 @@ const adjustDocxZoom = (delta: number) => {
 // ==================== 6. Markdown 双态视图与目录 TOC ====================
 const mdSourceMode = ref(false)
 const showToc = ref(true)
+const isTocHovered = ref(false)
+
+const handleTocMouseLeave = () => {
+  if (!showToc.value) {
+    isTocHovered.value = false
+  }
+}
 const previewMarkdownSource = ref('')
 const previewMarkdownHtml = ref('')
 interface TocItem {
@@ -2245,6 +2274,7 @@ const handleCopyText = async () => {
   gap: 24px;
   overflow: hidden;
   min-height: 0;
+  position: relative;
 }
 
 .markdown-raw-editor {
@@ -2376,6 +2406,27 @@ const handleCopyText = async () => {
   flex-direction: column;
   box-shadow: none !important;
   flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &.is-hover-floating {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    height: 100%;
+    background: var(--glass-bg) !important;
+    backdrop-filter: blur(25px);
+    border-left: 1px solid var(--glass-border) !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15) !important;
+    z-index: 1000;
+    padding-top: 60px; /* 留出顶部大标题间隙 */
+    animation: tocSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    
+    .dark-theme & {
+      background: rgba(30, 30, 34, 0.75) !important;
+      border-left-color: rgba(255, 255, 255, 0.08) !important;
+    }
+  }
   
   .toc-sidebar-header {
     display: flex;
@@ -2464,6 +2515,87 @@ const handleCopyText = async () => {
     &.level-3 { 
       padding-left: 32px;
     }
+  }
+}
+
+/* 右侧滑动唤出大纲触发感知带 */
+.markdown-toc-hover-trigger {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99;
+  cursor: pointer;
+  
+  .hover-trigger-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 120px;
+    width: 24px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    writing-mode: vertical-lr;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.2;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.05);
+    
+    .trigger-icon {
+      transform: rotate(0deg);
+      transition: transform 0.3s;
+      margin-bottom: 4px;
+    }
+  }
+  
+  &:hover {
+    .hover-trigger-bar {
+      opacity: 0.95;
+      background: rgba(255, 255, 255, 0.85);
+      color: #1677ff;
+      border-color: rgba(22, 119, 255, 0.2);
+      box-shadow: -4px 0 15px rgba(22, 119, 255, 0.15);
+      
+      .trigger-icon {
+        transform: rotate(90deg);
+      }
+    }
+  }
+  
+  .dark-theme & {
+    .hover-trigger-bar {
+      background: rgba(30, 30, 34, 0.45);
+      border-color: rgba(255, 255, 255, 0.08);
+      
+      &:hover {
+        background: rgba(30, 30, 34, 0.85);
+        color: #38bdf8;
+        border-color: rgba(56, 189, 248, 0.3);
+        box-shadow: -4px 0 15px rgba(56, 189, 248, 0.15);
+      }
+    }
+  }
+}
+
+@keyframes tocSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 

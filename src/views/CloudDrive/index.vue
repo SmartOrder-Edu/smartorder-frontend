@@ -1845,10 +1845,10 @@ onBeforeUnmount(() => {
   flex: 1;
 }
 
-/* 行内操作按钮 - 使用距右边固定距离定位，靠近中间 */
+/* 行内操作按钮 - 使用距右边固定距离定位，向右平移并保持紧凑 */
 .row-inline-actions {
   position: absolute;
-  right: 180px;
+  right: 80px; /* 向右平移，放置在更加精致的位置 */
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -1873,7 +1873,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 10px;
+  padding: 5px 8px; /* 缩小按钮内边距以让按钮间隔更紧凑 */
   border: none;
   background: transparent;
   border-radius: 6px;
@@ -1895,7 +1895,7 @@ onBeforeUnmount(() => {
   color: #2563eb !important;
   font-weight: 500;
   border-radius: 8px;
-  padding: 5px 12px;
+  padding: 5px 10px;
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.05);
 }
 
