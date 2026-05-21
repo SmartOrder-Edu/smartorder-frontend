@@ -1,5 +1,5 @@
 <template>
-  <div class="standalone-preview-page" :class="[currentTheme + '-theme']" v-loading="loading" element-loading-text="正在加载在线预览内容...">
+  <div class="standalone-preview-page" :class="[currentTheme + '-theme', { 'is-embedded': isEmbedded }]" v-loading="loading" element-loading-text="正在加载在线预览内容...">
     <!-- 顶部极客磨砂工具栏 -->
     <div class="preview-toolbar" v-if="fileName">
       <div class="toolbar-left">
@@ -554,6 +554,7 @@ const fileSize = ref(Number(route.query.size || 0))
 const fileExt = ref(fileName.value.split('.').pop()?.toLowerCase() || '')
 
 // 状态声明
+const isEmbedded = ref(window.self !== window.top)
 const loading = ref(true)
 const initialized = ref(false)
 const previewUrl = ref('')
@@ -1230,7 +1231,11 @@ const handleDownload = () => {
 }
 
 const handleClose = () => {
-  window.close()
+  if (window.self !== window.top) {
+    window.parent.postMessage({ type: 'close-preview' }, '*')
+  } else {
+    window.close()
+  }
 }
 
 const copyTextSuccess = ref(false)
@@ -1370,6 +1375,23 @@ const handleCopyText = async () => {
     opacity: 0.65;
     pointer-events: none;
     z-index: 1;
+  }
+  
+  /* 处于iframe嵌入模式下时微调内边距和顶栏高度，以让界面更显紧凑精致 */
+  &.is-embedded {
+    .preview-toolbar {
+      height: 52px;
+      padding: 0 18px;
+    }
+    
+    .preview-viewport {
+      height: calc(100vh - 52px) !important;
+    }
+    
+    /* 优雅隐藏内部原本的多余蓝色实心“关闭预览”按钮，交给Dialog统一的高级毛玻璃浮动按钮 */
+    .close-btn {
+      display: none !important;
+    }
   }
 }
 
@@ -2107,28 +2129,21 @@ const handleCopyText = async () => {
   display: flex;
   flex-direction: column;
   padding: 16px 24px;
-  background: #ffffff !important; /* 全局统一白色背景 */
-  
-  .dark-theme & {
-    background: #121212 !important; /* 暗夜极致哑光黑底 */
-  }
+  background: transparent !important; /* 透出底层极光渐变背景，使全局背景颜色一致 */
 }
 
 /* 语雀级面包屑控制栏 */
 .markdown-control-bar {
-  background: #ffffff;
-  border-bottom: 1px solid var(--border-color);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--glass-border);
   padding: 10px 24px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-  
-  .dark-theme & {
-    background: #1e1e22;
-  }
+  box-shadow: 0 1px 3px var(--shadow-color);
 }
 
 .md-bar-left {
@@ -2280,21 +2295,14 @@ const handleCopyText = async () => {
   }
 }
 
-/* 精致白色卡片纸张视口 */
-/* 完全融入背景的视口 */
 .markdown-rendered-view {
   flex: 1;
   height: 100%;
   overflow-y: auto;
   padding: 40px 60px 80px; /* 顶部/左右留白 */
-  background: #ffffff !important; 
+  background: transparent !important; 
   border: none;
   box-shadow: none; 
-  
-  .dark-theme & {
-    background: #121212 !important; 
-    box-shadow: none;
-  }
 }
 
 /* 语雀文档大标题及元信息区 */
@@ -2616,7 +2624,7 @@ const handleCopyText = async () => {
     }
     
     .copy-code-btn:hover {
-      background: var(--btn-hover);
+      background: var(--btn-hover-bg);
       color: var(--text-primary);
     }
 

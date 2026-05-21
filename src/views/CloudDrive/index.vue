@@ -162,7 +162,7 @@
           </el-button>
         </div>
         <div v-for="item in displayItems" :key="item.id" class="file-card"
-          :class="{ 'is-folder': item.type === 'folder' }" @dblclick="item.type === 'folder' && enterFolder(item)"
+          :class="{ 'is-folder': item.type === 'folder' }" @dblclick="item.type === 'folder' ? enterFolder(item) : handlePreview(item)"
           @contextmenu.prevent="openContextMenu($event, item)">
           <div class="file-card-icon">
             <span v-if="item.type === 'folder'" class="folder-icon-img">
@@ -221,6 +221,23 @@
                 </el-tag>
                 <!-- 行内操作按钮（悬停/选中时显示） -->
                 <div class="row-inline-actions" @click.stop>
+                  <button class="row-inline-btn btn-preview-highlight" title="预览" @click.stop="handlePreview(row)"
+                    v-if="row.type !== 'folder'">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    预览
+                  </button>
+                  <button class="row-inline-btn" title="全局预览" @click.stop="handleOpenInNewWindowDirect(row)"
+                    v-if="row.type !== 'folder'">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                    全局预览
+                  </button>
                   <button class="row-inline-btn" title="下载" @click.stop="handleDownload(row)"
                     v-if="row.type !== 'folder'">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -318,6 +335,14 @@
                   <circle cx="12" cy="12" r="3" />
                 </svg>
                 预览
+              </button>
+              <button class="context-menu-item" @click="handleOpenInNewWindowDirect(contextMenu.item); contextMenu.visible = false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                新窗口预览
               </button>
               <button class="context-menu-item" @click="handleDownload(contextMenu.item); contextMenu.visible = false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -450,23 +475,27 @@
         </template>
       </el-dialog>
 
-      <!-- 文件预览对话框 -->
-      <el-dialog v-model="showPreviewDialog" :title="previewFile?.name" width="700px">
-        <div class="preview-body" v-if="previewFile">
-          <div v-if="isPreviewableImage(previewFile.extension)" class="preview-image">
-            <img :src="previewFile.thumbnail" :alt="previewFile.name" />
-          </div>
-          <div v-else-if="isPreviewableText(previewFile.extension)" class="preview-text">
-            <pre>{{ previewFile.thumbnail }}</pre>
-          </div>
-          <div v-else class="preview-unsupported">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14,2 14,8 20,8" />
+      <!-- 文件预览对话框（高保真全屏 iframe 无缝预览） -->
+      <el-dialog 
+        v-model="showPreviewDialog" 
+        width="85vw"
+        class="premium-preview-dialog"
+        :show-close="false"
+        :destroy-on-close="true"
+        @closed="previewIframeUrl = ''"
+      >
+        <div class="iframe-preview-container" v-if="previewIframeUrl">
+          <iframe 
+            :src="previewIframeUrl" 
+            class="preview-iframe-element"
+          ></iframe>
+          <!-- 浮动在右上角精致的毛玻璃关闭手柄，高自适应感 -->
+          <button class="dialog-floating-close-btn" @click="showPreviewDialog = false" title="关闭预览">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
-            <p>暂不支持预览此文件类型</p>
-            <el-button @click="handleDownload(previewFile)">下载文件</el-button>
-          </div>
+          </button>
         </div>
       </el-dialog>
     </div>
@@ -475,6 +504,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { getFolderContent, getFolderTree, createFolder as apiCreateFolder, updateFolder as apiUpdateFolder, deleteFolder as apiDeleteFolder, deleteFile as apiDeleteFile, moveFile as apiMoveFile, moveFolder as apiMoveFolder, batchMoveToFolder, apiInitUpload, apiGetSignUrl, apiUploadChunkToOSS, apiChunkDone, apiMergeChunks, apiCancelUpload, downloadFile } from '@/api/resource'
@@ -519,6 +549,7 @@ interface DriveItem {
 }
 
 // ==================== 状态 ====================
+const router = useRouter()
 const viewMode = ref<'grid' | 'list'>('list')
 const searchKeyword = ref('')
 const currentPath = ref<DriveItem[]>([])
@@ -528,6 +559,7 @@ const showUploadDialog = ref(false)
 const showNewFolderDialog = ref(false)
 const showRenameDialog = ref(false)
 const showPreviewDialog = ref(false)
+const previewIframeUrl = ref('')
 const newFolderName = ref('')
 const renameValue = ref('')
 const renameTarget = ref<DriveItem | null>(null)
@@ -959,10 +991,43 @@ const handleDownload = (item: DriveItem | null) => {
 const handlePreview = (item: DriveItem | null) => {
   if (!item) return
   previewFile.value = { ...item }
-  if (isPreviewableImage(item.extension) || isPreviewableText(item.extension)) {
-    previewFile.value.thumbnail = item.thumbnail || '预览内容暂不可用'
-  }
+  const routeData = router.resolve({
+    name: 'FilePreview',
+    query: {
+      id: item.id,
+      name: item.name,
+      size: item.size
+    }
+  })
+  previewIframeUrl.value = routeData.href
   showPreviewDialog.value = true
+}
+
+const handleOpenInNewWindow = () => {
+  if (!previewFile.value) return
+  const file = previewFile.value
+  const routeData = router.resolve({
+    name: 'FilePreview',
+    query: {
+      id: file.id,
+      name: file.name,
+      size: file.size
+    }
+  })
+  window.open(routeData.href, '_blank')
+}
+
+const handleOpenInNewWindowDirect = (item: DriveItem | null) => {
+  if (!item) return
+  const routeData = router.resolve({
+    name: 'FilePreview',
+    query: {
+      id: item.id,
+      name: item.name,
+      size: item.size
+    }
+  })
+  window.open(routeData.href, '_blank')
 }
 
 const onElUploadChange = (file: any) => {
@@ -1199,6 +1264,8 @@ const getAiStatusText = (status?: string) => {
 const handleRowDblClick = (row: DriveItem) => {
   if (row.type === 'folder') {
     enterFolder(row)
+  } else if (row.type === 'file') {
+    handlePreview(row)
   }
 }
 
@@ -1206,13 +1273,21 @@ const handleRowContextMenu = (row: DriveItem, column: any, event: MouseEvent) =>
   openContextMenu(event, row)
 }
 
+const handlePreviewMessage = (e: MessageEvent) => {
+  if (e.data && e.data.type === 'close-preview') {
+    showPreviewDialog.value = false
+  }
+}
+
 onMounted(() => {
   document.addEventListener('click', onGlobalClick)
+  window.addEventListener('message', handlePreviewMessage)
   loadFolderFromApi('0')
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', onGlobalClick)
+  window.removeEventListener('message', handlePreviewMessage)
 })
 </script>
 
@@ -1814,6 +1889,23 @@ onBeforeUnmount(() => {
   color: #2563eb;
 }
 
+/* 常态下高亮显示的预览按钮（高透天空蓝背景 + 极客蓝文字 + 8px圆角 + 微阴影与微动效） */
+.row-inline-btn.btn-preview-highlight {
+  background: rgba(37, 99, 235, 0.09) !important;
+  color: #2563eb !important;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 5px 12px;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.05);
+}
+
+.row-inline-btn.btn-preview-highlight:hover {
+  background: rgba(37, 99, 235, 0.18) !important;
+  color: #1d4ed8 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.16);
+}
+
 .row-inline-btn-more {
   padding: 5px 6px;
 }
@@ -2195,52 +2287,70 @@ onBeforeUnmount(() => {
   font-size: 0.8125rem;
 }
 
-/* 预览样式 */
-.preview-body {
-  min-height: 200px;
+/* 高保真全屏 iframe 预览 Dialog 样式 */
+:deep(.premium-preview-dialog) {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin-top: 6vh !important;
+  
+  .el-dialog__header {
+    display: none !important;
+  }
+  
+  .el-dialog__body {
+    padding: 0 !important;
+    background: transparent !important;
+  }
+}
+
+.iframe-preview-container {
+  position: relative;
+  width: 100%;
+  height: 84vh;
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 40px rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(20px);
+  transition: all 0.3s ease;
+}
+
+.preview-iframe-element {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+}
+
+/* 浮层磨砂质感关闭按钮 */
+.dialog-floating-close-btn {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.preview-image img {
-  max-width: 100%;
-  max-height: 400px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-}
-
-.preview-text {
-  width: 100%;
-  max-height: 400px;
-  overflow: auto;
-  background: #f8fafc;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  padding: 16px;
-}
-
-.preview-text pre {
-  margin: 0;
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.preview-unsupported {
-  text-align: center;
-  padding: var(--spacing-2xl);
-  color: var(--text-muted);
-}
-
-.preview-unsupported svg {
-  margin-bottom: var(--spacing-md);
-  opacity: 0.4;
-}
-
-.preview-unsupported p {
-  margin: 0 0 var(--spacing-lg);
+.dialog-floating-close-btn:hover {
+  background: rgba(239, 68, 68, 0.85);
+  border-color: #ef4444;
+  color: #fff;
+  transform: rotate(90deg);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.4);
 }
 
 :deep(.el-dialog__header),
