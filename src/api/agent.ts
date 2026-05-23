@@ -19,6 +19,16 @@ export interface PlanSummary {
   kgNodeCount: number
   startDate: string
   targetEndDate: string
+  totalPhases?: number
+  totalWeeks?: number
+}
+
+export interface ExecutionStep {
+  stepName: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  startedAt?: number
+  completedAt?: number
+  message?: string
 }
 
 export interface ConversationVO {

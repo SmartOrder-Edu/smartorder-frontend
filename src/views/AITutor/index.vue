@@ -307,8 +307,16 @@
     <!-- 追踪面板（抽屉式） -->
     <AgentTracePanel />
 
-    <!-- 规划确认弹窗 -->
-    <PlanConfirmDialog @confirm="confirmPlan" @cancel="cancelPlan" />
+    <!-- 学习蓝图揭幕面板 -->
+    <PlanRevealOverlay
+      :visible="agentStore.planDialogVisible"
+      :plan="agentStore.currentPlan"
+      :draft-id="agentStore.currentDraftId"
+      :loading="agentStore.planConfirmLoading"
+      :execution-steps="agentStore.executionSteps"
+      @confirm="confirmPlan"
+      @cancel="cancelPlan"
+    />
   </AppLayout>
 </template>
 
@@ -325,7 +333,7 @@ import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
 import ToolCallCard from '@/components/agent/ToolCallCard.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
-import PlanConfirmDialog from '@/components/PlanConfirmDialog.vue'
+import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { useWindowSize } from '@/composables/useWindowSize'

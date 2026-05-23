@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { agentApi, type ConversationVO } from '@/api/agent'
+import { agentApi, type ConversationVO, type ExecutionStep, type PlanSummary } from '@/api/agent'
 
 export interface AgentTraceEvent<T = any> {
   traceId: string
@@ -69,6 +69,11 @@ export const useAgentStore = defineStore('agent', () => {
   const currentPlan = ref<any>(null)
   const planConfirmLoading = ref(false)
 
+  // === 执行步骤状态（plan confirm 期间） ===
+  const executionSteps = ref<ExecutionStep[]>([])
+  const planConfirmResult = ref<PlanSummary | null>(null)
+  const planDialogClosing = ref(false)
+
   // === 追踪面板状态 ===
   const tracePanelVisible = ref(false)
   const activeTraceId = ref<string>('')
@@ -93,6 +98,9 @@ export const useAgentStore = defineStore('agent', () => {
     currentDraftId.value = ''
     currentPlan.value = null
     tracePanelVisible.value = false
+    executionSteps.value = []
+    planConfirmResult.value = null
+    planDialogClosing.value = false
   }
 
   /**
@@ -171,12 +179,69 @@ export const useAgentStore = defineStore('agent', () => {
         planDialogVisible.value = true
         break
 
+      case 'agent.plan.step.started':
+        addExecutionStep({
+          stepName: data.payload?.stepName || '未知步骤',
+          status: 'running',
+          startedAt: Date.now(),
+        })
+        break
+
+      case 'agent.plan.step.completed':
+        addExecutionStep({
+          stepName: data.payload?.stepName || '',
+          status: 'completed',
+          completedAt: Date.now(),
+        })
+        break
+
+      case 'agent.plan.step.failed':
+        addExecutionStep({
+          stepName: data.payload?.stepName || '',
+          status: 'failed',
+          message: data.payload?.message,
+        })
+        break
+
+      // agent.status 在 plan confirm SSE 中可能包含执行步骤信息
+      case 'agent.status':
+        if (data.payload?.message) {
+          addExecutionStep({
+            stepName: data.payload.message,
+            status: 'running',
+            startedAt: Date.now(),
+          })
+        }
+        break
+
       case 'agent.error':
         if (data.payload?.message) {
           answerText.value += `\n\n[错误] ${data.payload.message}`
         }
         break
     }
+  }
+
+  function addExecutionStep(step: ExecutionStep) {
+    const existing = executionSteps.value.find(s => s.stepName === step.stepName)
+    if (existing) {
+      Object.assign(existing, step)
+    } else {
+      executionSteps.value.push(step)
+    }
+  }
+
+  function resetExecutionSteps() {
+    executionSteps.value = []
+  }
+
+  function closePlanDialog() {
+    planDialogClosing.value = true
+    setTimeout(() => {
+      planDialogVisible.value = false
+      planDialogClosing.value = false
+      resetExecutionSteps()
+    }, 300)
   }
 
   /**
@@ -242,6 +307,9 @@ export const useAgentStore = defineStore('agent', () => {
     currentDraftId.value = ''
     currentPlan.value = null
     tracePanelVisible.value = false
+    executionSteps.value = []
+    planConfirmResult.value = null
+    planDialogClosing.value = false
   }
 
   return {
@@ -260,6 +328,9 @@ export const useAgentStore = defineStore('agent', () => {
     currentDraftId,
     currentPlan,
     planConfirmLoading,
+    executionSteps,
+    planConfirmResult,
+    planDialogClosing,
     tracePanelVisible,
     activeTraceId,
     conversations,
@@ -267,6 +338,9 @@ export const useAgentStore = defineStore('agent', () => {
     startNewTurn,
     handleEvent,
     finishTurn,
+    addExecutionStep,
+    resetExecutionSteps,
+    closePlanDialog,
     openTracePanel,
     closeTracePanel,
     getCurrentMessageTraceEvents,

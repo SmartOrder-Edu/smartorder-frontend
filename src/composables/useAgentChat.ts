@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent, type ToolCallState } from '@/stores/agent'
-import { agentApi } from '@/api/agent'
+import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
 
 export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT'
@@ -16,6 +16,18 @@ export interface ChatMessage {
   toolCalls?: ToolCallState[]
   routeResult?: any
   timestamp: number
+  planSummary?: PlanSummary
+  executionSteps?: ExecutionStep[]
+}
+
+function computeTotalWeeks(plan: any): number {
+  if (!plan?.phases) return 0
+  return plan.phases.reduce((sum: number, p: any) => sum + (p.weeks || 0), 0)
+}
+
+function computeTotalKPs(plan: any): number {
+  if (!plan?.phases) return 0
+  return plan.phases.reduce((sum: number, p: any) => sum + (p.knowledgePoints?.length || 0), 0)
 }
 
 export function useAgentChat(scrollCallback?: () => void) {
@@ -170,6 +182,7 @@ export function useAgentChat(scrollCallback?: () => void) {
    */
   const confirmPlan = async (draftId: string) => {
     agentStore.planConfirmLoading = true
+    agentStore.resetExecutionSteps()
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
 
     // SSE 请求前主动刷新 accessToken
@@ -203,7 +216,26 @@ export function useAgentChat(scrollCallback?: () => void) {
           if (event.event === 'done') {
             agentStore.planConfirmLoading = false
             agentStore.planDialogVisible = false
-            // 添加执行结果消息
+
+            // 构造 PlanSummary
+            const plan = agentStore.currentPlan
+            const payload = (() => {
+              try { return JSON.parse(event.data).payload } catch { return null }
+            })()
+            const planSummary: PlanSummary = {
+              spaceId: payload?.spaceId || 0,
+              spaceName: plan?.spaceName || '',
+              spaceType: plan?.type || 'course',
+              nodeCount: payload?.nodeCount || plan?.phases?.length || 0,
+              taskCount: payload?.taskCount || computeTotalKPs(plan),
+              kgNodeCount: plan?.knowledgeGraph?.nodes?.length || 0,
+              startDate: plan?.startDate || '',
+              targetEndDate: plan?.targetEndDate || '',
+              totalPhases: plan?.phases?.length || 0,
+              totalWeeks: computeTotalWeeks(plan),
+            }
+
+            // 添加执行结果消息到聊天列表
             if (agentStore.answerText) {
               messages.value.push({
                 role: 'ai',
@@ -211,6 +243,8 @@ export function useAgentChat(scrollCallback?: () => void) {
                 traceId: agentStore.currentTraceId,
                 traceEvents: [...agentStore.traceEvents],
                 timestamp: Date.now(),
+                planSummary,
+                executionSteps: [...agentStore.executionSteps],
               })
               agentStore.answerText = ''
             }
