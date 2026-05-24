@@ -30,6 +30,13 @@ export interface ToolCallState {
   startedAt: number
 }
 
+/** 一轮 ReAct 推理：思考文本 + 可选的工具调用 */
+export interface ReasoningSegment {
+  thinkingText: string
+  toolCall?: ToolCallState
+  thinkingStreaming?: boolean
+}
+
 /**
  * Agent 对话状态管理
  */
@@ -53,6 +60,9 @@ export const useAgentStore = defineStore('agent', () => {
 
   // 工具调用状态（合并 started/completed/failed）
   const toolCalls = ref<ToolCallState[]>([])
+
+  // 按轮分段的推理过程（思考 + 工具调用配对）
+  const reasoningSegments = ref<ReasoningSegment[]>([])
 
   // 路由结果
   const routeResult = ref<any>(null)
@@ -91,6 +101,7 @@ export const useAgentStore = defineStore('agent', () => {
     thinkingStartTime.value = null
     thinkingDurationMs.value = null
     toolCalls.value = []
+    reasoningSegments.value = []
     routeResult.value = null
     traceEvents.value = []
     loading.value = true
@@ -126,6 +137,11 @@ export const useAgentStore = defineStore('agent', () => {
         if (data.payload?.text) {
           answerText.value += data.payload.text
         }
+        // 思考结束，回答开始
+        {
+          const lastSeg = reasoningSegments.value[reasoningSegments.value.length - 1]
+          if (lastSeg) lastSeg.thinkingStreaming = false
+        }
         break
 
       case 'agent.think.delta':
@@ -134,17 +150,42 @@ export const useAgentStore = defineStore('agent', () => {
             thinkingStartTime.value = Date.now()
           }
           thinkingText.value += data.payload.text
+
+          // 按轮分段：若最后一个 segment 无 toolCall，追加到同一轮；否则开新轮
+          const lastSeg = reasoningSegments.value[reasoningSegments.value.length - 1]
+          if (!lastSeg || lastSeg.toolCall) {
+            reasoningSegments.value.push({
+              thinkingText: data.payload.text,
+              thinkingStreaming: true,
+            })
+          } else {
+            lastSeg.thinkingText += data.payload.text
+          }
         }
         break
 
-      case 'agent.tool.started':
-        toolCalls.value.push({
+      case 'agent.tool.started': {
+        const newTool: ToolCallState = {
           toolName: data.payload?.toolName || '未知工具',
           status: 'running',
           arguments: data.payload?.arguments,
           startedAt: Date.now(),
-        })
+        }
+        toolCalls.value.push(newTool)
+
+        // 挂载到当前 segment 或创建新的（无思考的工具调用）
+        const lastSeg = reasoningSegments.value[reasoningSegments.value.length - 1]
+        if (lastSeg && !lastSeg.toolCall) {
+          lastSeg.thinkingStreaming = false
+          lastSeg.toolCall = newTool
+        } else {
+          reasoningSegments.value.push({
+            thinkingText: '',
+            toolCall: newTool,
+          })
+        }
         break
+      }
 
       case 'agent.tool.completed': {
         const tc = toolCalls.value.find(
@@ -154,6 +195,15 @@ export const useAgentStore = defineStore('agent', () => {
           tc.status = 'completed'
           tc.result = data.payload?.result
           tc.durationMs = data.payload?.durationMs
+        }
+        // 同步更新 reasoningSegments
+        const seg = reasoningSegments.value.find(
+          s => s.toolCall?.toolName === data.payload?.toolName && s.toolCall.status === 'running'
+        )
+        if (seg?.toolCall) {
+          seg.toolCall.status = 'completed'
+          seg.toolCall.result = data.payload?.result
+          seg.toolCall.durationMs = data.payload?.durationMs
         }
         break
       }
@@ -165,6 +215,14 @@ export const useAgentStore = defineStore('agent', () => {
         if (tf) {
           tf.status = 'failed'
           tf.durationMs = data.payload?.durationMs
+        }
+        // 同步更新 reasoningSegments
+        const segF = reasoningSegments.value.find(
+          s => s.toolCall?.toolName === data.payload?.toolName && s.toolCall.status === 'running'
+        )
+        if (segF?.toolCall) {
+          segF.toolCall.status = 'failed'
+          segF.toolCall.durationMs = data.payload?.durationMs
         }
         break
       }
@@ -300,6 +358,7 @@ export const useAgentStore = defineStore('agent', () => {
     thinkingStartTime.value = null
     thinkingDurationMs.value = null
     toolCalls.value = []
+    reasoningSegments.value = []
     routeResult.value = null
     traceEvents.value = []
     loading.value = false
@@ -321,6 +380,7 @@ export const useAgentStore = defineStore('agent', () => {
     thinkingStartTime,
     thinkingDurationMs,
     toolCalls,
+    reasoningSegments,
     routeResult,
     traceEvents,
     loading,

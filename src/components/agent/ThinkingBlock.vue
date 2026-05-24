@@ -14,7 +14,8 @@
       </span>
       <span class="thinking-label">
         <template v-if="streaming">思考中...</template>
-        <template v-else>思考了 {{ formattedDuration }}</template>
+        <template v-else-if="formattedDuration">思考了 {{ formattedDuration }}</template>
+        <template v-else>思考</template>
       </span>
       <span class="thinking-chevron">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
@@ -40,7 +41,7 @@ const props = defineProps<{
 const expanded = ref(false)
 
 const formattedDuration = computed(() => {
-  if (!props.durationMs) return '...'
+  if (!props.durationMs) return ''
   const seconds = props.durationMs / 1000
   if (seconds < 1) return `${props.durationMs}毫秒`
   if (seconds < 60) return `${seconds.toFixed(1)}秒`

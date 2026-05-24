@@ -116,20 +116,28 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble" :class="{ 'user-bubble': msg.role === 'user' }">
-                  <!-- 思考块 -->
-                  <ThinkingBlock
-                    v-if="msg.role === 'ai' && msg.thinkingText"
-                    :text="msg.thinkingText"
-                    :duration-ms="msg.thinkingDurationMs"
-                  />
-                  <!-- 工具调用卡片 -->
-                  <div v-if="msg.role === 'ai' && msg.toolCalls?.length" class="inline-tool-calls">
-                    <ToolCallCard
-                      v-for="tc in msg.toolCalls"
-                      :key="tc.toolName + tc.startedAt"
-                      v-bind="tc"
+                  <!-- 思考与工具调用交错展示 -->
+                  <template v-if="msg.role === 'ai' && msg.reasoningSegments?.length">
+                    <template v-for="(seg, segIdx) in msg.reasoningSegments" :key="'seg-' + segIdx">
+                      <ThinkingBlock v-if="seg.thinkingText" :text="seg.thinkingText" />
+                      <ToolCallCard v-if="seg.toolCall" v-bind="seg.toolCall" />
+                    </template>
+                  </template>
+                  <template v-else>
+                    <!-- 向后兼容：旧消息格式 -->
+                    <ThinkingBlock
+                      v-if="msg.role === 'ai' && msg.thinkingText"
+                      :text="msg.thinkingText"
+                      :duration-ms="msg.thinkingDurationMs"
                     />
-                  </div>
+                    <div v-if="msg.role === 'ai' && msg.toolCalls?.length" class="inline-tool-calls">
+                      <ToolCallCard
+                        v-for="tc in msg.toolCalls"
+                        :key="tc.toolName + tc.startedAt"
+                        v-bind="tc"
+                      />
+                    </div>
+                  </template>
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
                   <p v-else class="message-text">{{ msg.content }}</p>
@@ -193,25 +201,37 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble">
-                  <!-- 思考块（流式） -->
-                  <ThinkingBlock
-                    v-if="agentStore.thinkingText"
-                    :text="agentStore.thinkingText"
-                    :streaming="true"
-                  />
-                  <!-- 工具调用卡片（流式） -->
-                  <div v-if="agentStore.toolCalls.length" class="inline-tool-calls">
-                    <ToolCallCard
-                      v-for="tc in agentStore.toolCalls"
-                      :key="tc.toolName + tc.startedAt"
-                      v-bind="tc"
+                  <!-- 思考与工具调用交错展示（流式） -->
+                  <template v-if="agentStore.reasoningSegments.length">
+                    <template v-for="(seg, segIdx) in agentStore.reasoningSegments" :key="'seg-live-' + segIdx">
+                      <ThinkingBlock
+                        v-if="seg.thinkingText"
+                        :text="seg.thinkingText"
+                        :streaming="seg.thinkingStreaming"
+                      />
+                      <ToolCallCard v-if="seg.toolCall" v-bind="seg.toolCall" />
+                    </template>
+                  </template>
+                  <template v-else>
+                    <!-- 向后兼容：无 think 事件的引擎 -->
+                    <ThinkingBlock
+                      v-if="agentStore.thinkingText"
+                      :text="agentStore.thinkingText"
+                      :streaming="true"
                     />
-                  </div>
+                    <div v-if="agentStore.toolCalls.length" class="inline-tool-calls">
+                      <ToolCallCard
+                        v-for="tc in agentStore.toolCalls"
+                        :key="tc.toolName + tc.startedAt"
+                        v-bind="tc"
+                      />
+                    </div>
+                  </template>
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText"></span>
                   <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
-                  <div v-if="!agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText" class="loading-dots">
+                  <div v-if="!agentStore.reasoningSegments.length && !agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText" class="loading-dots">
                     <span></span><span></span><span></span>
                   </div>
                 </div>

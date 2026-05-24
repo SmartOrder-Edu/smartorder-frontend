@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
-import { useAgentStore, type AgentTraceEvent, type ToolCallState } from '@/stores/agent'
+import { useAgentStore, type AgentTraceEvent, type ToolCallState, type ReasoningSegment } from '@/stores/agent'
 import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
 
@@ -14,6 +14,7 @@ export interface ChatMessage {
   thinkingText?: string
   thinkingDurationMs?: number | null
   toolCalls?: ToolCallState[]
+  reasoningSegments?: ReasoningSegment[]
   routeResult?: any
   timestamp: number
   planSummary?: PlanSummary
@@ -64,6 +65,8 @@ export function useAgentChat(scrollCallback?: () => void) {
         thinkingText: agentStore.thinkingText || undefined,
         thinkingDurationMs: agentStore.thinkingDurationMs,
         toolCalls: agentStore.toolCalls.length ? [...agentStore.toolCalls] : undefined,
+        reasoningSegments: agentStore.reasoningSegments?.length
+          ? [...agentStore.reasoningSegments] : undefined,
         routeResult: agentStore.routeResult || undefined,
         timestamp: Date.now(),
       })
@@ -128,6 +131,8 @@ export function useAgentChat(scrollCallback?: () => void) {
                 thinkingText: agentStore.thinkingText || undefined,
                 thinkingDurationMs: agentStore.thinkingDurationMs,
                 toolCalls: agentStore.toolCalls.length ? [...agentStore.toolCalls] : undefined,
+                reasoningSegments: agentStore.reasoningSegments?.length
+                  ? [...agentStore.reasoningSegments] : undefined,
                 routeResult: agentStore.routeResult || undefined,
                 timestamp: Date.now(),
               })
@@ -150,6 +155,8 @@ export function useAgentChat(scrollCallback?: () => void) {
                   content: agentStore.answerText,
                   traceId: agentStore.currentTraceId,
                   traceEvents: [...agentStore.traceEvents],
+                  reasoningSegments: agentStore.reasoningSegments?.length
+                    ? [...agentStore.reasoningSegments] : undefined,
                   timestamp: Date.now(),
                 })
                 agentStore.answerText = ''
@@ -242,6 +249,8 @@ export function useAgentChat(scrollCallback?: () => void) {
                 content: agentStore.answerText,
                 traceId: agentStore.currentTraceId,
                 traceEvents: [...agentStore.traceEvents],
+                reasoningSegments: agentStore.reasoningSegments?.length
+                  ? [...agentStore.reasoningSegments] : undefined,
                 timestamp: Date.now(),
                 planSummary,
                 executionSteps: [...agentStore.executionSteps],
