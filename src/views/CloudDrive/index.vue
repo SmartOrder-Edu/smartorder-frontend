@@ -506,6 +506,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import SparkMD5 from 'spark-md5'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { getFolderContent, getFolderTree, createFolder as apiCreateFolder, updateFolder as apiUpdateFolder, deleteFolder as apiDeleteFolder, deleteFile as apiDeleteFile, moveFile as apiMoveFile, moveFolder as apiMoveFolder, batchMoveToFolder, apiInitUpload, apiGetSignUrl, apiUploadChunkToOSS, apiChunkDone, apiMergeChunks, apiCancelUpload, downloadFile } from '@/api/resource'
 
@@ -622,7 +623,7 @@ interface UploadItem {
   name: string
   size: number
   progress: number
-  status: 'pending' | 'uploading' | 'paused' | 'success' | 'canceled' | 'exception'
+  status: 'pending' | 'parsing' | 'uploading' | 'paused' | 'success' | 'canceled' | 'exception'
   fileHash: string
   file: File
 }
@@ -1070,6 +1071,37 @@ const checkUploadFinish = () => {
   }
 }
 
+const computeFileMD5 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const CHUNK_SIZE = 5 * 1024 * 1024
+    const chunksCount = Math.ceil(file.size / CHUNK_SIZE)
+    const spark = new SparkMD5.ArrayBuffer()
+    const reader = new FileReader()
+    let currentChunk = 0
+
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        spark.append(e.target.result as ArrayBuffer)
+      }
+      currentChunk++
+      if (currentChunk < chunksCount) {
+        loadNext()
+      } else {
+        resolve(spark.end())
+      }
+    }
+    reader.onerror = () => reject(new Error('文件读取发生错误'))
+
+    function loadNext() {
+      const start = currentChunk * CHUNK_SIZE
+      const end = Math.min(start + CHUNK_SIZE, file.size)
+      reader.readAsArrayBuffer(file.slice(start, end))
+    }
+
+    loadNext()
+  })
+}
+
 const handleHttpRequest = async (options: any) => {
   const { file, onSuccess, onError } = options
   const item = uploadQueue.value.find(i => i.file === file)
@@ -1082,7 +1114,9 @@ const handleHttpRequest = async (options: any) => {
   uploadControllers.set(item.id, controller)
 
   try {
-    const fileHash = `${file.name}-${file.size}-${file.lastModified}`
+    item.status = 'parsing'
+    const fileHash = await computeFileMD5(file)
+    item.status = 'uploading'
     item.fileHash = fileHash
     const CHUNK_SIZE = 5 * 1024 * 1024 // 5MB
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
@@ -1096,7 +1130,41 @@ const handleHttpRequest = async (options: any) => {
     })
     console.log("initRes", initRes);
 
-    const { uploadedChunksParts, fileId } = initRes || {}
+    const { uploadedChunksParts, fileId, isFinished } = initRes || {}
+
+    // 秒传：文件已存在，直接标记成功
+    if (isFinished) {
+      item.progress = 100
+      item.status = 'success'
+
+      const ext = item.name.split('.').pop()?.toLowerCase() || ''
+      const newFile: DriveItem = {
+        id: fileId || 'uf_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        name: item.name,
+        type: 'file',
+        extension: ext,
+        size: item.size,
+        createdAt: new Date().toISOString().split('T')[0],
+        updatedAt: new Date().toISOString().split('T')[0],
+        aiStatus: 'pending'
+      }
+
+      if (currentFolderId.value) {
+        if (!folderContents.value[currentFolderId.value]) {
+          folderContents.value[currentFolderId.value] = []
+        }
+        folderContents.value[currentFolderId.value].push(newFile)
+      } else {
+        rootFiles.value.push(newFile)
+      }
+
+      onSuccess()
+      successCount++
+      ElMessage.success(`文件 ${file.name} 秒传成功`)
+      checkUploadFinish()
+      return
+    }
+
     const chunksArray = uploadedChunksParts || []
 
     let uploadedSize = chunksArray.length * CHUNK_SIZE
