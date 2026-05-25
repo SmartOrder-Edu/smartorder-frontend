@@ -170,11 +170,18 @@ const timelineNodes = computed<TimelineNode[]>(() => {
   for (const e of events) {
     switch (e.eventType) {
       case 'agent.think.delta': {
-        nodes.push({
-          type: 'think',
-          seq: e.seq,
-          detail: e.payload?.text || '',
-        })
+        // 合并连续的 think.delta，避免每个 delta 生成一张独立卡片
+        const text = e.payload?.text || ''
+        const lastNode = nodes[nodes.length - 1]
+        if (lastNode && lastNode.type === 'think') {
+          lastNode.detail = (lastNode.detail || '') + text
+        } else {
+          nodes.push({
+            type: 'think',
+            seq: e.seq,
+            detail: text,
+          })
+        }
         break
       }
 
