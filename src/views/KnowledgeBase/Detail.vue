@@ -24,38 +24,43 @@
         <div class="stat-card">
           <div class="stat-icon docs"><el-icon><Document /></el-icon></div>
           <div class="stat-info">
-            <span class="stat-value">{{ filteredFiles.length }}</span>
+            <span class="stat-value">{{ detailStats.fileCount }}</span>
             <span class="stat-label">总文件数</span>
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-icon chunks"><el-icon><Grid /></el-icon></div>
           <div class="stat-info">
-            <span class="stat-value">{{ totalChunks }}</span>
+            <span class="stat-value">{{ detailStats.chunkCount }}</span>
             <span class="stat-label">总切片数</span>
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-icon success"><el-icon><CircleCheckFilled /></el-icon></div>
           <div class="stat-info">
-            <span class="stat-value">{{ embeddedFilesCount }}</span>
+            <span class="stat-value">{{ detailStats.embeddedFileCount }}</span>
             <span class="stat-label">向量化就绪</span>
           </div>
         </div>
       </div>
 
       <!-- 文件列表视图 -->
-      <div class="content-section">
-        <el-table :data="filteredFiles" class="files-table" style="width: 100%" v-loading="loading">
+      <div 
+        class="content-section"
+        v-infinite-scroll="() => fetchFileList(true)"
+        :infinite-scroll-disabled="loading || !hasMore"
+        infinite-scroll-distance="50"
+      >
+        <el-table :data="filteredFiles" class="files-table" style="width: 100%" v-loading="loading && pageNum === 1" stripe highlight-current-row :header-cell-style="{ background: '#f5f7fa', color: '#606266' }">
           <el-table-column label="文件名" min-width="250" show-overflow-tooltip>
             <template #default="{ row }">
               <div class="file-name-cell">
-                <img :src="getFileIcon(row.file_extension)" class="file-icon" @error="handleImgError" />
+                <img :src="getFileIcon(row.fileExtension)" class="file-icon" @error="handleImgError" />
                 <div class="file-info">
-                  <span class="file-name" @click="previewFile(row)">{{ row.original_name }}</span>
+                  <span class="file-name" @click="previewFile(row)">{{ row.originalName }}</span>
                   <span class="file-meta">
-                    <span v-if="row.page_count">{{ row.page_count }} 页</span>
-                    <span v-else-if="row.word_count">{{ formatNumber(row.word_count) }} 字</span>
+                    <span v-if="row.pageCount">{{ row.pageCount }} 页</span>
+                    <span v-else-if="row.wordCount">{{ formatNumber(row.wordCount) }} 字</span>
                     <span v-else>无字数/页数信息</span>
                   </span>
                 </div>
@@ -65,47 +70,47 @@
           
           <el-table-column label="大小" width="100">
             <template #default="{ row }">
-              {{ formatSize(row.file_size) }}
+              {{ formatSize(row.fileSize) }}
             </template>
           </el-table-column>
           
           <el-table-column label="解析状态" width="120">
             <template #default="{ row }">
-              <el-tag :type="getStatusType(row.parse_status)" size="small">
-                {{ getStatusText(row.parse_status, 'parse') }}
+              <el-tag :type="getStatusType(row.parseStatus)" size="small">
+                {{ getStatusText(row.parseStatus, 'parse') }}
               </el-tag>
             </template>
           </el-table-column>
           
           <el-table-column label="分块状态" width="120">
             <template #default="{ row }">
-              <el-tag :type="getStatusType(row.chunk_status)" size="small">
-                {{ getStatusText(row.chunk_status, 'chunk') }}
+              <el-tag :type="getStatusType(row.chunkStatus)" size="small">
+                {{ getStatusText(row.chunkStatus, 'chunk') }}
               </el-tag>
             </template>
           </el-table-column>
           
           <el-table-column label="向量化状态" width="120">
             <template #default="{ row }">
-              <el-tag :type="getStatusType(row.embedding_status)" size="small">
-                {{ getStatusText(row.embedding_status, 'embedding') }}
+              <el-tag :type="getStatusType(row.embeddingStatus)" size="small">
+                {{ getStatusText(row.embeddingStatus, 'embedding') }}
               </el-tag>
             </template>
           </el-table-column>
           
-          <el-table-column prop="chunk_count" label="切片数" width="100" />
+          <el-table-column prop="chunkCount" label="切片数" width="100" />
           
           <el-table-column label="上传时间" width="160">
             <template #default="{ row }">
-              {{ formatDate(row.created_at) }}
+              {{ formatDate(row.createdAt) }}
             </template>
           </el-table-column>
           
           <el-table-column label="操作" width="150" fixed="right">
             <template #default="{ row }">
               <div class="action-btns">
-                <el-tooltip content="重新解析" placement="top">
-                  <el-button type="primary" link icon="RefreshRight" @click="reparseFile(row)" />
+                <el-tooltip content="查看知识图谱" placement="top">
+                  <el-button type="primary" link icon="Connection" @click="viewKnowledgeGraph(row)" />
                 </el-tooltip>
                 <el-tooltip content="预览文件" placement="top">
                   <el-button type="primary" link icon="View" @click="previewFile(row)" />
@@ -123,6 +128,16 @@
             </el-empty>
           </template>
         </el-table>
+        
+        <!-- 加载状态提示 -->
+        <div class="list-bottom-tips" v-if="fileList.length > 0">
+          <div v-if="loading" class="loading-tips">
+            <el-icon class="is-loading"><Loading /></el-icon> 正在加载更多...
+          </div>
+          <div v-else-if="!hasMore" class="no-more-tips">
+            没有更多文件了
+          </div>
+        </div>
       </div>
 
       <!-- 上传弹窗模拟 -->
@@ -163,15 +178,40 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadRequestOptions } from 'element-plus'
-import { ArrowLeft, Search, Upload, Document, Grid, CircleCheckFilled, View, Delete, RefreshRight, UploadFilled } from '@element-plus/icons-vue'
+import { ArrowLeft, Search, Upload, Document, Grid, CircleCheckFilled, View, Delete, Connection, UploadFilled, Loading } from '@element-plus/icons-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useChunkUpload } from '@/composables/useChunkUpload'
+import { getKnowledgeBaseDetailStats, getKnowledgeFileList, type KnowledgeBaseDetailStatsVO, type KnowledgeFilePageVO } from '@/api/knowledgeBase'
 
 const route = useRoute()
 const kbId = route.params.id
 
 const { doUpload, uploadProgress } = useChunkUpload(Number(kbId))
 const isUploading = ref(false)
+
+const detailStats = ref<KnowledgeBaseDetailStatsVO>({
+  fileCount: 0,
+  chunkCount: 0,
+  embeddedFileCount: 0
+})
+
+const fetchDetailStats = async () => {
+  try {
+    const stats = await getKnowledgeBaseDetailStats(Number(kbId))
+    if (stats) {
+      detailStats.value = stats
+    }
+  } catch (error) {
+    console.error('获取知识库详细统计信息失败:', error)
+  }
+}
+
+onMounted(() => {
+  fetchDetailStats()
+  if (kbId) {
+    fetchFileList()
+  }
+})
 
 const onDialogClosed = () => {
   if (!isUploading.value) {
@@ -186,19 +226,21 @@ const customUploadRequest = async (options: UploadRequestOptions) => {
     const url = await doUpload(options.file)
     ElMessage.success('文件上传成功并已加入处理队列')
     
-    // 模拟添加新文件
+    // 模拟添加新文件，将其转化为驼峰命名的VO结构
     fileList.value.unshift({
       id: Date.now(),
-      original_name: options.file.name,
-      file_extension: options.file.name.split('.').pop()?.toLowerCase() || '',
-      file_size: options.file.size,
-      page_count: null,
-      word_count: null,
-      parse_status: 'pending',
-      chunk_status: 'pending',
-      embedding_status: 'pending',
-      chunk_count: 0,
-      created_at: new Date().toISOString()
+      originalName: options.file.name,
+      fileUrl: '',
+      fileExtension: options.file.name.split('.').pop()?.toLowerCase() || '',
+      mimeType: options.file.type,
+      fileSize: options.file.size,
+      pageCount: 0,
+      wordCount: 0,
+      parseStatus: 'pending',
+      chunkStatus: 'pending',
+      embeddingStatus: 'pending',
+      chunkCount: 0,
+      createdAt: new Date().toISOString()
     })
     
     setTimeout(() => {
@@ -217,93 +259,64 @@ const kbInfo = ref({
   category: '课程学习'
 })
 
-// 模拟文件列表数据
-interface KnowledgeFile {
-  id: number
-  original_name: string
-  file_extension: string
-  file_size: number
-  page_count: number | null
-  word_count: number | null
-  parse_status: string
-  chunk_status: string
-  embedding_status: string
-  chunk_count: number
-  created_at: string
-}
-
+// 列表和分页数据
 const loading = ref(false)
 const searchKeyword = ref('')
 const uploadDialogVisible = ref(false)
 
-const fileList = ref<KnowledgeFile[]>([
-  {
-    id: 1,
-    original_name: '计算机网络(第7版) 谢希仁.pdf',
-    file_extension: 'pdf',
-    file_size: 25430000, // 25.43 MB
-    page_count: 420,
-    word_count: null,
-    parse_status: 'parsed',
-    chunk_status: 'chunked',
-    embedding_status: 'embedded',
-    chunk_count: 520,
-    created_at: '2026-05-13T09:30:00Z'
-  },
-  {
-    id: 2,
-    original_name: 'TCP_IP详解_卷1.pdf',
-    file_extension: 'pdf',
-    file_size: 45600000,
-    page_count: 856,
-    word_count: null,
-    parse_status: 'parsing',
-    chunk_status: 'pending',
-    embedding_status: 'pending',
-    chunk_count: 0,
-    created_at: '2026-05-13T10:15:00Z'
-  },
-  {
-    id: 3,
-    original_name: '期末复习重点图表缩略版.docx',
-    file_extension: 'docx',
-    file_size: 2500000,
-    page_count: 24,
-    word_count: 12500,
-    parse_status: 'parsed',
-    chunk_status: 'chunked',
-    embedding_status: 'embedded',
-    chunk_count: 45,
-    created_at: '2026-05-12T15:20:00Z'
-  },
-  {
-    id: 4,
-    original_name: '个人笔记-传输层协议分析.md',
-    file_extension: 'md',
-    file_size: 45000,
-    page_count: null,
-    word_count: 8000,
-    parse_status: 'parsed',
-    chunk_status: 'chunked',
-    embedding_status: 'failed',
-    chunk_count: 32,
-    created_at: '2026-05-11T20:00:00Z'
+const fileList = ref<KnowledgeFilePageVO[]>([])
+const pageNum = ref(1)
+const pageSize = ref(15)
+const hasMore = ref(true)
+
+// 获取文件列表
+const fetchFileList = async (isLoadMore = false) => {
+  if (loading.value || (!hasMore.value && isLoadMore)) return
+  
+  // 如果不是加载更多（即刷新/首次加载），重置页码状态
+  if (!isLoadMore) {
+    pageNum.value = 1
+    hasMore.value = true
   }
-])
+  
+  loading.value = true
+
+  try {
+    const res = await getKnowledgeFileList({
+      knowledgeBaseId: Number(kbId),
+      pageNum: pageNum.value,
+      pageSize: pageSize.value
+    })
+
+    if (res) {
+      if (isLoadMore) {
+        fileList.value.push(...res.records)
+      } else {
+        fileList.value = res.records
+      }
+
+      // 用更靠谱的分页判断：如果后端返回的数据条数比 pageSize 小，就说明没数据了
+      if (res.records.length < pageSize.value) {
+        hasMore.value = false
+      } else {
+        hasMore.value = true
+        pageNum.value++
+      }
+    }
+  } catch (error) {
+    console.error('获取文件列表失败:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+// 模拟文件上传新结构（可选修改）
 
 // 计算属性
 const filteredFiles = computed(() => {
   return fileList.value.filter(file => 
-    file.original_name.toLowerCase().includes(searchKeyword.value.toLowerCase())
+    file.originalName.toLowerCase().includes(searchKeyword.value.toLowerCase())
   )
-})
-
-const totalChunks = computed(() => {
-  return filteredFiles.value.reduce((sum, file) => sum + file.chunk_count, 0)
-})
-
-const embeddedFilesCount = computed(() => {
-  return filteredFiles.value.filter(f => f.embedding_status === 'embedded').length
 })
 
 // 工具方法
@@ -326,38 +339,58 @@ const formatDate = (dateStr: string) => {
 
 const getStatusType = (status: string) => {
   switch (status) {
-    case 'parsed':
-    case 'chunked':
-    case 'embedded': return 'success'
-    case 'parsing':
-    case 'chunking':
-    case 'embedding': return 'primary'
+    case 'success': return 'success'
+    case 'processing': return 'primary'
     case 'failed': return 'danger'
+    case 'pending': return 'info'
     default: return 'info'
   }
 }
 
 const getStatusText = (status: string, flow: string) => {
   const map: Record<string, any> = {
-    parse: { pending: '待解析', parsing: '解析中', parsed: '解析完成', failed: '解析失败' },
-    chunk: { pending: '待分块', chunking: '分块中', chunked: '分块完成', failed: '分块失败' },
-    embedding: { pending: '待向量化', embedding: '向量化中', embedded: '向量化完成', failed: '向量化失败' }
+    parse: { pending: '待解析', processing: '解析中', success: '解析完成', failed: '解析失败' },
+    chunk: { pending: '待分块', processing: '分块中', success: '分块完成', failed: '分块失败' },
+    embedding: { pending: '待向量化', processing: '向量化中', success: '向量化完成', failed: '向量化失败' }
   }
   return map[flow][status] || '未知'
 }
 
 const getFileIcon = (ext: string) => {
-  // 这里可以替换为真实的 svg 或在线图标链接
   const iconBase = 'https://api.iconify.design/vscode-icons/file-type-'
-  if (['pdf', 'word', 'powerpoint', 'excel', 'markdown'].includes(ext)) {
-    return `${iconBase}${ext}.svg`
+  if (!ext) return `${iconBase}text.svg`
+  
+  switch (ext.toLowerCase()) {
+    case 'txt': 
+    case 'md': 
+      return ext.toLowerCase() === 'md' ? `${iconBase}markdown.svg` : `${iconBase}text.svg`
+    case 'pdf': 
+      return `${iconBase}pdf2.svg`
+    case 'doc': 
+    case 'docx': 
+      return `${iconBase}word.svg`
+    case 'xls': 
+    case 'xlsx': 
+      return `${iconBase}excel.svg`
+    case 'ppt': 
+    case 'pptx': 
+      return `${iconBase}powerpoint.svg`
+    case 'png': 
+    case 'jpg': 
+    case 'jpeg': 
+    case 'bmp': 
+    case 'gif': 
+      return `${iconBase}image.svg`
+    case 'mp3': 
+    case 'wav': 
+      return `${iconBase}audio.svg`
+    case 'mp4': 
+    case 'mkv': 
+    case 'webm': 
+      return `${iconBase}video.svg`
+    default: 
+      return `${iconBase}text.svg`
   }
-  if (ext === 'docx' || ext === 'doc') return `${iconBase}word.svg`
-  if (ext === 'pptx' || ext === 'ppt') return `${iconBase}powerpoint.svg`
-  if (ext === 'xlsx' || ext === 'xls') return `${iconBase}excel.svg`
-  if (ext === 'md') return `${iconBase}markdown.svg`
-  if (ext === 'txt') return `${iconBase}text.svg`
-  return `${iconBase}text.svg`
 }
 
 const handleImgError = (e: Event) => {
@@ -370,20 +403,18 @@ const handleUpload = () => {
   uploadDialogVisible.value = true
 }
 
-const previewFile = (file: KnowledgeFile) => {
-  ElMessage.info(`预览文件：${file.original_name}`)
+const previewFile = (file: KnowledgeFilePageVO) => {
+  ElMessage.info(`预览文件：${file.originalName}`)
 }
 
-const reparseFile = (file: KnowledgeFile) => {
-  ElMessage.success(`已将 ${file.original_name} 重新加入解析队列`)
-  file.parse_status = 'pending'
-  file.chunk_status = 'pending'
-  file.embedding_status = 'pending'
+const viewKnowledgeGraph = (file: KnowledgeFilePageVO) => {
+  ElMessage.info(`查看知识图谱：${file.originalName}`)
+  // TODO: 跳转知识图谱或打开图谱弹窗
 }
 
-const deleteFile = (file: KnowledgeFile) => {
+const deleteFile = (file: KnowledgeFilePageVO) => {
   ElMessageBox.confirm(
-    `确定要删除文件 "${file.original_name}" 吗？关联的知识切片和向量都会被一并移除。`,
+    `确定要删除文件 "${file.originalName}" 吗？关联的知识切片和向量都会被一并移除。`,
     '删除确认',
     {
       confirmButtonText: '确定',
@@ -518,6 +549,8 @@ onMounted(() => {
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.02);
+  height: 600px;
+  overflow-y: auto;
 }
 
 .files-table {
@@ -559,6 +592,21 @@ onMounted(() => {
     display: flex;
     gap: 8px;
     align-items: center;
+  }
+}
+
+.list-bottom-tips {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+
+  .loading-tips {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 }
 </style>
