@@ -125,7 +125,13 @@ async function renderMermaidBlocks(el: HTMLElement) {
       <button class="mermaid-tool-btn" data-action="zoom-in" title="放大">${ICON_ZOOM_IN}</button>
       <span class="mermaid-toolbar-divider"></span>
       <button class="mermaid-tool-btn" data-action="fullscreen" title="全屏查看">${ICON_FULLSCREEN}</button>
-      <button class="mermaid-tool-btn" data-action="download" title="下载图片">${ICON_DOWNLOAD}</button>
+      <div class="mermaid-download-wrap">
+        <button class="mermaid-tool-btn" data-action="download" title="下载">${ICON_DOWNLOAD}</button>
+        <div class="mermaid-download-menu">
+          <button class="mermaid-download-option" data-dl="svg">下载 SVG</button>
+          <button class="mermaid-download-option" data-dl="png">下载 PNG</button>
+        </div>
+      </div>
       <button class="mermaid-tool-btn" data-action="copy" title="复制源码">${ICON_COPY}</button>
     </div>
   </div>
@@ -157,6 +163,7 @@ async function renderMermaidBlocks(el: HTMLElement) {
 }
 
 function bindMermaidActions(el: HTMLElement) {
+  // 工具栏按钮
   el.querySelectorAll('.mermaid-tool-btn').forEach((btn) => {
     if ((btn as HTMLElement)._actionBound) return
     ;(btn as HTMLElement)._actionBound = true
@@ -170,11 +177,50 @@ function bindMermaidActions(el: HTMLElement) {
         case 'zoom-in': zoomDiagram(block, 20); break
         case 'zoom-out': zoomDiagram(block, -20); break
         case 'fullscreen': openFullscreen(block); break
-        case 'download': downloadDiagram(block); break
+        case 'download': toggleDownloadMenu(block); break
         case 'copy': copySource(block); break
       }
     })
   })
+
+  // 下载菜单选项
+  el.querySelectorAll('.mermaid-download-option').forEach((opt) => {
+    if ((opt as HTMLElement)._dlBound) return
+    ;(opt as HTMLElement)._dlBound = true
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation()
+      const block = opt.closest('.mermaid-block') as HTMLElement
+      const menu = opt.closest('.mermaid-download-menu') as HTMLElement
+      if (menu) menu.style.display = 'none'
+      const format = (opt as HTMLElement).dataset.dl as 'svg' | 'png'
+      if (block) downloadDiagram(block, format)
+    })
+  })
+}
+
+function toggleDownloadMenu(block: HTMLElement) {
+  const menu = block.querySelector('.mermaid-download-menu') as HTMLElement
+  if (!menu) return
+
+  // 关闭其他打开的菜单
+  document.querySelectorAll('.mermaid-download-menu').forEach((m) => {
+    if (m !== menu) (m as HTMLElement).style.display = 'none'
+  })
+
+  const isOpen = menu.style.display === 'block'
+  menu.style.display = isOpen ? 'none' : 'block'
+
+  if (!isOpen) {
+    setTimeout(() => {
+      const close = (e: MouseEvent) => {
+        if (!menu.contains(e.target as HTMLElement)) {
+          menu.style.display = 'none'
+          document.removeEventListener('click', close, true)
+        }
+      }
+      document.addEventListener('click', close, true)
+    }, 0)
+  }
 }
 
 function toggleView(block: HTMLElement) {
@@ -230,7 +276,13 @@ function openFullscreen(block: HTMLElement) {
         <span class="mermaid-fullscreen-zoom">100%</span>
         <button class="mermaid-fullscreen-btn" data-fs-action="zoom-in">${ICON_ZOOM_IN}</button>
         <span class="mermaid-fullscreen-divider"></span>
-        <button class="mermaid-fullscreen-btn" data-fs-action="download">${ICON_DOWNLOAD}</button>
+        <div class="mermaid-fs-download-wrap">
+          <button class="mermaid-fullscreen-btn" data-fs-action="download">${ICON_DOWNLOAD}</button>
+          <div class="mermaid-fs-download-menu">
+            <button class="mermaid-fs-download-option" data-fs-dl="svg">下载 SVG</button>
+            <button class="mermaid-fs-download-option" data-fs-dl="png">下载 PNG</button>
+          </div>
+        </div>
         <button class="mermaid-fullscreen-btn" data-fs-action="close">${ICON_CLOSE}</button>
       </div>
     </div>
@@ -247,10 +299,40 @@ function openFullscreen(block: HTMLElement) {
   let fsZoom = 100
   const zoomLabel = overlay.querySelector('.mermaid-fullscreen-zoom') as HTMLElement
   const content = overlay.querySelector('.mermaid-fullscreen-content') as HTMLElement
-  const source = block.dataset.mermaidSource!
+
+  const doDownload = async (format: 'svg' | 'png') => {
+    const s = overlay.querySelector('.mermaid-fullscreen-content svg') as SVGElement | null
+    if (!s) return
+    const svgStr = fixSvgDimensions(new XMLSerializer().serializeToString(s))
+    if (format === 'svg') {
+      triggerDownload(new Blob([svgStr], { type: 'image/svg+xml' }), '.svg')
+    } else {
+      const blob = await svgToPngBlob(svgStr)
+      if (blob) triggerDownload(blob, '.png')
+    }
+  }
+
+  // 下载菜单选项
+  overlay.querySelectorAll('.mermaid-fs-download-option').forEach((opt) => {
+    opt.addEventListener('click', (e) => {
+      e.stopPropagation()
+      overlay.querySelectorAll('.mermaid-fs-download-menu').forEach((m) => {
+        ;(m as HTMLElement).style.display = 'none'
+      })
+      doDownload((opt as HTMLElement).dataset.fsDl as 'svg' | 'png')
+    })
+  })
 
   overlay.addEventListener('click', (e) => {
     const target = e.target as HTMLElement
+
+    // 点击菜单外关闭
+    if (!target.closest('.mermaid-fs-download-menu')) {
+      overlay.querySelectorAll('.mermaid-fs-download-menu').forEach((m) => {
+        ;(m as HTMLElement).style.display = 'none'
+      })
+    }
+
     const fsBtn = target.closest('[data-fs-action]') as HTMLElement
     if (fsBtn) {
       const action = fsBtn.dataset.fsAction
@@ -264,8 +346,10 @@ function openFullscreen(block: HTMLElement) {
         content.style.transform = `scale(${fsZoom / 100})`
         zoomLabel.textContent = `${fsZoom}%`
       } else if (action === 'download') {
-        const decodedSource = decodeURIComponent(escape(atob(source)))
-        downloadSvgAsPng(decodedSource)
+        const menu = overlay.querySelector('.mermaid-fs-download-menu') as HTMLElement
+        if (menu) {
+          menu.style.display = menu.style.display === 'block' ? 'none' : 'block'
+        }
       }
     } else if (target === overlay || target.classList.contains('mermaid-fullscreen-body')) {
       closeFullscreen(overlay)
@@ -286,49 +370,69 @@ function closeFullscreen(overlay: HTMLElement) {
   setTimeout(() => overlay.remove(), 200)
 }
 
-async function downloadDiagram(block: HTMLElement) {
-  const source = decodeURIComponent(escape(atob(block.dataset.mermaidSource!)))
-  await downloadSvgAsPng(source)
+async function downloadDiagram(block: HTMLElement, format: 'svg' | 'png') {
+  const svgEl = block.querySelector('.mermaid-diagram-body svg') as SVGElement | null
+  if (!svgEl) return
+
+  const svgStr = fixSvgDimensions(new XMLSerializer().serializeToString(svgEl))
+
+  if (format === 'svg') {
+    triggerDownload(new Blob([svgStr], { type: 'image/svg+xml' }), '.svg')
+  } else {
+    const blob = await svgToPngBlob(svgStr)
+    if (blob) triggerDownload(blob, '.png')
+  }
 }
 
-async function downloadSvgAsPng(mermaidSource: string) {
-  const mermaid = (await import('mermaid')).default
-  mermaid.initialize({
-    startOnLoad: false,
-    securityLevel: 'strict',
-    theme: isDarkTheme() ? 'dark' : 'default',
+function fixSvgDimensions(svg: string): string {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(svg, 'image/svg+xml')
+  const root = doc.documentElement
+
+  let w = parseFloat(root.getAttribute('width') || '')
+  let h = parseFloat(root.getAttribute('height') || '')
+  const viewBox = root.getAttribute('viewBox')
+
+  if ((!w || !h) && viewBox) {
+    const parts = viewBox.split(/\s+/)
+    if (parts.length === 4) {
+      w = parseFloat(parts[2])
+      h = parseFloat(parts[3])
+    }
+  }
+  if (!w || !h) { w = 800; h = 600 }
+
+  root.setAttribute('width', String(w))
+  root.setAttribute('height', String(h))
+  return new XMLSerializer().serializeToString(root)
+}
+
+async function svgToPngBlob(svgStr: string): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr)
+
+    img.onload = () => {
+      const scale = 2
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth * scale
+      canvas.height = img.naturalHeight * scale
+      const ctx = canvas.getContext('2d')!
+      ctx.scale(scale, scale)
+      ctx.drawImage(img, 0, 0)
+      canvas.toBlob((blob) => resolve(blob), 'image/png')
+    }
+    img.onerror = () => resolve(null)
+    img.src = dataUrl
   })
+}
 
-  const id = `mermaid-dl-${Math.random().toString(36).slice(2, 10)}`
-  const { svg } = await mermaid.render(id, mermaidSource)
-
-  const img = new Image()
-  const svgBlob = new Blob([svg], { type: 'image/svg+xml' })
-  const url = URL.createObjectURL(svgBlob)
-
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve()
-    img.onerror = reject
-    img.src = url
-  })
-
-  const scale = 2
-  const canvas = document.createElement('canvas')
-  canvas.width = img.naturalWidth * scale
-  canvas.height = img.naturalHeight * scale
-  const ctx = canvas.getContext('2d')!
-  ctx.scale(scale, scale)
-  ctx.drawImage(img, 0, 0)
-  URL.revokeObjectURL(url)
-
-  canvas.toBlob((blob) => {
-    if (!blob) return
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `mermaid-${Date.now()}.png`
-    a.click()
-    URL.revokeObjectURL(a.href)
-  }, 'image/png')
+function triggerDownload(blob: Blob, ext: string) {
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `mermaid-${Date.now()}${ext}`
+  a.click()
+  URL.revokeObjectURL(a.href)
 }
 
 async function copySource(block: HTMLElement) {
@@ -532,7 +636,7 @@ onUnmounted(() => {
   padding: 0;
 }
 
-/* 兼容：没有经过 wrapper 的裸 pre（如非代码块内的 pre） */
+/* 兼容：没有经过 wrapper 的裸 pre */
 .markdown-renderer :deep(pre:not(.code-block-wrapper pre)) {
   margin: 0.6em 0;
   border-radius: 8px;
@@ -683,6 +787,44 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+/* 下载下拉菜单 */
+.markdown-renderer :deep(.mermaid-download-wrap) {
+  position: relative;
+}
+
+.markdown-renderer :deep(.mermaid-download-menu) {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e2e6ea;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  min-width: 120px;
+  overflow: hidden;
+}
+
+.markdown-renderer :deep(.mermaid-download-option) {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: #fff;
+  color: #24292e;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+  font-family: inherit;
+}
+
+.markdown-renderer :deep(.mermaid-download-option:hover) {
+  background: #f0f2f5;
+}
+
 .markdown-renderer :deep(.mermaid-zoom-label) {
   font-size: 0.7rem;
   color: #6a737d;
@@ -754,7 +896,7 @@ onUnmounted(() => {
 }
 </style>
 
-<!-- 全屏覆盖层样式（不使用 scoped，需要挂载到 body） -->
+<!-- 全屏覆盖层样式（非 scoped，挂载到 body） -->
 <style>
 .mermaid-fullscreen-overlay {
   position: fixed;
@@ -795,13 +937,14 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
+  min-width: 30px;
   height: 30px;
-  padding: 0;
+  padding: 0 8px;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: #aaa;
+  font-size: 0.7rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -809,6 +952,42 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
+
+/* 全屏下载菜单 */
+.mermaid-fs-download-wrap {
+  position: relative;
+}
+.mermaid-fs-download-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  min-width: 120px;
+  overflow: hidden;
+}
+.mermaid-fs-download-option {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: #2a2a2a;
+  color: #ccc;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+  font-family: inherit;
+}
+.mermaid-fs-download-option:hover {
+  background: #3a3a3a;
+}
+
 .mermaid-fullscreen-zoom {
   font-size: 0.75rem;
   color: #999;
