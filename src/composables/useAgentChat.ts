@@ -308,6 +308,8 @@ export function useAgentChat(scrollCallback?: () => void) {
 
       for (let i = 0; i < result.list.length; i++) {
         const msg = result.list[i]
+        // 跳过 tool/system 消息：工具调用结果和系统消息是内部数据，不应作为对话展示
+        if (msg.role === 'tool' || msg.role === 'system') continue
         const chatMsg: ChatMessage = {
           role: (msg.role === 'user' ? 'user' : 'ai') as 'user' | 'ai',
           content: msg.content || '',
@@ -331,7 +333,7 @@ export function useAgentChat(scrollCallback?: () => void) {
             }
           }
           if (msg.traceId) {
-            traceJobs.push({ msgIndex: i, traceId: msg.traceId })
+            traceJobs.push({ msgIndex: msgs.length, traceId: msg.traceId })
           }
         }
 
@@ -497,6 +499,17 @@ export function useAgentChat(scrollCallback?: () => void) {
     agentStore.reset()
   }
 
+  /**
+   * 删除对话并清理本地状态
+   */
+  const deleteConversation = async (conversationId: string) => {
+    const wasActive = agentStore.currentConversationId === conversationId
+    await agentStore.deleteConversation(conversationId)
+    if (wasActive) {
+      messages.value = []
+    }
+  }
+
   return {
     messages,
     loadingHistory,
@@ -507,5 +520,6 @@ export function useAgentChat(scrollCallback?: () => void) {
     loadConversation,
     startNewConversation,
     clearMessages,
+    deleteConversation,
   }
 }
