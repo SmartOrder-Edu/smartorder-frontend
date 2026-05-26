@@ -349,6 +349,17 @@ export const useAgentStore = defineStore('agent', () => {
     }
   }
 
+  /**
+   * 删除指定对话
+   */
+  async function deleteConversation(conversationId: string) {
+    await agentApi.deleteConversation(conversationId)
+    conversations.value = conversations.value.filter(c => c.conversationId !== conversationId)
+    if (currentConversationId.value === conversationId) {
+      currentConversationId.value = ''
+    }
+  }
+
   function reset() {
     currentConversationId.value = ''
     currentTraceId.value = ''
@@ -405,6 +416,7 @@ export const useAgentStore = defineStore('agent', () => {
     closeTracePanel,
     getCurrentMessageTraceEvents,
     fetchConversations,
+    deleteConversation,
     reset,
   }
 })
