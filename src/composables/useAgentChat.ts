@@ -301,12 +301,155 @@ export function useAgentChat(scrollCallback?: () => void) {
     loadingHistory.value = true
     try {
       const result = await agentApi.getConversationMessages(conversationId, 1, 200)
-      const msgs = result.list.map((msg) => ({
-        role: (msg.role === 'user' ? 'user' : 'ai') as 'user' | 'ai',
-        content: msg.content || '',
-        traceId: msg.traceId || undefined,
-        timestamp: new Date(msg.createTime).getTime(),
-      }))
+      const msgs: ChatMessage[] = []
+
+      // 第一遍：从 MessageVO 构建消息（无 API 调用），收集 trace 拉取任务
+      const traceJobs: { msgIndex: number; traceId: string }[] = []
+
+      for (let i = 0; i < result.list.length; i++) {
+        const msg = result.list[i]
+        const chatMsg: ChatMessage = {
+          role: (msg.role === 'user' ? 'user' : 'ai') as 'user' | 'ai',
+          content: msg.content || '',
+          traceId: msg.traceId || undefined,
+          timestamp: new Date(msg.createTime).getTime(),
+        }
+
+        if (msg.role === 'assistant') {
+          if (msg.reasoningContent) {
+            chatMsg.thinkingText = msg.reasoningContent
+          }
+          if (msg.traceId) {
+            traceJobs.push({ msgIndex: i, traceId: msg.traceId })
+          }
+        }
+
+        msgs.push(chatMsg)
+      }
+
+      // 第二遍：并行拉取所有 trace 事件
+      if (traceJobs.length > 0) {
+        const traceResults = await Promise.all(
+          traceJobs.map(j =>
+            agentApi.getTraceEvents(j.traceId).catch(e => {
+              console.warn('[useAgentChat] 获取 trace 事件失败:', j.traceId, e)
+              return null
+            }),
+          ),
+        )
+
+        for (let j = 0; j < traceJobs.length; j++) {
+          const chatMsg = msgs[traceJobs[j].msgIndex]
+          const events = traceResults[j]
+          if (!events || !Array.isArray(events)) continue
+
+          const toolCalls: ToolCallState[] = []
+          const traceEvents: AgentTraceEvent[] = []
+          // 用 seq 做 key 避免同名工具调用互相覆盖
+          const pendingTools: Map<number, { toolName: string; arguments?: any; startedAt: number }> = new Map()
+
+          for (const raw of events) {
+            let payload = raw.payload
+            if (typeof payload === 'string') {
+              try { payload = JSON.parse(payload) } catch { /* keep as string */ }
+            }
+
+            const evt: AgentTraceEvent = {
+              traceId: raw.traceId || '',
+              conversationId: raw.conversationId || '',
+              userId: raw.userId || 0,
+              mode: raw.agentMode || raw.mode || '',
+              eventType: raw.eventType || '',
+              seq: raw.sequenceNum || raw.seq || 0,
+              timestamp: raw.createTime ? new Date(raw.createTime).getTime() : (raw.timestamp || Date.now()),
+              payload,
+            }
+
+            traceEvents.push(evt)
+
+            switch (evt.eventType) {
+              case 'agent.route.completed': {
+                chatMsg.routeResult = evt.payload
+                break
+              }
+              case 'agent.tool.started': {
+                const toolName = evt.payload?.toolName || '未知工具'
+                pendingTools.set(evt.seq, {
+                  toolName,
+                  arguments: evt.payload?.arguments,
+                  startedAt: evt.timestamp || Date.now(),
+                })
+                break
+              }
+              case 'agent.tool.completed': {
+                const toolName = evt.payload?.toolName || ''
+                const { key, entry } = findPendingByToolName(pendingTools, toolName)
+                toolCalls.push({
+                  toolName,
+                  status: 'completed',
+                  arguments: entry?.arguments || evt.payload?.arguments,
+                  result: evt.payload?.result,
+                  durationMs: evt.payload?.durationMs,
+                  startedAt: entry?.startedAt || evt.timestamp,
+                })
+                if (key !== null) pendingTools.delete(key)
+                break
+              }
+              case 'agent.tool.failed': {
+                const toolName = evt.payload?.toolName || ''
+                const { key, entry } = findPendingByToolName(pendingTools, toolName)
+                toolCalls.push({
+                  toolName,
+                  status: 'failed',
+                  arguments: entry?.arguments || evt.payload?.arguments,
+                  durationMs: evt.payload?.durationMs,
+                  startedAt: entry?.startedAt || evt.timestamp,
+                })
+                if (key !== null) pendingTools.delete(key)
+                break
+              }
+            }
+          }
+
+          // 未匹配完成的 pending 工具（兜底）
+          for (const [, pending] of pendingTools) {
+            toolCalls.push({
+              toolName: pending.toolName,
+              status: 'running',
+              arguments: pending.arguments,
+              startedAt: pending.startedAt,
+            })
+          }
+
+          if (toolCalls.length > 0) {
+            chatMsg.toolCalls = toolCalls
+          }
+          if (traceEvents.length > 0) {
+            chatMsg.traceEvents = traceEvents
+          }
+
+          // 重建 reasoningSegments（使历史消息与实时消息展示一致）
+          if (chatMsg.thinkingText || toolCalls.length > 0) {
+            const segments: ReasoningSegment[] = []
+
+            if (chatMsg.thinkingText) {
+              segments.push({ thinkingText: chatMsg.thinkingText })
+            }
+
+            for (const tc of toolCalls) {
+              const lastSeg = segments[segments.length - 1]
+              if (lastSeg && !lastSeg.toolCall) {
+                lastSeg.toolCall = tc
+              } else {
+                segments.push({ thinkingText: '', toolCall: tc })
+              }
+            }
+
+            chatMsg.reasoningSegments = segments
+          }
+        }
+      }
+
       messages.value = msgs
       agentStore.currentConversationId = conversationId
       scrollCallback?.()
@@ -315,6 +458,19 @@ export function useAgentChat(scrollCallback?: () => void) {
     } finally {
       loadingHistory.value = false
     }
+  }
+
+  /** 从 pendingTools 中查找第一个匹配 toolName 的条目（用于 tool.completed/failed 匹配 tool.started） */
+  function findPendingByToolName(
+    map: Map<number, { toolName: string; arguments?: any; startedAt: number }>,
+    toolName: string,
+  ): { key: number | null; entry: { toolName: string; arguments?: any; startedAt: number } | undefined } {
+    for (const [key, val] of map) {
+      if (val.toolName === toolName) {
+        return { key, entry: val }
+      }
+    }
+    return { key: null, entry: undefined }
   }
 
   /**

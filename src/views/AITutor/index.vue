@@ -600,18 +600,63 @@ const hasTraceEventsForMsg = (msg: any): boolean => {
 
 const openMsgTrace = async (msg: any) => {
   if (msg.traceEvents?.length) {
-    agentStore.traceEvents = msg.traceEvents
+    agentStore.traceEvents = injectThinkEventIfMissing(msg.traceEvents, msg.thinkingText)
   } else if (msg.traceId) {
     try {
-      const events = await agentApi.getTraceEvents(msg.traceId)
-      agentStore.traceEvents = events || []
-      msg.traceEvents = events || [] // 缓存
+      const rawEvents: any[] = await agentApi.getTraceEvents(msg.traceId)
+      // 标准化后端实体格式 → 前端 AgentTraceEvent 格式
+      const normalized = (rawEvents || []).map((raw: any) => {
+        let payload = raw.payload
+        if (typeof payload === 'string') {
+          try { payload = JSON.parse(payload) } catch { /* keep as string */ }
+        }
+        return {
+          traceId: raw.traceId || '',
+          conversationId: raw.conversationId || '',
+          userId: raw.userId || 0,
+          mode: raw.agentMode || raw.mode || '',
+          eventType: raw.eventType || '',
+          seq: raw.sequenceNum || raw.seq || 0,
+          timestamp: raw.createTime ? new Date(raw.createTime).getTime() : (raw.timestamp || Date.now()),
+          payload,
+        }
+      })
+      const enriched = injectThinkEventIfMissing(normalized, msg.thinkingText)
+      agentStore.traceEvents = enriched
+      msg.traceEvents = enriched // 缓存（含合成 think 事件）
     } catch (e) {
       console.error('[AITutor] 获取 trace 失败:', e)
       agentStore.traceEvents = []
     }
   }
   agentStore.openTracePanel(msg.traceId)
+}
+
+/**
+ * 历史 trace 中缺少 agent.think.delta（后端不持久化高频 delta 事件），
+ * 导致抽屉时间线缺少"思考"节点。用 reasoningContent 合成一条虚拟事件补上。
+ */
+function injectThinkEventIfMissing(
+  events: AgentTraceEvent[],
+  thinkingText?: string,
+): AgentTraceEvent[] {
+  if (!thinkingText || events.length === 0) return events
+  const hasThinkDelta = events.some(e => e.eventType === 'agent.think.delta')
+  if (hasThinkDelta) return events
+
+  const minSeq = Math.min(...events.map(e => e.seq))
+  const ref = events[0]
+  const synthetic: AgentTraceEvent = {
+    traceId: ref.traceId,
+    conversationId: ref.conversationId,
+    userId: ref.userId,
+    mode: ref.mode,
+    eventType: 'agent.think.delta',
+    seq: Math.max(0, minSeq - 1),
+    timestamp: ref.timestamp,
+    payload: { text: thinkingText },
+  }
+  return [synthetic, ...events]
 }
 
 onMounted(() => {

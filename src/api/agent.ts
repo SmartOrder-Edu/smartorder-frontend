@@ -45,6 +45,7 @@ export interface MessageVO {
   content: string | null
   toolName: string | null
   traceId?: string
+  reasoningContent?: string
   createTime: string
 }
 

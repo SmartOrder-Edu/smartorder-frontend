@@ -115,7 +115,7 @@
           <p>该消息没有可用的执行追踪数据</p>
           <p class="trace-empty-hint">追踪数据在以下情况不可用：</p>
           <ul class="trace-empty-reasons">
-            <li>消息来自历史记录加载（历史消息未保存追踪）</li>
+            <li>该消息没有关联的执行追踪（如纯文本回复）</li>
             <li>Agent 尚未开始执行任务</li>
             <li>追踪数据已在新一轮对话中被清除</li>
           </ul>
