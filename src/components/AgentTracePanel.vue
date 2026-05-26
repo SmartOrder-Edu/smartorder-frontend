@@ -43,29 +43,29 @@
               </div>
             </div>
 
-            <!-- 工具调用 -->
+            <!-- 工具调用（自然语言） -->
             <div v-else-if="node.type === 'tool'" class="node-tool">
               <div class="node-header">
-                <el-icon :color="toolDotColor(node.status)"><Tools /></el-icon>
-                <span class="node-title">{{ node.toolName }}</span>
+                <el-icon :color="toolDotColor(node.status)">
+                  <component :is="getToolIcon(node.toolName)" />
+                </el-icon>
+                <span class="node-title">{{ toolNodeActionText(node) }}</span>
                 <el-tag :type="toolTagType(node.status)" size="small">
                   {{ toolStatusText(node.status) }}
                 </el-tag>
                 <span class="node-duration" v-if="node.durationMs">{{ formatDuration(node.durationMs) }}</span>
               </div>
-              <div class="node-body" v-if="node.arguments || node.result">
-                <el-collapse>
-                  <el-collapse-item title="查看详情">
-                    <div class="tool-detail" v-if="node.arguments">
-                      <div class="detail-label">入参</div>
-                      <pre>{{ formatJson(node.arguments) }}</pre>
-                    </div>
-                    <div class="tool-detail" v-if="node.result">
-                      <div class="detail-label">结果</div>
-                      <pre>{{ formatJson(node.result) }}</pre>
-                    </div>
-                  </el-collapse-item>
-                </el-collapse>
+              <!-- 结果句 + 草稿说明 -->
+              <div class="node-body" v-if="node.status === 'completed' && (toolNodeResultText(node) || toolNodeDraftNote(node))">
+                <div class="tool-result-line" v-if="toolNodeResultText(node)">{{ toolNodeResultText(node) }}</div>
+                <div class="tool-draft-note" v-if="toolNodeDraftNote(node)">
+                  <el-icon :size="12"><InfoFilled /></el-icon>
+                  <span>{{ toolNodeDraftNote(node) }}</span>
+                </div>
+              </div>
+              <!-- 失败提示 -->
+              <div class="node-body" v-if="node.status === 'failed'">
+                <span class="error-text">执行出错，请稍后再试</span>
               </div>
             </div>
 
@@ -115,7 +115,7 @@
           <p>该消息没有可用的执行追踪数据</p>
           <p class="trace-empty-hint">追踪数据在以下情况不可用：</p>
           <ul class="trace-empty-reasons">
-            <li>消息来自历史记录加载（历史消息未保存追踪）</li>
+            <li>该消息没有关联的执行追踪（如纯文本回复）</li>
             <li>Agent 尚未开始执行任务</li>
             <li>追踪数据已在新一轮对话中被清除</li>
           </ul>
@@ -128,6 +128,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAgentStore, type AgentTraceEvent } from '@/stores/agent'
+import {
+  getToolDisplayMeta,
+  formatRunningText,
+  formatCompletedText,
+  formatResultText,
+  formatDraftNote,
+  formatFailedText,
+} from '@/utils/agentToolDisplay'
 
 interface TimelineNode {
   type: 'route' | 'think' | 'tool' | 'sub_agent' | 'phase' | 'error'
@@ -158,20 +166,22 @@ const timelineNodes = computed<TimelineNode[]>(() => {
   const nodes: TimelineNode[] = []
   const pendingTools: Map<number, AgentTraceEvent> = new Map()
   const pendingSubAgents: Map<number, AgentTraceEvent> = new Map()
-  let thinkText = ''
-  let thinkSeq = 0
-  let thinkTimestamp = 0
-  let hasThink = false
 
   for (const e of events) {
     switch (e.eventType) {
       case 'agent.think.delta': {
-        if (!hasThink) {
-          thinkSeq = e.seq
-          thinkTimestamp = e.timestamp
-          hasThink = true
+        // 合并连续的 think.delta，避免每个 delta 生成一张独立卡片
+        const text = e.payload?.text || ''
+        const lastNode = nodes[nodes.length - 1]
+        if (lastNode && lastNode.type === 'think') {
+          lastNode.detail = (lastNode.detail || '') + text
+        } else {
+          nodes.push({
+            type: 'think',
+            seq: e.seq,
+            detail: text,
+          })
         }
-        thinkText += e.payload?.text || ''
         break
       }
 
@@ -192,7 +202,6 @@ const timelineNodes = computed<TimelineNode[]>(() => {
 
       case 'agent.tool.completed':
       case 'agent.tool.failed': {
-        // 找到对应的 started 事件
         const toolName = e.payload?.toolName
         let startedEntry: [number, AgentTraceEvent] | undefined
         for (const [key, val] of pendingTools) {
@@ -271,24 +280,7 @@ const timelineNodes = computed<TimelineNode[]>(() => {
     }
   }
 
-  // 如果有思考文本，插入到合适的位置（route 之后，第一个 tool 之前）
-  if (hasThink && thinkText.trim()) {
-    const thinkNode: TimelineNode = {
-      type: 'think',
-      seq: thinkSeq,
-      detail: thinkText,
-      durationMs: undefined, // 无法从事件中精确计算
-    }
-    // 插入到 route 之后
-    const routeIdx = nodes.findIndex(n => n.type === 'route')
-    if (routeIdx >= 0) {
-      nodes.splice(routeIdx + 1, 0, thinkNode)
-    } else {
-      nodes.unshift(thinkNode)
-    }
-  }
-
-  // 处理剩余的 started 事件（未收到 completed/failed）
+  // 未完成的工具
   for (const [, val] of pendingTools) {
     nodes.push({
       type: 'tool',
@@ -310,6 +302,32 @@ const timelineNodes = computed<TimelineNode[]>(() => {
   nodes.sort((a, b) => a.seq - b.seq)
   return nodes
 })
+
+// ─── 工具节点自然语言 ──────────────────────────────
+
+function getToolIcon(toolName?: string): string {
+  if (!toolName) return 'Setting'
+  return getToolDisplayMeta(toolName).icon
+}
+
+function toolNodeActionText(node: TimelineNode): string {
+  const toolName = node.toolName || '未知工具'
+  if (node.status === 'running') return formatRunningText(toolName, node.arguments)
+  if (node.status === 'completed') return formatCompletedText(toolName, node.arguments)
+  return formatFailedText(toolName)
+}
+
+function toolNodeResultText(node: TimelineNode): string | null {
+  if (node.status !== 'completed') return null
+  return formatResultText(node.toolName || '未知工具', node.result)
+}
+
+function toolNodeDraftNote(node: TimelineNode): string | null {
+  if (node.status !== 'completed') return null
+  return formatDraftNote(node.toolName || '未知工具')
+}
+
+// ─── 通用格式化 ────────────────────────────────────
 
 function nodeDotClass(node: TimelineNode): string {
   if (node.type === 'error' || node.status === 'failed') return 'dot-error'
@@ -344,14 +362,6 @@ function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
   return `${Math.floor(ms / 60000)}m${Math.round((ms % 60000) / 1000)}s`
-}
-
-function formatJson(obj: any): string {
-  try {
-    return typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2)
-  } catch {
-    return String(obj)
-  }
 }
 </script>
 
@@ -468,26 +478,20 @@ function formatJson(obj: any): string {
   overflow-y: auto;
 }
 
-/* 工具 */
-.tool-detail {
-  margin-top: 8px;
-}
-
-.tool-detail .detail-label {
+/* 工具——结果行 */
+.tool-result-line {
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  margin-bottom: 4px;
+  line-height: 1.5;
 }
 
-.tool-detail pre {
-  font-size: 12px;
-  background: var(--el-fill-color);
-  padding: 8px;
-  border-radius: 4px;
-  max-height: 200px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
+.tool-draft-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #e6a23c;
 }
 
 /* 子 Agent */
@@ -498,7 +502,8 @@ function formatJson(obj: any): string {
 }
 
 /* 错误 */
-.node-error .error-text {
+.node-error .error-text,
+.node-tool .error-text {
   color: #f56c6c;
   font-size: 12px;
 }

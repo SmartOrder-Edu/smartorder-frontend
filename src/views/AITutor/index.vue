@@ -53,6 +53,18 @@
                 <span class="history-date">{{ formatDate(conv.lastActiveTime) }}</span>
               </div>
               <span class="history-count" v-if="conv.messageCount > 0">{{ conv.messageCount }}</span>
+              <button
+                class="history-delete-btn"
+                title="删除对话"
+                @click.stop="handleDeleteConversation(conv)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <polyline points="3,6 5,6 21,6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+              </button>
             </div>
           </div>
         </aside>
@@ -116,20 +128,28 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble" :class="{ 'user-bubble': msg.role === 'user' }">
-                  <!-- 思考块 -->
-                  <ThinkingBlock
-                    v-if="msg.role === 'ai' && msg.thinkingText"
-                    :text="msg.thinkingText"
-                    :duration-ms="msg.thinkingDurationMs"
-                  />
-                  <!-- 工具调用卡片 -->
-                  <div v-if="msg.role === 'ai' && msg.toolCalls?.length" class="inline-tool-calls">
-                    <ToolCallCard
-                      v-for="tc in msg.toolCalls"
-                      :key="tc.toolName + tc.startedAt"
-                      v-bind="tc"
+                  <!-- 思考与工具调用交错展示 -->
+                  <template v-if="msg.role === 'ai' && msg.reasoningSegments?.length">
+                    <template v-for="(seg, segIdx) in msg.reasoningSegments" :key="'seg-' + segIdx">
+                      <ThinkingBlock v-if="seg.thinkingText" :text="seg.thinkingText" />
+                      <ToolCallCard v-if="seg.toolCall" v-bind="seg.toolCall" />
+                    </template>
+                  </template>
+                  <template v-else>
+                    <!-- 向后兼容：旧消息格式 -->
+                    <ThinkingBlock
+                      v-if="msg.role === 'ai' && msg.thinkingText"
+                      :text="msg.thinkingText"
+                      :duration-ms="msg.thinkingDurationMs"
                     />
-                  </div>
+                    <div v-if="msg.role === 'ai' && msg.toolCalls?.length" class="inline-tool-calls">
+                      <ToolCallCard
+                        v-for="tc in msg.toolCalls"
+                        :key="tc.toolName + tc.startedAt"
+                        v-bind="tc"
+                      />
+                    </div>
+                  </template>
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
                   <p v-else class="message-text">{{ msg.content }}</p>
@@ -193,25 +213,37 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble">
-                  <!-- 思考块（流式） -->
-                  <ThinkingBlock
-                    v-if="agentStore.thinkingText"
-                    :text="agentStore.thinkingText"
-                    :streaming="true"
-                  />
-                  <!-- 工具调用卡片（流式） -->
-                  <div v-if="agentStore.toolCalls.length" class="inline-tool-calls">
-                    <ToolCallCard
-                      v-for="tc in agentStore.toolCalls"
-                      :key="tc.toolName + tc.startedAt"
-                      v-bind="tc"
+                  <!-- 思考与工具调用交错展示（流式） -->
+                  <template v-if="agentStore.reasoningSegments.length">
+                    <template v-for="(seg, segIdx) in agentStore.reasoningSegments" :key="'seg-live-' + segIdx">
+                      <ThinkingBlock
+                        v-if="seg.thinkingText"
+                        :text="seg.thinkingText"
+                        :streaming="seg.thinkingStreaming"
+                      />
+                      <ToolCallCard v-if="seg.toolCall" v-bind="seg.toolCall" />
+                    </template>
+                  </template>
+                  <template v-else>
+                    <!-- 向后兼容：无 think 事件的引擎 -->
+                    <ThinkingBlock
+                      v-if="agentStore.thinkingText"
+                      :text="agentStore.thinkingText"
+                      :streaming="true"
                     />
-                  </div>
+                    <div v-if="agentStore.toolCalls.length" class="inline-tool-calls">
+                      <ToolCallCard
+                        v-for="tc in agentStore.toolCalls"
+                        :key="tc.toolName + tc.startedAt"
+                        v-bind="tc"
+                      />
+                    </div>
+                  </template>
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText"></span>
                   <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
-                  <div v-if="!agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText" class="loading-dots">
+                  <div v-if="!agentStore.reasoningSegments.length && !agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText" class="loading-dots">
                     <span></span><span></span><span></span>
                   </div>
                 </div>
@@ -307,25 +339,33 @@
     <!-- 追踪面板（抽屉式） -->
     <AgentTracePanel />
 
-    <!-- 规划确认弹窗 -->
-    <PlanConfirmDialog @confirm="confirmPlan" @cancel="cancelPlan" />
+    <!-- 学习蓝图揭幕面板 -->
+    <PlanRevealOverlay
+      :visible="agentStore.planDialogVisible"
+      :plan="agentStore.currentPlan"
+      :draft-id="agentStore.currentDraftId"
+      :loading="agentStore.planConfirmLoading"
+      :execution-steps="agentStore.executionSteps"
+      @confirm="confirmPlan"
+      @cancel="cancelPlan"
+    />
   </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAgentChat } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationVO } from '@/api/agent'
 import { agentApi } from '@/api/agent'
-import type { AgentTraceEvent } from '@/stores/agent'
+import type { AgentTraceEvent, ReasoningSegment } from '@/stores/agent'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
 import ToolCallCard from '@/components/agent/ToolCallCard.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
-import PlanConfirmDialog from '@/components/PlanConfirmDialog.vue'
+import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
@@ -368,7 +408,8 @@ const {
   cancelPlan,
   loadConversation,
   startNewConversation,
-  clearMessages: agentClear
+  clearMessages: agentClear,
+  deleteConversation
 } = useAgentChat(scrollToBottom)
 
 const contextOptions = ref([
@@ -519,6 +560,30 @@ const handleStopGeneration = () => {
   stopGeneration()
 }
 
+const handleDeleteConversation = async (conv: ConversationVO) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除对话"${conv.title || '未命名对话'}"吗？此操作不可撤销。`,
+      '确认删除',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  try {
+    await deleteConversation(conv.conversationId)
+    ElMessage.success('对话已删除')
+    await agentStore.fetchConversations()
+  } catch {
+    ElMessage.error('删除失败，请重试')
+  }
+}
+
 const handleUploadClick = () => {
   ElMessage.info('文件上传功能即将上线，敬请期待')
 }
@@ -572,18 +637,172 @@ const hasTraceEventsForMsg = (msg: any): boolean => {
 
 const openMsgTrace = async (msg: any) => {
   if (msg.traceEvents?.length) {
-    agentStore.traceEvents = msg.traceEvents
+    agentStore.traceEvents = injectThinkEventIfMissing(msg.traceEvents, msg.thinkingText, msg.reasoningSegments)
   } else if (msg.traceId) {
     try {
-      const events = await agentApi.getTraceEvents(msg.traceId)
-      agentStore.traceEvents = events || []
-      msg.traceEvents = events || [] // 缓存
+      const rawEvents: any[] = await agentApi.getTraceEvents(msg.traceId)
+      // 标准化后端实体格式 → 前端 AgentTraceEvent 格式
+      const normalized = (rawEvents || []).map((raw: any) => {
+        let payload = raw.payload
+        if (typeof payload === 'string') {
+          try { payload = JSON.parse(payload) } catch { /* keep as string */ }
+        }
+        return {
+          traceId: raw.traceId || '',
+          conversationId: raw.conversationId || '',
+          userId: raw.userId || 0,
+          mode: raw.agentMode || raw.mode || '',
+          eventType: raw.eventType || '',
+          seq: raw.sequenceNum || raw.seq || 0,
+          timestamp: raw.createTime ? new Date(raw.createTime).getTime() : (raw.timestamp || Date.now()),
+          payload,
+        }
+      })
+      const enriched = injectThinkEventIfMissing(normalized, msg.thinkingText, msg.reasoningSegments)
+      agentStore.traceEvents = enriched
+      msg.traceEvents = enriched // 缓存（含合成 think 事件）
     } catch (e) {
       console.error('[AITutor] 获取 trace 失败:', e)
       agentStore.traceEvents = []
     }
   }
   agentStore.openTracePanel(msg.traceId)
+}
+
+/**
+ * 历史 trace 中缺少 agent.think.delta（后端不持久化高频 delta 事件），
+ * 导致抽屉时间线缺少"思考"节点。
+ *
+ * - 如果有 reasoningSegments，按段精确合成多条 think.delta 与工具事件交错
+ * - 否则用 reasoningContent 合成一条虚拟事件补上（旧行为）
+ */
+function injectThinkEventIfMissing(
+  events: AgentTraceEvent[],
+  thinkingText?: string,
+  reasoningSegments?: ReasoningSegment[],
+): AgentTraceEvent[] {
+  // 优先使用 reasoningSegments 精确重建思考与工具的交错顺序
+  if (reasoningSegments?.length) {
+    return interleaveThinkFromSegments(events, reasoningSegments)
+  }
+
+  if (!thinkingText || events.length === 0) return events
+  const hasThinkDelta = events.some(e => e.eventType === 'agent.think.delta')
+  if (hasThinkDelta) return events
+
+  const minSeq = Math.min(...events.map(e => e.seq))
+  const ref = events[0]
+  const synthetic: AgentTraceEvent = {
+    traceId: ref.traceId,
+    conversationId: ref.conversationId,
+    userId: ref.userId,
+    mode: ref.mode,
+    eventType: 'agent.think.delta',
+    seq: Math.max(0, minSeq - 1),
+    timestamp: ref.timestamp,
+    payload: { text: thinkingText },
+  }
+  return [synthetic, ...events]
+}
+
+/**
+ * 根据 reasoningSegments 在工具事件之间精确插入合成 think.delta 事件，
+ * 使历史追踪面板与实时展示的思考→工具→思考交错结构完全一致。
+ */
+function interleaveThinkFromSegments(
+  events: AgentTraceEvent[],
+  segments: ReasoningSegment[],
+): AgentTraceEvent[] {
+  const ref = events[0]
+  const result: AgentTraceEvent[] = []
+  let seq = 0
+
+  // 分类原始事件
+  const preEvents: AgentTraceEvent[] = []          // trace.started, route.completed, phase.change
+  const toolStartedList: AgentTraceEvent[] = []     // agent.tool.started
+  const toolCompletedMap = new Map<string, AgentTraceEvent>()  // toolName → completed/failed
+  const postEvents: AgentTraceEvent[] = []          // sub_agent.*, error, trace.completed
+
+  for (const e of events) {
+    switch (e.eventType) {
+      case 'agent.tool.started':
+        toolStartedList.push(e)
+        break
+      case 'agent.tool.completed':
+      case 'agent.tool.failed':
+        toolCompletedMap.set(e.payload?.toolName || '', e)
+        break
+      case 'agent.trace.started':
+      case 'agent.route.completed':
+      case 'agent.phase.change':
+      case 'agent.status':
+        preEvents.push(e)
+        break
+      default:
+        postEvents.push(e)
+        break
+    }
+  }
+
+  // 1. 前置事件（路由、阶段等）
+  for (const e of preEvents) {
+    result.push({ ...e, seq: seq++ })
+  }
+
+  // 2. 按 segments 交错：思考 → 工具
+  const usedTools = new Set<number>()
+
+  for (const seg of segments) {
+    // 思考
+    if (seg.thinkingText) {
+      result.push({
+        traceId: ref.traceId,
+        conversationId: ref.conversationId,
+        userId: ref.userId,
+        mode: ref.mode,
+        eventType: 'agent.think.delta',
+        seq: seq++,
+        timestamp: ref.timestamp,
+        payload: { text: seg.thinkingText },
+      })
+    }
+
+    // 工具调用（按顺序匹配 toolStartedList 中第一个未使用的同名工具）
+    if (seg.toolCall) {
+      for (let i = 0; i < toolStartedList.length; i++) {
+        if (usedTools.has(i)) continue
+        const started = toolStartedList[i]
+        if (started.payload?.toolName === seg.toolCall.toolName) {
+          result.push({ ...started, seq: seq++ })
+          usedTools.add(i)
+
+          const completed = toolCompletedMap.get(seg.toolCall.toolName)
+          if (completed) {
+            result.push({ ...completed, seq: seq++ })
+          }
+          break
+        }
+      }
+    }
+  }
+
+  // 3. 未匹配的工具事件（兜底）
+  for (let i = 0; i < toolStartedList.length; i++) {
+    if (!usedTools.has(i)) {
+      result.push({ ...toolStartedList[i], seq: seq++ })
+      const completed = toolCompletedMap.get(toolStartedList[i].payload?.toolName || '')
+      if (completed) {
+        result.push({ ...completed, seq: seq++ })
+      }
+    }
+  }
+
+  // 4. 后置事件（子 Agent、错误等）
+  for (const e of postEvents) {
+    result.push({ ...e, seq: seq++ })
+  }
+
+  return result
 }
 
 onMounted(() => {
@@ -1283,6 +1502,35 @@ watch(windowWidth, (newWidth) => {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--transition-fast);
+  position: relative;
+}
+
+.history-delete-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.history-item:hover .history-delete-btn {
+  opacity: 1;
+}
+
+.history-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .history-item:hover { background: var(--background-color-base); }

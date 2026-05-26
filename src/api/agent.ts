@@ -19,6 +19,16 @@ export interface PlanSummary {
   kgNodeCount: number
   startDate: string
   targetEndDate: string
+  totalPhases?: number
+  totalWeeks?: number
+}
+
+export interface ExecutionStep {
+  stepName: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  startedAt?: number
+  completedAt?: number
+  message?: string
 }
 
 export interface ConversationVO {
@@ -35,6 +45,9 @@ export interface MessageVO {
   content: string | null
   toolName: string | null
   traceId?: string
+  reasoningContent?: string
+  /** 思考分段 JSON 字符串（与工具调用交错） */
+  reasoningSegments?: string
   createTime: string
 }
 
@@ -74,6 +87,11 @@ export const agentApi = {
       `/agent/conversations/${conversationId}/messages`,
       { params: { page, size } }
     )
+  },
+
+  /** 删除指定对话 */
+  deleteConversation(conversationId: string) {
+    return request.delete<string>(`/agent/conversations/${conversationId}`)
   },
 }
 

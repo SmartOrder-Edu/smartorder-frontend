@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { agentApi, type ConversationVO } from '@/api/agent'
+import { agentApi, type ConversationVO, type ExecutionStep, type PlanSummary } from '@/api/agent'
 
 export interface AgentTraceEvent<T = any> {
   traceId: string
@@ -30,6 +30,13 @@ export interface ToolCallState {
   startedAt: number
 }
 
+/** 一轮 ReAct 推理：思考文本 + 可选的工具调用 */
+export interface ReasoningSegment {
+  thinkingText: string
+  toolCall?: ToolCallState
+  thinkingStreaming?: boolean
+}
+
 /**
  * Agent 对话状态管理
  */
@@ -54,6 +61,9 @@ export const useAgentStore = defineStore('agent', () => {
   // 工具调用状态（合并 started/completed/failed）
   const toolCalls = ref<ToolCallState[]>([])
 
+  // 按轮分段的推理过程（思考 + 工具调用配对）
+  const reasoningSegments = ref<ReasoningSegment[]>([])
+
   // 路由结果
   const routeResult = ref<any>(null)
 
@@ -68,6 +78,11 @@ export const useAgentStore = defineStore('agent', () => {
   const currentDraftId = ref('')
   const currentPlan = ref<any>(null)
   const planConfirmLoading = ref(false)
+
+  // === 执行步骤状态（plan confirm 期间） ===
+  const executionSteps = ref<ExecutionStep[]>([])
+  const planConfirmResult = ref<PlanSummary | null>(null)
+  const planDialogClosing = ref(false)
 
   // === 追踪面板状态 ===
   const tracePanelVisible = ref(false)
@@ -86,6 +101,7 @@ export const useAgentStore = defineStore('agent', () => {
     thinkingStartTime.value = null
     thinkingDurationMs.value = null
     toolCalls.value = []
+    reasoningSegments.value = []
     routeResult.value = null
     traceEvents.value = []
     loading.value = true
@@ -93,6 +109,9 @@ export const useAgentStore = defineStore('agent', () => {
     currentDraftId.value = ''
     currentPlan.value = null
     tracePanelVisible.value = false
+    executionSteps.value = []
+    planConfirmResult.value = null
+    planDialogClosing.value = false
   }
 
   /**
@@ -118,6 +137,11 @@ export const useAgentStore = defineStore('agent', () => {
         if (data.payload?.text) {
           answerText.value += data.payload.text
         }
+        // 思考结束，回答开始
+        {
+          const lastSeg = reasoningSegments.value[reasoningSegments.value.length - 1]
+          if (lastSeg) lastSeg.thinkingStreaming = false
+        }
         break
 
       case 'agent.think.delta':
@@ -126,17 +150,42 @@ export const useAgentStore = defineStore('agent', () => {
             thinkingStartTime.value = Date.now()
           }
           thinkingText.value += data.payload.text
+
+          // 按轮分段：若最后一个 segment 无 toolCall，追加到同一轮；否则开新轮
+          const lastSeg = reasoningSegments.value[reasoningSegments.value.length - 1]
+          if (!lastSeg || lastSeg.toolCall) {
+            reasoningSegments.value.push({
+              thinkingText: data.payload.text,
+              thinkingStreaming: true,
+            })
+          } else {
+            lastSeg.thinkingText += data.payload.text
+          }
         }
         break
 
-      case 'agent.tool.started':
-        toolCalls.value.push({
+      case 'agent.tool.started': {
+        const newTool: ToolCallState = {
           toolName: data.payload?.toolName || '未知工具',
           status: 'running',
           arguments: data.payload?.arguments,
           startedAt: Date.now(),
-        })
+        }
+        toolCalls.value.push(newTool)
+
+        // 挂载到当前 segment 或创建新的（无思考的工具调用）
+        const lastSeg = reasoningSegments.value[reasoningSegments.value.length - 1]
+        if (lastSeg && !lastSeg.toolCall) {
+          lastSeg.thinkingStreaming = false
+          lastSeg.toolCall = newTool
+        } else {
+          reasoningSegments.value.push({
+            thinkingText: '',
+            toolCall: newTool,
+          })
+        }
         break
+      }
 
       case 'agent.tool.completed': {
         const tc = toolCalls.value.find(
@@ -146,6 +195,15 @@ export const useAgentStore = defineStore('agent', () => {
           tc.status = 'completed'
           tc.result = data.payload?.result
           tc.durationMs = data.payload?.durationMs
+        }
+        // 同步更新 reasoningSegments
+        const seg = reasoningSegments.value.find(
+          s => s.toolCall?.toolName === data.payload?.toolName && s.toolCall.status === 'running'
+        )
+        if (seg?.toolCall) {
+          seg.toolCall.status = 'completed'
+          seg.toolCall.result = data.payload?.result
+          seg.toolCall.durationMs = data.payload?.durationMs
         }
         break
       }
@@ -157,6 +215,14 @@ export const useAgentStore = defineStore('agent', () => {
         if (tf) {
           tf.status = 'failed'
           tf.durationMs = data.payload?.durationMs
+        }
+        // 同步更新 reasoningSegments
+        const segF = reasoningSegments.value.find(
+          s => s.toolCall?.toolName === data.payload?.toolName && s.toolCall.status === 'running'
+        )
+        if (segF?.toolCall) {
+          segF.toolCall.status = 'failed'
+          segF.toolCall.durationMs = data.payload?.durationMs
         }
         break
       }
@@ -171,12 +237,69 @@ export const useAgentStore = defineStore('agent', () => {
         planDialogVisible.value = true
         break
 
+      case 'agent.plan.step.started':
+        addExecutionStep({
+          stepName: data.payload?.stepName || '未知步骤',
+          status: 'running',
+          startedAt: Date.now(),
+        })
+        break
+
+      case 'agent.plan.step.completed':
+        addExecutionStep({
+          stepName: data.payload?.stepName || '',
+          status: 'completed',
+          completedAt: Date.now(),
+        })
+        break
+
+      case 'agent.plan.step.failed':
+        addExecutionStep({
+          stepName: data.payload?.stepName || '',
+          status: 'failed',
+          message: data.payload?.message,
+        })
+        break
+
+      // agent.status 在 plan confirm SSE 中可能包含执行步骤信息
+      case 'agent.status':
+        if (data.payload?.message) {
+          addExecutionStep({
+            stepName: data.payload.message,
+            status: 'running',
+            startedAt: Date.now(),
+          })
+        }
+        break
+
       case 'agent.error':
         if (data.payload?.message) {
           answerText.value += `\n\n[错误] ${data.payload.message}`
         }
         break
     }
+  }
+
+  function addExecutionStep(step: ExecutionStep) {
+    const existing = executionSteps.value.find(s => s.stepName === step.stepName)
+    if (existing) {
+      Object.assign(existing, step)
+    } else {
+      executionSteps.value.push(step)
+    }
+  }
+
+  function resetExecutionSteps() {
+    executionSteps.value = []
+  }
+
+  function closePlanDialog() {
+    planDialogClosing.value = true
+    setTimeout(() => {
+      planDialogVisible.value = false
+      planDialogClosing.value = false
+      resetExecutionSteps()
+    }, 300)
   }
 
   /**
@@ -226,6 +349,17 @@ export const useAgentStore = defineStore('agent', () => {
     }
   }
 
+  /**
+   * 删除指定对话
+   */
+  async function deleteConversation(conversationId: string) {
+    await agentApi.deleteConversation(conversationId)
+    conversations.value = conversations.value.filter(c => c.conversationId !== conversationId)
+    if (currentConversationId.value === conversationId) {
+      currentConversationId.value = ''
+    }
+  }
+
   function reset() {
     currentConversationId.value = ''
     currentTraceId.value = ''
@@ -235,6 +369,7 @@ export const useAgentStore = defineStore('agent', () => {
     thinkingStartTime.value = null
     thinkingDurationMs.value = null
     toolCalls.value = []
+    reasoningSegments.value = []
     routeResult.value = null
     traceEvents.value = []
     loading.value = false
@@ -242,6 +377,9 @@ export const useAgentStore = defineStore('agent', () => {
     currentDraftId.value = ''
     currentPlan.value = null
     tracePanelVisible.value = false
+    executionSteps.value = []
+    planConfirmResult.value = null
+    planDialogClosing.value = false
   }
 
   return {
@@ -253,6 +391,7 @@ export const useAgentStore = defineStore('agent', () => {
     thinkingStartTime,
     thinkingDurationMs,
     toolCalls,
+    reasoningSegments,
     routeResult,
     traceEvents,
     loading,
@@ -260,6 +399,9 @@ export const useAgentStore = defineStore('agent', () => {
     currentDraftId,
     currentPlan,
     planConfirmLoading,
+    executionSteps,
+    planConfirmResult,
+    planDialogClosing,
     tracePanelVisible,
     activeTraceId,
     conversations,
@@ -267,10 +409,14 @@ export const useAgentStore = defineStore('agent', () => {
     startNewTurn,
     handleEvent,
     finishTurn,
+    addExecutionStep,
+    resetExecutionSteps,
+    closePlanDialog,
     openTracePanel,
     closeTracePanel,
     getCurrentMessageTraceEvents,
     fetchConversations,
+    deleteConversation,
     reset,
   }
 })
