@@ -88,6 +88,11 @@ export const agentApi = {
       { params: { page, size } }
     )
   },
+
+  /** 删除指定对话 */
+  deleteConversation(conversationId: string) {
+    return request.delete<string>(`/agent/conversations/${conversationId}`)
+  },
 }
 
 export default { agentApi }

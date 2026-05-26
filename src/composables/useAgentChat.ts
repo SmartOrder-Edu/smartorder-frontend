@@ -499,6 +499,17 @@ export function useAgentChat(scrollCallback?: () => void) {
     agentStore.reset()
   }
 
+  /**
+   * 删除对话并清理本地状态
+   */
+  const deleteConversation = async (conversationId: string) => {
+    const wasActive = agentStore.currentConversationId === conversationId
+    await agentStore.deleteConversation(conversationId)
+    if (wasActive) {
+      messages.value = []
+    }
+  }
+
   return {
     messages,
     loadingHistory,
@@ -509,5 +520,6 @@ export function useAgentChat(scrollCallback?: () => void) {
     loadConversation,
     startNewConversation,
     clearMessages,
+    deleteConversation,
   }
 }

@@ -53,6 +53,18 @@
                 <span class="history-date">{{ formatDate(conv.lastActiveTime) }}</span>
               </div>
               <span class="history-count" v-if="conv.messageCount > 0">{{ conv.messageCount }}</span>
+              <button
+                class="history-delete-btn"
+                title="删除对话"
+                @click.stop="handleDeleteConversation(conv)"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <polyline points="3,6 5,6 21,6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+              </button>
             </div>
           </div>
         </aside>
@@ -342,7 +354,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAgentChat } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
@@ -396,7 +408,8 @@ const {
   cancelPlan,
   loadConversation,
   startNewConversation,
-  clearMessages: agentClear
+  clearMessages: agentClear,
+  deleteConversation
 } = useAgentChat(scrollToBottom)
 
 const contextOptions = ref([
@@ -545,6 +558,30 @@ const handleNewChat = async () => {
 
 const handleStopGeneration = () => {
   stopGeneration()
+}
+
+const handleDeleteConversation = async (conv: ConversationVO) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除对话"${conv.title || '未命名对话'}"吗？此操作不可撤销。`,
+      '确认删除',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+  } catch {
+    return // 用户取消
+  }
+
+  try {
+    await deleteConversation(conv.conversationId)
+    ElMessage.success('对话已删除')
+    await agentStore.fetchConversations()
+  } catch {
+    ElMessage.error('删除失败，请重试')
+  }
 }
 
 const handleUploadClick = () => {
@@ -1465,6 +1502,35 @@ watch(windowWidth, (newWidth) => {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--transition-fast);
+  position: relative;
+}
+
+.history-delete-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.history-item:hover .history-delete-btn {
+  opacity: 1;
+}
+
+.history-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .history-item:hover { background: var(--background-color-base); }
