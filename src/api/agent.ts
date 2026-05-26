@@ -46,6 +46,8 @@ export interface MessageVO {
   toolName: string | null
   traceId?: string
   reasoningContent?: string
+  /** 思考分段 JSON 字符串（与工具调用交错） */
+  reasoningSegments?: string
   createTime: string
 }
 

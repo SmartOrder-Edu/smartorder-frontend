@@ -348,7 +348,7 @@ import { useAgentChat } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationVO } from '@/api/agent'
 import { agentApi } from '@/api/agent'
-import type { AgentTraceEvent } from '@/stores/agent'
+import type { AgentTraceEvent, ReasoningSegment } from '@/stores/agent'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
 import ToolCallCard from '@/components/agent/ToolCallCard.vue'
@@ -600,7 +600,7 @@ const hasTraceEventsForMsg = (msg: any): boolean => {
 
 const openMsgTrace = async (msg: any) => {
   if (msg.traceEvents?.length) {
-    agentStore.traceEvents = injectThinkEventIfMissing(msg.traceEvents, msg.thinkingText)
+    agentStore.traceEvents = injectThinkEventIfMissing(msg.traceEvents, msg.thinkingText, msg.reasoningSegments)
   } else if (msg.traceId) {
     try {
       const rawEvents: any[] = await agentApi.getTraceEvents(msg.traceId)
@@ -621,7 +621,7 @@ const openMsgTrace = async (msg: any) => {
           payload,
         }
       })
-      const enriched = injectThinkEventIfMissing(normalized, msg.thinkingText)
+      const enriched = injectThinkEventIfMissing(normalized, msg.thinkingText, msg.reasoningSegments)
       agentStore.traceEvents = enriched
       msg.traceEvents = enriched // 缓存（含合成 think 事件）
     } catch (e) {
@@ -634,12 +634,21 @@ const openMsgTrace = async (msg: any) => {
 
 /**
  * 历史 trace 中缺少 agent.think.delta（后端不持久化高频 delta 事件），
- * 导致抽屉时间线缺少"思考"节点。用 reasoningContent 合成一条虚拟事件补上。
+ * 导致抽屉时间线缺少"思考"节点。
+ *
+ * - 如果有 reasoningSegments，按段精确合成多条 think.delta 与工具事件交错
+ * - 否则用 reasoningContent 合成一条虚拟事件补上（旧行为）
  */
 function injectThinkEventIfMissing(
   events: AgentTraceEvent[],
   thinkingText?: string,
+  reasoningSegments?: ReasoningSegment[],
 ): AgentTraceEvent[] {
+  // 优先使用 reasoningSegments 精确重建思考与工具的交错顺序
+  if (reasoningSegments?.length) {
+    return interleaveThinkFromSegments(events, reasoningSegments)
+  }
+
   if (!thinkingText || events.length === 0) return events
   const hasThinkDelta = events.some(e => e.eventType === 'agent.think.delta')
   if (hasThinkDelta) return events
@@ -657,6 +666,106 @@ function injectThinkEventIfMissing(
     payload: { text: thinkingText },
   }
   return [synthetic, ...events]
+}
+
+/**
+ * 根据 reasoningSegments 在工具事件之间精确插入合成 think.delta 事件，
+ * 使历史追踪面板与实时展示的思考→工具→思考交错结构完全一致。
+ */
+function interleaveThinkFromSegments(
+  events: AgentTraceEvent[],
+  segments: ReasoningSegment[],
+): AgentTraceEvent[] {
+  const ref = events[0]
+  const result: AgentTraceEvent[] = []
+  let seq = 0
+
+  // 分类原始事件
+  const preEvents: AgentTraceEvent[] = []          // trace.started, route.completed, phase.change
+  const toolStartedList: AgentTraceEvent[] = []     // agent.tool.started
+  const toolCompletedMap = new Map<string, AgentTraceEvent>()  // toolName → completed/failed
+  const postEvents: AgentTraceEvent[] = []          // sub_agent.*, error, trace.completed
+
+  for (const e of events) {
+    switch (e.eventType) {
+      case 'agent.tool.started':
+        toolStartedList.push(e)
+        break
+      case 'agent.tool.completed':
+      case 'agent.tool.failed':
+        toolCompletedMap.set(e.payload?.toolName || '', e)
+        break
+      case 'agent.trace.started':
+      case 'agent.route.completed':
+      case 'agent.phase.change':
+      case 'agent.status':
+        preEvents.push(e)
+        break
+      default:
+        postEvents.push(e)
+        break
+    }
+  }
+
+  // 1. 前置事件（路由、阶段等）
+  for (const e of preEvents) {
+    result.push({ ...e, seq: seq++ })
+  }
+
+  // 2. 按 segments 交错：思考 → 工具
+  const usedTools = new Set<number>()
+
+  for (const seg of segments) {
+    // 思考
+    if (seg.thinkingText) {
+      result.push({
+        traceId: ref.traceId,
+        conversationId: ref.conversationId,
+        userId: ref.userId,
+        mode: ref.mode,
+        eventType: 'agent.think.delta',
+        seq: seq++,
+        timestamp: ref.timestamp,
+        payload: { text: seg.thinkingText },
+      })
+    }
+
+    // 工具调用（按顺序匹配 toolStartedList 中第一个未使用的同名工具）
+    if (seg.toolCall) {
+      for (let i = 0; i < toolStartedList.length; i++) {
+        if (usedTools.has(i)) continue
+        const started = toolStartedList[i]
+        if (started.payload?.toolName === seg.toolCall.toolName) {
+          result.push({ ...started, seq: seq++ })
+          usedTools.add(i)
+
+          const completed = toolCompletedMap.get(seg.toolCall.toolName)
+          if (completed) {
+            result.push({ ...completed, seq: seq++ })
+          }
+          break
+        }
+      }
+    }
+  }
+
+  // 3. 未匹配的工具事件（兜底）
+  for (let i = 0; i < toolStartedList.length; i++) {
+    if (!usedTools.has(i)) {
+      result.push({ ...toolStartedList[i], seq: seq++ })
+      const completed = toolCompletedMap.get(toolStartedList[i].payload?.toolName || '')
+      if (completed) {
+        result.push({ ...completed, seq: seq++ })
+      }
+    }
+  }
+
+  // 4. 后置事件（子 Agent、错误等）
+  for (const e of postEvents) {
+    result.push({ ...e, seq: seq++ })
+  }
+
+  return result
 }
 
 onMounted(() => {

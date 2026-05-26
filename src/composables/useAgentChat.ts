@@ -319,6 +319,17 @@ export function useAgentChat(scrollCallback?: () => void) {
           if (msg.reasoningContent) {
             chatMsg.thinkingText = msg.reasoningContent
           }
+          // 优先使用后端提供的思考分段（精确还原实时展示效果）
+          if (msg.reasoningSegments) {
+            try {
+              const parsed = JSON.parse(msg.reasoningSegments)
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                chatMsg.reasoningSegments = parsed as ReasoningSegment[]
+              }
+            } catch {
+              // 解析失败，后续用旧逻辑重建
+            }
+          }
           if (msg.traceId) {
             traceJobs.push({ msgIndex: i, traceId: msg.traceId })
           }
@@ -428,8 +439,8 @@ export function useAgentChat(scrollCallback?: () => void) {
             chatMsg.traceEvents = traceEvents
           }
 
-          // 重建 reasoningSegments（使历史消息与实时消息展示一致）
-          if (chatMsg.thinkingText || toolCalls.length > 0) {
+          // 重建 reasoningSegments（仅在 API 未提供时用旧逻辑）
+          if (!chatMsg.reasoningSegments?.length && (chatMsg.thinkingText || toolCalls.length > 0)) {
             const segments: ReasoningSegment[] = []
 
             if (chatMsg.thinkingText) {
