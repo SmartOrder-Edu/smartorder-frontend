@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUpdated, ref } from 'vue'
+import { computed, onMounted, onUnmounted, onUpdated, ref } from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
@@ -12,6 +12,14 @@ import 'highlight.js/styles/github.css'
 const renderer = new marked.Renderer()
 
 renderer.code = function ({ text, lang }: { text: string; lang?: string }) {
+  // Mermaid 代码块：输出占位符，后续异步渲染
+  if (lang === 'mermaid') {
+    const encodedSource = btoa(unescape(encodeURIComponent(text)))
+    return `<div class="mermaid-block" data-mermaid-source="${encodedSource}">
+  <div class="mermaid-loading">正在渲染图表…</div>
+</div>`
+  }
+
   const language = lang || ''
   let highlighted: string
 
@@ -64,7 +72,98 @@ const renderedHtml = computed(() => {
   }
 })
 
-// 绑定复制按钮事件
+// ─── Mermaid 渲染 ───────────────────────────────────────────
+const blobUrls: string[] = []
+
+function isDarkTheme(): boolean {
+  const el = document.documentElement
+  return el.classList.contains('dark') || el.getAttribute('data-theme') === 'dark'
+}
+
+async function renderMermaidBlocks(el: HTMLElement) {
+  const blocks = el.querySelectorAll('.mermaid-block:not([data-rendered])')
+  if (blocks.length === 0) return
+
+  const mermaid = (await import('mermaid')).default
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'strict',
+    theme: isDarkTheme() ? 'dark' : 'default',
+  })
+
+  for (const block of blocks) {
+    block.setAttribute('data-rendered', 'true')
+    const source = decodeURIComponent(escape(atob((block as HTMLElement).dataset.mermaidSource!)))
+    const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`
+
+    try {
+      mermaid.parse(source)
+      const { svg } = await mermaid.render(id, source)
+      const blob = new Blob([svg], { type: 'image/svg+xml' })
+      const blobUrl = URL.createObjectURL(blob)
+      blobUrls.push(blobUrl)
+      block.innerHTML = `
+  <div class="mermaid-diagram-header">
+    <span class="code-lang">Mermaid</span>
+    <button class="mermaid-copy-btn" data-mermaid-copy title="复制源码">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <span>复制</span>
+    </button>
+  </div>
+  <div class="mermaid-diagram-body">
+    <img src="${blobUrl}" alt="Mermaid diagram" />
+  </div>`
+    } catch {
+      block.innerHTML = `
+  <div class="mermaid-diagram-header">
+    <span class="code-lang">Mermaid</span>
+  </div>
+  <div class="mermaid-error-body">
+    <p class="mermaid-error-msg">图表渲染失败，请检查语法</p>
+    <pre><code>${escapeHtml(source)}</code></pre>
+  </div>`
+    }
+  }
+
+  bindMermaidCopyButtons(el)
+}
+
+function bindMermaidCopyButtons(el: HTMLElement) {
+  el.querySelectorAll('.mermaid-copy-btn').forEach((btn) => {
+    if ((btn as HTMLElement)._copyBound) return
+    ;(btn as HTMLElement)._copyBound = true
+
+    btn.addEventListener('click', async () => {
+      const block = btn.closest('.mermaid-block')
+      if (!block) return
+      const source = decodeURIComponent(
+        escape(atob((block as HTMLElement).dataset.mermaidSource!)),
+      )
+      try {
+        await navigator.clipboard.writeText(source)
+        const span = btn.querySelector('span')!
+        const prevText = span.textContent
+        span.textContent = '已复制!'
+        btn.classList.add('copied')
+        setTimeout(() => {
+          span.textContent = prevText
+          btn.classList.remove('copied')
+        }, 2000)
+      } catch {
+        const textarea = document.createElement('textarea')
+        textarea.value = source
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+    })
+  })
+}
+
+// ─── 代码块复制按钮 ─────────────────────────────────────────
 const rootRef = ref<HTMLElement>()
 
 function bindCopyButtons(el: HTMLElement) {
@@ -105,11 +204,22 @@ function bindCopyButtons(el: HTMLElement) {
 }
 
 onMounted(() => {
-  if (rootRef.value) bindCopyButtons(rootRef.value)
+  if (rootRef.value) {
+    bindCopyButtons(rootRef.value)
+    renderMermaidBlocks(rootRef.value)
+  }
 })
 
 onUpdated(() => {
-  if (rootRef.value) bindCopyButtons(rootRef.value)
+  if (rootRef.value) {
+    bindCopyButtons(rootRef.value)
+    renderMermaidBlocks(rootRef.value)
+  }
+})
+
+onUnmounted(() => {
+  blobUrls.forEach((url) => URL.revokeObjectURL(url))
+  blobUrls.length = 0
 })
 </script>
 
@@ -310,5 +420,101 @@ onUpdated(() => {
 .markdown-renderer :deep(strong) {
   font-weight: 600;
   color: var(--text-dark);
+}
+
+/* ─── Mermaid 图表 ─────────────────────────────────────── */
+.markdown-renderer :deep(.mermaid-block) {
+  margin: 0.8em 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8f9fa;
+  border: 1px solid #e2e6ea;
+}
+
+.markdown-renderer :deep(.mermaid-loading) {
+  padding: 24px 16px;
+  text-align: center;
+  color: #6a737d;
+  font-size: 0.8125rem;
+}
+
+.markdown-renderer :deep(.mermaid-diagram-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: #eef0f3;
+  border-bottom: 1px solid #e2e6ea;
+  font-size: 0.75rem;
+  color: #6a737d;
+}
+
+.markdown-renderer :deep(.mermaid-copy-btn) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #6a737d;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.markdown-renderer :deep(.mermaid-copy-btn:hover) {
+  background: rgba(0, 0, 0, 0.06);
+  color: #24292e;
+}
+
+.markdown-renderer :deep(.mermaid-copy-btn.copied) {
+  color: #22863a;
+}
+
+.markdown-renderer :deep(.mermaid-copy-btn svg) {
+  flex-shrink: 0;
+}
+
+.markdown-renderer :deep(.mermaid-diagram-body) {
+  padding: 16px;
+  text-align: center;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.markdown-renderer :deep(.mermaid-diagram-body img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-renderer :deep(.mermaid-error-body) {
+  padding: 12px 16px;
+}
+
+.markdown-renderer :deep(.mermaid-error-msg) {
+  margin: 0 0 8px;
+  color: #cf222e;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.markdown-renderer :deep(.mermaid-error-body pre) {
+  margin: 0;
+  border-radius: 6px;
+  overflow-x: auto;
+  padding: 10px 14px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  background: #fff;
+  border: 1px solid #e2e6ea;
+}
+
+.markdown-renderer :deep(.mermaid-error-body pre code) {
+  font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+  background: none;
+  padding: 0;
 }
 </style>
