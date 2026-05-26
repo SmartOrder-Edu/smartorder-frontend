@@ -106,7 +106,7 @@
             </template>
           </el-table-column>
           
-          <el-table-column label="操作" width="150" fixed="right">
+          <el-table-column label="操作" width="160" align="right">
             <template #default="{ row }">
               <div class="action-btns">
                 <el-tooltip content="查看知识图谱" placement="top">
@@ -114,6 +114,9 @@
                 </el-tooltip>
                 <el-tooltip content="预览文件" placement="top">
                   <el-button type="primary" link icon="View" @click="previewFile(row)" />
+                </el-tooltip>
+                <el-tooltip content="下载" placement="top">
+                  <el-button type="primary" link icon="Download" @click="downloadFile(row)" />
                 </el-tooltip>
                 <el-tooltip content="删除" placement="top">
                   <el-button type="danger" link icon="Delete" @click="deleteFile(row)" />
@@ -169,6 +172,73 @@
           </template>
         </el-upload>
       </el-dialog>
+
+      <!-- 文件预览弹窗 -->
+      <el-dialog
+        v-model="previewDialogVisible"
+        width="80%"
+        top="5vh"
+        custom-class="preview-dialog"
+        destroy-on-close
+      >
+        <template #header>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-right: 20px;">
+            <span>{{ currentPreviewFile ? '预览 - ' + currentPreviewFile.originalName : '文件预览' }}</span>
+            <el-button type="primary" :icon="Download" @click="currentPreviewFile && downloadFile(currentPreviewFile)" v-if="currentPreviewFile">
+              下载
+            </el-button>
+          </div>
+        </template>
+        <div class="preview-container" v-if="currentPreviewFile">
+          <!-- 图片预览 -->
+          <div v-if="isImage(currentPreviewFile.fileExtension)" class="preview-center">
+            <el-image
+              :src="currentPreviewFile.fileUrl"
+              :zoom-rate="1.2"
+              :max-scale="7"
+              :min-scale="0.2"
+              :preview-src-list="[currentPreviewFile.fileUrl]"
+              :preview-teleported="true"
+              :z-index="9999"
+              :initial-index="0"
+              fit="contain"
+              class="preview-image"
+            />
+          </div>
+          <!-- 视频预览 -->
+          <div v-else-if="isVideo(currentPreviewFile.fileExtension)" class="preview-center">
+            <video :src="currentPreviewFile.fileUrl" controls class="preview-media"></video>
+          </div>
+          <!-- 音频预览 -->
+          <div v-else-if="isAudio(currentPreviewFile.fileExtension)" class="preview-center">
+            <audio :src="currentPreviewFile.fileUrl" controls class="preview-media"></audio>
+          </div>
+          <!-- Word 预览 -->
+          <div v-else-if="isWord(currentPreviewFile.fileExtension)" class="preview-full">
+            <vue-office-docx :src="currentPreviewFile.fileUrl" style="height: 100%;" />
+          </div>
+          <!-- Excel 预览 -->
+          <div v-else-if="isExcel(currentPreviewFile.fileExtension)" class="preview-full">
+            <vue-office-excel :src="currentPreviewFile.fileUrl" style="height: 100%;" />
+          </div>
+          <!-- PDF 预览 -->
+          <div v-else-if="isPdf(currentPreviewFile.fileExtension)" class="preview-full">
+            <vue-office-pdf :src="currentPreviewFile.fileUrl" style="height: 100%;" />
+          </div>
+          <!-- TXT / MD 预览 -->
+          <div v-else-if="isTxtOrMd(currentPreviewFile.fileExtension)" class="preview-full text-preview-container" v-loading="mdLoading">
+             <MarkdownRenderer v-if="mdContent" :content="mdContent" class="md-content" />
+          </div>
+          <!-- 无法通过内置方案预览的文档 -->
+          <div v-else class="preview-unsupported">
+            <el-icon class="icon"><DocumentDelete /></el-icon>
+            <p>当前格式暂不支持通过浏览器直接预览</p>
+            <el-button type="primary" tag="a" :href="currentPreviewFile.fileUrl" target="_blank" download>
+              下载文件后本地查看
+            </el-button>
+          </div>
+        </div>
+      </el-dialog>
     </div>
   </AppLayout>
 </template>
@@ -178,10 +248,17 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadRequestOptions } from 'element-plus'
-import { ArrowLeft, Search, Upload, Document, Grid, CircleCheckFilled, View, Delete, Connection, UploadFilled, Loading } from '@element-plus/icons-vue'
+import { ArrowLeft, Search, Upload, Document, Grid, CircleCheckFilled, View, Delete, Connection, UploadFilled, Loading, DocumentDelete, Download } from '@element-plus/icons-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useChunkUpload } from '@/composables/useChunkUpload'
 import { getKnowledgeBaseDetailStats, getKnowledgeFileList, type KnowledgeBaseDetailStatsVO, type KnowledgeFilePageVO } from '@/api/knowledgeBase'
+
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import VueOfficeDocx from '@vue-office/docx'
+import VueOfficeExcel from '@vue-office/excel'
+import VueOfficePdf from '@vue-office/pdf'
+import '@vue-office/docx/lib/index.css'
+import '@vue-office/excel/lib/index.css'
 
 const route = useRoute()
 const kbId = route.params.id
@@ -403,13 +480,63 @@ const handleUpload = () => {
   uploadDialogVisible.value = true
 }
 
-const previewFile = (file: KnowledgeFilePageVO) => {
-  ElMessage.info(`预览文件：${file.originalName}`)
+// 预览状态
+const previewDialogVisible = ref(false)
+const currentPreviewFile = ref<KnowledgeFilePageVO | null>(null)
+const mdContent = ref('')
+const mdLoading = ref(false)
+
+const isImage = (ext: string) => ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext?.toLowerCase())
+const isVideo = (ext: string) => ['mp4', 'webm', 'ogg', 'mkv'].includes(ext?.toLowerCase())
+const isAudio = (ext: string) => ['mp3', 'wav', 'ogg', 'aac'].includes(ext?.toLowerCase())
+const isPdf = (ext: string) => ['pdf'].includes(ext?.toLowerCase())
+const isWord = (ext: string) => ['doc', 'docx'].includes(ext?.toLowerCase())
+const isExcel = (ext: string) => ['xls', 'xlsx', 'csv'].includes(ext?.toLowerCase())
+const isTxtOrMd = (ext: string) => ['txt', 'md'].includes(ext?.toLowerCase())
+
+const previewFile = async (file: KnowledgeFilePageVO) => {
+  if (!file.fileUrl) {
+    ElMessage.warning('该文件暂无预览链接')
+    return
+  }
+  currentPreviewFile.value = file
+  previewDialogVisible.value = true
+
+  if (isTxtOrMd(file.fileExtension)) {
+    mdLoading.value = true
+    mdContent.value = ''
+    try {
+      const response = await fetch(file.fileUrl)
+      if (!response.ok) throw new Error('文件请求失败')
+      const text = await response.text()
+      mdContent.value = text
+    } catch (error) {
+      console.error('文本预览失败', error)
+      ElMessage.error('文本文件解析预览失败')
+    } finally {
+      mdLoading.value = false
+    }
+  }
 }
 
 const viewKnowledgeGraph = (file: KnowledgeFilePageVO) => {
   ElMessage.info(`查看知识图谱：${file.originalName}`)
   // TODO: 跳转知识图谱或打开图谱弹窗
+}
+
+const downloadFile = (file: KnowledgeFilePageVO) => {
+  if (!file.fileUrl) {
+    ElMessage.warning('该文件暂无下载链接')
+    return
+  }
+  const link = document.createElement('a')
+  link.href = file.fileUrl
+  link.download = file.originalName
+  link.target = '_blank'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  ElMessage.success('开始下载文件')
 }
 
 const deleteFile = (file: KnowledgeFilePageVO) => {
@@ -607,6 +734,64 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+}
+.preview-container {
+  min-height: 400px;
+  height: 70vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--el-fill-color-light);
+  border-radius: 8px;
+  overflow: hidden;
+
+  .preview-center {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    
+    .preview-image {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    .preview-media {
+      max-width: 90%;
+      max-height: 90%;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .preview-full {
+    width: 100%;
+    height: 100%;
+  }
+
+  .preview-unsupported {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    color: var(--el-text-color-secondary);
+
+    .icon {
+      font-size: 64px;
+      color: var(--el-text-color-placeholder);
+    }
+  }
+
+  .text-preview-container {
+    background: #fff;
+    overflow-y: auto;
+    padding: 20px;
+    .md-content {
+      text-align: left;
+    }
   }
 }
 </style>
