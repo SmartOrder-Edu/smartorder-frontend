@@ -1,262 +1,381 @@
 <template>
   <AppLayout>
-    <!-- 加载状态 -->
-    <div v-if="spaceStore.detailLoading" class="loading-state">
-      <div class="space-hero skeleton">
-        <div class="hero-content skeleton-inside">
-          <div class="skeleton-block hero-skel"></div>
-        </div>
+    <!-- Loading -->
+    <div v-if="dashStore.loading && !dashStore.dashboard" class="loading-state">
+      <div class="skeleton-hero">
+        <div class="skeleton-block hero-skel"></div>
       </div>
     </div>
 
-    <!-- 错误/不存在 -->
-    <div v-else-if="!spaceData" class="error-state">
+    <!-- Error -->
+    <div v-else-if="dashStore.error && !dashStore.dashboard" class="error-state">
       <el-empty description="学习空间不存在或加载失败" :image-size="120">
         <el-button type="primary" @click="$router.push('/dashboard')">返回仪表盘</el-button>
       </el-empty>
     </div>
 
-    <!-- 正常内容 -->
-    <div v-else class="learning-space-page">
-    <!-- 空间头部 -->
-    <section class="space-hero">
-      <div class="hero-bg" :style="{ background: spaceData.colorGradient }"></div>
-      <div class="hero-content">
-        <div class="hero-left">
-          <button class="back-btn" @click="$router.push('/dashboard')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-              <polyline points="15,18 9,12 15,6"/>
-            </svg>
-          </button>
-          <div class="hero-info">
-            <h1 class="hero-title">{{ spaceData.name }}</h1>
-            <p class="hero-goal" v-if="spaceData.goal">目标：{{ spaceData.goal }}</p>
-          </div>
-        </div>
-        <div class="hero-right">
-          <div class="hero-stat">
-            <span class="hero-stat-value">{{ Math.round(spaceData.progress) }}%</span>
-            <span class="hero-stat-label">完成进度</span>
-          </div>
-          <div class="hero-stat">
-            <span class="hero-stat-value">{{ spaceData.streakDays }} 天</span>
-            <span class="hero-stat-label">连续学习</span>
-          </div>
-          <div class="hero-stat warning" v-if="spaceData.healthStatus === 'warning'">
-            <span class="hero-stat-value">关注</span>
-            <span class="hero-stat-label">正确率下降</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 空间子导航 -->
-    <div class="space-tabs">
-      <button
-        v-for="tab in spaceTabs"
-        :key="tab.id"
-        class="space-tab"
-        :class="{ active: activeTab === tab.id }"
-        @click="activeTab = tab.id"
-      >
-        <span class="tab-icon" v-html="tab.icon"></span>
-        {{ tab.label }}
-      </button>
-    </div>
-
-    <!-- Tab 内容 -->
-    <div class="tab-content">
-      <!-- 空间 Agent -->
-      <div v-if="activeTab === 'agent'" class="tab-panel">
-        <div class="space-agent-card glass">
-          <div class="agent-card-header">
-            <div class="agent-card-avatar">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                <line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+    <!-- Main Content -->
+    <div v-else-if="dashboard" class="learning-space-page">
+      <!-- Space Header -->
+      <section class="space-hero">
+        <div class="hero-bg" :style="{ background: themeGradient }"></div>
+        <div class="hero-content">
+          <div class="hero-top">
+            <button class="back-btn" @click="$router.push('/spaces')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <polyline points="15,18 9,12 15,6"/>
               </svg>
-            </div>
-            <div>
-              <span class="agent-card-name">{{ spaceData.name }} Agent</span>
-              <span class="agent-card-status">在线 · 已监控该空间 {{ spaceData.streakDays }} 天</span>
-            </div>
-          </div>
-          <div class="agent-card-body">
-            <p v-if="spaceData.agentInsight" class="agent-insight-text" v-html="spaceData.agentInsight"></p>
-            <p v-else class="agent-insight-text">该学习空间的 Agent 正在分析你的学习数据，详情即将上线。</p>
-          </div>
-          <div class="agent-card-actions">
-            <button class="agent-quick-btn" @click="askAgent('我最近哪里学得不好？')">我最近哪里学得不好？</button>
-            <button class="agent-quick-btn" @click="askAgent('帮我调整学习计划')">帮我调整学习计划</button>
-            <button class="agent-quick-btn" @click="askAgent('生成一套练习题')">生成一套练习题</button>
-            <button class="agent-quick-btn primary" @click="startChat">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-              与 Agent 对话
             </button>
-          </div>
-        </div>
-
-        <!-- Agent 近期提醒 -->
-        <div class="agent-alerts">
-          <h3 class="panel-title">Agent 近期提醒</h3>
-          <div class="alert-list" v-if="spaceData.healthStatus !== 'normal'">
-            <div class="alert-item warning" v-if="spaceData.healthStatus === 'warning' || spaceData.healthStatus === 'danger'">
-              <div class="alert-dot"></div>
-              <div class="alert-content">
-                <p class="alert-text" v-if="spaceData.alert">{{ spaceData.alert }}</p>
-                <p class="alert-text" v-else>该空间需要关注，请查看学习进度并及时调整计划</p>
-                <span class="alert-time">今天</span>
-              </div>
+            <div class="hero-info">
+              <h1 class="hero-title">{{ dashboard.space.name }}</h1>
+              <p class="hero-goal" v-if="dashboard.currentGoal">目标：{{ dashboard.currentGoal }}</p>
+            </div>
+            <div class="hero-badge" :class="dashboard.riskStatus">
+              {{ riskLabel(dashboard.riskStatus) }}
             </div>
           </div>
-          <el-empty v-else description="暂无提醒" :image-size="60" />
-        </div>
-      </div>
 
-      <!-- 当前路径 -->
-      <div v-if="activeTab === 'path'" class="tab-panel">
-        <div class="path-timeline" v-if="spaceData.pathNodes.length > 0">
-          <div
-            class="path-node"
-            v-for="(node, idx) in spaceData.pathNodes"
-            :key="node.id"
-            :class="{ completed: node.status === 'completed', current: node.status === 'current', locked: node.status === 'locked' }"
-          >
-            <div class="path-node-marker">
-              <div class="path-line" v-if="idx < spaceData.pathNodes.length - 1"></div>
-              <div class="path-dot"></div>
-            </div>
-            <div class="path-node-content">
-              <span class="path-week">Week {{ node.week }}</span>
-              <h4 class="path-name">{{ node.name }}</h4>
-              <p class="path-desc">{{ node.description }}</p>
-              <div class="path-meta">
-                <span class="path-duration">{{ node.duration }}</span>
-                <span class="path-status-tag" :class="node.status">{{ statusLabel(node.status) }}</span>
-              </div>
-            </div>
+          <!-- Stats Row -->
+          <div class="stats-row">
+            <SpaceStatCard
+              :value="dashboard.progress"
+              label="完成进度"
+              emoji="📊"
+              bg-color="#eff6ff"
+              value-color="#3b82f6"
+            />
+            <SpaceStatCard
+              :value="dashboard.streakDays"
+              label="连续学习"
+              suffix=" 天"
+              emoji="🔥"
+              bg-color="#fef3c7"
+              value-color="#d97706"
+            />
+            <SpaceStatCard
+              :value="dashboard.daysRemaining"
+              label="剩余天数"
+              suffix=" 天"
+              emoji="📅"
+              bg-color="#ecfdf5"
+              value-color="#10b981"
+            />
+            <SpaceStatCard
+              :value="riskLabel(dashboard.riskStatus)"
+              label="风险状态"
+              emoji="⚡"
+              bg-color="rgba(139, 92, 246, 0.08)"
+              value-color="#7c3aed"
+            />
           </div>
-        </div>
-        <el-empty v-else description="学习路径即将由 Agent 生成" :image-size="100" />
-      </div>
 
-      <!-- 今日任务 -->
-      <div v-if="activeTab === 'tasks'" class="tab-panel">
-        <div class="space-task-list" v-if="spaceData.tasks.length > 0">
-          <div
-            class="space-task-card"
-            v-for="task in spaceData.tasks"
-            :key="task.id"
-          >
-            <div class="task-check" :class="{ done: task.status === 'done' }">
-              <svg v-if="task.status === 'done'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="18" height="18">
-                <polyline points="20,6 9,17 4,12"/>
+          <!-- Agent Insight Banner -->
+          <div class="agent-insight-banner" v-if="dashboard.agentInsight" @click="$refs.agentPanel?.open?.()">
+            <div class="insight-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
             </div>
-            <div class="task-info">
-              <span class="task-type-tag" :class="task.type">{{ typeLabel(task.type) }}</span>
-              <h4 class="task-name">{{ task.title }}</h4>
-              <p class="task-desc">{{ task.agentReason }}</p>
-            </div>
-            <div class="task-meta">
-              <span class="task-time">{{ task.minutes }} 分钟</span>
-              <button class="task-do-btn" v-if="task.status !== 'done'" @click="doTask(task)">开始</button>
-            </div>
+            <span class="insight-text">{{ dashboard.agentInsight }}</span>
+            <span class="insight-link">查看详情 →</span>
           </div>
         </div>
-        <el-empty v-else description="暂无任务，等待 Agent 生成" :image-size="100" />
-      </div>
+      </section>
 
-      <!-- 资源 -->
-      <div v-if="activeTab === 'resources'" class="tab-panel">
-        <div class="resource-grid" v-if="spaceData.resources.length > 0">
-          <div class="resource-card" v-for="r in spaceData.resources" :key="r.id">
-            <div class="resource-type-icon" :class="r.type">
-              <svg v-if="r.type === 'doc'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-              <svg v-else-if="r.type === 'quiz'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-              <svg v-else-if="r.type === 'mindmap'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/></svg>
-              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+      <!-- Main Content + Sidebar -->
+      <div class="page-body">
+        <div class="main-content">
+          <!-- Tab Navigation -->
+          <nav class="tab-nav">
+            <button
+              v-for="tab in tabs"
+              :key="tab.id"
+              class="tab-btn"
+              :class="{ active: activeTab === tab.id }"
+              @click="activeTab = tab.id"
+            >
+              <span class="tab-icon" v-html="tab.icon"></span>
+              {{ tab.label }}
+              <span v-if="tab.badge" class="tab-badge">{{ tab.badge }}</span>
+            </button>
+          </nav>
+
+          <!-- Tab: Today -->
+          <div v-show="activeTab === 'today'" class="tab-content">
+            <div class="section-header">
+              <h3>今日任务</h3>
+              <span class="task-count">{{ dashboard.todayTasks.length }} 项</span>
             </div>
-            <div class="resource-info">
-              <h4 class="resource-title">{{ r.title }}</h4>
-              <span class="resource-type">{{ typeLabel(r.type) }}</span>
+
+            <div class="task-list" v-if="dashboard.todayTasks.length">
+              <TaskCard
+                v-for="task in dashboard.todayTasks"
+                :key="task.id"
+                :task="task"
+                @start="handleStartTask"
+                @complete="handleCompleteTask"
+              />
+            </div>
+            <el-empty v-else description="今日暂无任务" :image-size="80" />
+
+            <!-- Overdue tasks -->
+            <div v-if="dashboard.overdueTasks.length" class="section-header mt-32">
+              <h3 class="text-danger">已逾期任务</h3>
+              <span class="task-count danger">{{ dashboard.overdueTasks.length }} 项</span>
+            </div>
+            <div class="task-list" v-if="dashboard.overdueTasks.length">
+              <TaskCard
+                v-for="task in dashboard.overdueTasks"
+                :key="task.id"
+                :task="task"
+                @start="handleStartTask"
+                @complete="handleCompleteTask"
+              />
+            </div>
+
+            <!-- Quick actions -->
+            <div class="quick-actions-row">
+              <el-button @click="showAddTask = true">手动添加任务</el-button>
+              <el-button type="primary" plain @click="$router.push('/ai-tutor')">
+                请 Agent 调整今日安排
+              </el-button>
             </div>
           </div>
-        </div>
-        <el-empty v-else description="暂无资源，等待 Agent 生成" :image-size="100" />
-      </div>
 
-      <!-- 测评 / 错题 / 知识图谱 / 记录 占位 -->
-      <div v-if="activeTab === 'exam'" class="tab-panel placeholder-panel">
-        <el-empty description="该学习空间的测评数据">
-          <el-button type="primary" @click="ElMessage.info('AI 正在生成测评...')">AI 生成测评</el-button>
-        </el-empty>
-      </div>
-      <div v-if="activeTab === 'wrong'" class="tab-panel placeholder-panel">
-        <el-empty description="暂无错题记录" />
-      </div>
-      <div v-if="activeTab === 'graph'" class="tab-panel placeholder-panel">
-        <el-empty description="知识图谱" />
-      </div>
-      <div v-if="activeTab === 'records'" class="tab-panel placeholder-panel">
-        <el-empty description="学习记录" />
+          <!-- Tab: Path -->
+          <div v-show="activeTab === 'path'" class="tab-content">
+            <div class="section-header">
+              <h3>学习路径</h3>
+              <span class="task-count">{{ dashboard.pathProgress.completedNodes }}/{{ dashboard.pathProgress.totalNodes }} 阶段</span>
+            </div>
+            <PathTimeline
+              v-if="dashboard.pathNodes.length"
+              :nodes="dashboard.pathNodes"
+              :tasks="dashboard.pendingTasks"
+              :resources="dashboard.resources"
+            />
+            <el-empty v-else description="学习路径即将由 Agent 生成" :image-size="100" />
+          </div>
+
+          <!-- Tab: Resources -->
+          <div v-show="activeTab === 'resources'" class="tab-content">
+            <div class="section-header">
+              <h3>学习资源</h3>
+              <span class="task-count">{{ dashboard.resources.length }} 项</span>
+            </div>
+
+            <div class="resource-grid" v-if="dashboard.resources.length">
+              <div
+                v-for="r in dashboard.resources"
+                :key="r.id"
+                class="resource-card"
+              >
+                <div class="res-icon" :class="r.resourceType">
+                  <span>{{ resourceIcon(r.resourceType) }}</span>
+                </div>
+                <div class="res-body">
+                  <h4 class="res-title">{{ r.title }}</h4>
+                  <p class="res-desc">{{ r.description }}</p>
+                  <div class="res-meta">
+                    <span class="res-type">{{ resourceTypeLabel(r.resourceType) }}</span>
+                    <span class="res-source" :class="r.source">
+                      {{ r.isAiGenerated ? 'AI生成' : r.source === 'curated' ? '精选' : '用户上传' }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <el-empty v-else description="暂无资源，等待 Agent 生成" :image-size="100" />
+
+            <!-- Assessment Summary -->
+            <div class="section-header mt-32">
+              <h3>测评摘要</h3>
+            </div>
+            <div class="assessment-summary">
+              <div class="assess-stat">
+                <span class="assess-value green">72%</span>
+                <span class="assess-label">近期正确率</span>
+              </div>
+              <div class="assess-stat">
+                <span class="assess-value blue">12</span>
+                <span class="assess-label">已答题目</span>
+              </div>
+              <div class="assess-stat">
+                <span class="assess-value purple">3</span>
+                <span class="assess-label">薄弱知识点</span>
+              </div>
+            </div>
+            <div class="weakness-list">
+              <span class="weakness-tag" v-for="w in weaknesses" :key="w">{{ w }}</span>
+            </div>
+          </div>
+
+          <!-- Tab: Records -->
+          <div v-show="activeTab === 'records'" class="tab-content">
+            <div class="section-header">
+              <h3>学习记录</h3>
+              <span class="task-count">近 7 天</span>
+            </div>
+
+            <div class="records-chart" v-if="dashboard.recentRecords.length">
+              <div class="chart-bars">
+                <div
+                  v-for="rec in dashboard.recentRecords"
+                  :key="rec.id"
+                  class="chart-bar-col"
+                >
+                  <div class="bar-wrapper">
+                    <div
+                      class="bar-fill"
+                      :style="{ height: (rec.studyDurationMinutes / maxDuration * 100) + '%' }"
+                    ></div>
+                  </div>
+                  <span class="bar-label">{{ formatDateShort(rec.recordDate) }}</span>
+                  <span class="bar-value">{{ rec.studyDurationMinutes }}m</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="records-table" v-if="dashboard.recentRecords.length">
+              <div
+                v-for="rec in [...dashboard.recentRecords].reverse()"
+                :key="rec.id"
+                class="record-row"
+              >
+                <span class="record-date">{{ rec.recordDate }}</span>
+                <span class="record-duration">{{ rec.studyDurationMinutes }}分钟</span>
+                <span class="record-tasks">{{ rec.tasksCompleted }}/{{ rec.tasksPlanned }} 任务</span>
+                <span class="record-focus">
+                  <template v-for="i in 5" :key="i">
+                    <span class="focus-dot" :class="{ filled: i <= rec.focusLevel }"></span>
+                  </template>
+                </span>
+                <span class="record-reflection" v-if="rec.aiReflection">{{ rec.aiReflection }}</span>
+              </div>
+            </div>
+            <el-empty v-else description="暂无学习记录" :image-size="80" />
+          </div>
+        </div>
+
+        <!-- Agent Sidebar -->
+        <SpaceAgentPanel
+          ref="agentPanel"
+          :space-name="dashboard.space.name"
+          :insight="dashboard.agentInsight"
+          :agent-actions="dashboard.recentAgentActions"
+          @quick-action="handleAgentQuickAction"
+          @send-message="handleAgentMessage"
+        />
       </div>
     </div>
-  </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { useLearningSpaceStore } from '@/stores/learningSpace'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import SpaceStatCard from '@/components/SpaceStatCard.vue'
+import TaskCard from '@/components/TaskCard.vue'
+import PathTimeline from '@/components/PathTimeline.vue'
+import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
+import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
+import type { RiskStatus, TaskVO } from '@/types/learningSpace'
 
 const route = useRoute()
-const spaceStore = useLearningSpaceStore()
-const activeTab = ref('agent')
+const router = useRouter()
+const dashStore = useSpaceDashboardStore()
+
+const activeTab = ref('today')
+const showAddTask = ref(false)
 
 const spaceId = computed(() => Number(route.params.spaceId))
+const dashboard = computed(() => dashStore.dashboard)
 
-function loadSpace() {
-  const id = spaceId.value
-  if (id && !isNaN(id)) {
-    spaceStore.fetchSpaceDetail(id)
-  }
-}
-
-onMounted(loadSpace)
-watch(() => route.params.spaceId, loadSpace)
-
-const spaceData = computed(() => spaceStore.currentSpace)
-
-const spaceTabs = [
-  { id: 'agent', label: '空间 Agent', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
-  { id: 'path', label: '当前路径', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>' },
-  { id: 'tasks', label: '今日任务', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' },
-  { id: 'resources', label: '资源', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
-  { id: 'exam', label: '测评', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' },
-  { id: 'wrong', label: '错题', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' },
-  { id: 'graph', label: '知识图谱', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/></svg>' },
-  { id: 'records', label: '学习记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>' }
+const tabs = [
+  { id: 'today', label: '今日', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>', badge: dashboard.value?.todayTasks.length || 0 },
+  { id: 'path', label: '路径', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>' },
+  { id: 'resources', label: '资源与测评', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
+  { id: 'records', label: '记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>' },
 ]
 
-const typeLabel = (t: string) => {
-  const m: Record<string, string> = { practice: '练习', review: '复习', project: '项目', learn: '学习', test: '测试', doc: '文档', quiz: '练习', mindmap: '思维导图' }
-  return m[t] || t
-}
+const weaknesses = ['洛必达法则适用条件', '无穷小阶数比较', '间断点分类']
 
-const statusLabel = (s: string) => {
-  const m: Record<string, string> = { completed: '已完成', current: '学习中', locked: '未解锁' }
+const themeGradient = computed(() => 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)')
+
+const maxDuration = computed(() => {
+  if (!dashboard.value?.recentRecords.length) return 60
+  return Math.max(...dashboard.value.recentRecords.map(r => r.studyDurationMinutes), 30)
+})
+
+function riskLabel(s: RiskStatus) {
+  const m: Record<string, string> = { good: '良好', normal: '正常', warning: '注意', danger: '危险' }
   return m[s] || s
 }
 
-const askAgent = (q: string) => { ElMessage.info(`向 ${spaceData.value.name} Agent 提问：${q}`) }
-const startChat = () => { ElMessage.success(`开始与 ${spaceData.value.name} Agent 对话`) }
-const doTask = (task: any) => { ElMessage.success(`开始任务：${task.title}`) }
+function resourceIcon(t: string) {
+  const m: Record<string, string> = { doc: '📄', video: '🎬', mind_map: '🧠', quiz: '📝', case_study: '📋', flashcard_set: '🃏', image: '🖼', audio: '🎵', link: '🔗', ppt: '📊' }
+  return m[t] || '📄'
+}
+
+function resourceTypeLabel(t: string) {
+  const m: Record<string, string> = { doc: '文档', ppt: 'PPT', video: '视频', mind_map: '思维导图', quiz: '练习题', case_study: '案例', flashcard_set: '闪卡', image: '图片', audio: '音频', link: '链接' }
+  return m[t] || t
+}
+
+function formatDateShort(date: string) {
+  return date.slice(5)
+}
+
+async function handleStartTask(task: TaskVO) {
+  try {
+    await dashStore.startTask(task.id)
+    ElMessage.success(`开始任务：${task.title}`)
+    router.push(`/study/${task.id}`)
+  } catch {
+    ElMessage.error('开始任务失败')
+  }
+}
+
+async function handleCompleteTask(task: TaskVO) {
+  try {
+    await ElMessageBox.prompt('请输入实际学习时长（分钟）', '完成任务', {
+      confirmButtonText: '确认完成',
+      inputType: 'number',
+      inputValue: String(task.estimatedDurationMinutes || 20),
+    })
+    const minutes = Number((document.querySelector('.el-message-box__input input') as HTMLInputElement)?.value || task.estimatedDurationMinutes || 20)
+    await dashStore.completeTask(task.id, minutes)
+    ElMessage.success('任务完成！')
+  } catch {
+    // cancelled
+  }
+}
+
+function handleAgentQuickAction(label: string) {
+  // Navigate to AI Tutor with the question pre-filled, or open agent panel
+  router.push({ path: '/ai-tutor', query: { message: label, spaceId: spaceId.value } })
+}
+
+function handleAgentMessage(text: string) {
+  // The SpaceAgentPanel handles local echo; for real SSE, post to /agent/chat/stream
+  console.log('Agent message:', text, 'spaceId:', spaceId.value)
+}
+
+function loadDashboard() {
+  const id = spaceId.value
+  if (id && !isNaN(id)) {
+    dashStore.fetchDashboard(id)
+  }
+}
+
+onMounted(loadDashboard)
+watch(() => route.params.spaceId, () => {
+  loadDashboard()
+  activeTab.value = 'today'
+})
 </script>
 
 <style scoped lang="scss">
@@ -266,12 +385,35 @@ const doTask = (task: any) => { ElMessage.success(`开始任务：${task.title}`
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: 20px;
 }
 
-/* 空间头部 */
+/* ========== Loading / Error ========== */
+.loading-state, .error-state {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  padding: 80px 0;
+}
+
+.skeleton-hero { min-height: 180px; border-radius: 16px; overflow: hidden; }
+.skeleton-block {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  width: 100%;
+  height: 100%;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ========== Hero ========== */
 .space-hero {
-  border-radius: var(--radius-xl);
+  border-radius: 16px;
   overflow: hidden;
   position: relative;
 }
@@ -279,519 +421,370 @@ const doTask = (task: any) => { ElMessage.success(`开始任务：${task.title}`
 .hero-bg {
   position: absolute;
   inset: 0;
-  opacity: 0.06;
+  opacity: 0.05;
 }
 
 .hero-content {
   position: relative;
-  padding: var(--spacing-xl);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: rgba(255,255,255,0.85);
+  padding: 24px 28px;
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-xl);
+  border: 1px solid #f0f0f0;
+  border-radius: 16px;
 }
 
-.hero-left {
+.hero-top {
   display: flex;
   align-items: center;
-  gap: var(--spacing-lg);
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
 .back-btn {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
   background: white;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
-  &:hover { background: var(--background-color-base); color: var(--primary-color); }
+  color: #6b7280;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  &:hover { background: #f9fafb; color: #3b82f6; }
 }
+
+.hero-info { flex: 1; }
 
 .hero-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--text-dark);
+  color: #1a1a2e;
   margin: 0;
 }
 
 .hero-goal {
   font-size: 0.8125rem;
-  color: var(--text-muted);
-  margin: 4px 0 0;
+  color: #6b7280;
+  margin: 2px 0 0;
 }
 
-.hero-right {
+.hero-badge {
+  font-size: 0.75rem;
+  padding: 4px 14px;
+  border-radius: 99px;
+  font-weight: 500;
+
+  &.good { background: #ecfdf5; color: #10b981; }
+  &.normal { background: #eff6ff; color: #3b82f6; }
+  &.warning { background: #fef3c7; color: #d97706; }
+  &.danger { background: #fef2f2; color: #ef4444; }
+}
+
+.stats-row {
   display: flex;
-  gap: var(--spacing-2xl);
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
 }
 
-.hero-stat {
-  text-align: center;
-
-  &.warning .hero-stat-value { color: var(--warn-color); }
-}
-
-.hero-stat-value {
-  display: block;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-dark);
-}
-
-.hero-stat-label {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-}
-
-/* 子导航 */
-.space-tabs {
-  display: flex;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-sm);
-  background: white;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border-light);
-  overflow-x: auto;
-}
-
-.space-tab {
+.agent-insight-banner {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border-radius: var(--radius-lg);
-  border: none;
-  background: transparent;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #f0f0f0;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-
-  .tab-icon {
-    display: flex;
-    align-items: center;
-    svg { width: 16px; height: 16px; }
-  }
-
-  &:hover { color: var(--primary-color); background: rgba(59, 91, 219, 0.04); }
-
-  &.active {
-    color: var(--primary-color);
-    background: rgba(59, 91, 219, 0.08);
-    font-weight: 600;
-  }
+  transition: all 0.15s;
+  &:hover { border-color: #d1d5db; }
 }
 
-/* Tab 内容 */
-.tab-panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
-}
-
-/* 空间 Agent 卡片 */
-.space-agent-card {
-  padding: var(--spacing-xl);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.03) 0%, rgba(139, 92, 246, 0.03) 100%);
-  border: 1px solid rgba(59, 91, 219, 0.1);
-}
-
-.agent-card-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
-}
-
-.agent-card-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
+.insight-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #eff6ff;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  svg { width: 22px; height: 22px; }
-}
-
-.agent-card-name {
-  display: block;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-dark);
-}
-
-.agent-card-status {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-}
-
-.agent-insight-text {
-  font-size: 0.875rem;
-  color: var(--text-regular);
-  line-height: 1.8;
-  margin: 0 0 var(--spacing-md);
-}
-
-.agent-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-sm);
-}
-
-.agent-quick-btn {
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-light);
-  background: white;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); }
-
-  &.primary {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
-    border-color: transparent;
-    color: white;
-    &:hover { opacity: 0.9; }
-  }
-}
-
-/* Agent 提醒 */
-.agent-alerts {
-  .panel-title {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: var(--text-dark);
-    margin: 0 0 var(--spacing-md);
-  }
-}
-
-.alert-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.alert-item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-
-  &.warning { border-left: 3px solid var(--warn-color); }
-  &.info { border-left: 3px solid var(--primary-color); }
-  &.success { border-left: 3px solid var(--accent-color); }
-}
-
-.alert-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-top: 4px;
+  color: #3b82f6;
   flex-shrink: 0;
-  .alert-item.warning & { background: var(--warn-color); }
-  .alert-item.info & { background: var(--primary-color); }
-  .alert-item.success & { background: var(--accent-color); }
 }
 
-.alert-text {
+.insight-text {
+  flex: 1;
   font-size: 0.8125rem;
-  color: var(--text-regular);
-  margin: 0;
+  color: #374151;
   line-height: 1.5;
 }
 
-.alert-time {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
+.insight-link {
+  font-size: 0.75rem;
+  color: #3b82f6;
+  white-space: nowrap;
 }
 
-/* 路径时间线 */
-.path-timeline {
-  padding-left: var(--spacing-lg);
-}
-
-.path-node {
+/* ========== Page Body ========== */
+.page-body {
   display: flex;
-  gap: var(--spacing-lg);
-  padding-bottom: var(--spacing-lg);
-
-  &.locked { opacity: 0.4; }
+  gap: 24px;
+  align-items: flex-start;
 }
 
-.path-node-marker {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.path-line {
-  position: absolute;
-  top: 20px;
-  width: 2px;
-  height: calc(100% + var(--spacing-lg));
-  background: var(--border-light);
-  .path-node.completed & { background: var(--accent-color); }
-}
-
-.path-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--border-light);
-  border: 3px solid white;
-  box-shadow: 0 0 0 1px var(--border-light);
-  flex-shrink: 0;
-  z-index: 1;
-
-  .path-node.completed & { background: var(--accent-color); box-shadow: 0 0 0 1px var(--accent-color); }
-  .path-node.current & { background: var(--primary-color); box-shadow: 0 0 0 1px var(--primary-color); animation: pulse-ring 2s infinite; }
-}
-
-.path-node-content {
-  flex: 1;
-  padding-bottom: var(--spacing-sm);
-}
-
-.path-week {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.path-name {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  margin: 2px 0;
-}
-
-.path-desc {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-.path-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-xs);
-}
-
-.path-duration {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-}
-
-.path-status-tag {
-  font-size: 0.6875rem;
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-
-  &.completed { background: rgba(16, 185, 129, 0.08); color: #10b981; }
-  &.current { background: rgba(59, 130, 246, 0.08); color: #3b82f6; }
-  &.locked { background: var(--background-color-base); color: var(--text-muted); }
-}
-
-/* 任务列表 */
-.space-task-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.space-task-card {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: white;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  transition: all var(--transition-fast);
-
-  &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-}
-
-.task-check {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid var(--border-default);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--text-muted);
-
-  &.done {
-    background: var(--accent-color);
-    border-color: var(--accent-color);
-    color: white;
-  }
-}
-
-.task-info {
+.main-content {
   flex: 1;
   min-width: 0;
 }
 
-.task-type-tag {
-  font-size: 0.6875rem;
-  padding: 1px 8px;
-  border-radius: var(--radius-full);
-  &.practice { background: rgba(59, 130, 246, 0.08); color: #3b82f6; }
-  &.review { background: rgba(139, 92, 246, 0.08); color: #8b5cf6; }
-  &.project { background: rgba(245, 158, 11, 0.08); color: #f59e0b; }
+/* ========== Tab Nav ========== */
+.tab-nav {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #f0f0f0;
+  margin-bottom: 24px;
 }
 
-.task-name {
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
   font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  margin: 4px 0;
-}
-
-.task-desc {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin: 0;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+
+  .tab-icon { display: flex; align-items: center; }
+  &:hover { color: #374151; background: #f9fafb; }
+
+  &.active {
+    color: #3b82f6;
+    background: #eff6ff;
+    font-weight: 600;
+  }
 }
 
-.task-meta {
+.tab-badge {
+  font-size: 0.6875rem;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: #e5e7eb;
+  color: #6b7280;
+  .tab-btn.active & { background: #dbeafe; color: #3b82f6; }
+}
+
+.tab-content {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 16px;
 }
 
-.task-time {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+/* ========== Section ========== */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+
+  h3 { font-size: 1rem; font-weight: 600; color: #1a1a2e; margin: 0; }
+  .text-danger { color: #ef4444; }
 }
 
-.task-do-btn {
-  padding: 4px 14px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--primary-color);
-  background: white;
-  color: var(--primary-color);
-  font-size: 0.75rem;
-  cursor: pointer;
-  &:hover { background: var(--primary-color); color: white; }
+.task-count {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  margin: 0;
+
+  &.danger { color: #ef4444; }
 }
 
-/* 资源网格 */
+.mt-32 { margin-top: 32px; }
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quick-actions-row {
+  display: flex;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+/* ========== Resource Grid ========== */
 .resource-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-md);
+  gap: 12px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .resource-card {
   display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #f0f0f0;
+  background: white;
   cursor: pointer;
-  transition: all var(--transition-fast);
-
-  &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); transform: translateY(-1px); }
+  transition: all 0.15s;
+  &:hover { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06); transform: translateY(-1px); }
 }
 
-.resource-type-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
+.res-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  font-size: 20px;
 
-  &.doc { background: rgba(59, 130, 246, 0.08); color: #3b82f6; }
-  &.quiz { background: rgba(16, 185, 129, 0.08); color: #10b981; }
-  &.mindmap { background: rgba(139, 92, 246, 0.08); color: #8b5cf6; }
+  &.doc, &.ppt { background: #eff6ff; } &.video { background: #fef2f2; }
+  &.mind_map { background: #ede9fe; } &.quiz { background: #ecfdf5; }
+  &.case_study { background: #fef3c7; } &.flashcard_set { background: #fce7f3; }
+  &.image { background: #f0fdf4; } &.audio { background: #fff7ed; } &.link { background: #f3f4f6; }
 }
 
-.resource-title {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--text-dark);
-  margin: 0;
-}
-
-.resource-type {
+.res-body { flex: 1; min-width: 0; }
+.res-title { font-size: 0.875rem; font-weight: 600; color: #1a1a2e; margin: 0 0 2px; }
+.res-desc { font-size: 0.75rem; color: #6b7280; margin: 0 0 6px; line-height: 1.4; }
+.res-meta { display: flex; gap: 8px; }
+.res-type { font-size: 0.6875rem; color: #9ca3af; }
+.res-source {
   font-size: 0.6875rem;
-  color: var(--text-muted);
+  padding: 1px 6px; border-radius: 99px;
+  &.ai { background: #ede9fe; color: #7c3aed; }
+  &.curated { background: #f0fdf4; color: #16a34a; }
+  &.user { background: #f3f4f6; color: #6b7280; }
 }
 
-.placeholder-panel {
-  padding: var(--spacing-3xl) 0;
-}
-
-@keyframes pulse-ring {
-  0%, 100% { box-shadow: 0 0 0 1px var(--primary-color); }
-  50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2); }
-}
-
-/* Loading skeleton */
-.loading-state {
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.skeleton {
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-}
-
-.skeleton-inside {
-  min-height: 120px;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.error-state {
-  width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
+/* ========== Assessment Summary ========== */
+.assessment-summary {
   display: flex;
-  justify-content: center;
-  padding: 80px 0;
+  gap: 24px;
+  padding: 16px 20px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #f0f0f0;
+}
+
+.assess-stat { text-align: center; }
+.assess-value {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 700;
+  &.green { color: #10b981; } &.blue { color: #3b82f6; } &.purple { color: #7c3aed; }
+}
+.assess-label { font-size: 0.75rem; color: #9ca3af; }
+
+.weakness-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.weakness-tag {
+  font-size: 0.75rem;
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: #fef2f2;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+}
+
+/* ========== Records ========== */
+.records-chart { margin-bottom: 16px; }
+
+.chart-bars {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  height: 120px;
+  padding: 0 8px;
+  justify-content: space-around;
+}
+
+.chart-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.bar-wrapper {
+  width: 100%;
+  max-width: 40px;
+  height: 100px;
+  background: #f3f4f6;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bar-fill {
+  width: 100%;
+  background: linear-gradient(to top, #3b82f6, #60a5fa);
+  border-radius: 8px 8px 0 0;
+  min-height: 4px;
+  transition: height 0.5s ease;
+}
+
+.bar-label {
+  font-size: 0.625rem;
+  color: #9ca3af;
+}
+
+.bar-value {
+  font-size: 0.625rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.records-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.record-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  background: white;
+  border-radius: 10px;
+  border: 1px solid #f0f0f0;
+  font-size: 0.8125rem;
+}
+
+.record-date { color: #6b7280; font-weight: 500; min-width: 80px; }
+.record-duration { color: #3b82f6; font-weight: 600; min-width: 64px; }
+.record-tasks { color: #374151; }
+.record-focus { display: flex; gap: 2px; }
+.focus-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #e5e7eb;
+  &.filled { background: #f59e0b; }
+}
+.record-reflection {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  flex: 1;
+  text-align: right;
 }
 </style>
