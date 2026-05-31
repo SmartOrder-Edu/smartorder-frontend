@@ -244,13 +244,13 @@
       <el-dialog
         v-model="graphDialogVisible"
         :title="'知识图谱 - ' + currentGraphName"
-        width="70%"
+        width="85%"
         top="5vh"
         custom-class="graph-dialog"
         destroy-on-close
       >
         <div class="graph-dialog-content" v-loading="graphLoading">
-          <KnowledgeGraphPreview :graph="graphData" v-if="graphData.nodes.length > 0" />
+          <KnowledgeGraphPreview :graph="graphData" v-if="graphData.nodes.length > 0" class="kg-preview-comp" />
           <el-empty v-else-if="!graphLoading" description="暂无知识图谱数据" />
         </div>
       </el-dialog>
@@ -864,12 +864,19 @@ onMounted(() => {
   }
 
   .graph-dialog-content {
-    height: 60vh;
+    height: 75vh;
     background-color: var(--el-bg-color-page);
     border-radius: 8px;
     padding: 16px;
     display: flex;
     flex-direction: column;
+    
+    .kg-preview-comp {
+      flex: 1;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
   }
 }
 </style>
