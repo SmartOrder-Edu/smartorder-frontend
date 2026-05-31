@@ -239,6 +239,21 @@
           </div>
         </div>
       </el-dialog>
+
+      <!-- 知识图谱弹窗 -->
+      <el-dialog
+        v-model="graphDialogVisible"
+        :title="'知识图谱 - ' + currentGraphName"
+        width="70%"
+        top="5vh"
+        custom-class="graph-dialog"
+        destroy-on-close
+      >
+        <div class="graph-dialog-content" v-loading="graphLoading">
+          <KnowledgeGraphPreview :graph="graphData" v-if="graphData.nodes.length > 0" />
+          <el-empty v-else-if="!graphLoading" description="暂无知识图谱数据" />
+        </div>
+      </el-dialog>
     </div>
   </AppLayout>
 </template>
@@ -250,8 +265,16 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadRequestOptions } from 'element-plus'
 import { ArrowLeft, Search, Upload, Document, Grid, CircleCheckFilled, View, Delete, Connection, UploadFilled, Loading, DocumentDelete, Download } from '@element-plus/icons-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import KnowledgeGraphPreview from '@/components/plan/KnowledgeGraphPreview.vue'
 import { useChunkUpload } from '@/composables/useChunkUpload'
-import { getKnowledgeBaseDetailStats, getKnowledgeFileList, type KnowledgeBaseDetailStatsVO, type KnowledgeFilePageVO } from '@/api/knowledgeBase'
+import { 
+  getKnowledgeBaseDetailStats, 
+  getKnowledgeFileList, 
+  getFileKnowledgeGraph,
+  type KnowledgeBaseDetailStatsVO, 
+  type KnowledgeFilePageVO,
+  type KnowledgeGraphVO
+} from '@/api/knowledgeBase'
 
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import VueOfficeDocx from '@vue-office/docx'
@@ -519,9 +542,38 @@ const previewFile = async (file: KnowledgeFilePageVO) => {
   }
 }
 
-const viewKnowledgeGraph = (file: KnowledgeFilePageVO) => {
-  ElMessage.info(`查看知识图谱：${file.originalName}`)
-  // TODO: 跳转知识图谱或打开图谱弹窗
+const graphDialogVisible = ref(false)
+const graphLoading = ref(false)
+const currentGraphName = ref('')
+const graphData = ref<{
+  nodes: { name: string; category?: string; importance?: number }[]
+  edges: { from: string; to: string; type?: string }[]
+}>({ nodes: [], edges: [] })
+
+const viewKnowledgeGraph = async (file: KnowledgeFilePageVO) => {
+  currentGraphName.value = file.originalName
+  graphDialogVisible.value = true
+  graphLoading.value = true
+  // @ts-ignore
+  graphData.value = { nodes: [], edges: [] }
+  try {
+    const res: any = await getFileKnowledgeGraph(file.id)
+    const data = res?.data || res
+    if (data) {
+      graphData.value = {
+        nodes: data.nodes || [],
+        edges: (data.edges || []).map((e: any) => ({
+          from: e.source,
+          to: e.target,
+          type: e.relationType || e.description
+        }))
+      }
+    }
+  } catch (error) {
+    console.error('获取知识图谱失败', error)
+  } finally {
+    graphLoading.value = false
+  }
 }
 
 const downloadFile = (file: KnowledgeFilePageVO) => {
@@ -792,6 +844,15 @@ onMounted(() => {
     .md-content {
       text-align: left;
     }
+  }
+
+  .graph-dialog-content {
+    height: 60vh;
+    background-color: var(--el-bg-color-page);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
   }
 }
 </style>

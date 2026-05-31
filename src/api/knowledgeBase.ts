@@ -191,3 +191,35 @@ export const uploadChunk = (uploadId: string, partNumber: number, fileChunk: Blo
 export const mergeChunks = (data: ChunkUploadMergeReqDTO) => {
   return request.post<string>('/knowledge/file/upload/merge', data)
 }
+
+// ======================= 知识图谱 =======================
+
+export interface KnowledgeGraphNodeVO {
+  id: string
+  name: string
+  description?: string
+  category?: string
+  importance?: number
+}
+
+export interface KnowledgeGraphEdgeVO {
+  source: string
+  target: string
+  relationType?: string
+  weight?: number
+  description?: string
+}
+
+export interface KnowledgeGraphVO {
+  fileId: number
+  nodes: KnowledgeGraphNodeVO[]
+  edges: KnowledgeGraphEdgeVO[]
+}
+
+/**
+ * 获取文件的知识图谱
+ */
+export const getFileKnowledgeGraph = (fileId: number) => {
+  return request.get<KnowledgeGraphVO>(`/knowledge/file/${fileId}`)
+}
+
