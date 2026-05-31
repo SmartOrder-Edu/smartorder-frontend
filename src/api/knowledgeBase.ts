@@ -223,3 +223,18 @@ export const getFileKnowledgeGraph = (fileId: number) => {
   return request.get<KnowledgeGraphVO>(`/knowledge/file/${fileId}`)
 }
 
+/**
+ * 删除知识库
+ * @param id 知识库ID
+ */
+export const deleteKnowledgeBase = (id: number) => {
+  return request.delete<string>(`/knowledge/base/delete/${id}`)
+}
+
+/**
+ * 删除文件
+ * @param id 文件ID
+ */
+export const deleteKnowledgeFile = (id: number) => {
+  return request.delete<string>(`/knowledge/file/${id}`)
+}

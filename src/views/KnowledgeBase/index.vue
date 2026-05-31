@@ -187,7 +187,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { uploadKnowledgeBaseCover, createKnowledgeBase, updateKnowledgeBase, getKnowledgeBaseList, getKnowledgeBaseStats, KnowledgeBaseListRespVO, KnowledgeBaseStatsVO } from '@/api/knowledgeBase'
+import { uploadKnowledgeBaseCover, createKnowledgeBase, updateKnowledgeBase, getKnowledgeBaseList, getKnowledgeBaseStats, deleteKnowledgeBase, KnowledgeBaseListRespVO, KnowledgeBaseStatsVO } from '@/api/knowledgeBase'
 
 const router = useRouter()
 
@@ -293,9 +293,15 @@ const handleCommand = (command: string, kb: KnowledgeBaseListRespVO) => {
         type: 'warning',
         confirmButtonClass: 'el-button--danger'
       }
-    ).then(() => {
-      kbList.value = kbList.value.filter(item => item.id !== kb.id)
-      ElMessage.success('删除成功')
+    ).then(async () => {
+      try {
+        await deleteKnowledgeBase(kb.id)
+        ElMessage.success('删除成功')
+        await fetchKbList()
+        await fetchKbStats()
+      } catch (error) {
+        console.error('删除知识库失败', error)
+      }
     }).catch(() => {})
   } else if (command === 'upload') {
     ElMessage.info('假装打开了上传文件抽屉：' + kb.name)

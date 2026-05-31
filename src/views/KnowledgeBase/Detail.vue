@@ -271,6 +271,7 @@ import {
   getKnowledgeBaseDetailStats, 
   getKnowledgeFileList, 
   getFileKnowledgeGraph,
+  deleteKnowledgeFile,
   type KnowledgeBaseDetailStatsVO, 
   type KnowledgeFilePageVO,
   type KnowledgeGraphVO
@@ -600,9 +601,25 @@ const deleteFile = (file: KnowledgeFilePageVO) => {
       cancelButtonText: '取消',
       type: 'warning',
     }
-  ).then(() => {
-    fileList.value = fileList.value.filter(f => f.id !== file.id)
-    ElMessage.success('删除成功')
+  ).then(async () => {
+    try {
+      await deleteKnowledgeFile(file.id)
+      fileList.value = fileList.value.filter(f => f.id !== file.id)
+      ElMessage.success('删除成功')
+      
+      // 更新统计数据
+      if (kbId) {
+        getKnowledgeBaseDetailStats(Number(kbId)).then(res => {
+          if (res) {
+            // @ts-ignore
+            detailStats.value = res.data || res
+          }
+        })
+      }
+    } catch (error) {
+      console.error('删除文件失败', error)
+      ElMessage.error('删除文件失败')
+    }
   }).catch(() => {})
 }
 
