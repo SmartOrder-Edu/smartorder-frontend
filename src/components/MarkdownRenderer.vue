@@ -108,7 +108,7 @@ async function renderMermaidBlocks(el: HTMLElement) {
     const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`
 
     try {
-      mermaid.parse(source)
+      await mermaid.parse(source)
       const { svg } = await mermaid.render(id, source)
       const blob = new Blob([svg], { type: 'image/svg+xml' })
       const blobUrl = URL.createObjectURL(blob)
