@@ -59,7 +59,21 @@
         >
           <div class="space-card-top">
             <div class="space-card-header">
-              <span class="space-card-icon">{{ space.icon }}</span>
+              <el-image 
+                class="space-card-cover" 
+                :src="space.coverUrl" 
+                fit="cover"
+              >
+                <template #error>
+                  <div class="space-cover-placeholder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                  </div>
+                </template>
+              </el-image>
               <div class="space-card-title-group">
                 <h3 class="space-card-name">{{ space.name }}</h3>
                 <span class="space-card-status" :class="space.healthStatus">{{ healthStatusLabel(space.healthStatus) }}</span>
@@ -514,10 +528,8 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   margin-bottom: var(--spacing-sm);
 }
 
-.space-card-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
+.space-card-cover { width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; border: 1px solid var(--border-light); background: #f8fafc; }
+  .space-cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f1f5f9; color: #94a3b8; border-radius: 10px; }
 
 .space-card-title-group {
   flex: 1;
