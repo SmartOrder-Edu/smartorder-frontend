@@ -134,7 +134,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 const chatMessage = ref('')
 const chatContainer = ref<HTMLElement | null>(null)
@@ -339,15 +339,51 @@ const handleQuickAction = (action: any) => {
   sendMessage()
 }
 
-onMounted(() => {
-  scrollToBottom()
-})
+  const checkBounds = () => {
+    // 如果没有使用绝对定位则不需要处理
+    if (floatingStyle.value.left === 'auto' || floatingStyle.value.top === 'auto') return
+    
+    const floatingEl = document.querySelector('.ai-assistant') as HTMLElement
+    if (floatingEl) {
+      const rect = floatingEl.getBoundingClientRect()
+      const maxLeft = window.innerWidth - rect.width
+      const maxTop = window.innerHeight - rect.height
+      let currentLeft = parseInt(floatingStyle.value.left) || 0
+      let currentTop = parseInt(floatingStyle.value.top) || 0
+      
+      let changed = false
+      if (currentLeft < 0) { currentLeft = 0; changed = true; }
+      if (currentLeft > maxLeft && maxLeft > 0) { currentLeft = maxLeft; changed = true; }
+      if (currentTop < 0) { currentTop = 0; changed = true; }
+      if (currentTop > maxTop && maxTop > 0) { currentTop = maxTop; changed = true; }
+      
+      if (changed) {
+        floatingStyle.value.left = `${currentLeft}px`
+        floatingStyle.value.top = `${currentTop}px`
+      }
+    }
+  }
+
+  const handleResize = () => checkBounds()
+
+  onMounted(() => {
+    scrollToBottom()
+    // 延迟检查边界，等元素渲染
+    nextTick(() => {
+      checkBounds()
+    })
+    window.addEventListener('resize', handleResize)
+  })
+
+  onBeforeUnmount(() => {
+    window.removeEventListener('resize', handleResize)
+  })
 </script>
 
 <style scoped>
-/* AI 助手悬浮框 — 展开态为基础样式 */
-.ai-assistant {
-  position: fixed;
+  /* AI */
+  .ai-assistant {
+    position: fixed;
   width: 360px;
   border-radius: 14px;
   box-shadow: 
