@@ -2,21 +2,60 @@
   <div class="app-layout">
     <div class="layout-container" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <!-- 左侧边栏 -->
-      <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }">
-        <!-- Logo -->
-        <div class="sidebar-logo" @click="goHome">
-          <img src="/logo.png" alt="知序智学" class="sidebar-logo-img" />
-          <div class="sidebar-logo-text" v-if="!sidebarCollapsed">
-            <span class="sidebar-logo-title gradient-text">知序智学</span>
-            <span class="sidebar-logo-subtitle">AI Learning OS</span>
+      <aside 
+        class="sidebar" 
+        :class="{ collapsed: sidebarCollapsed }"
+        @mouseenter="sidebarHovered = true"
+        @mouseleave="sidebarHovered = false"
+      >
+        <!-- Logo / 展开控制区 -->
+        <div 
+          class="sidebar-logo-container"
+          :class="{ 'is-collapsed': sidebarCollapsed }"
+        >
+          <!-- 非折叠状态下正常显示 Logo 和折叠按钮 -->
+          <div v-if="!sidebarCollapsed" class="sidebar-logo" @click="goHome">
+            <img src="/logo.png" alt="知序智学" class="sidebar-logo-img" />
+            <div class="sidebar-logo-text">
+              <span class="sidebar-logo-title gradient-text">知序智学</span>
+              <span class="sidebar-logo-subtitle">AI Learning OS</span>
+            </div>
+            <button class="collapse-btn" @click.stop="handleCollapse" title="收起侧边栏">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15,18 9,12 15,6"/>
+              </svg>
+            </button>
           </div>
-          <button class="collapse-btn" @click.stop="sidebarCollapsed = !sidebarCollapsed" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline v-if="!sidebarCollapsed" points="15,18 9,12 15,6"/>
-              <polyline v-else points="9,18 15,12 9,6"/>
-            </svg>
-          </button>
+
+          <!-- 折叠状态下 -->
+          <div v-else class="sidebar-logo-collapsed">
+            <!-- 鼠标悬停在侧边栏区域时显示“打开边栏”图标，否则显示星星 Logo -->
+            <el-tooltip
+              :disabled="!sidebarCollapsed || !sidebarHovered"
+              content="打开边栏"
+              placement="right"
+              effect="dark"
+              :show-after="50"
+            >
+              <div class="sidebar-logo-collapsed-inner" @click.stop="handleLogoClick">
+                <transition name="fade-icon" mode="out-in">
+                  <div v-if="sidebarHovered" class="expand-action-btn" key="expand">
+                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect width="18" height="18" x="3" y="3" rx="2" />
+                      <path d="M9 3v18" />
+                      <path d="m14 9 3 3-3 3" />
+                    </svg>
+                  </div>
+                  
+                  <div v-else class="sidebar-logo-mini" key="logo">
+                    <img src="/logo.png" alt="知序智学" class="sidebar-logo-img" />
+                  </div>
+                </transition>
+              </div>
+            </el-tooltip>
+          </div>
         </div>
+
 
         <nav class="sidebar-nav">
           <!-- 核心入口 -->
@@ -255,6 +294,28 @@ watch(() => sidebarCollapsed.value, (val) => {
   localStorage.setItem('sidebarCollapsed', String(val))
 })
 
+const sidebarHovered = ref(false)
+
+const handleLogoClick = () => {
+  if (sidebarCollapsed.value) {
+    sidebarCollapsed.value = false
+    sidebarHovered.value = false
+  } else {
+    goHome()
+  }
+}
+
+const handleCollapse = () => {
+  sidebarCollapsed.value = true
+  sidebarHovered.value = false
+  setTimeout(() => {
+    const sidebarEl = document.querySelector('.sidebar')
+    if (sidebarEl && sidebarEl.matches(':hover')) {
+      sidebarHovered.value = true
+    }
+  }, 50)
+}
+
 const showNotifications = ref(false)
 const showUserMenu = ref(false)
 const unreadCount = ref(2)
@@ -373,7 +434,11 @@ const isActiveSpace = (spaceId: number) => {
   return pathId === spaceId
 }
 
-const goHome = () => router.push('/ai-tutor')
+const goHome = () => {
+  if (route.path !== '/ai-tutor') {
+    router.push('/ai-tutor').catch(() => {})
+  }
+}
 const goOnboarding = () => {
   showUserMenu.value = false
   router.push('/onboarding')
@@ -434,22 +499,106 @@ const handleLogout = async () => {
   z-index: 90;
 }
 
+/* 新的 Logo 容器 */
+.sidebar-logo-container {
+  margin-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--border-soft);
+  height: 64px; 
+  display: flex;
+  align-items: center;
+  transition: all var(--transition-base);
+}
+
+.sidebar-logo-container.is-collapsed {
+  justify-content: center;
+  border-bottom: none; /* 折叠时去除底边框 */
+  margin-bottom: 0;
+  height: 64px;
+}
+
 /* 侧边栏 Logo */
 .sidebar-logo {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm) 0 var(--spacing-md);
-  margin-bottom: var(--spacing-sm);
-  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  width: 100%;
+}
+
+/* 折叠后的 Logo 区域 */
+.sidebar-logo-collapsed {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* 折叠后的 Logo 区域内部包裹层 */
+.sidebar-logo-collapsed-inner {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
-.sidebar.collapsed .sidebar-logo {
-  flex-direction: column;
+/* 迷你 Logo 状态 */
+.sidebar-logo-mini {
+  display: flex;
+  align-items: center;
   justify-content: center;
-  padding: var(--spacing-md) 0;
-  gap: var(--spacing-sm);
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  transition: all var(--transition-base);
+}
+
+/* 打开边栏的 Hover 动作按钮 */
+.expand-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-xl);
+  background: var(--bg-secondary);
+  color: var(--primary-color);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-soft);
+  transition: all var(--transition-base);
+}
+
+.expand-action-btn:hover {
+  background: var(--primary-color);
+  color: #ffffff;
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md);
+}
+
+.expand-icon {
+  width: 20px;
+  height: 20px;
+  transition: transform var(--transition-base);
+}
+
+.expand-action-btn:hover .expand-icon {
+  transform: translateX(1px);
+}
+
+/* 图标淡入淡出动画 */
+.fade-icon-enter-active,
+.fade-icon-leave-active {
+  transition: opacity 0.08s cubic-bezier(0.4, 0, 0.2, 1), transform 0.08s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.fade-icon-enter-from,
+.fade-icon-leave-to {
+  opacity: 0;
+  transform: scale(0.92);
 }
 
 .sidebar-logo-img {

@@ -1,85 +1,77 @@
 <template>
   <div class="kg-container">
-    <!-- 30 节点以上降级为网格视图 -->
-    <div v-if="graph.nodes.length > 30" class="kg-grid-fallback">
-      <div class="kg-category-groups">
-        <div
-          v-for="group in categoryGroups"
-          :key="group.category"
-          class="kg-category-group"
-        >
-          <span class="kg-category-label" :style="{ color: categoryColor(group.category) }">
-            {{ categoryLabel(group.category) }}
-          </span>
-          <div class="kg-category-nodes">
-            <span
-              v-for="node in group.nodes"
-              :key="node.name"
-              class="kg-fallback-tag"
-              :style="fallbackTagStyle(node)"
-            >
-              {{ node.name }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- SVG 图谱（30 节点以内） -->
-    <div v-else class="kg-svg-wrapper" ref="svgWrapper">
-      <svg :viewBox="viewBox" class="kg-svg">
+    <div class="kg-svg-wrapper" ref="svgWrapper">
+      <svg class="kg-svg" width="100%" height="100%" ref="svgRef">
         <defs>
           <marker
             id="arrowhead"
-            markerWidth="8"
-            markerHeight="6"
-            refX="8"
-            refY="3"
+            markerWidth="10"
+            markerHeight="7"
+            refX="16"
+            refY="3.5"
             orient="auto"
           >
-            <polygon points="0 0, 8 3, 0 6" fill="rgba(148, 163, 184, 0.5)" />
+            <polygon points="0 0, 10 3.5, 0 7" fill="rgba(148, 163, 184, 0.8)" />
           </marker>
         </defs>
 
-        <!-- 边 -->
-        <g class="kg-edges">
-          <path
-            v-for="edge in layoutEdges"
-            :key="edge.from + '-' + edge.to"
-            :d="edge.d"
-            class="kg-edge"
-            :class="{ highlighted: edge.highlighted }"
-            marker-end="url(#arrowhead)"
-          />
-        </g>
-
-        <!-- 节点 -->
-        <g class="kg-nodes">
-          <g
-            v-for="node in layoutNodes"
-            :key="node.name"
-            :transform="`translate(${node.x}, ${node.y})`"
-            class="kg-node-group"
-            :class="{
-              highlighted: node.highlighted,
-              dimmed: highlightedNode && !node.highlighted,
-            }"
-            @mouseenter="hoverNode(node)"
-            @mouseleave="clearHover"
-          >
-            <circle
-              :r="node.radius"
-              class="kg-node-circle"
-              :fill="categoryColor(node.category)"
-              :stroke="categoryColor(node.category)"
-              stroke-width="2"
-              fill-opacity="0.18"
+        <!-- 放缩/平移图层 -->
+        <g ref="zoomLayer">
+          <!-- 边 -->
+          <g class="kg-edges">
+            <line
+              v-for="edge in layoutEdges"
+              :key="edge.id"
+              :x1="edge.source.x"
+              :y1="edge.source.y"
+              :x2="edge.target.x"
+              :y2="edge.target.y"
+              class="kg-edge"
+              :class="{ highlighted: edge.highlighted }"
+              :style="{ strokeWidth: edge.highlighted ? 3 : Math.max(1, (edge.weight || 1) * 1.5) + 'px' }"
+              marker-end="url(#arrowhead)"
             />
             <text
-              class="kg-node-label"
-              dy="0.35em"
-              :font-size="node.radius > 28 ? '11' : '10'"
-            >{{ node.name.length > 6 ? node.name.slice(0, 6) + '...' : node.name }}</text>
+              v-for="edge in layoutEdges"
+              :key="'text-' + edge.id"
+              :x="(edge.source.x + edge.target.x) / 2"
+              :y="(edge.source.y + edge.target.y) / 2 - 4"
+              class="kg-edge-label"
+              :class="{ highlighted: edge.highlighted }"
+            >
+              {{ edge.type }}
+            </text>
+          </g>
+
+          <!-- 节点 -->
+          <g class="kg-nodes">
+            <g
+              v-for="node in layoutNodes"
+              :key="node.id"
+              :transform="`translate(${node.x || 0}, ${node.y || 0})`"
+              class="kg-node-group"
+              :class="{
+                highlighted: node.highlighted,
+                dimmed: highlightedNode && !node.highlighted,
+              }"
+              @mouseenter="hoverNode(node)"
+              @mouseleave="clearHover"
+              :ref="el => setNodeRef(el, node)"
+            >
+              <circle
+                :r="node.radius"
+                class="kg-node-circle"
+                :fill="categoryColor(node.category)"
+                :stroke="categoryColor(node.category)"
+                stroke-width="2"
+                fill-opacity="0.18"
+              />
+              <text
+                class="kg-node-label"
+                dy="0.35em"
+                :font-size="node.radius > 28 ? '11' : '10'"
+              >{{ node.name.length > 8 ? node.name.slice(0, 8) + '...' : node.name }}</text>
+            </g>
           </g>
         </g>
       </svg>
@@ -100,66 +92,164 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import * as d3 from 'd3'
 
 const props = defineProps<{
   graph: {
-    nodes: { name: string; category?: string; importance?: number }[]
-    edges?: { from: string; to: string; type?: string }[]
+    nodes: { id?: string; name: string; category?: string; importance?: number }[]
+    edges?: { from: string; to: string; type?: string; description?: string; weight?: number }[]
   }
 }>()
 
 const highlightedNode = ref<string | null>(null)
+const svgWrapper = ref<HTMLElement | null>(null)
+const svgRef = ref<SVGElement | null>(null)
+const zoomLayer = ref<SVGGElement | null>(null)
 
-// ===== 布局计算 =====
-
-interface LayoutNode {
+// ===== 布局及数据定义 =====
+interface LayoutNode extends d3.SimulationNodeDatum {
+  id: string
   name: string
   category: string
   importance: number
-  x: number
-  y: number
   radius: number
   highlighted: boolean
+  x?: number
+  y?: number
+  fx?: number | null
+  fy?: number | null
 }
 
-interface LayoutEdge {
-  from: string
-  to: string
+interface LayoutEdge extends d3.SimulationLinkDatum<LayoutNode> {
+  id: string
   type: string
-  d: string
+  weight: number
   highlighted: boolean
+  source: LayoutNode
+  target: LayoutNode
 }
 
-const layout = computed(() => computeLayout(props.graph))
-const layoutNodes = computed(() => layout.value.nodes)
-const layoutEdges = computed(() => layout.value.edges)
+const layoutNodes = ref<LayoutNode[]>([])
+const layoutEdges = ref<LayoutEdge[]>([])
+let simulation: d3.Simulation<LayoutNode, LayoutEdge> | null = null
 
-const viewBox = computed(() => {
-  const nodes = layoutNodes.value
-  if (!nodes.length) return '0 0 600 400'
-  const minX = Math.min(...nodes.map(n => n.x)) - 50
-  const maxX = Math.max(...nodes.map(n => n.x)) + 50
-  const maxY = Math.max(...nodes.map(n => n.y)) + 60
-  return `${minX} 0 ${maxX - minX} ${Math.max(maxY, 300)}`
-})
-
-// ===== 类别分组（fallback） =====
-
-const categoryGroups = computed(() => {
-  const graph = props.graph
-  if (!graph?.nodes) return []
-  const groups: Record<string, any[]> = {}
-  for (const node of graph.nodes) {
-    const cat = node.category || 'concept'
-    if (!groups[cat]) groups[cat] = []
-    groups[cat].push(node)
+// 设置节点绑定的 D3 drag 事件
+const setNodeRef = (el: any, node: LayoutNode) => {
+  if (el) {
+    d3.select(el as Element).call(
+      d3.drag<Element, unknown>()
+        .on('start', (event) => {
+          if (!event.active) simulation?.alphaTarget(0.3).restart()
+          node.fx = node.x
+          node.fy = node.y
+        })
+        .on('drag', (event) => {
+          node.fx = event.x
+          node.fy = event.y
+        })
+        .on('end', (event) => {
+          if (!event.active) simulation?.alphaTarget(0)
+          node.fx = null
+          node.fy = null
+        }) as any
+    )
   }
-  return Object.entries(groups).map(([category, nodes]) => ({
-    category,
-    nodes: nodes.sort((a, b) => (b.importance || 3) - (a.importance || 3)),
-  }))
+}
+
+const initGraph = () => {
+  if (simulation) {
+    simulation.stop()
+  }
+
+  const nodesMap = new Map<string, LayoutNode>()
+  const nodes: LayoutNode[] = props.graph.nodes.map(n => {
+    const radius = 25 + (n.importance || 3) * 3
+    const node: LayoutNode = {
+      id: n.id || n.name,
+      name: n.name,
+      category: n.category || 'concept',
+      importance: n.importance || 3,
+      radius,
+      highlighted: false,
+    }
+    nodesMap.set(node.id, node)
+    // fallback map by name as well
+    if (n.name && n.name !== node.id) nodesMap.set(n.name, node)
+    return node
+  })
+
+  const edges: LayoutEdge[] = (props.graph.edges || []).map((e, idx) => {
+    return {
+      id: `${e.from}-${e.to}-${idx}`,
+      source: nodesMap.get(e.from) as LayoutNode,
+      target: nodesMap.get(e.to) as LayoutNode,
+      type: e.description || e.type || '',
+      weight: e.weight || 1,
+      highlighted: false
+    }
+  }).filter(e => e.source && e.target)
+
+  layoutNodes.value = nodes
+  layoutEdges.value = edges
+
+  nextTick(() => {
+    if (!svgWrapper.value) return
+    const width = svgWrapper.value.clientWidth || 600
+    const height = svgWrapper.value.clientHeight || 400
+
+    // 初始化缩放行为
+    if (svgRef.value && zoomLayer.value) {
+      const zoom = d3.zoom<SVGElement, unknown>()
+        .scaleExtent([0.1, 4])
+        .on('zoom', (event) => {
+          if (zoomLayer.value) {
+            d3.select(zoomLayer.value).attr('transform', event.transform)
+          }
+        })
+      d3.select(svgRef.value).call(zoom)
+    }
+
+    simulation = d3.forceSimulation<LayoutNode>(nodes)
+      .force('link', d3.forceLink<LayoutNode, LayoutEdge>(edges)
+        .id(d => d.id)
+        .distance(120))
+      .force('charge', d3.forceManyBody().strength(-400))
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('collide', d3.forceCollide().radius(d => (d as LayoutNode).radius + 15))
+      .on('tick', () => {
+        // Vue 响应式会自动更新视图，不需要手动操作 DOM
+        // 这里只是为了触发响应式更新
+        layoutNodes.value = [...nodes]
+        layoutEdges.value = [...edges]
+      })
+  })
+}
+
+watch(() => props.graph, () => {
+  initGraph()
+}, { deep: true })
+
+onMounted(() => {
+  initGraph()
+  
+  // 监听容器大小变化重置中心点
+  window.addEventListener('resize', handleResize)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  if (simulation) simulation.stop()
+})
+
+const handleResize = () => {
+  if (simulation && svgWrapper.value) {
+    const width = svgWrapper.value.clientWidth
+    const height = svgWrapper.value.clientHeight
+    simulation.force('center', d3.forceCenter(width / 2, height / 2))
+    simulation.alpha(0.3).restart()
+  }
+}
 
 const legendCategories = computed(() => {
   const cats = new Set(props.graph.nodes?.map(n => n.category || 'concept') || [])
@@ -169,24 +259,21 @@ const legendCategories = computed(() => {
 // ===== Hover 交互 =====
 
 function hoverNode(node: LayoutNode) {
-  highlightedNode.value = node.name
+  highlightedNode.value = node.id
   node.highlighted = true
-  for (const edge of layoutEdges.value) {
-    if (edge.from === node.name || edge.to === node.name) {
+  layoutEdges.value.forEach(edge => {
+    if (edge.source.id === node.id || edge.target.id === node.id) {
       edge.highlighted = true
+      edge.source.highlighted = true
+      edge.target.highlighted = true
     }
-    // highlight connected nodes
-    for (const n of layoutNodes.value) {
-      if (edge.from === node.name && edge.to === n.name) n.highlighted = true
-      if (edge.to === node.name && edge.from === n.name) n.highlighted = true
-    }
-  }
+  })
 }
 
 function clearHover() {
   highlightedNode.value = null
-  for (const node of layoutNodes.value) node.highlighted = false
-  for (const edge of layoutEdges.value) edge.highlighted = false
+  layoutNodes.value.forEach(n => n.highlighted = false)
+  layoutEdges.value.forEach(e => e.highlighted = false)
 }
 
 // ===== 配色 =====
@@ -213,81 +300,6 @@ function categoryLabel(cat: string): string {
   return labels[cat] || cat
 }
 
-function fallbackTagStyle(node: any): Record<string, string> {
-  const imp = node.importance || 3
-  const color = categoryColor(node.category || 'concept')
-  return {
-    fontSize: `${0.7 + imp * 0.04}rem`,
-    fontWeight: imp >= 4 ? '600' : '400',
-    borderColor: color,
-    color,
-  }
-}
-
-// ===== 布局算法 =====
-
-function computeLayout(graph: { nodes: any[]; edges?: any[] }) {
-  if (!graph?.nodes?.length) return { nodes: [], edges: [] }
-
-  // 按 category 分组
-  const categoryColumns: Record<string, LayoutNode[]> = {}
-  for (const node of graph.nodes) {
-    const cat = node.category || 'concept'
-    if (!categoryColumns[cat]) categoryColumns[cat] = []
-    categoryColumns[cat].push({
-      name: node.name,
-      category: cat,
-      importance: node.importance || 3,
-      x: 0, y: 0,
-      radius: 18 + (node.importance || 3) * 4,
-      highlighted: false,
-    })
-  }
-
-  const columns = Object.keys(categoryColumns).filter(k => categoryColumns[k].length > 0)
-  const colCount = columns.length || 1
-  const svgWidth = 600
-  const colPadding = svgWidth / (colCount + 1)
-
-  columns.forEach((cat, colIdx) => {
-    const nodes = categoryColumns[cat]
-    nodes.sort((a, b) => b.importance - a.importance)
-    const spacing = Math.min(80, 400 / nodes.length)
-    const startY = 40
-    nodes.forEach((node, i) => {
-      node.x = colPadding * (colIdx + 1)
-      node.y = startY + spacing * i
-    })
-  })
-
-  const allNodes = Object.values(categoryColumns).flat()
-
-  // 构建节点查找表
-  const nodeMap = new Map<string, LayoutNode>()
-  for (const n of allNodes) nodeMap.set(n.name, n)
-
-  // 构建边
-  const edges: LayoutEdge[] = []
-  if (graph.edges) {
-    for (const edge of graph.edges) {
-      const from = nodeMap.get(edge.from)
-      const to = nodeMap.get(edge.to)
-      if (!from || !to) continue
-
-      const midX = (from.x + to.x) / 2
-      const d = `M ${from.x} ${from.y} Q ${midX} ${from.y} ${to.x} ${to.y}`
-      edges.push({
-        from: edge.from,
-        to: edge.to,
-        type: edge.type || 'prerequisite_of',
-        d,
-        highlighted: false,
-      })
-    }
-  }
-
-  return { nodes: allNodes, edges }
-}
 </script>
 
 <style scoped>
@@ -296,91 +308,83 @@ function computeLayout(graph: { nodes: any[]; edges?: any[] }) {
   border: 1px solid var(--border-soft, rgba(148, 163, 184, 0.12));
   border-radius: var(--radius-xl, 1rem);
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-/* ===== SVG 图谱 ===== */
 .kg-svg-wrapper {
   width: 100%;
-  overflow: auto;
-  max-height: 420px;
+  flex: 1;
+  min-height: 400px;
+  overflow: hidden;
+  position: relative;
 }
+
 .kg-svg {
   width: 100%;
-  min-height: 300px;
+  height: 100%;
+  display: block;
+}
+
+.kg-edges {
+  pointer-events: none;
 }
 
 .kg-edge {
-  fill: none;
-  stroke: rgba(148, 163, 184, 0.35);
+  stroke: rgba(148, 163, 184, 0.5);
   stroke-width: 1.5;
-  stroke-dasharray: 4 3;
-  transition: stroke 0.2s ease, stroke-width 0.2s ease;
-}
-.kg-edge.highlighted {
-  stroke: var(--primary-color, #3b82f6);
-  stroke-width: 2;
-  stroke-dasharray: none;
+  transition: all 0.2s ease;
 }
 
-.kg-node-group {
-  cursor: pointer;
-  transition: opacity 0.2s ease;
+.kg-edge.highlighted {
+  stroke: var(--el-color-primary, #409eff);
+  stroke-width: 2.5;
 }
+
+.kg-edge-label {
+  font-size: 10px;
+  fill: #94a3b8;
+  text-anchor: middle;
+  pointer-events: none;
+  background-color: white;
+  transition: opacity 0.2s;
+  opacity: 0.8;
+}
+
+.kg-edge-label.highlighted {
+  fill: var(--el-color-primary, #409eff);
+  font-weight: 600;
+  opacity: 1;
+}
+
+.kg-nodes {
+  cursor: grab;
+}
+
+.kg-node-group:active {
+  cursor: grabbing;
+}
+
 .kg-node-group.dimmed {
-  opacity: 0.2;
-}
-.kg-node-group.highlighted .kg-node-circle {
-  fill-opacity: 0.35;
-  stroke-width: 3;
+  opacity: 0.3;
 }
 
 .kg-node-circle {
   transition: all 0.2s ease;
 }
+
+.kg-node-group.highlighted .kg-node-circle {
+  fill-opacity: 0.5;
+  stroke-width: 3;
+}
+
 .kg-node-label {
   text-anchor: middle;
   fill: var(--text-dark, #0f172a);
   font-weight: 500;
   pointer-events: none;
   user-select: none;
-}
-
-/* ===== Fallback 网格视图 ===== */
-.kg-grid-fallback {
-  max-height: 400px;
-  overflow-y: auto;
-}
-.kg-category-groups {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.kg-category-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.kg-category-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.kg-category-nodes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.kg-fallback-tag {
-  padding: 4px 10px;
-  border: 1px solid;
-  border-radius: var(--radius-full, 9999px);
-  background: white;
-  transition: all 0.15s ease;
-}
-.kg-fallback-tag:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
 }
 
 /* ===== 图例 ===== */
@@ -404,11 +408,5 @@ function computeLayout(graph: { nodes: any[]; edges?: any[] }) {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
-}
-
-@media (max-width: 768px) {
-  .kg-svg-wrapper {
-    max-height: 300px;
-  }
 }
 </style>

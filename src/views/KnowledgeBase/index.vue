@@ -20,21 +20,21 @@
           <div class="stat-icon bg-blue"><el-icon><DataBoard /></el-icon></div>
           <div class="stat-info">
             <span class="stat-label">知识库总数</span>
-            <span class="stat-value">{{ kbList.length }}</span>
+            <span class="stat-value">{{ kbStats.knowledgeBaseCount }}</span>
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-icon bg-green"><el-icon><Document /></el-icon></div>
           <div class="stat-info">
             <span class="stat-label">累计文件数</span>
-            <span class="stat-value">{{ totalFiles }}</span>
+            <span class="stat-value">{{ kbStats.fileCount }}</span>
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-icon bg-orange"><el-icon><DataAnalysis /></el-icon></div>
           <div class="stat-info">
             <span class="stat-label">总知识切片</span>
-            <span class="stat-value">{{ totalChunks }}</span>
+            <span class="stat-value">{{ kbStats.chunkCount }}</span>
           </div>
         </div>
       </div>
@@ -187,7 +187,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { uploadKnowledgeBaseCover, createKnowledgeBase, updateKnowledgeBase, getKnowledgeBaseList, KnowledgeBaseListRespVO } from '@/api/knowledgeBase'
+import { uploadKnowledgeBaseCover, createKnowledgeBase, updateKnowledgeBase, getKnowledgeBaseList, getKnowledgeBaseStats, deleteKnowledgeBase, KnowledgeBaseListRespVO, KnowledgeBaseStatsVO } from '@/api/knowledgeBase'
 
 const router = useRouter()
 
@@ -201,9 +201,12 @@ const categories = ['全部', '课程学习', '项目资料', '论文阅读', '�
 
 const kbList = ref<KnowledgeBaseListRespVO[]>([])
 
-// 统计计算
-const totalFiles = computed(() => kbList.value.reduce((sum, item) => sum + (item.fileCount || 0), 0))
-const totalChunks = computed(() => kbList.value.reduce((sum, item) => sum + (item.documentCount || 0), 0))
+// 统计状态
+const kbStats = ref<KnowledgeBaseStatsVO>({
+  knowledgeBaseCount: 0,
+  fileCount: 0,
+  chunkCount: 0
+})
 
 // 获取列表数据
 const fetchKbList = async () => {
@@ -215,8 +218,21 @@ const fetchKbList = async () => {
   }
 }
 
+// 获取统计数据
+const fetchKbStats = async () => {
+  try {
+    const stats = await getKnowledgeBaseStats()
+    if (stats) {
+      kbStats.value = stats
+    }
+  } catch (error) {
+    console.error('获取知识库统计信息失败:', error)
+  }
+}
+
 onMounted(() => {
   fetchKbList()
+  fetchKbStats()
 })
 
 const filteredKBs = computed(() => {
@@ -277,9 +293,15 @@ const handleCommand = (command: string, kb: KnowledgeBaseListRespVO) => {
         type: 'warning',
         confirmButtonClass: 'el-button--danger'
       }
-    ).then(() => {
-      kbList.value = kbList.value.filter(item => item.id !== kb.id)
-      ElMessage.success('删除成功')
+    ).then(async () => {
+      try {
+        await deleteKnowledgeBase(kb.id)
+        ElMessage.success('删除成功')
+        await fetchKbList()
+        await fetchKbStats()
+      } catch (error) {
+        console.error('删除知识库失败', error)
+      }
     }).catch(() => {})
   } else if (command === 'upload') {
     ElMessage.info('假装打开了上传文件抽屉：' + kb.name)
