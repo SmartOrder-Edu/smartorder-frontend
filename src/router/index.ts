@@ -103,6 +103,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '测评中心 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/exam/session',
+    name: 'ExamSession',
+    component: () => import('@/views/ExamSession/index.vue'),
+    meta: { title: '开始测评 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import('@/views/Profile/index.vue'),

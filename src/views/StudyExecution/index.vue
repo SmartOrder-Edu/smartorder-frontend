@@ -331,7 +331,7 @@
       <el-dialog v-model="showAdjustDialog" title="调整学习难度" width="400px">
         <div class="adjust-difficulty">
           <p class="adjust-label">当前难度：<strong>{{ difficultyLevel }}</strong></p>
-          <el-slider v-model="difficultyValue" :min="1" :max="5" :marks="difficultyMarks" />
+          <el-slider v-model="difficultyValue" :min="1" :max="10" :marks="difficultyMarks" />
           <div class="difficulty-desc">
             {{ difficultyDescriptions[difficultyValue - 1] }}
           </div>
@@ -417,29 +417,34 @@ const selectedAnswer = ref<number | null>(null)
 const showResult = ref(false)
 const showAdjustDialog = ref(false)
 const showWhyDialog = ref(false)
-const difficultyValue = ref(3)
+const difficultyValue = ref(5)
 const aiInput = ref('')
 const understandingLevel = ref(65)
 
 const difficultyLevel = computed(() => {
-  const levels = ['入门', '基础', '适中', '提高', '挑战']
+  const levels = ['识记', '简单识别', '概念理解', '基础应用', '综合应用', '典型分析', '进阶分析', '综合设计', '迁移推理', '深层综合']
   return levels[difficultyValue.value - 1]
 })
 
 const difficultyDescriptions = [
-  '详细讲解，简化概念，多用类比和图示',
-  '正常讲解，配合示例，帮助理解基础概念',
-  '标准讲解，结合实例，强调重点和难点',
-  '精简讲解，侧重应用，引入进阶概念',
-  '快速讲解，大量练习，直接挑战高难度问题'
+  '回忆基本知识点，详细讲解基础概念',
+  '识别基础概念，配合简单示例说明',
+  '理解核心原理，正常节奏讲解',
+  '简单场景应用，结合实例练习',
+  '多知识点融合，标准讲解重点难点',
+  '分析典型问题，精简讲解侧重要点',
+  '深入分析推理，引入进阶概念',
+  '设计解决方案，强调综合能力',
+  '跨领域推理，快速节奏高要求',
+  '高阶思维综合，挑战极限深度'
 ]
 
 const difficultyMarks = {
-  1: '入门',
-  2: '基础',
-  3: '适中',
-  4: '提高',
-  5: '挑战'
+  1: '1',
+  3: '3',
+  5: '5',
+  7: '7',
+  10: '10'
 }
 
 const task = ref({
