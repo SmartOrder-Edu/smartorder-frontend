@@ -862,21 +862,21 @@ onMounted(() => {
       text-align: left;
     }
   }
+}
 
-  .graph-dialog-content {
-    height: 75vh;
-    background-color: var(--el-bg-color-page);
-    border-radius: 8px;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    
-    .kg-preview-comp {
-      flex: 1;
-      height: 100%;
-      min-height: 0;
-      overflow: hidden;
-    }
+.graph-dialog-content {
+  height: 75vh;
+  background-color: var(--el-bg-color-page);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  
+  .kg-preview-comp {
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
   }
 }
 </style>

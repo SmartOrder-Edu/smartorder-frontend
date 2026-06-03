@@ -476,7 +476,7 @@ const formatDate = (dateStr?: string) => {
   border-radius: 12px;
   border: 1px solid var(--el-border-color-lighter);
 
-  ::v-deep .search-input {
+  :deep(.search-input) {
     max-width: 300px;
     .el-input__wrapper {
       border-radius: 8px;
@@ -527,7 +527,7 @@ const formatDate = (dateStr?: string) => {
     border-color: var(--kb-color, var(--el-color-primary));
   }
 
-  ::v-deep .el-card__body {
+  :deep(.el-card__body) {
     padding: 20px;
     display: flex;
     flex-direction: column;

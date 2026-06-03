@@ -230,15 +230,28 @@ watch(() => props.graph, () => {
   initGraph()
 }, { deep: true })
 
+let resizeObserver: ResizeObserver | null = null
+
 onMounted(() => {
   initGraph()
   
-  // 监听容器大小变化重置中心点
-  window.addEventListener('resize', handleResize)
+  if (svgWrapper.value) {
+    resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (entry.target === svgWrapper.value) {
+          handleResize()
+        }
+      }
+    })
+    resizeObserver.observe(svgWrapper.value)
+  }
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
+  if (resizeObserver && svgWrapper.value) {
+    resizeObserver.unobserve(svgWrapper.value)
+    resizeObserver.disconnect()
+  }
   if (simulation) simulation.stop()
 })
 
