@@ -81,7 +81,9 @@
             </button>
             <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
           </div>
-          <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
+          <div class="chat-flow">
+            <div class="chat-flow-inner">
+            <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
             <!-- 欢迎消息 -->
             <div class="welcome-message" v-if="messages.length === 0 && !agentStore.loading">
               <div class="welcome-avatar">
@@ -250,9 +252,12 @@
               </div>
             </div>
           </div>
+            </div>
+          </div>
 
           <!-- 底部输入 -->
           <div class="chat-input-area">
+            <div class="chat-flow-inner">
             <div class="input-composer">
               <div class="composer-toolbar">
                 <button class="toolbar-btn" @click="handleUploadClick" title="上传文件（即将上线）">
@@ -310,6 +315,7 @@
                   </span>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </main>
@@ -961,6 +967,18 @@ watch(windowWidth, (newWidth) => {
   min-height: 0;
 }
 
+.chat-flow {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.chat-flow-inner {
+  max-width: min(896px, 100%);
+  margin: 0 auto;
+  width: 100%;
+}
+
 .chat-area-top-bar {
   display: flex;
   align-items: center;
@@ -1004,9 +1022,6 @@ watch(windowWidth, (newWidth) => {
 }
 
 .chat-messages {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
@@ -1097,26 +1112,21 @@ watch(windowWidth, (newWidth) => {
   animation: fadeInUp 0.3s ease;
 }
 
-.message-wrapper.user { flex-direction: row-reverse; }
-
-.message-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(59, 130, 246, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--primary-color);
+.message-wrapper.user {
+  flex-direction: row-reverse;
 }
 
-.message-avatar svg { width: 20px; height: 20px; stroke-width: 2; }
+.message-wrapper.user .message-content {
+  width: fit-content;
+  max-width: 50%;
+}
 
-.message-wrapper.user .message-avatar { background: rgba(59, 91, 219, 0.15); }
+.message-avatar {
+  display: none;
+}
 
 .message-content {
-  max-width: 85%;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
@@ -1129,14 +1139,16 @@ watch(windowWidth, (newWidth) => {
 }
 
 .message-wrapper.ai .message-bubble {
-  background: var(--background-color-base);
-  border-bottom-left-radius: 4px;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
 }
 
 .user-bubble {
-  background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
-  color: white;
+  background: rgba(59, 91, 219, 0.08);
+  color: var(--text-dark);
   border-bottom-right-radius: 4px;
+  padding: var(--spacing-sm) var(--spacing-md);
 }
 
 .message-text {
