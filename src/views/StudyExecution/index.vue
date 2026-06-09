@@ -124,127 +124,74 @@ import { useTaskStepStore } from '@/stores/taskStep'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 
 const route = useRoute()
+const router = useRouter()
+const stepStore = useTaskStepStore()
+const dashStore = useSpaceDashboardStore()
 
-const currentStep = ref(0)
-const selectedAnswer = ref<number | null>(null)
-const showResult = ref(false)
-const showAdjustDialog = ref(false)
-const showWhyDialog = ref(false)
-const difficultyValue = ref(3)
-const aiInput = ref('')
-const understandingLevel = ref(65)
+const finishing = ref(false)
 
-const difficultyLevel = computed(() => {
-  const levels = ['入门', '基础', '适中', '提高', '挑战']
-  return levels[difficultyValue.value - 1]
+const taskId = computed(() => Number(route.params.taskId))
+
+const progressPercent = computed(() => {
+  if (!stepStore.steps.length) return 0
+  return Math.round(stepStore.completedSteps / stepStore.steps.length * 100)
 })
 
-const difficultyDescriptions = [
-  '详细讲解，简化概念，多用类比和图示',
-  '正常讲解，配合示例，帮助理解基础概念',
-  '标准讲解，结合实例，强调重点和难点',
-  '精简讲解，侧重应用，引入进阶概念',
-  '快速讲解，大量练习，直接挑战高难度问题'
-]
-
-const difficultyMarks = {
-  1: '入门',
-  2: '基础',
-  3: '适中',
-  4: '提高',
-  5: '挑战'
-}
-
-const task = ref({
-  id: route.params.taskId || 1,
-  title: '进程与线程的核心概念',
-  minutes: 15
+const agentHint = computed(() => {
+  const step = stepStore.currentStep
+  if (!step) return ''
+  if (step.stepType === 'practice') return '练习模式：遇到问题随时问我，或点击下方按钮'
+  if (step.stepType === 'review') return '复习模式：快速回顾知识点，标记需要加强的部分'
+  return '学习模式：用心理解每个概念，有问题随时提问'
 })
 
-const steps = ref([
-  {
-    id: 1, title: '阅读概念讲解', type: 'review', typeName: '复习', done: true,
-    reason: '系统检测到你对"进程"概念理解不够深入',
-    content: { definition: '进程是程序的一次执行实例，是操作系统资源分配和调度的基本单位。', features: ['动态性', '并发性', '独立性', '异步性'] }
-  },
-  {
-    id: 2, title: '完成同步互斥练习题', type: 'practice', typeName: '练习', done: false,
-    reason: '你的 PV 操作正确率上周下降了 15%，需要专项练习',
-    questions: [
-      { text: 'PV 操作用于解决什么问题？', options: ['文件管理', '进程同步与互斥', '内存分配', '设备管理'], answer: 1, explanation: 'PV 操作是 Dijkstra 提出的用于解决进程同步与互斥问题的经典方法。' },
-      { text: '当信号量 S > 0 时，表示？', options: ['有 S 个资源可用', '有 S 个进程在等待', '临界区已加锁', '临界区已解锁'], answer: 0, explanation: '信号量 S 的值表示当前可用资源的数量。' },
-      { text: 'P 操作的本质是？', options: ['申请一个资源', '释放一个资源', '创建新进程', '终止进程'], answer: 0, explanation: 'P 操作（wait）将信号量减 1，如果小于 0 则阻塞。' },
-      { text: 'V 操作的本质是？', options: ['申请一个资源', '释放一个资源', '创建新进程', '终止进程'], answer: 1, explanation: 'V 操作（signal）将信号量加 1，如果小于等于 0 则唤醒等待队列中的进程。' },
-      { text: '二值信号量的取值范围是？', options: ['0 ~ 1', '-1 ~ 0', '0 ~ N', '1 ~ N'], answer: 0, explanation: '二值信号量（互斥锁）只有 0 和 1 两个取值，用于实现互斥。' }
-    ]
-  },
-  {
-    id: 3, title: '查看信号量图解讲义', type: 'resource', typeName: '资源', done: false,
-    reason: '你偏好可视化学习方式，系统优先推荐图解资源'
+function stepTypeLabel(t: string) {
+  const m: Record<string, string> = { learn: '学习', practice: '练习', review: '复习', rest: '休息' }
+  return m[t] || t
+}
+
+function renderContent(markdown: string): string {
+  if (!markdown) return ''
+  // Simple markdown-to-HTML conversion
+  return markdown
+    .replace(/### (.+)/g, '<h4>$1</h4>')
+    .replace(/## (.+)/g, '<h3>$1</h3>')
+    .replace(/# (.+)/g, '<h2>$1</h2>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n- (.+)/g, '\n<li>$1</li>')
+    .replace(/<li>.*<\/li>\n<li>/gs, (m: string) => '<ul>' + m + '</ul>')
+    .replace(/\n\n/g, '<br/><br/>')
+    .replace(/---/g, '<hr/>')
+    .replace(/\$\$([^$]+)\$\$/g, '<div class="math-block">$1</div>')
+    .replace(/\$([^$]+)\$/g, '<span class="math-inline">$1</span>')
+    .replace(/\n/g, '<br/>')
+}
+
+function handleFeedback(label: string) {
+  ElMessage.success(`已触发：${label}`)
+  // TODO: post to Agent with the current step context
+}
+
+function handleAgentMessage(text: string) {
+  console.log('Study agent message:', text)
+}
+
+function handleFinish() {
+  finishing.value = true
+  setTimeout(() => {
+    // Navigate back to space detail
+    router.back()
+    ElMessage.success('学习任务已完成！')
+    finishing.value = false
+  }, 800)
+}
+
+onMounted(async () => {
+  const id = taskId.value
+  if (id && !isNaN(id)) {
+    await stepStore.fetchSteps(id)
   }
-])
-
-const currentQuestion = ref(0)
-const currentStepData = computed(() => steps.value[currentStep.value])
-
-const completedSteps = computed(() => steps.value.filter(s => s.done).length)
-
-const isCorrect = computed(() => {
-  const qs = currentStepData.value.questions
-  if (!qs) return false
-  return selectedAnswer.value === qs[currentQuestion.value]?.answer
 })
-
-const aiMessages = ref([
-  { role: 'ai', content: '当前学习内容：进程与线程的核心概念。如果有任何不懂的地方，随时问我。' }
-])
-
-const quickActions = [
-  { id: 1, label: '举一个生活中的例子' },
-  { id: 2, label: '生成对比表格' },
-  { id: 3, label: '解释专业术语' },
-  { id: 4, label: '推荐相关视频' }
-]
-
-const selectAnswer = (idx: number) => {
-  selectedAnswer.value = idx
-}
-
-const submitAnswer = () => {
-  showResult.value = true
-}
-
-const nextQuestion = () => {
-  if (currentQuestion.value < (currentStepData.value.questions?.length || 5) - 1) {
-    currentQuestion.value++
-    selectedAnswer.value = null
-    showResult.value = false
-  }
-}
-
-const markComplete = () => {
-  steps.value[currentStep.value].done = true
-  if (currentStep.value < steps.value.length - 1) {
-    currentStep.value++
-  }
-}
-
-const applyDifficulty = () => {
-  showAdjustDialog.value = false
-}
-
-const handleAIAction = (action: any) => {
-  aiMessages.value.push({ role: 'ai', content: `好的，我来帮你${action.label}...` })
-}
-
-const sendAI = () => {
-  if (!aiInput.value.trim()) return
-  aiMessages.value.push({ role: 'user', content: aiInput.value })
-  aiMessages.value.push({ role: 'ai', content: '让我结合你的学习进度为你详细解答...' })
-  aiInput.value = ''
-}
-
-const showNodeDetail = (node: string) => { }
 </script>
 
 <style scoped lang="scss">
