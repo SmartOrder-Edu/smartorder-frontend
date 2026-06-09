@@ -1427,9 +1427,15 @@ watch(windowWidth, (newWidth) => {
 
 .footer-hints {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   justify-content: flex-end;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+  mask-image: linear-gradient(to right, transparent 0%, black 6px, black calc(100% - 6px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 6px, black calc(100% - 6px), transparent 100%);
 }
 
 .hint-chip {
@@ -1442,6 +1448,7 @@ watch(windowWidth, (newWidth) => {
   cursor: pointer;
   transition: all var(--transition-fast);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .hint-chip:hover {
@@ -1615,9 +1622,6 @@ watch(windowWidth, (newWidth) => {
   }
   .footer-hints {
     justify-content: flex-start;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
   }
 }
 </style>
