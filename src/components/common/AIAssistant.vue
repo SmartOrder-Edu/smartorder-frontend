@@ -51,6 +51,8 @@
         <span class="assistant-name">学习助手</span>
         <span class="assistant-status">在线 · 随时帮你</span>
       </div>
+      <!-- 收起状态悬浮提示文字 -->
+      <span class="hover-label" v-if="!assistantExpanded">AI 学习助手</span>
       <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="18,15 12,9 6,15" v-if="assistantExpanded"/>
       </svg>
@@ -399,27 +401,44 @@ const handleQuickAction = (action: any) => {
               box-shadow 0.3s ease;
 }
 
-/* 收起状态：圆角方形小按钮 */
+/* 收起状态：完美圆形悬浮球 */
 .ai-assistant:not(.expanded) {
-  width: 52px;
-  border-radius: 16px;
+  width: 56px;
+  border-radius: 50%;
   box-shadow: 
-    0 4px 20px rgba(59, 130, 246, 0.25),
-    0 0 0 2px rgba(59, 130, 246, 0.1);
-  transition: width 0.32s cubic-bezier(0.4, 0, 0.2, 1) 0.16s,
-              border-radius 0.32s cubic-bezier(0.4, 0, 0.2, 1) 0.16s,
+    0 8px 24px rgba(79, 110, 246, 0.28),
+    0 0 0 2px rgba(79, 110, 246, 0.12);
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              border-radius 0.35s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow 0.3s ease;
+  animation: orbBreathing 3s infinite ease-in-out;
+}
+
+@keyframes orbBreathing {
+  0%, 100% {
+    box-shadow: 
+      0 8px 24px rgba(79, 110, 246, 0.28),
+      0 0 0 2px rgba(79, 110, 246, 0.12);
+  }
+  50% {
+    box-shadow: 
+      0 12px 30px rgba(79, 110, 246, 0.42),
+      0 0 0 4px rgba(79, 110, 246, 0.22);
+  }
 }
 
 .ai-assistant:not(.expanded):hover {
+  width: 146px; /* 悬停展开长条形 */
+  border-radius: 28px;
   box-shadow: 
-    0 6px 28px rgba(59, 130, 246, 0.35),
-    0 0 0 3px rgba(59, 130, 246, 0.15);
-  transform: translateY(-1px);
+    0 10px 28px rgba(79, 110, 246, 0.38),
+    0 0 0 2px rgba(79, 110, 246, 0.2);
+  animation: none; /* 悬停时停止呼吸阴影 */
 }
 
-.ai-assistant:not(.expanded):active {
-  transform: translateY(0) scale(0.97);
+/* 交互点击缩放反馈，应用在内部 header 上以避免 transform 冲突 */
+.ai-assistant:not(.expanded) .assistant-header:active {
+  transform: scale(0.95);
 }
 
 /* header 条 */
@@ -495,7 +514,26 @@ const handleQuickAction = (action: any) => {
 }
 
 .ai-assistant:not(.expanded) .assistant-avatar .online-dot {
-  border-color: #3b5bdb;
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+/* 悬停文本提示样式 */
+.hover-label {
+  color: white;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.03em;
+}
+
+.ai-assistant:not(.expanded):hover .hover-label {
+  opacity: 1;
+  max-width: 90px;
+  margin-left: 6px;
 }
 
 /* 展开时的文本和图标 */
