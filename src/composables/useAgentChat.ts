@@ -78,7 +78,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   /**
    * 发送消息给 Agent（使用 fetch-event-source POST SSE）
    */
-  const sendMessage = async (message: string) => {
+  const sendMessage = async (message: string, fileIds: number[] = []) => {
     if (!message.trim() || agentStore.loading) return
 
     // 添加用户消息到本地列表
@@ -113,6 +113,7 @@ export function useAgentChat(scrollCallback?: () => void) {
         body: JSON.stringify({
           message,
           conversationId: agentStore.currentConversationId || undefined,
+          fileIds,
         }),
         openWhenHidden: true,
         signal: abortController.signal,

@@ -3,6 +3,7 @@ import request from './request'
 export interface AgentChatRequest {
   message: string
   conversationId?: string
+  fileIds?: number[]
 }
 
 export interface PlanConfirmRequest {

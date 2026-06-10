@@ -260,18 +260,46 @@
             <div class="chat-flow-inner">
             <div class="input-composer">
               <div class="composer-toolbar">
-                <button class="toolbar-btn" @click="handleUploadClick" title="上传文件（即将上线）">
+                <button class="toolbar-btn" @click="handleUploadClick" title="上传文件">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                   </svg>
                   <span>上传</span>
                 </button>
+                <input
+                  ref="fileInputRef"
+                  class="hidden-file-input"
+                  type="file"
+                  multiple
+                  @change="handleFileSelected"
+                />
                 <button class="toolbar-btn" @click="handleContextClick" title="设置上下文（即将上线）">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                   </svg>
                   <span>上下文</span>
                 </button>
+              </div>
+              <div class="attachment-strip" v-if="attachments.length || uploadProgress.status !== 'idle'">
+                <div class="attachment-chip uploading" v-if="uploadProgress.status !== 'idle' && uploadProgress.status !== 'success'">
+                  <span class="attachment-name">{{ uploadProgress.statusText || '正在上传附件...' }}</span>
+                  <span class="attachment-status">{{ uploadProgress.percentage }}%</span>
+                </div>
+                <div
+                  v-for="att in attachments"
+                  :key="att.fileId"
+                  class="attachment-chip"
+                  :class="att.status"
+                >
+                  <span class="attachment-name">{{ att.fileName }}</span>
+                  <span class="attachment-status">{{ attachmentStatusLabel(att) }}</span>
+                  <button class="attachment-remove" @click="removeAttachment(att)" title="移除附件">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div class="composer-body">
                 <textarea
@@ -359,13 +387,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAgentChat } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationVO } from '@/api/agent'
 import { agentApi } from '@/api/agent'
+import { agentAttachmentApi, type AttachmentStatus } from '@/api/agentAttachment'
 import type { AgentTraceEvent, ReasoningSegment } from '@/stores/agent'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
@@ -375,6 +404,7 @@ import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
+import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
@@ -382,9 +412,13 @@ const agentStore = useAgentStore()
 const inputMessage = ref('')
 const chatContainer = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
+const fileInputRef = ref<HTMLInputElement>()
 const activeContext = ref('global')
 const historySidebarOpen = ref(false)
 const copiedIndex = ref<number | null>(null)
+const attachments = ref<AttachmentStatus[]>([])
+const pollingTimers = new Map<number, number>()
+const { upload: uploadAttachment, uploadProgress, resetProgress } = useAgentAttachmentUpload()
 
 const { width: windowWidth } = useWindowSize()
 const isMobile = computed(() => windowWidth.value < 768)
@@ -414,7 +448,6 @@ const {
   cancelPlan,
   loadConversation,
   startNewConversation,
-  clearMessages: agentClear,
   deleteConversation
 } = useAgentChat(scrollToBottom)
 
@@ -547,9 +580,13 @@ const autoResize = () => {
 
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || agentStore.loading) return
+  if (attachments.value.some(a => a.status === 'processing' || a.status === 'uploading')) {
+    ElMessage.warning('附件仍在解析中，请稍后再提问')
+    return
+  }
   const msg = inputMessage.value
   inputMessage.value = ''
-  await agentSend(msg)
+  await agentSend(msg, readyAttachmentIds.value)
 }
 
 const sendQuickMessage = (msg: string) => {
@@ -559,6 +596,7 @@ const sendQuickMessage = (msg: string) => {
 
 const handleNewChat = async () => {
   startNewConversation()
+  clearAttachmentState()
   await agentStore.fetchConversations()
 }
 
@@ -590,8 +628,126 @@ const handleDeleteConversation = async (conv: ConversationVO) => {
   }
 }
 
+const readyAttachmentIds = computed(() => {
+  return attachments.value
+    .filter(att => att.status === 'ready')
+    .map(att => att.fileId)
+})
+
 const handleUploadClick = () => {
-  ElMessage.info('文件上传功能即将上线，敬请期待')
+  fileInputRef.value?.click()
+}
+
+const handleFileSelected = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ''
+  if (!files.length) return
+
+  for (const file of files) {
+    try {
+      const result = await uploadAttachment(file, agentStore.currentConversationId || undefined)
+      if (result.conversationId && !agentStore.currentConversationId) {
+        agentStore.currentConversationId = result.conversationId
+      }
+      if (result.fileId) {
+        upsertAttachment({
+          conversationId: result.conversationId,
+          fileId: result.fileId,
+          jobId: result.jobId,
+          fileName: result.fileName || file.name,
+          fileSize: file.size,
+          status: result.status || 'processing',
+          parseStatus: result.parseStatus,
+          chunkStatus: result.chunkStatus,
+          embeddingStatus: result.embeddingStatus,
+          progress: result.progress,
+          currentStep: result.currentStep,
+          errorMessage: result.errorMessage,
+        })
+        startAttachmentPolling(result.conversationId, result.fileId)
+      }
+      ElMessage.success(`${file.name} 已上传，正在解析`)
+    } catch (error: any) {
+      ElMessage.error(error?.message || `${file.name} 上传失败`)
+    }
+  }
+  setTimeout(resetProgress, 800)
+}
+
+const upsertAttachment = (attachment: AttachmentStatus) => {
+  const index = attachments.value.findIndex(att => att.fileId === attachment.fileId)
+  if (index >= 0) {
+    attachments.value[index] = { ...attachments.value[index], ...attachment }
+  } else {
+    attachments.value.push(attachment)
+  }
+}
+
+const startAttachmentPolling = (conversationId: string, fileId: number) => {
+  if (pollingTimers.has(fileId)) {
+    window.clearInterval(pollingTimers.get(fileId))
+  }
+  const poll = async () => {
+    try {
+      const status = await agentAttachmentApi.getStatus(conversationId, fileId)
+      upsertAttachment(status)
+      if (status.status === 'ready' || status.status === 'failed' || status.status === 'deleted') {
+        const timer = pollingTimers.get(fileId)
+        if (timer) {
+          window.clearInterval(timer)
+          pollingTimers.delete(fileId)
+        }
+      }
+    } catch (e) {
+      console.warn('[AITutor] 附件状态轮询失败:', e)
+    }
+  }
+  poll()
+  pollingTimers.set(fileId, window.setInterval(poll, 2500))
+}
+
+const loadConversationAttachments = async (conversationId: string) => {
+  try {
+    const list = await agentAttachmentApi.list(conversationId)
+    attachments.value = list || []
+    attachments.value
+      .filter(att => att.status === 'processing' || att.status === 'uploading')
+      .forEach(att => startAttachmentPolling(conversationId, att.fileId))
+  } catch (e) {
+    console.warn('[AITutor] 加载附件失败:', e)
+    attachments.value = []
+  }
+}
+
+const removeAttachment = async (attachment: AttachmentStatus) => {
+  try {
+    await agentAttachmentApi.remove(attachment.conversationId, attachment.fileId)
+    attachments.value = attachments.value.filter(att => att.fileId !== attachment.fileId)
+    const timer = pollingTimers.get(attachment.fileId)
+    if (timer) {
+      window.clearInterval(timer)
+      pollingTimers.delete(attachment.fileId)
+    }
+  } catch {
+    ElMessage.error('移除附件失败，请重试')
+  }
+}
+
+const attachmentStatusLabel = (attachment: AttachmentStatus) => {
+  if (attachment.status === 'ready') return '可提问'
+  if (attachment.status === 'failed') return '解析失败'
+  if (attachment.progress != null) return `${attachment.currentStep || '解析中'} ${attachment.progress}%`
+  return '解析中'
+}
+
+const clearAttachmentState = () => {
+  for (const timer of pollingTimers.values()) {
+    window.clearInterval(timer)
+  }
+  pollingTimers.clear()
+  attachments.value = []
+  resetProgress()
 }
 
 const handleContextClick = () => {
@@ -632,6 +788,7 @@ const copyMessage = async (content: string) => {
 
 const loadConversationFromSidebar = async (conv: ConversationVO) => {
   await loadConversation(conv.conversationId)
+  await loadConversationAttachments(conv.conversationId)
   if (isMobile.value) {
     historySidebarOpen.value = false
   }
@@ -816,6 +973,10 @@ onMounted(() => {
   if (window.innerWidth < 768) {
     historySidebarOpen.value = false
   }
+})
+
+onUnmounted(() => {
+  clearAttachmentState()
 })
 
 watch(windowWidth, (newWidth) => {
@@ -1316,6 +1477,10 @@ watch(windowWidth, (newWidth) => {
   padding: 6px 8px 0;
 }
 
+.hidden-file-input {
+  display: none;
+}
+
 .toolbar-btn {
   display: flex;
   align-items: center;
@@ -1334,6 +1499,83 @@ watch(windowWidth, (newWidth) => {
 .toolbar-btn:hover {
   background: rgba(59, 91, 219, 0.06);
   color: var(--primary-color);
+}
+
+.attachment-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px 0;
+}
+
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 8px;
+  border: 1px solid #dbe3ef;
+  background: white;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.attachment-chip.ready {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.attachment-chip.processing,
+.attachment-chip.uploading {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.attachment-chip.failed {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
+.attachment-status {
+  color: inherit;
+  opacity: 0.78;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+}
+
+.attachment-remove {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.attachment-remove:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.attachment-remove svg {
+  width: 12px;
+  height: 12px;
 }
 
 .composer-body {
