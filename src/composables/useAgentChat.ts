@@ -114,6 +114,24 @@ export function useAgentChat(scrollCallback?: () => void) {
     abortController = new AbortController()
 
     try {
+      // 从 references 中提取 fileIds 和 knowledgeBaseIds
+      let fileIds: number[] | undefined
+      let knowledgeBaseIds: number[] | undefined
+
+      if (references && references.length > 0) {
+        // 提取文件ID（type为'file'的引用）
+        const files = references.filter(r => r.type === 'file')
+        if (files.length > 0) {
+          fileIds = files.map(r => parseInt(r.id))
+        }
+
+        // 提取知识库ID（type为'kb'的引用）
+        const kbs = references.filter(r => r.type === 'kb')
+        if (kbs.length > 0) {
+          knowledgeBaseIds = kbs.map(r => parseInt(r.id))
+        }
+      }
+
       await fetchEventSource(`${base}/agent/chat/stream`, {
         method: 'POST',
         headers: {
@@ -123,11 +141,8 @@ export function useAgentChat(scrollCallback?: () => void) {
         body: JSON.stringify({
           message,
           conversationId: agentStore.currentConversationId || undefined,
-          references: references && references.length > 0 ? references.map(r => ({
-            id: r.id,
-            type: r.type,
-            name: r.name,
-          })) : undefined,
+          fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
+          knowledgeBaseIds: knowledgeBaseIds && knowledgeBaseIds.length > 0 ? knowledgeBaseIds : undefined,
         }),
         openWhenHidden: true,
         signal: abortController.signal,
