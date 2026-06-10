@@ -6,6 +6,14 @@ import { refreshAccessToken } from '@/api/request'
 
 export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT'
 
+export interface RagReference {
+  id: string
+  name: string
+  type: 'kb' | 'file'
+  kbId?: string
+  kbName?: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'ai'
   content: string
@@ -19,6 +27,7 @@ export interface ChatMessage {
   timestamp: number
   planSummary?: PlanSummary
   executionSteps?: ExecutionStep[]
+  references?: RagReference[]
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -78,7 +87,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   /**
    * 发送消息给 Agent（使用 fetch-event-source POST SSE）
    */
-  const sendMessage = async (message: string) => {
+  const sendMessage = async (message: string, references?: RagReference[]) => {
     if (!message.trim() || agentStore.loading) return
 
     // 添加用户消息到本地列表
@@ -86,6 +95,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       role: 'user',
       content: message,
       timestamp: Date.now(),
+      references: references && references.length > 0 ? [...references] : undefined,
     })
 
     agentStore.startNewTurn()
@@ -113,6 +123,11 @@ export function useAgentChat(scrollCallback?: () => void) {
         body: JSON.stringify({
           message,
           conversationId: agentStore.currentConversationId || undefined,
+          references: references && references.length > 0 ? references.map(r => ({
+            id: r.id,
+            type: r.type,
+            name: r.name,
+          })) : undefined,
         }),
         openWhenHidden: true,
         signal: abortController.signal,
