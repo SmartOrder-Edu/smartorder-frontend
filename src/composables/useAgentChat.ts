@@ -19,6 +19,8 @@ export interface ChatMessage {
   timestamp: number
   planSummary?: PlanSummary
   executionSteps?: ExecutionStep[]
+  /** 本条消息关联的附件文件ID列表 */
+  attachmentFileIds?: number[]
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -86,6 +88,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       role: 'user',
       content: message,
       timestamp: Date.now(),
+      attachmentFileIds: fileIds.length > 0 ? [...fileIds] : undefined,
     })
 
     agentStore.startNewTurn()
@@ -316,6 +319,18 @@ export function useAgentChat(scrollCallback?: () => void) {
           content: msg.content || '',
           traceId: msg.traceId || undefined,
           timestamp: new Date(msg.createTime).getTime(),
+        }
+
+        // 解析附件文件ID列表
+        if (msg.attachmentFileIds) {
+          try {
+            const parsed = JSON.parse(msg.attachmentFileIds)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              chatMsg.attachmentFileIds = parsed
+            }
+          } catch {
+            // 解析失败忽略
+          }
         }
 
         if (msg.role === 'assistant') {

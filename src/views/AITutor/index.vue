@@ -154,7 +154,15 @@
                   </template>
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
-                  <p v-else class="message-text">{{ msg.content }}</p>
+                  <template v-else>
+                    <p class="message-text">{{ msg.content }}</p>
+                    <div v-if="msg.attachmentFileIds?.length" class="message-attachment-hint">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                      <span>{{ msg.attachmentFileIds.length }}个附件</span>
+                    </div>
+                  </template>
 
                   <!-- 资源卡片 -->
                   <div v-if="msg.resources" class="message-resources">
@@ -1315,6 +1323,19 @@ watch(windowWidth, (newWidth) => {
 .message-text {
   white-space: pre-wrap;
   margin: 0;
+}
+
+.message-attachment-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  width: fit-content;
 }
 
 /* 流式光标 */

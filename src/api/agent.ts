@@ -49,6 +49,8 @@ export interface MessageVO {
   reasoningContent?: string
   /** 思考分段 JSON 字符串（与工具调用交错） */
   reasoningSegments?: string
+  /** 本条消息关联的附件文件ID列表，JSON数组格式如[1,2,3] */
+  attachmentFileIds?: string
   createTime: string
 }
 
