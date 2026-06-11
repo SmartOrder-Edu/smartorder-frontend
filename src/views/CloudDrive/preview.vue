@@ -1,5 +1,5 @@
 <template>
-  <div class="standalone-preview-page" :class="[currentTheme + '-theme']" v-loading="loading" element-loading-text="正在加载在线预览内容...">
+  <div class="standalone-preview-page" :class="[currentTheme + '-theme', { 'is-embedded': isEmbedded }]" v-loading="loading" element-loading-text="正在加载在线预览内容...">
     <!-- 顶部极客磨砂工具栏 -->
     <div class="preview-toolbar" v-if="fileName">
       <div class="toolbar-left">
@@ -324,7 +324,13 @@
           </div>
 
           <!-- 右侧浮动文档大纲 TOC -->
-          <div class="markdown-toc-sidebar" v-show="showToc" v-if="!mdSourceMode && markdownToc.length > 0">
+          <div 
+            class="markdown-toc-sidebar" 
+            :class="{ 'is-hover-floating': !showToc && isTocHovered }"
+            v-show="showToc || (!showToc && isTocHovered)" 
+            v-if="!mdSourceMode && markdownToc.length > 0"
+            @mouseleave="handleTocMouseLeave"
+          >
             <div class="toc-sidebar-header">
               <span class="toc-title">大纲</span>
               <div class="toc-actions">
@@ -347,6 +353,22 @@
                 <span class="toc-bullet">▾</span>
                 <span class="toc-text" :title="item.text">{{ item.text }}</span>
               </div>
+            </div>
+          </div>
+
+          <!-- 右侧滑动唤出大纲触发感知带 -->
+          <div 
+            v-if="!showToc && !mdSourceMode && markdownToc.length > 0" 
+            class="markdown-toc-hover-trigger"
+            @mouseenter="isTocHovered = true"
+          >
+            <div class="hover-trigger-bar">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" class="trigger-icon">
+                <line x1="4" y1="6" x2="20" y2="6"></line>
+                <line x1="4" y1="12" x2="20" y2="12"></line>
+                <line x1="4" y1="18" x2="20" y2="18"></line>
+              </svg>
+              <span class="trigger-text">大纲</span>
             </div>
           </div>
         </div>
@@ -554,6 +576,7 @@ const fileSize = ref(Number(route.query.size || 0))
 const fileExt = ref(fileName.value.split('.').pop()?.toLowerCase() || '')
 
 // 状态声明
+const isEmbedded = ref(window.self !== window.top)
 const loading = ref(true)
 const initialized = ref(false)
 const previewUrl = ref('')
@@ -690,6 +713,13 @@ const adjustDocxZoom = (delta: number) => {
 // ==================== 6. Markdown 双态视图与目录 TOC ====================
 const mdSourceMode = ref(false)
 const showToc = ref(true)
+const isTocHovered = ref(false)
+
+const handleTocMouseLeave = () => {
+  if (!showToc.value) {
+    isTocHovered.value = false
+  }
+}
 const previewMarkdownSource = ref('')
 const previewMarkdownHtml = ref('')
 interface TocItem {
@@ -1230,7 +1260,11 @@ const handleDownload = () => {
 }
 
 const handleClose = () => {
-  window.close()
+  if (window.self !== window.top) {
+    window.parent.postMessage({ type: 'close-preview' }, '*')
+  } else {
+    window.close()
+  }
 }
 
 const copyTextSuccess = ref(false)
@@ -1370,6 +1404,23 @@ const handleCopyText = async () => {
     opacity: 0.65;
     pointer-events: none;
     z-index: 1;
+  }
+  
+  /* 处于iframe嵌入模式下时微调内边距和顶栏高度，以让界面更显紧凑精致 */
+  &.is-embedded {
+    .preview-toolbar {
+      height: 52px;
+      padding: 0 18px;
+    }
+    
+    .preview-viewport {
+      height: calc(100vh - 52px) !important;
+    }
+    
+    /* 优雅隐藏内部原本的多余蓝色实心“关闭预览”按钮，交给Dialog统一的高级毛玻璃浮动按钮 */
+    .close-btn {
+      display: none !important;
+    }
   }
 }
 
@@ -2107,28 +2158,21 @@ const handleCopyText = async () => {
   display: flex;
   flex-direction: column;
   padding: 16px 24px;
-  background: #ffffff !important; /* 全局统一白色背景 */
-  
-  .dark-theme & {
-    background: #121212 !important; /* 暗夜极致哑光黑底 */
-  }
+  background: transparent !important; /* 透出底层极光渐变背景，使全局背景颜色一致 */
 }
 
 /* 语雀级面包屑控制栏 */
 .markdown-control-bar {
-  background: #ffffff;
-  border-bottom: 1px solid var(--border-color);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--glass-border);
   padding: 10px 24px;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-  
-  .dark-theme & {
-    background: #1e1e22;
-  }
+  box-shadow: 0 1px 3px var(--shadow-color);
 }
 
 .md-bar-left {
@@ -2230,6 +2274,7 @@ const handleCopyText = async () => {
   gap: 24px;
   overflow: hidden;
   min-height: 0;
+  position: relative;
 }
 
 .markdown-raw-editor {
@@ -2280,21 +2325,14 @@ const handleCopyText = async () => {
   }
 }
 
-/* 精致白色卡片纸张视口 */
-/* 完全融入背景的视口 */
 .markdown-rendered-view {
   flex: 1;
   height: 100%;
   overflow-y: auto;
   padding: 40px 60px 80px; /* 顶部/左右留白 */
-  background: #ffffff !important; 
+  background: transparent !important; 
   border: none;
   box-shadow: none; 
-  
-  .dark-theme & {
-    background: #121212 !important; 
-    box-shadow: none;
-  }
 }
 
 /* 语雀文档大标题及元信息区 */
@@ -2368,6 +2406,27 @@ const handleCopyText = async () => {
   flex-direction: column;
   box-shadow: none !important;
   flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &.is-hover-floating {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    height: 100%;
+    background: var(--glass-bg) !important;
+    backdrop-filter: blur(25px);
+    border-left: 1px solid var(--glass-border) !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15) !important;
+    z-index: 1000;
+    padding-top: 60px; /* 留出顶部大标题间隙 */
+    animation: tocSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    
+    .dark-theme & {
+      background: rgba(30, 30, 34, 0.75) !important;
+      border-left-color: rgba(255, 255, 255, 0.08) !important;
+    }
+  }
   
   .toc-sidebar-header {
     display: flex;
@@ -2456,6 +2515,87 @@ const handleCopyText = async () => {
     &.level-3 { 
       padding-left: 32px;
     }
+  }
+}
+
+/* 右侧滑动唤出大纲触发感知带 */
+.markdown-toc-hover-trigger {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99;
+  cursor: pointer;
+  
+  .hover-trigger-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 120px;
+    width: 24px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--glass-border);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    writing-mode: vertical-lr;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.2;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.05);
+    
+    .trigger-icon {
+      transform: rotate(0deg);
+      transition: transform 0.3s;
+      margin-bottom: 4px;
+    }
+  }
+  
+  &:hover {
+    .hover-trigger-bar {
+      opacity: 0.95;
+      background: rgba(255, 255, 255, 0.85);
+      color: #1677ff;
+      border-color: rgba(22, 119, 255, 0.2);
+      box-shadow: -4px 0 15px rgba(22, 119, 255, 0.15);
+      
+      .trigger-icon {
+        transform: rotate(90deg);
+      }
+    }
+  }
+  
+  .dark-theme & {
+    .hover-trigger-bar {
+      background: rgba(30, 30, 34, 0.45);
+      border-color: rgba(255, 255, 255, 0.08);
+      
+      &:hover {
+        background: rgba(30, 30, 34, 0.85);
+        color: #38bdf8;
+        border-color: rgba(56, 189, 248, 0.3);
+        box-shadow: -4px 0 15px rgba(56, 189, 248, 0.15);
+      }
+    }
+  }
+}
+
+@keyframes tocSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 
@@ -2616,7 +2756,7 @@ const handleCopyText = async () => {
     }
     
     .copy-code-btn:hover {
-      background: var(--btn-hover);
+      background: var(--btn-hover-bg);
       color: var(--text-primary);
     }
 

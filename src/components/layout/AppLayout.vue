@@ -423,6 +423,19 @@ const bottomMenuItems = [
     path: '/cloud-drive',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>'
   }
+  /* ,
+  {
+    id: 'admin-feedback',
+    label: '反馈智能管理',
+    path: '/admin/feedback',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M9 10h6"/><path d="M9 14h6"/></svg>'
+  },
+  {
+    id: 'admin-prize',
+    label: '反馈奖品管理',
+    path: '/admin/prize',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><path d="M12 12h.01"/></svg>'
+  } */
 ]
 
 const isActive = (path: string) => {
@@ -453,7 +466,7 @@ const goSettings = () => {
 }
 const goFeedback = () => {
   showUserMenu.value = false
-  ElMessage.info('问题反馈页面开发中')
+  router.push('/feedback')
 }
 
 const handleLogout = async () => {
