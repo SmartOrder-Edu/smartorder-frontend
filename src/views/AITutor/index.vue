@@ -81,9 +81,9 @@
             </button>
             <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
           </div>
-          <div class="chat-flow">
+          <div class="chat-flow" ref="chatContainer">
             <div class="chat-flow-inner">
-            <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
+            <div class="chat-messages" v-loading="loadingHistory">
             <!-- 欢迎消息 -->
             <div class="welcome-message" v-if="messages.length === 0 && !agentStore.loading">
               <div class="welcome-avatar">
