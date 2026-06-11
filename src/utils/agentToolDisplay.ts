@@ -25,8 +25,9 @@ const TOOL_META: Record<string, ToolDisplayMeta> = {
   queryLearningProgress:  { label: '学习进度',  icon: 'TrendCharts', riskLevel: 'read' },
   queryTasks:             { label: '学习任务',  icon: 'List',        riskLevel: 'read' },
   manageLearningTask:     { label: '学习计划',  icon: 'EditPen',     riskLevel: 'write_draft' },
-  generateResource:       { label: '学习资料',  icon: 'Document',    riskLevel: 'write_draft' },
-  generateQuiz:           { label: '练习题',    icon: 'Edit',        riskLevel: 'write_draft' },
+  manageLearningPlan:     { label: '学习规划',  icon: 'EditPen',     riskLevel: 'write_confirmed' },
+  generateResource:       { label: '学习资料',  icon: 'Document',    riskLevel: 'write_confirmed' },
+  generateQuiz:           { label: '练习题',    icon: 'Edit',        riskLevel: 'write_confirmed' },
   // 兼容旧名字（LangChain4j @Tool 注册名）
   profile_tool:           { label: '学习画像',  icon: 'User',        riskLevel: 'read' },
   knowledge_search_tool:  { label: '知识图谱',  icon: 'Connection',  riskLevel: 'read' },

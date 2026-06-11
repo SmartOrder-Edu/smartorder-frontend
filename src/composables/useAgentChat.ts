@@ -4,7 +4,7 @@ import { useAgentStore, type AgentTraceEvent, type ToolCallState, type Reasoning
 import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
 
-export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT'
+export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT' | 'PLAN_THEN_REACT'
 
 export interface ChatMessage {
   role: 'user' | 'ai'

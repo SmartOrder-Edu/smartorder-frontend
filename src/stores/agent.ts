@@ -233,8 +233,46 @@ export const useAgentStore = defineStore('agent', () => {
 
       case 'agent.plan.created':
         currentDraftId.value = data.payload?.draftId || ''
-        currentPlan.value = data.payload?.plan || null
+        currentPlan.value = data.payload?.taskList || data.payload?.plan || null
         planDialogVisible.value = true
+        break
+
+      // ====== PlanThenReAct 新增事件 ======
+
+      case 'agent.plan.task.started':
+        addExecutionStep({
+          stepName: `${data.payload?.taskId || ''} - ${data.payload?.description || ''}`,
+          status: 'running',
+          startedAt: Date.now(),
+        })
+        break
+
+      case 'agent.plan.task.completed':
+        addExecutionStep({
+          stepName: `${data.payload?.taskId || ''} - ${data.payload?.description || ''}`,
+          status: 'completed',
+          completedAt: Date.now(),
+        })
+        break
+
+      case 'agent.plan.task.failed':
+        addExecutionStep({
+          stepName: `${data.payload?.taskId || ''} - ${data.payload?.description || ''}`,
+          status: 'failed',
+          message: data.payload?.errorMessage,
+        })
+        break
+
+      case 'agent.plan.paused':
+        if (data.payload?.reason === 'CLARIFICATION') {
+          // 澄清暂停：将追问文本追加到回答
+          const question = data.payload?.question || '请提供更多信息'
+          answerText.value += '\n\n' + question
+        }
+        break
+
+      case 'agent.plan.resumed':
+        // 计划恢复，无需特殊处理
         break
 
       case 'agent.plan.step.started':
