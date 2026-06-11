@@ -110,16 +110,16 @@
             <template #default="{ row }">
               <div class="action-btns">
                 <el-tooltip content="查看知识图谱" placement="top">
-                  <el-button type="primary" link icon="Connection" @click="viewKnowledgeGraph(row)" />
+                  <el-button icon="Connection" @click="viewKnowledgeGraph(row)" />
                 </el-tooltip>
                 <el-tooltip content="预览文件" placement="top">
-                  <el-button type="primary" link icon="View" @click="previewFile(row)" />
+                  <el-button icon="View" @click="previewFile(row)" />
                 </el-tooltip>
                 <el-tooltip content="下载" placement="top">
-                  <el-button type="primary" link icon="Download" @click="downloadFile(row)" />
+                  <el-button icon="Download" @click="downloadFile(row)" />
                 </el-tooltip>
                 <el-tooltip content="删除" placement="top">
-                  <el-button type="danger" link icon="Delete" @click="deleteFile(row)" />
+                  <el-button class="btn-danger" icon="Delete" @click="deleteFile(row)" />
                 </el-tooltip>
               </div>
             </template>
@@ -633,8 +633,8 @@ onMounted(() => {
 
 <style scoped lang="scss">
 .kb-detail-page {
-  padding: 0;
-  max-width: 1200px;
+  padding: 12px 24px 24px 24px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -643,22 +643,32 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  background-color: var(--el-bg-color);
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(16px);
+  padding: 20px 24px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
 
   .header-left {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 18px;
 
     .back-btn {
-      border: none;
-      background: var(--el-fill-color-light);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      background: #ffffff;
+      color: #64748b;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+      transition: all 0.2s ease;
       &:hover {
-        background: var(--el-fill-color);
+        background: var(--el-fill-color-light);
         color: var(--el-color-primary);
+        border-color: rgba(79, 110, 246, 0.3);
+        transform: scale(1.05);
+      }
+      &:active {
+        transform: scale(0.95);
       }
     }
 
@@ -669,9 +679,18 @@ onMounted(() => {
 
       .page-title {
         font-size: 22px;
-        font-weight: 600;
-        color: var(--el-text-color-primary);
+        font-weight: 700;
+        color: #0f172a;
         margin: 0;
+        letter-spacing: -0.01em;
+      }
+      
+      .el-tag {
+        border-radius: 6px;
+        font-weight: 500;
+        border: none;
+        background: #f1f5f9;
+        color: #64748b;
       }
     }
   }
@@ -679,6 +698,39 @@ onMounted(() => {
   .header-right {
     display: flex;
     align-items: center;
+    
+    .el-input {
+      :deep(.el-input__wrapper) {
+        border-radius: 20px;
+        padding-left: 14px;
+        background: #f8fafc;
+        border: 1px solid rgba(148, 163, 184, 0.12);
+        box-shadow: none !important;
+        transition: all 0.25s ease;
+        
+        &.is-focus, &:hover {
+          background: #ffffff;
+          border-color: rgba(79, 110, 246, 0.4);
+          box-shadow: 0 0 0 3px rgba(79, 110, 246, 0.08) !important;
+        }
+      }
+    }
+
+    .el-button {
+      border-radius: 20px;
+      padding: 10px 18px;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(79, 110, 246, 0.2);
+      transition: all 0.25s ease;
+      
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(79, 110, 246, 0.3);
+      }
+      &:active {
+        transform: translateY(0);
+      }
+    }
   }
 }
 
@@ -690,35 +742,49 @@ onMounted(() => {
 }
 
 .stat-card {
-  background: var(--el-bg-color);
-  border-radius: 12px;
-  padding: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border-radius: 16px;
+  padding: 20px 24px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.02);
+  gap: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(79, 110, 246, 0.08);
+    border-color: rgba(79, 110, 246, 0.2);
+  }
 
   .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
+    transition: transform 0.3s ease;
 
     &.docs {
-      background: var(--el-color-primary-light-9);
-      color: var(--el-color-primary);
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(37, 99, 235, 0.12));
+      color: #2563eb;
     }
     &.chunks {
-      background: var(--el-color-warning-light-9);
-      color: var(--el-color-warning);
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(217, 119, 6, 0.12));
+      color: #d97706;
     }
     &.success {
-      background: var(--el-color-success-light-9);
-      color: var(--el-color-success);
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.12));
+      color: #059669;
     }
+  }
+  
+  &:hover .stat-icon {
+    transform: scale(1.1) rotate(4deg);
   }
 
   .stat-info {
@@ -726,51 +792,93 @@ onMounted(() => {
     flex-direction: column;
 
     .stat-value {
-      font-size: 24px;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
-      line-height: 1.2;
+      font-size: 28px;
+      font-weight: 750;
+      color: #0f172a;
+      line-height: 1.1;
     }
 
     .stat-label {
       font-size: 13px;
-      color: var(--el-text-color-secondary);
-      margin-top: 4px;
+      font-weight: 500;
+      color: #64748b;
+      margin-top: 6px;
     }
   }
 }
 
 .content-section {
-  background: var(--el-bg-color);
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.02);
-  height: 600px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.08);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.01);
+  height: calc(100vh - 270px);
+  min-height: 500px;
   overflow-y: auto;
+  
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.2);
+    border-radius: 3px;
+    &:hover {
+      background: rgba(148, 163, 184, 0.4);
+    }
+  }
 }
 
 .files-table {
+  :deep(.el-table__header-wrapper) {
+    th {
+      font-weight: 600;
+      font-size: 13px;
+      color: #475569 !important;
+      background: #f8fafc !important;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+      height: 48px;
+    }
+  }
+
+  :deep(.el-table__row) {
+    transition: background-color 0.2s ease;
+    
+    &:hover td {
+      background-color: #f8fafc !important;
+    }
+    
+    td {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.06);
+    }
+  }
+
   .file-name-cell {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 14px;
 
     .file-icon {
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       object-fit: contain;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.05));
     }
 
     .file-info {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
 
       .file-name {
-        font-weight: 500;
-        color: var(--el-text-color-primary);
+        font-weight: 600;
+        color: #1e293b;
         cursor: pointer;
-        transition: color 0.2s;
+        transition: color 0.2s ease;
 
         &:hover {
           color: var(--el-color-primary);
@@ -778,16 +886,79 @@ onMounted(() => {
       }
 
       .file-meta {
-        font-size: 12px;
-        color: var(--el-text-color-placeholder);
+        font-size: 11px;
+        color: #94a3b8;
       }
+    }
+  }
+
+  .el-tag {
+    border-radius: 20px;
+    padding: 0 10px;
+    font-weight: 600;
+    border: none;
+    
+    &.el-tag--success {
+      background: rgba(16, 185, 129, 0.12) !important;
+      color: #10b981 !important;
+    }
+    &.el-tag--primary {
+      background: rgba(59, 130, 246, 0.12) !important;
+      color: #3b82f6 !important;
+    }
+    &.el-tag--danger {
+      background: rgba(239, 68, 68, 0.12) !important;
+      color: #ef4444 !important;
+    }
+    &.el-tag--info {
+      background: rgba(148, 163, 184, 0.12) !important;
+      color: #64748b !important;
     }
   }
 
   .action-btns {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
+    
+    .el-button {
+      width: 32px;
+      height: 32px;
+      min-height: auto;
+      min-width: auto;
+      padding: 0;
+      border-radius: 50%;
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      background: #ffffff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      
+      :deep(.el-icon) {
+        font-size: 14px;
+        margin: 0;
+      }
+      
+      &:hover {
+        transform: scale(1.1);
+        border-color: rgba(79, 110, 246, 0.25);
+        color: var(--el-color-primary);
+        background: rgba(79, 110, 246, 0.06);
+        box-shadow: 0 4px 10px rgba(79, 110, 246, 0.1);
+      }
+      
+      &.btn-danger {
+        &:hover {
+          border-color: rgba(239, 68, 68, 0.25);
+          color: #ef4444;
+          background: rgba(239, 68, 68, 0.06);
+          box-shadow: 0 4px 10px rgba(239, 68, 68, 0.15);
+        }
+      }
+    }
   }
 }
 
@@ -795,9 +966,9 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 16px 0;
+  padding: 20px 0 10px 0;
   font-size: 13px;
-  color: var(--el-text-color-secondary);
+  color: #94a3b8;
 
   .loading-tips {
     display: flex;
@@ -805,6 +976,7 @@ onMounted(() => {
     gap: 8px;
   }
 }
+
 .preview-container {
   min-height: 400px;
   height: 70vh;
@@ -812,9 +984,10 @@ onMounted(() => {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  background-color: var(--el-fill-color-light);
-  border-radius: 8px;
+  background-color: #f8fafc;
+  border-radius: 12px;
   overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.08);
 
   .preview-center {
     width: 100%;
@@ -824,15 +997,17 @@ onMounted(() => {
     align-items: center;
     
     .preview-image {
-      max-width: 100%;
-      max-height: 100%;
+      max-width: 95%;
+      max-height: 95%;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
     }
 
     .preview-media {
       max-width: 90%;
       max-height: 90%;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
     }
   }
 
@@ -845,32 +1020,43 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
-    color: var(--el-text-color-secondary);
+    gap: 18px;
+    color: #64748b;
 
     .icon {
-      font-size: 64px;
-      color: var(--el-text-color-placeholder);
+      font-size: 72px;
+      color: #cbd5e1;
+      animation: floatEffect 3s infinite ease-in-out;
+    }
+    
+    p {
+      font-weight: 500;
     }
   }
 
   .text-preview-container {
-    background: #fff;
+    background: #ffffff;
     overflow-y: auto;
-    padding: 20px;
+    padding: 24px;
     .md-content {
       text-align: left;
     }
   }
 }
 
+@keyframes floatEffect {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
 .graph-dialog-content {
   height: 75vh;
-  background-color: var(--el-bg-color-page);
-  border-radius: 8px;
+  background-color: #f8fafc;
+  border-radius: 12px;
   padding: 16px;
   display: flex;
   flex-direction: column;
+  border: 1px solid rgba(148, 163, 184, 0.08);
   
   .kg-preview-comp {
     flex: 1;

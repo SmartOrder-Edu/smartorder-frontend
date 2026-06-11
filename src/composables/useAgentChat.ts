@@ -6,6 +6,14 @@ import { refreshAccessToken } from '@/api/request'
 
 export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT'
 
+export interface RagReference {
+  id: string
+  name: string
+  type: 'kb' | 'file'
+  kbId?: string
+  kbName?: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'ai'
   content: string
@@ -19,6 +27,7 @@ export interface ChatMessage {
   timestamp: number
   planSummary?: PlanSummary
   executionSteps?: ExecutionStep[]
+  references?: RagReference[]
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -78,7 +87,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   /**
    * 发送消息给 Agent（使用 fetch-event-source POST SSE）
    */
-  const sendMessage = async (message: string) => {
+  const sendMessage = async (message: string, references?: RagReference[]) => {
     if (!message.trim() || agentStore.loading) return
 
     // 添加用户消息到本地列表
@@ -86,6 +95,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       role: 'user',
       content: message,
       timestamp: Date.now(),
+      references: references && references.length > 0 ? [...references] : undefined,
     })
 
     agentStore.startNewTurn()
@@ -105,6 +115,24 @@ export function useAgentChat(scrollCallback?: () => void) {
     abortController = new AbortController()
 
     try {
+      // 从 references 中提取 fileIds 和 knowledgeBaseIds
+      let fileIds: number[] | undefined
+      let knowledgeBaseIds: number[] | undefined
+
+      if (references && references.length > 0) {
+        // 提取文件ID（type为'file'的引用）
+        const files = references.filter(r => r.type === 'file')
+        if (files.length > 0) {
+          fileIds = files.map(r => parseInt(r.id))
+        }
+
+        // 提取知识库ID（type为'kb'的引用）
+        const kbs = references.filter(r => r.type === 'kb')
+        if (kbs.length > 0) {
+          knowledgeBaseIds = kbs.map(r => parseInt(r.id))
+        }
+      }
+
       await fetchEventSource(`${base}/agent/chat/stream`, {
         method: 'POST',
         headers: {
@@ -114,6 +142,8 @@ export function useAgentChat(scrollCallback?: () => void) {
         body: JSON.stringify({
           message,
           conversationId: agentStore.currentConversationId || undefined,
+          fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
+          knowledgeBaseIds: knowledgeBaseIds && knowledgeBaseIds.length > 0 ? knowledgeBaseIds : undefined,
         }),
         openWhenHidden: true,
         signal: abortController.signal,
