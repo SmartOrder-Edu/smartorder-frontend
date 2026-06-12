@@ -130,28 +130,15 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble" :class="{ 'user-bubble': msg.role === 'user' }">
-                  <!-- 思考与工具调用交错展示 -->
-                  <template v-if="msg.role === 'ai' && msg.reasoningSegments?.length">
-                    <template v-for="(seg, segIdx) in msg.reasoningSegments" :key="'seg-' + segIdx">
-                      <ThinkingBlock v-if="seg.thinkingText" :text="seg.thinkingText" />
-                      <ToolCallCard v-if="seg.toolCall" v-bind="seg.toolCall" />
-                    </template>
-                  </template>
-                  <template v-else>
-                    <!-- 向后兼容：旧消息格式 -->
-                    <ThinkingBlock
-                      v-if="msg.role === 'ai' && msg.thinkingText"
-                      :text="msg.thinkingText"
-                      :duration-ms="msg.thinkingDurationMs"
-                    />
-                    <div v-if="msg.role === 'ai' && msg.toolCalls?.length" class="inline-tool-calls">
-                      <ToolCallCard
-                        v-for="tc in msg.toolCalls"
-                        :key="tc.toolName + tc.startedAt"
-                        v-bind="tc"
-                      />
-                    </div>
-                  </template>
+                  <!-- 思考与工具调用过程（默认折叠） -->
+                  <ReasoningProcess
+                    v-if="msg.role === 'ai' && hasReasoningContent(msg)"
+                    :segments="msg.reasoningSegments || []"
+                    :thinking-text="msg.thinkingText || ''"
+                    :tool-calls="msg.toolCalls || []"
+                    :streaming="false"
+                    :duration-ms="msg.thinkingDurationMs || null"
+                  />
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
                   <template v-else>
@@ -248,32 +235,14 @@
                     <span class="phase-spinner"></span>
                     <span class="phase-label">正在分析目标并生成任务计划...</span>
                   </div>
-                  <!-- 思考与工具调用交错展示（流式） -->
-                  <template v-if="agentStore.reasoningSegments.length">
-                    <template v-for="(seg, segIdx) in agentStore.reasoningSegments" :key="'seg-live-' + segIdx">
-                      <ThinkingBlock
-                        v-if="seg.thinkingText"
-                        :text="seg.thinkingText"
-                        :streaming="seg.thinkingStreaming"
-                      />
-                      <ToolCallCard v-if="seg.toolCall" v-bind="seg.toolCall" />
-                    </template>
-                  </template>
-                  <template v-else>
-                    <!-- 向后兼容：无 think 事件的引擎 -->
-                    <ThinkingBlock
-                      v-if="agentStore.thinkingText"
-                      :text="agentStore.thinkingText"
-                      :streaming="true"
-                    />
-                    <div v-if="agentStore.toolCalls.length" class="inline-tool-calls">
-                      <ToolCallCard
-                        v-for="tc in agentStore.toolCalls"
-                        :key="tc.toolName + tc.startedAt"
-                        v-bind="tc"
-                      />
-                    </div>
-                  </template>
+                  <!-- 思考与工具调用过程（流式，自动展开） -->
+                  <ReasoningProcess
+                    v-if="hasLiveReasoningContent()"
+                    :segments="agentStore.reasoningSegments"
+                    :thinking-text="agentStore.thinkingText"
+                    :tool-calls="agentStore.toolCalls"
+                    :streaming="true"
+                  />
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
@@ -473,7 +442,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { useAgentChat } from '@/composables/useAgentChat'
+import { useAgentChat, type ChatMessage } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationVO } from '@/api/agent'
 import { agentApi } from '@/api/agent'
@@ -481,8 +450,7 @@ import { agentAttachmentApi, type AttachmentStatus } from '@/api/agentAttachment
 import type { AgentTraceEvent, ReasoningSegment } from '@/stores/agent'
 import type { TaskList } from '@/types/planExecute'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
-import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
-import ToolCallCard from '@/components/agent/ToolCallCard.vue'
+import ReasoningProcess from '@/components/agent/ReasoningProcess.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
 import PlanChecklist from '@/components/plan/PlanChecklist.vue'
@@ -916,6 +884,24 @@ function isPlanAwaitingConfirmation(taskList: TaskList): boolean {
   return taskList.status === 'DRAFT'
     || taskList.status === 'PENDING_CONFIRM'
     || taskList.status === 'PAUSED_CONFIRMATION'
+}
+
+/** 判断消息是否包含推理过程（思考或工具调用） */
+function hasReasoningContent(msg: ChatMessage): boolean {
+  return !!(
+    msg.reasoningSegments?.length ||
+    msg.thinkingText ||
+    msg.toolCalls?.length
+  )
+}
+
+/** 判断当前流式状态是否有推理内容 */
+function hasLiveReasoningContent(): boolean {
+  return !!(
+    agentStore.reasoningSegments.length ||
+    agentStore.thinkingText ||
+    agentStore.toolCalls.length
+  )
 }
 
 /** 取消自动执行倒计时 */
