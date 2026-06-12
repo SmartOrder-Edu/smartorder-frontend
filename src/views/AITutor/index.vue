@@ -205,8 +205,20 @@
                   </button>
                 </div>
 
-                <!-- 计划创建卡片 -->
-                <PlanCreatedCard v-if="msg.planSummary" :plan="msg.planSummary" />
+                <!-- 计划创建卡片（LEGACY 模式） -->
+                <PlanCreatedCard v-if="msg.planSummary && !msg.taskList" :plan="msg.planSummary" />
+
+                <!-- Plan-and-Execute: 执行完成后的手风琴 -->
+                <PlanExecutionAccordion
+                  v-if="msg.taskList && !msg.planExecuting"
+                  :task-list="msg.taskList"
+                  :task-execution-map="msg.taskExecutionMap || new Map()"
+                  :pause-info="msg.pauseInfo || null"
+                  @gate-answer="handleGateAnswer"
+                  @gate-confirm="handleGateConfirm"
+                  @gate-cancel="handleGateCancel"
+                />
+
                 <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
               </div>
             </div>
@@ -252,8 +264,29 @@
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText"></span>
+
+                  <!-- Plan-and-Execute: 规划阶段清单 -->
+                  <PlanChecklist
+                    v-if="agentStore.currentTaskList && !agentStore.planExecuting"
+                    :task-list="agentStore.currentTaskList"
+                    :confirming="agentStore.planConfirmLoading"
+                    @confirm="confirmPlan(agentStore.currentDraftId)"
+                  />
+
+                  <!-- Plan-and-Execute: 执行阶段手风琴 -->
+                  <PlanExecutionAccordion
+                    v-if="agentStore.currentTaskList && agentStore.planExecuting"
+                    :task-list="agentStore.currentTaskList"
+                    :task-execution-map="agentStore.taskExecutionMap"
+                    :pause-info="agentStore.planPauseInfo"
+                    :live-reasoning-segments="agentStore.reasoningSegments"
+                    @gate-answer="handleGateAnswer"
+                    @gate-confirm="handleGateConfirm"
+                    @gate-cancel="handleGateCancel"
+                  />
+
                   <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
-                  <div v-if="!agentStore.reasoningSegments.length && !agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText" class="loading-dots">
+                  <div v-if="!agentStore.reasoningSegments.length && !agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText && !agentStore.currentTaskList" class="loading-dots">
                     <span></span><span></span><span></span>
                   </div>
                 </div>
@@ -381,9 +414,9 @@
     <!-- 追踪面板（抽屉式） -->
     <AgentTracePanel />
 
-    <!-- 学习蓝图揭幕面板 -->
+    <!-- 学习蓝图揭幕面板（LEGACY 模式） -->
     <PlanRevealOverlay
-      :visible="agentStore.planDialogVisible"
+      :visible="agentStore.planDialogVisible && !agentStore.currentTaskList"
       :plan="agentStore.currentPlan"
       :draft-id="agentStore.currentDraftId"
       :loading="agentStore.planConfirmLoading"
@@ -409,6 +442,8 @@ import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
 import ToolCallCard from '@/components/agent/ToolCallCard.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
+import PlanChecklist from '@/components/plan/PlanChecklist.vue'
+import PlanExecutionAccordion from '@/components/plan/PlanExecutionAccordion.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
@@ -838,6 +873,23 @@ const openMsgTrace = async (msg: any) => {
     }
   }
   agentStore.openTracePanel(msg.traceId)
+}
+
+// === Plan-and-Execute Gate 事件处理 ===
+
+const handleGateAnswer = (taskId: string, answer: string) => {
+  // CLARIFICATION gate: 用户回答后通过普通聊天发送
+  agentSend(answer, [])
+}
+
+const handleGateConfirm = (taskId: string) => {
+  // CONFIRMATION gate: 确认执行
+  confirmPlan(agentStore.currentDraftId)
+}
+
+const handleGateCancel = (_taskId: string) => {
+  // 取消执行
+  cancelPlan()
 }
 
 /**

@@ -3,6 +3,7 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent, type ToolCallState, type ReasoningSegment } from '@/stores/agent'
 import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
+import type { TaskList, TaskExecutionState, PlanPauseInfo } from '@/types/planExecute'
 
 export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT' | 'PLAN_THEN_REACT'
 
@@ -21,6 +22,14 @@ export interface ChatMessage {
   executionSteps?: ExecutionStep[]
   /** 本条消息关联的附件文件ID列表 */
   attachmentFileIds?: number[]
+  /** Plan-and-Execute: TaskList（规划审阅阶段） */
+  taskList?: TaskList
+  /** Plan-and-Execute: 任务执行状态快照 */
+  taskExecutionMap?: Map<string, TaskExecutionState>
+  /** Plan-and-Execute: 暂停信息 */
+  pauseInfo?: PlanPauseInfo | null
+  /** Plan-and-Execute: 是否处于执行阶段 */
+  planExecuting?: boolean
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -162,6 +171,10 @@ export function useAgentChat(scrollCallback?: () => void) {
                   reasoningSegments: agentStore.reasoningSegments?.length
                     ? [...agentStore.reasoningSegments] : undefined,
                   timestamp: Date.now(),
+                  taskList: agentStore.currentTaskList || undefined,
+                  taskExecutionMap: agentStore.taskExecutionMap.size
+                    ? new Map(agentStore.taskExecutionMap) : undefined,
+                  pauseInfo: agentStore.planPauseInfo,
                 })
                 agentStore.answerText = ''
               }
@@ -258,6 +271,11 @@ export function useAgentChat(scrollCallback?: () => void) {
                 timestamp: Date.now(),
                 planSummary,
                 executionSteps: [...agentStore.executionSteps],
+                taskList: agentStore.currentTaskList || undefined,
+                taskExecutionMap: agentStore.taskExecutionMap.size
+                  ? new Map(agentStore.taskExecutionMap) : undefined,
+                pauseInfo: agentStore.planPauseInfo,
+                planExecuting: false,
               })
               agentStore.answerText = ''
             }
