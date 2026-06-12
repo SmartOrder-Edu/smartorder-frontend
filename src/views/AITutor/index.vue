@@ -208,9 +208,17 @@
                 <!-- 计划创建卡片（LEGACY 模式） -->
                 <PlanCreatedCard v-if="msg.planSummary && !msg.taskList" :plan="msg.planSummary" />
 
+                <!-- Plan-and-Execute: 规划审阅阶段（所有任务待执行） -->
+                <PlanChecklist
+                  v-if="msg.taskList && !msg.planExecuting && isPlanInReview(msg.taskList)"
+                  :task-list="msg.taskList"
+                  :confirming="agentStore.planConfirmLoading"
+                  @confirm="confirmPlan(msg.taskList.confirmationDraftId || agentStore.currentDraftId)"
+                />
+
                 <!-- Plan-and-Execute: 执行完成后的手风琴 -->
                 <PlanExecutionAccordion
-                  v-if="msg.taskList && !msg.planExecuting"
+                  v-if="msg.taskList && !msg.planExecuting && !isPlanInReview(msg.taskList)"
                   :task-list="msg.taskList"
                   :task-execution-map="msg.taskExecutionMap || new Map()"
                   :pause-info="msg.pauseInfo || null"
@@ -235,6 +243,11 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble">
+                  <!-- 阶段指示器 -->
+                  <div v-if="agentStore.currentPhase === 'PLANNING' && !agentStore.currentTaskList" class="phase-indicator">
+                    <span class="phase-spinner"></span>
+                    <span class="phase-label">正在分析目标并生成任务计划...</span>
+                  </div>
                   <!-- 思考与工具调用交错展示（流式） -->
                   <template v-if="agentStore.reasoningSegments.length">
                     <template v-for="(seg, segIdx) in agentStore.reasoningSegments" :key="'seg-live-' + segIdx">
@@ -266,12 +279,18 @@
                   <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
 
                   <!-- Plan-and-Execute: 规划阶段清单 -->
-                  <PlanChecklist
-                    v-if="agentStore.currentTaskList && !agentStore.planExecuting"
-                    :task-list="agentStore.currentTaskList"
-                    :confirming="agentStore.planConfirmLoading"
-                    @confirm="confirmPlan(agentStore.currentDraftId)"
-                  />
+                  <div v-if="agentStore.currentTaskList && !agentStore.planExecuting" class="plan-review-section">
+                    <div v-if="autoConfirmCountdown > 0 && !agentStore.planNeedsConfirmation" class="auto-confirm-hint">
+                      <span class="auto-confirm-spinner"></span>
+                      <span>{{ autoConfirmCountdown }}s 后自动开始执行...</span>
+                      <button class="auto-confirm-cancel" @click="cancelAutoConfirm">取消自动执行</button>
+                    </div>
+                    <PlanChecklist
+                      :task-list="agentStore.currentTaskList"
+                      :confirming="agentStore.planConfirmLoading"
+                      @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
+                    />
+                  </div>
 
                   <!-- Plan-and-Execute: 执行阶段手风琴 -->
                   <PlanExecutionAccordion
@@ -460,6 +479,7 @@ import type { ConversationVO } from '@/api/agent'
 import { agentApi } from '@/api/agent'
 import { agentAttachmentApi, type AttachmentStatus } from '@/api/agentAttachment'
 import type { AgentTraceEvent, ReasoningSegment } from '@/stores/agent'
+import type { TaskList } from '@/types/planExecute'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
 import ToolCallCard from '@/components/agent/ToolCallCard.vue'
@@ -889,6 +909,22 @@ const hasTraceEventsForMsg = (msg: any): boolean => {
   return !!(msg.traceEvents?.length) || !!msg.traceId
 }
 
+/**
+ * 判断计划是否处于审阅阶段（所有任务均为 PENDING，尚未开始执行）
+ */
+function isPlanInReview(taskList: TaskList): boolean {
+  return taskList.tasks.every(t => t.status === 'PENDING')
+}
+
+/** 取消自动执行倒计时 */
+function cancelAutoConfirm() {
+  if (autoConfirmTimer) {
+    clearInterval(autoConfirmTimer)
+    autoConfirmTimer = null
+  }
+  autoConfirmCountdown.value = 0
+}
+
 const openMsgTrace = async (msg: any) => {
   if (msg.traceEvents?.length) {
     agentStore.traceEvents = injectThinkEventIfMissing(msg.traceEvents, msg.thinkingText, msg.reasoningSegments)
@@ -1076,6 +1112,43 @@ function interleaveThinkFromSegments(
   return result
 }
 
+// Plan-and-Execute 自动确认倒计时（全 NORMAL 门计划无需手动确认）
+const autoConfirmCountdown = ref(0)
+let autoConfirmTimer: ReturnType<typeof setInterval> | null = null
+
+watch(
+  () => agentStore.currentTaskList,
+  (taskList) => {
+    // 清除上一次的定时器
+    if (autoConfirmTimer) {
+      clearInterval(autoConfirmTimer)
+      autoConfirmTimer = null
+    }
+    autoConfirmCountdown.value = 0
+
+    if (
+      taskList &&
+      !agentStore.planExecuting &&
+      !agentStore.planNeedsConfirmation &&
+      taskList.tasks.every(t => t.status === 'PENDING' || t.gate === 'NORMAL')
+    ) {
+      autoConfirmCountdown.value = 2
+      autoConfirmTimer = setInterval(() => {
+        autoConfirmCountdown.value--
+        if (autoConfirmCountdown.value <= 0) {
+          if (autoConfirmTimer) {
+            clearInterval(autoConfirmTimer)
+            autoConfirmTimer = null
+          }
+          if (agentStore.currentTaskList && agentStore.currentDraftId) {
+            confirmPlan(agentStore.currentDraftId)
+          }
+        }
+      }, 750)
+    }
+  },
+)
+
 onMounted(() => {
   agentStore.fetchConversations()
   if (window.innerWidth < 768) {
@@ -1085,6 +1158,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearAttachmentState()
+  if (autoConfirmTimer) {
+    clearInterval(autoConfirmTimer)
+    autoConfirmTimer = null
+  }
 })
 
 watch(windowWidth, (newWidth) => {
@@ -1452,6 +1529,84 @@ watch(windowWidth, (newWidth) => {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* 计划审阅区域 */
+.plan-review-section {
+  margin-top: var(--spacing-sm);
+}
+
+/* 自动确认提示 */
+.auto-confirm-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: var(--spacing-xs);
+  background: linear-gradient(135deg, rgba(59, 91, 219, 0.06), rgba(18, 184, 134, 0.04));
+  border: 1px solid rgba(59, 91, 219, 0.15);
+  border-radius: var(--radius-lg);
+  font-size: 0.8125rem;
+  color: var(--primary-color);
+}
+
+.auto-confirm-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(59, 91, 219, 0.2);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.auto-confirm-cancel {
+  margin-left: auto;
+  padding: 2px 10px;
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.auto-confirm-cancel:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.04);
+}
+
+/* 阶段指示器 */
+.phase-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: var(--spacing-sm);
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.06), rgba(59, 91, 219, 0.04));
+  border: 1px solid rgba(18, 184, 134, 0.15);
+  border-radius: var(--radius-lg);
+  font-size: 0.8125rem;
+  color: #047857;
+}
+
+.phase-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(18, 184, 134, 0.2);
+  border-top-color: #10b981;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+.phase-label {
+  font-weight: 500;
 }
 
 .message-resources {

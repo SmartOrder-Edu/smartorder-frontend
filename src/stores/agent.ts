@@ -97,6 +97,10 @@ export const useAgentStore = defineStore('agent', () => {
   const planPauseInfo = ref<PlanPauseInfo | null>(null)
   /** 计划执行阶段是否正在运行（区别于普通 loading） */
   const planExecuting = ref(false)
+  /** 计划是否需要用户确认（CONFIRMATION gate 为 true，全 NORMAL 为 false） */
+  const planNeedsConfirmation = ref(false)
+  /** 当前阶段（PLANNING / EXECUTING 等） */
+  const currentPhase = ref<string>('')
 
   // === 追踪面板状态 ===
   const tracePanelVisible = ref(false)
@@ -126,11 +130,13 @@ export const useAgentStore = defineStore('agent', () => {
     executionSteps.value = []
     planConfirmResult.value = null
     planDialogClosing.value = false
+    currentPhase.value = ''
     // Plan-and-Execute 状态在 planExecuting 为 true 时不清除（跨消息保持）
     if (!planExecuting.value) {
       currentTaskList.value = null
       taskExecutionMap.value = new Map()
       planPauseInfo.value = null
+      planNeedsConfirmation.value = false
     }
   }
 
@@ -251,9 +257,14 @@ export const useAgentStore = defineStore('agent', () => {
         routeResult.value = data.payload
         break
 
+      case 'agent.phase.change':
+        currentPhase.value = data.payload?.phase || ''
+        break
+
       case 'agent.plan.created': {
         currentDraftId.value = data.payload?.draftId || ''
         currentPlan.value = data.payload?.taskList || data.payload?.plan || null
+        planNeedsConfirmation.value = data.payload?.needsConfirmation === true
 
         // 如果携带 TaskList（新架构 TASK_LIST 类型），初始化执行状态
         const taskList = data.payload?.taskList
@@ -475,6 +486,7 @@ export const useAgentStore = defineStore('agent', () => {
   function finishTurn() {
     loading.value = false
     answerText.value = ''
+    currentPhase.value = ''
     if (thinkingStartTime.value) {
       thinkingDurationMs.value = Date.now() - thinkingStartTime.value
     }
@@ -552,6 +564,8 @@ export const useAgentStore = defineStore('agent', () => {
     taskExecutionMap.value = new Map()
     planPauseInfo.value = null
     planExecuting.value = false
+    planNeedsConfirmation.value = false
+    currentPhase.value = ''
   }
 
   return {
@@ -583,6 +597,8 @@ export const useAgentStore = defineStore('agent', () => {
     taskExecutionMap,
     planPauseInfo,
     planExecuting,
+    planNeedsConfirmation,
+    currentPhase,
     startNewTurn,
     handleEvent,
     finishTurn,

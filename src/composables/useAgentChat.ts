@@ -3,7 +3,7 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent, type ToolCallState, type ReasoningSegment } from '@/stores/agent'
 import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
-import type { TaskList, TaskExecutionState, PlanPauseInfo } from '@/types/planExecute'
+import type { TaskList, TaskExecutionState, PlanPauseInfo, PauseReason } from '@/types/planExecute'
 
 export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT' | 'PLAN_THEN_REACT'
 
@@ -70,7 +70,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       abortController = null
     }
     // 将当前已累积的文本保存为消息
-    if (agentStore.answerText) {
+    if (agentStore.answerText || agentStore.currentTaskList) {
       messages.value.push({
         role: 'ai',
         content: agentStore.answerText + '\n\n*[已停止生成]*',
@@ -83,6 +83,12 @@ export function useAgentChat(scrollCallback?: () => void) {
           ? [...agentStore.reasoningSegments] : undefined,
         routeResult: agentStore.routeResult || undefined,
         timestamp: Date.now(),
+        // Plan-and-Execute: 附加计划状态到消息
+        taskList: agentStore.currentTaskList || undefined,
+        taskExecutionMap: agentStore.taskExecutionMap.size
+          ? new Map(agentStore.taskExecutionMap) : undefined,
+        pauseInfo: agentStore.planPauseInfo,
+        planExecuting: agentStore.planExecuting,
       })
     }
     agentStore.finishTurn()
@@ -138,8 +144,8 @@ export function useAgentChat(scrollCallback?: () => void) {
           if (!event.data) return
 
           if (event.event === 'done') {
-            // 将 AI 回复添加到消息列表
-            if (agentStore.answerText) {
+            // 将 AI 回复添加到消息列表（含 Plan-and-Execute 状态）
+            if (agentStore.answerText || agentStore.currentTaskList) {
               messages.value.push({
                 role: 'ai',
                 content: agentStore.answerText,
@@ -152,6 +158,12 @@ export function useAgentChat(scrollCallback?: () => void) {
                   ? [...agentStore.reasoningSegments] : undefined,
                 routeResult: agentStore.routeResult || undefined,
                 timestamp: Date.now(),
+                // Plan-and-Execute: 附加计划状态到消息
+                taskList: agentStore.currentTaskList || undefined,
+                taskExecutionMap: agentStore.taskExecutionMap.size
+                  ? new Map(agentStore.taskExecutionMap) : undefined,
+                pauseInfo: agentStore.planPauseInfo,
+                planExecuting: agentStore.planExecuting,
               })
             }
             agentStore.finishTurn()
@@ -164,24 +176,11 @@ export function useAgentChat(scrollCallback?: () => void) {
             const data = JSON.parse(event.data) as AgentTraceEvent
             agentStore.handleEvent(event.event, data)
 
-            // plan.created 时立即推送 AI 消息占位
+            // plan.created 时设置 planExecuting = false（进入审阅阶段）
+            // 不提前推送消息——让计划摘要通过 TEXT_DELTA 累积到 answerText，
+            // 等 done 事件时统一推送完整消息（含 taskList/taskExecutionMap）
             if (event.event === 'agent.plan.created') {
-              if (agentStore.answerText) {
-                messages.value.push({
-                  role: 'ai',
-                  content: agentStore.answerText,
-                  traceId: agentStore.currentTraceId,
-                  traceEvents: [...agentStore.traceEvents],
-                  reasoningSegments: agentStore.reasoningSegments?.length
-                    ? [...agentStore.reasoningSegments] : undefined,
-                  timestamp: Date.now(),
-                  taskList: agentStore.currentTaskList || undefined,
-                  taskExecutionMap: agentStore.taskExecutionMap.size
-                    ? new Map(agentStore.taskExecutionMap) : undefined,
-                  pauseInfo: agentStore.planPauseInfo,
-                })
-                agentStore.answerText = ''
-              }
+              agentStore.planExecuting = false
             }
           } catch {
             // 非 JSON 忽略
@@ -457,6 +456,97 @@ export function useAgentChat(scrollCallback?: () => void) {
                   startedAt: entry?.startedAt || evt.timestamp,
                 })
                 if (key !== null) pendingTools.delete(key)
+                break
+              }
+              // ===== Plan-and-Execute 事件：恢复计划 / 任务状态 =====
+              case 'agent.plan.created': {
+                const tl = evt.payload?.taskList as TaskList | undefined
+                if (tl && tl.tasks) {
+                  chatMsg.taskList = tl
+                  const execMap = new Map<string, TaskExecutionState>()
+                  for (const task of tl.tasks) {
+                    execMap.set(task.taskId, {
+                      taskItem: task,
+                      status: (task.status?.toLowerCase() as TaskExecutionState['status']) || 'pending',
+                      retryCount: task.retryCount || 0,
+                      reasoningSegments: [],
+                      thinkText: '',
+                    })
+                  }
+                  chatMsg.taskExecutionMap = execMap
+                  chatMsg.planExecuting = !tl.tasks.every(t => t.status === 'PENDING')
+                }
+                break
+              }
+              case 'agent.plan.task.started': {
+                const taskId = evt.payload?.taskId || ''
+                if (chatMsg.taskExecutionMap) {
+                  const es = chatMsg.taskExecutionMap.get(taskId)
+                  if (es) { es.status = 'running'; es.startedAt = evt.timestamp }
+                }
+                if (chatMsg.taskList) {
+                  const t = chatMsg.taskList.tasks.find(tk => tk.taskId === taskId)
+                  if (t) t.status = 'RUNNING'
+                }
+                chatMsg.planExecuting = true
+                break
+              }
+              case 'agent.plan.task.completed': {
+                const taskId = evt.payload?.taskId || ''
+                if (chatMsg.taskExecutionMap) {
+                  const es = chatMsg.taskExecutionMap.get(taskId)
+                  if (es) {
+                    es.status = 'completed'
+                    es.resultSummary = evt.payload?.resultSummary || ''
+                    es.completedAt = evt.timestamp
+                  }
+                }
+                if (chatMsg.taskList) {
+                  const t = chatMsg.taskList.tasks.find(tk => tk.taskId === taskId)
+                  if (t) { t.status = 'COMPLETED'; t.resultSummary = evt.payload?.resultSummary || '' }
+                }
+                break
+              }
+              case 'agent.plan.task.failed': {
+                const taskId = evt.payload?.taskId || ''
+                if (chatMsg.taskExecutionMap) {
+                  const es = chatMsg.taskExecutionMap.get(taskId)
+                  if (es) {
+                    es.status = 'failed'
+                    es.errorMessage = evt.payload?.errorMessage || ''
+                  }
+                }
+                if (chatMsg.taskList) {
+                  const t = chatMsg.taskList.tasks.find(tk => tk.taskId === taskId)
+                  if (t) { t.status = 'FAILED'; t.errorMessage = evt.payload?.errorMessage || '' }
+                }
+                break
+              }
+              case 'agent.plan.paused': {
+                chatMsg.pauseInfo = {
+                  reason: evt.payload?.reason || 'CLARIFICATION',
+                  taskId: evt.payload?.taskId || '',
+                  question: evt.payload?.question || '',
+                }
+                if (chatMsg.taskExecutionMap) {
+                  const es = chatMsg.taskExecutionMap.get(evt.payload?.taskId || '')
+                  if (es) es.status = 'paused'
+                }
+                if (chatMsg.taskList) {
+                  const reason = evt.payload?.reason
+                  if (reason === 'CLARIFICATION') {
+                    chatMsg.taskList.status = 'PAUSED_CLARIFICATION'
+                  } else if (reason === 'CONFIRMATION') {
+                    chatMsg.taskList.status = 'PAUSED_CONFIRMATION'
+                  }
+                }
+                break
+              }
+              case 'agent.plan.resumed': {
+                chatMsg.pauseInfo = null
+                if (chatMsg.taskList) {
+                  chatMsg.taskList.status = 'EXECUTING'
+                }
                 break
               }
             }
