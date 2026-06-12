@@ -263,7 +263,7 @@
                   </template>
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
-                  <span class="streaming-cursor" v-if="agentStore.answerText"></span>
+                  <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
 
                   <!-- Plan-and-Execute: 规划阶段清单 -->
                   <PlanChecklist

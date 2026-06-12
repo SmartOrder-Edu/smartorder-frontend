@@ -474,6 +474,7 @@ export const useAgentStore = defineStore('agent', () => {
    */
   function finishTurn() {
     loading.value = false
+    answerText.value = ''
     if (thinkingStartTime.value) {
       thinkingDurationMs.value = Date.now() - thinkingStartTime.value
     }
