@@ -48,6 +48,9 @@ export function useAgentChat(scrollCallback?: () => void) {
   const loadingHistory = ref(false)
   let abortController: AbortController | null = null
 
+  /** 用户手动选择的运行模式，null 表示走意图路由 */
+  const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>(null)
+
   // 流式输出时自动滚动
   watch(
     () => agentStore.answerText,
@@ -126,6 +129,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           message,
           conversationId: agentStore.currentConversationId || undefined,
           fileIds,
+          forceMode: currentForceMode.value || undefined,
         }),
         openWhenHidden: true,
         signal: abortController.signal,
@@ -547,6 +551,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   return {
     messages,
     loadingHistory,
+    currentForceMode,
     sendMessage,
     stopGeneration,
     confirmPlan,

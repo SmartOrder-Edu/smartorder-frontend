@@ -342,10 +342,33 @@
                   </button>
                 </div>
               </div>
+              <div class="mode-selector">
+                <button
+                  class="mode-btn"
+                  :class="{ active: currentMode === 'REACT' }"
+                  @click="switchMode('REACT')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <polyline points="13,2 3,14 12,14 11,22 21,10 12,10"/>
+                  </svg>
+                  <span>快速回答</span>
+                </button>
+                <button
+                  class="mode-btn"
+                  :class="{ active: currentMode === 'PLAN_AND_EXECUTE' }"
+                  @click="switchMode('PLAN_AND_EXECUTE')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="8,12 11,15 16,9"/>
+                  </svg>
+                  <span>目标规划</span>
+                </button>
+              </div>
               <div class="composer-body">
                 <textarea
                   v-model="inputMessage"
-                  placeholder="输入你的问题，AI 会结合你的学习画像给出个性化回答…"
+                  :placeholder="inputPlaceholder"
                   rows="1"
                   @keydown.enter.exact.prevent="sendMessage"
                   @keydown.enter.shift.exact.stop
@@ -485,6 +508,7 @@ const scrollToBottom = () => {
 const {
   messages,
   loadingHistory,
+  currentForceMode,
   sendMessage: agentSend,
   stopGeneration,
   confirmPlan,
@@ -493,6 +517,14 @@ const {
   startNewConversation,
   deleteConversation
 } = useAgentChat(scrollToBottom)
+
+// 用户手动选择的对话模式
+const currentMode = ref<'REACT' | 'PLAN_AND_EXECUTE'>('REACT')
+
+const switchMode = (mode: 'REACT' | 'PLAN_AND_EXECUTE') => {
+  currentMode.value = mode
+  currentForceMode.value = mode
+}
 
 const contextOptions = ref([
   { id: 'global', label: '全局学习', color: '#6b7280' },
@@ -561,13 +593,29 @@ const welcomeFeatures = [
   }
 ]
 
-const quickHints = [
-  '帮我制定一个学习计划',
-  '我今天应该重点学什么？',
-  '生成一组洛必达法则的练习题',
-  '软件工程项目帮我拆一下任务',
-  '帮我分析最近的薄弱点'
-]
+const inputPlaceholder = computed(() =>
+  currentMode.value === 'PLAN_AND_EXECUTE'
+    ? '描述你的学习目标，AI 将为你制定学习路径和计划…'
+    : '输入你的问题，AI 会结合你的学习画像给出个性化回答…'
+)
+
+const quickHints = computed(() =>
+  currentMode.value === 'PLAN_AND_EXECUTE'
+    ? [
+        '帮我制定操作系统复习计划',
+        '帮我规划考研408备考方案',
+        '制定英语六级备考计划',
+        '帮我拆解软件工程项目任务',
+        '帮我安排计算机基础学习路径',
+      ]
+    : [
+        '帮我制定一个学习计划',
+        '我今天应该重点学什么？',
+        '生成一组洛必达法则的练习题',
+        '软件工程项目帮我拆一下任务',
+        '帮我分析最近的薄弱点',
+      ]
+)
 
 const quickTools = [
   {
@@ -1541,6 +1589,49 @@ watch(windowWidth, (newWidth) => {
 .input-composer:focus-within {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.08);
+}
+
+/* 模式选择器 */
+.mode-selector {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px 0;
+}
+
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn svg {
+  flex-shrink: 0;
+}
+
+.mode-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: rgba(59, 91, 219, 0.04);
+}
+
+.mode-btn.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.mode-btn.active:hover {
+  background: #2c4fcc;
+  border-color: #2c4fcc;
 }
 
 .composer-toolbar {

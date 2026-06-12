@@ -4,6 +4,8 @@ export interface AgentChatRequest {
   message: string
   conversationId?: string
   fileIds?: number[]
+  /** 强制运行模式：'REACT' 快速回答 / 'PLAN_AND_EXECUTE' 目标规划，不传则走意图路由 */
+  forceMode?: 'REACT' | 'PLAN_AND_EXECUTE'
 }
 
 export interface PlanConfirmRequest {
