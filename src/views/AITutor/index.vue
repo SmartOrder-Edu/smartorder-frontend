@@ -210,7 +210,7 @@
 
                 <!-- Plan-and-Execute: 规划审阅阶段（所有任务待执行） -->
                 <PlanChecklist
-                  v-if="msg.taskList && !msg.planExecuting && isPlanInReview(msg.taskList)"
+                  v-if="msg.taskList && !msg.planExecuting && isPlanAwaitingConfirmation(msg.taskList)"
                   :task-list="msg.taskList"
                   :confirming="agentStore.planConfirmLoading"
                   @confirm="confirmPlan(msg.taskList.confirmationDraftId || agentStore.currentDraftId)"
@@ -218,7 +218,7 @@
 
                 <!-- Plan-and-Execute: 执行完成后的手风琴 -->
                 <PlanExecutionAccordion
-                  v-if="msg.taskList && !msg.planExecuting && !isPlanInReview(msg.taskList)"
+                  v-if="msg.taskList && !msg.planExecuting && !isPlanAwaitingConfirmation(msg.taskList)"
                   :task-list="msg.taskList"
                   :task-execution-map="msg.taskExecutionMap || new Map()"
                   :pause-info="msg.pauseInfo || null"
@@ -910,10 +910,12 @@ const hasTraceEventsForMsg = (msg: any): boolean => {
 }
 
 /**
- * 判断计划是否处于审阅阶段（所有任务均为 PENDING，尚未开始执行）
+ * 判断计划是否正在等待用户确认执行。
  */
-function isPlanInReview(taskList: TaskList): boolean {
-  return taskList.tasks.every(t => t.status === 'PENDING')
+function isPlanAwaitingConfirmation(taskList: TaskList): boolean {
+  return taskList.status === 'DRAFT'
+    || taskList.status === 'PENDING_CONFIRM'
+    || taskList.status === 'PAUSED_CONFIRMATION'
 }
 
 /** 取消自动执行倒计时 */

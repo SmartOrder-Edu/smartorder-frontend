@@ -5,7 +5,7 @@ import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
 import type { TaskList, TaskExecutionState, PlanPauseInfo, PauseReason } from '@/types/planExecute'
 
-export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT' | 'PLAN_THEN_REACT'
+export type AgentRunMode = 'REACT' | 'PLAN_AND_EXECUTE'
 
 export interface ChatMessage {
   role: 'user' | 'ai'
@@ -243,6 +243,14 @@ export function useAgentChat(scrollCallback?: () => void) {
           if (event.event === 'done') {
             agentStore.planConfirmLoading = false
             agentStore.planDialogVisible = false
+            agentStore.planExecuting = false
+            if (agentStore.currentTaskList) {
+              const hasFailedTask = agentStore.currentTaskList.tasks.some(t => t.status === 'FAILED')
+              const hasRunningTask = agentStore.currentTaskList.tasks.some(t => t.status === 'RUNNING')
+              if (!hasRunningTask) {
+                agentStore.currentTaskList.status = hasFailedTask ? 'FAILED' : 'COMPLETED'
+              }
+            }
 
             // 构造 PlanSummary
             const plan = agentStore.currentPlan
@@ -474,7 +482,7 @@ export function useAgentChat(scrollCallback?: () => void) {
                     })
                   }
                   chatMsg.taskExecutionMap = execMap
-                  chatMsg.planExecuting = !tl.tasks.every(t => t.status === 'PENDING')
+                  chatMsg.planExecuting = tl.status === 'EXECUTING'
                 }
                 break
               }

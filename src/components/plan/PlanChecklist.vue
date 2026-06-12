@@ -30,10 +30,25 @@
         :class="{ expanded: expandedId === task.taskId }"
       >
         <div class="item-row" @click="toggleExpand(task.taskId)">
-          <span class="item-index">{{ index + 1 }}</span>
+          <span class="item-status" :class="statusClass(task.status)">
+            <svg v-if="task.status === 'COMPLETED'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <svg v-else-if="task.status === 'FAILED'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+            </svg>
+            <span v-else-if="task.status === 'RUNNING'" class="item-spinner"></span>
+            <svg v-else-if="task.status === 'PAUSED'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>
+            </svg>
+            <span v-else>{{ index + 1 }}</span>
+          </span>
           <span class="item-desc">{{ task.description }}</span>
-          <span v-if="task.dependsOn.length" class="item-deps">
+          <span v-if="task.dependsOn?.length" class="item-deps">
             ← 依赖{{ formatDepIds(task.dependsOn) }}
+          </span>
+          <span class="item-state-label" :class="statusClass(task.status)">
+            {{ statusLabel(task.status) }}
           </span>
           <span class="item-gate" :class="gateClass(task.gate)">
             {{ gateLabel(task.gate) }}
@@ -49,7 +64,7 @@
             <span class="detail-label">预期产出</span>
             <span class="detail-value">{{ task.expectedOutput }}</span>
           </div>
-          <div class="detail-row" v-if="task.requiredTools.length">
+          <div class="detail-row" v-if="task.requiredTools?.length">
             <span class="detail-label">所需工具</span>
             <div class="detail-tags">
               <span class="tool-tag" v-for="tool in task.requiredTools" :key="tool">{{ tool }}</span>
@@ -123,6 +138,28 @@ function riskLabel(level: RiskLevel): string {
   }
 }
 
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'COMPLETED': return '已完成'
+    case 'RUNNING': return '执行中'
+    case 'FAILED': return '失败'
+    case 'SKIPPED': return '已跳过'
+    case 'PAUSED': return '已暂停'
+    default: return '待执行'
+  }
+}
+
+function statusClass(status: string): string {
+  switch (status) {
+    case 'COMPLETED': return 'state-completed'
+    case 'RUNNING': return 'state-running'
+    case 'FAILED': return 'state-failed'
+    case 'SKIPPED': return 'state-skipped'
+    case 'PAUSED': return 'state-paused'
+    default: return 'state-pending'
+  }
+}
+
 function formatDepIds(ids: string[]): string {
   return ids.map(id => {
     const num = id.replace('task-', '')
@@ -141,7 +178,7 @@ const maxChainDepth = computed(() => {
   function getDepth(taskId: string): number {
     if (depths.has(taskId)) return depths.get(taskId)!
     const task = props.taskList.tasks.find(t => t.taskId === taskId)
-    if (!task || task.dependsOn.length === 0) {
+    if (!task || !task.dependsOn?.length) {
       depths.set(taskId, 1)
       return 1
     }
@@ -272,7 +309,7 @@ const maxChainDepth = computed(() => {
   background: rgba(59, 130, 246, 0.03);
 }
 
-.item-index {
+.item-status {
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -284,6 +321,40 @@ const maxChainDepth = computed(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.item-status.state-completed {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+.item-status.state-running {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.item-status.state-failed {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+
+.item-status.state-paused {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.item-status.state-skipped {
+  background: rgba(148, 163, 184, 0.16);
+  color: #64748b;
+}
+
+.item-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 .item-desc {
@@ -301,6 +372,45 @@ const maxChainDepth = computed(() => {
   font-size: 0.625rem;
   color: var(--text-muted, #94a3b8);
   flex-shrink: 0;
+}
+
+.item-state-label {
+  font-size: 0.625rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-full, 999px);
+  font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.item-state-label.state-pending {
+  background: rgba(148, 163, 184, 0.12);
+  color: #64748b;
+}
+
+.item-state-label.state-completed {
+  background: rgba(16, 185, 129, 0.08);
+  color: #059669;
+}
+
+.item-state-label.state-running {
+  background: rgba(59, 130, 246, 0.08);
+  color: #3b82f6;
+}
+
+.item-state-label.state-failed {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+}
+
+.item-state-label.state-paused {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+
+.item-state-label.state-skipped {
+  background: rgba(148, 163, 184, 0.12);
+  color: #64748b;
 }
 
 .item-gate {
