@@ -194,23 +194,21 @@ const maxChainDepth = computed(() => {
 .plan-checklist {
   background: linear-gradient(135deg, #f0f7ff 0%, #eef2ff 50%, #f5f3ff 100%);
   border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: var(--radius-xl, 1rem);
-  padding: 16px 18px;
-  margin-top: 10px;
-  animation: cardIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border-radius: var(--radius-lg, 0.75rem);
+  padding: 10px;
 }
 
 .checklist-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .header-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-lg, 0.75rem);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md, 0.5rem);
   background: var(--gradient-primary);
   display: flex;
   align-items: center;
@@ -227,12 +225,12 @@ const maxChainDepth = computed(() => {
 }
 
 .header-label {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: var(--text-muted, #94a3b8);
 }
 
 .header-goal {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: var(--text-dark, #0f172a);
   overflow: hidden;
@@ -244,13 +242,13 @@ const maxChainDepth = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 18px;
+  gap: 4px;
+  padding: 6px 12px;
   border: none;
-  border-radius: var(--radius-lg, 0.75rem);
+  border-radius: var(--radius-md, 0.5rem);
   background: var(--gradient-primary);
   color: white;
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -299,8 +297,8 @@ const maxChainDepth = computed(() => {
 .item-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 6px 8px;
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -310,12 +308,12 @@ const maxChainDepth = computed(() => {
 }
 
 .item-status {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: rgba(59, 130, 246, 0.1);
   color: var(--primary-color, #3b5bdb);
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -359,7 +357,7 @@ const maxChainDepth = computed(() => {
 
 .item-desc {
   flex: 1;
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
   color: var(--text-dark, #0f172a);
   font-weight: 500;
   min-width: 0;
@@ -450,10 +448,10 @@ const maxChainDepth = computed(() => {
 }
 
 .item-detail {
-  padding: 0 12px 10px 42px;
+  padding: 0 8px 8px 34px;
   border-top: 1px solid rgba(59, 130, 246, 0.06);
   margin-top: 0;
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
 .detail-row {
@@ -464,16 +462,16 @@ const maxChainDepth = computed(() => {
 }
 
 .detail-label {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: var(--text-muted, #94a3b8);
   flex-shrink: 0;
-  min-width: 56px;
+  min-width: 48px;
 }
 
 .detail-value {
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   color: var(--text-secondary, #475569);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .detail-tags {
@@ -516,10 +514,10 @@ const maxChainDepth = computed(() => {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid rgba(59, 130, 246, 0.1);
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   color: var(--text-muted, #94a3b8);
 }
 
@@ -538,8 +536,8 @@ const maxChainDepth = computed(() => {
 }
 
 .checklist-hint {
-  margin: 8px 0 0;
-  font-size: 0.6875rem;
+  margin: 6px 0 0;
+  font-size: 0.625rem;
   color: var(--text-muted, #94a3b8);
 }
 

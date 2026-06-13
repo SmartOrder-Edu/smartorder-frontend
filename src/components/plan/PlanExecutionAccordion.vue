@@ -265,10 +265,8 @@ function handleGateCancel() {
 .plan-execution-accordion {
   background: linear-gradient(135deg, #f0f7ff 0%, #eef2ff 50%, #f5f3ff 100%);
   border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: var(--radius-xl, 1rem);
-  padding: 16px 18px;
-  margin-top: 10px;
-  animation: cardIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border-radius: var(--radius-lg, 0.75rem);
+  padding: 10px;
 }
 
 /* 进度条 */
@@ -342,8 +340,8 @@ function handleGateCancel() {
 .step-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 6px 8px;
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -393,12 +391,12 @@ function handleGateCancel() {
 }
 
 .step-index {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: rgba(59, 130, 246, 0.08);
   color: var(--primary-color, #3b5bdb);
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -408,7 +406,7 @@ function handleGateCancel() {
 
 .step-desc {
   flex: 1;
-  font-size: 0.8125rem;
+  font-size: 0.6875rem;
   color: var(--text-dark, #0f172a);
   font-weight: 500;
   min-width: 0;
@@ -448,10 +446,10 @@ function handleGateCancel() {
 
 /* 展开内容 */
 .step-expand {
-  padding: 0 12px 10px 44px;
+  padding: 0 8px 8px 34px;
   border-top: 1px solid rgba(59, 130, 246, 0.06);
   margin-top: 0;
-  padding-top: 8px;
+  padding-top: 6px;
 }
 
 .step-react-view {

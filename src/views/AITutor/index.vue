@@ -249,30 +249,15 @@
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
 
-                  <!-- Plan-and-Execute: 规划阶段清单 -->
-                  <div v-if="agentStore.currentTaskList && !agentStore.planExecuting" class="plan-review-section">
-                    <div v-if="autoConfirmCountdown > 0 && !agentStore.planNeedsConfirmation" class="auto-confirm-hint">
-                      <span class="auto-confirm-spinner"></span>
-                      <span>{{ autoConfirmCountdown }}s 后自动开始执行...</span>
-                      <button class="auto-confirm-cancel" @click="cancelAutoConfirm">取消自动执行</button>
-                    </div>
-                    <PlanChecklist
-                      :task-list="agentStore.currentTaskList"
-                      :confirming="agentStore.planConfirmLoading"
-                      @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
-                    />
-                  </div>
-
-                  <!-- Plan-and-Execute: 执行阶段手风琴 -->
-                  <PlanExecutionAccordion
-                    v-if="agentStore.currentTaskList && agentStore.planExecuting"
+                  <!-- Plan-and-Execute: 紧凑状态卡片（任务详情在右侧面板） -->
+                  <PlanStatusCard
+                    v-if="agentStore.currentTaskList"
                     :task-list="agentStore.currentTaskList"
-                    :task-execution-map="agentStore.taskExecutionMap"
-                    :pause-info="agentStore.planPauseInfo"
-                    :live-reasoning-segments="agentStore.reasoningSegments"
-                    @gate-answer="handleGateAnswer"
-                    @gate-confirm="handleGateConfirm"
-                    @gate-cancel="handleGateCancel"
+                    :confirming="agentStore.planConfirmLoading"
+                    :completed-count="planCompletedCount"
+                    :total-count="planTotalCount"
+                    :current-running-desc="planCurrentRunningDesc"
+                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
                   />
 
                   <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
@@ -402,7 +387,7 @@
           </div>
         </main>
 
-        <!-- 右侧：快捷工具 -->
+        <!-- 右侧：快捷工具 + 任务执行面板 -->
         <aside class="tutor-sidebar">
           <div class="sidebar-section">
             <h3 class="section-title">快捷工具</h3>
@@ -419,6 +404,19 @@
               </button>
             </div>
           </div>
+
+          <!-- 任务执行面板（Plan-and-Execute 模式下出现） -->
+          <TaskExecutionPanel
+            :task-list="agentStore.currentTaskList"
+            :task-execution-map="agentStore.taskExecutionMap"
+            :pause-info="agentStore.planPauseInfo"
+            :confirming="agentStore.planConfirmLoading"
+            :live-reasoning-segments="agentStore.reasoningSegments"
+            @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
+            @gate-answer="handleGateAnswer"
+            @gate-confirm="handleGateConfirm"
+            @gate-cancel="handleGateCancel"
+          />
         </aside>
       </div>
       <!-- 移动端历史侧边栏遮罩 -->
@@ -457,6 +455,8 @@ import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
 import PlanChecklist from '@/components/plan/PlanChecklist.vue'
 import PlanExecutionAccordion from '@/components/plan/PlanExecutionAccordion.vue'
+import TaskExecutionPanel from '@/components/plan/TaskExecutionPanel.vue'
+import PlanStatusCard from '@/components/plan/PlanStatusCard.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
@@ -887,6 +887,27 @@ function isPlanAwaitingConfirmation(taskList: TaskList): boolean {
     || taskList.status === 'PENDING_CONFIRM'
     || taskList.status === 'PAUSED_CONFIRMATION'
 }
+
+/** PlanStatusCard 所需的计算属性 */
+const planCompletedCount = computed(() => {
+  let count = 0
+  for (const [, state] of agentStore.taskExecutionMap) {
+    if (state.status === 'completed') count++
+  }
+  return count
+})
+
+const planTotalCount = computed(() => {
+  return agentStore.currentTaskList?.tasks.length || 0
+})
+
+const planCurrentRunningDesc = computed(() => {
+  for (const [, state] of agentStore.taskExecutionMap) {
+    if (state.status === 'running') return state.taskItem.description
+  }
+  // 规划阶段或全部完成时返回空
+  return ''
+})
 
 /** 判断消息是否包含推理过程（思考或工具调用） */
 function hasReasoningContent(msg: ChatMessage): boolean {
@@ -1546,56 +1567,6 @@ watch(windowWidth, (newWidth) => {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
-}
-
-/* 计划审阅区域 */
-.plan-review-section {
-  margin-top: var(--spacing-sm);
-}
-
-/* 自动确认提示 */
-.auto-confirm-hint {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  margin-bottom: var(--spacing-xs);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.06), rgba(18, 184, 134, 0.04));
-  border: 1px solid rgba(59, 91, 219, 0.15);
-  border-radius: var(--radius-lg);
-  font-size: 0.8125rem;
-  color: var(--primary-color);
-}
-
-.auto-confirm-spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(59, 91, 219, 0.2);
-  border-top-color: var(--primary-color);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.auto-confirm-cancel {
-  margin-left: auto;
-  padding: 2px 10px;
-  background: transparent;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-full);
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.auto-confirm-cancel:hover {
-  border-color: #ef4444;
-  color: #ef4444;
-  background: rgba(239, 68, 68, 0.04);
 }
 
 /* 阶段指示器 */
