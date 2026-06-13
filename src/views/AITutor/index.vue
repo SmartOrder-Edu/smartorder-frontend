@@ -196,16 +196,18 @@
                 <PlanCreatedCard v-if="msg.planSummary && !msg.taskList" :plan="msg.planSummary" />
 
                 <!-- Plan-and-Execute: 规划审阅阶段（所有任务待执行） -->
+                <!-- 注意：不使用 msg.planExecuting 判断，因为自动确认竞态会导致该值不准确；
+                     改用 isPlanAwaitingConfirmation 根据 TaskList.status 精确判断 -->
                 <PlanChecklist
-                  v-if="msg.taskList && !msg.planExecuting && isPlanAwaitingConfirmation(msg.taskList)"
+                  v-if="msg.taskList && isPlanAwaitingConfirmation(msg.taskList)"
                   :task-list="msg.taskList"
                   :confirming="agentStore.planConfirmLoading"
                   @confirm="confirmPlan(msg.taskList.confirmationDraftId || agentStore.currentDraftId)"
                 />
 
-                <!-- Plan-and-Execute: 执行完成后的手风琴 -->
+                <!-- Plan-and-Execute: 执行中/已完成的手风琴 -->
                 <PlanExecutionAccordion
-                  v-if="msg.taskList && !msg.planExecuting && !isPlanAwaitingConfirmation(msg.taskList)"
+                  v-if="msg.taskList && !isPlanAwaitingConfirmation(msg.taskList)"
                   :task-list="msg.taskList"
                   :task-execution-map="msg.taskExecutionMap || new Map()"
                   :pause-info="msg.pauseInfo || null"
@@ -884,6 +886,7 @@ function isPlanAwaitingConfirmation(taskList: TaskList): boolean {
   return taskList.status === 'DRAFT'
     || taskList.status === 'PENDING_CONFIRM'
     || taskList.status === 'PAUSED_CONFIRMATION'
+    || taskList.status === 'PAUSED_CLARIFICATION'
 }
 
 /** 判断消息是否包含推理过程（思考或工具调用） */
@@ -911,6 +914,7 @@ function cancelAutoConfirm() {
     autoConfirmTimer = null
   }
   autoConfirmCountdown.value = 0
+  autoConfirmPending.value = false
 }
 
 const openMsgTrace = async (msg: any) => {
@@ -1100,10 +1104,12 @@ function interleaveThinkFromSegments(
   return result
 }
 
-// Plan-and-Execute 自动确认倒计时（全 NORMAL 门计划无需手动确认）
+// Plan-and-Execute 自动确认（纯 NORMAL 门计划无需手动确认）
+const autoConfirmPending = ref(false)
 const autoConfirmCountdown = ref(0)
 let autoConfirmTimer: ReturnType<typeof setInterval> | null = null
 
+// 监听 currentTaskList 变化，标记是否需要自动确认
 watch(
   () => agentStore.currentTaskList,
   (taskList) => {
@@ -1113,14 +1119,20 @@ watch(
       autoConfirmTimer = null
     }
     autoConfirmCountdown.value = 0
+    autoConfirmPending.value = false
+
+    // 只有纯 NORMAL 门（无 CONFIRMATION/CLARIFICATION）计划才能自动执行
+    const allNormal = taskList
+      && taskList.tasks.every(t => t.gate === 'NORMAL' && t.status === 'PENDING')
 
     if (
       taskList &&
+      allNormal &&
       !agentStore.planExecuting &&
-      !agentStore.planNeedsConfirmation &&
-      taskList.tasks.every(t => t.status === 'PENDING' || t.gate === 'NORMAL')
+      !agentStore.planNeedsConfirmation
     ) {
-      autoConfirmCountdown.value = 2
+      autoConfirmPending.value = true
+      autoConfirmCountdown.value = 3
       autoConfirmTimer = setInterval(() => {
         autoConfirmCountdown.value--
         if (autoConfirmCountdown.value <= 0) {
@@ -1128,11 +1140,29 @@ watch(
             clearInterval(autoConfirmTimer)
             autoConfirmTimer = null
           }
-          if (agentStore.currentTaskList && agentStore.currentDraftId) {
+          if (autoConfirmPending.value && agentStore.currentTaskList && agentStore.currentDraftId && !agentStore.loading) {
+            autoConfirmPending.value = false
             confirmPlan(agentStore.currentDraftId)
           }
         }
       }, 750)
+    }
+  },
+)
+
+// 监听 loading 变化：当 SSE 流结束且需要自动确认时，立即触发
+watch(
+  () => agentStore.loading,
+  (loading) => {
+    if (!loading && autoConfirmPending.value && agentStore.currentDraftId) {
+      // 清除倒计时
+      if (autoConfirmTimer) {
+        clearInterval(autoConfirmTimer)
+        autoConfirmTimer = null
+      }
+      autoConfirmCountdown.value = 0
+      autoConfirmPending.value = false
+      confirmPlan(agentStore.currentDraftId)
     }
   },
 )
