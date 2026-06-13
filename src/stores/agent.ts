@@ -7,6 +7,8 @@ import type {
   TaskExecutionState,
   PauseReason,
   PlanPauseInfo,
+  LearningPlanDraft,
+  PhaseInfo,
 } from '@/types/planExecute'
 
 export interface AgentTraceEvent<T = any> {
@@ -102,6 +104,10 @@ export const useAgentStore = defineStore('agent', () => {
   /** 当前阶段（PLANNING / EXECUTING 等） */
   const currentPhase = ref<string>('')
 
+  // === 学习计划草稿状态（LEARNING_PLAN 类型） ===
+  const learningPlanDraft = ref<LearningPlanDraft | null>(null)
+  const showLearningPlanPreview = ref(false)
+
   // === 追踪面板状态 ===
   const tracePanelVisible = ref(false)
   const activeTraceId = ref<string>('')
@@ -138,6 +144,9 @@ export const useAgentStore = defineStore('agent', () => {
       planPauseInfo.value = null
       planNeedsConfirmation.value = false
     }
+    // 学习计划草稿状态——每次新对话重置
+    learningPlanDraft.value = null
+    showLearningPlanPreview.value = false
   }
 
   /**
@@ -336,6 +345,26 @@ export const useAgentStore = defineStore('agent', () => {
         break
       }
 
+      case 'agent.learning_plan.created': {
+        currentDraftId.value = data.payload?.draftId || ''
+        const plan = data.payload?.plan
+        if (plan) {
+          learningPlanDraft.value = {
+            draftId: data.payload?.draftId || '',
+            spaceName: plan.spaceName || '',
+            type: plan.type || 'course',
+            description: plan.description || '',
+            goals: parseGoals(plan.goals),
+            startDate: plan.startDate || '',
+            targetEndDate: plan.targetEndDate || '',
+            phases: parsePhases(plan.phases) || [],
+            knowledgeGraph: plan.knowledgeGraph || { nodes: [], edges: [] },
+          }
+          showLearningPlanPreview.value = true
+        }
+        break
+      }
+
       // ====== Plan-and-Execute 事件 ======
 
       case 'agent.plan.task.started': {
@@ -492,6 +521,8 @@ export const useAgentStore = defineStore('agent', () => {
           if (payload.message) {
             answerText.value += '\n\n' + payload.message
           }
+          // 隐藏学习计划预览（LEARNING_PLAN 路径确认后）
+          showLearningPlanPreview.value = false
         }
         if (payload?.type === 'plan_replanned') {
           const newTaskList = payload?.taskList as TaskList | undefined
@@ -618,6 +649,24 @@ export const useAgentStore = defineStore('agent', () => {
     }
   }
 
+  /** 解析 goals（可能为数组或 JSON 字符串） */
+  function parseGoals(goals: any): string[] {
+    if (Array.isArray(goals)) return goals
+    if (typeof goals === 'string') {
+      try { return JSON.parse(goals) } catch { return [] }
+    }
+    return []
+  }
+
+  /** 解析 phases（可能为数组或 JSON 字符串） */
+  function parsePhases(phases: any): PhaseInfo[] {
+    if (Array.isArray(phases)) return phases
+    if (typeof phases === 'string') {
+      try { return JSON.parse(phases) } catch { return [] }
+    }
+    return []
+  }
+
   function reset() {
     currentConversationId.value = ''
     currentTraceId.value = ''
@@ -644,6 +693,8 @@ export const useAgentStore = defineStore('agent', () => {
     planExecuting.value = false
     planNeedsConfirmation.value = false
     currentPhase.value = ''
+    learningPlanDraft.value = null
+    showLearningPlanPreview.value = false
   }
 
   return {
@@ -677,6 +728,8 @@ export const useAgentStore = defineStore('agent', () => {
     planExecuting,
     planNeedsConfirmation,
     currentPhase,
+    learningPlanDraft,
+    showLearningPlanPreview,
     startNewTurn,
     handleEvent,
     finishTurn,

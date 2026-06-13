@@ -249,6 +249,14 @@
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
 
+                  <!-- 学习计划预览（LEARNING_PLAN 草稿审阅） -->
+                  <LearningPlanPreview
+                    v-if="agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
+                    :learning-plan="agentStore.learningPlanDraft"
+                    :confirming="agentStore.planConfirmLoading"
+                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
+                  />
+
                   <!-- Plan-and-Execute: 紧凑状态卡片（任务详情在右侧面板） -->
                   <PlanStatusCard
                     v-if="agentStore.currentTaskList"
@@ -457,6 +465,7 @@ import PlanChecklist from '@/components/plan/PlanChecklist.vue'
 import PlanExecutionAccordion from '@/components/plan/PlanExecutionAccordion.vue'
 import TaskExecutionPanel from '@/components/plan/TaskExecutionPanel.vue'
 import PlanStatusCard from '@/components/plan/PlanStatusCard.vue'
+import LearningPlanPreview from '@/components/plan/LearningPlanPreview.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { useWindowSize } from '@/composables/useWindowSize'

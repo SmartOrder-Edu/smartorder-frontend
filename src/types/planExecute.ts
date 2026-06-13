@@ -109,3 +109,51 @@ export interface PlanPauseInfo {
   /** 暂停时的问题 */
   question: string
 }
+
+// ============================================================
+// LEARNING_PLAN 草稿类型 — 用户审阅用
+// ============================================================
+
+/** 学习计划草稿（用户审阅用，非 Agent 执行计划） */
+export interface LearningPlanDraft {
+  draftId: string
+  spaceName: string
+  type: string
+  description: string
+  goals: string[]
+  startDate: string
+  targetEndDate: string
+  phases: PhaseInfo[]
+  knowledgeGraph: KnowledgeGraphInfo
+}
+
+export interface PhaseInfo {
+  phaseIndex: number
+  phaseName: string
+  knowledgePoints: string[]
+  weeks: number
+  resources: ResourceInfo[]
+}
+
+export interface ResourceInfo {
+  resourceType: string
+  title: string
+}
+
+export interface KnowledgeGraphInfo {
+  nodes: KnowledgeNode[]
+  edges: KnowledgeEdge[]
+}
+
+export interface KnowledgeNode {
+  name: string
+  description: string
+  category: string
+  importance: number
+}
+
+export interface KnowledgeEdge {
+  from: string
+  to: string
+  type: string
+}
