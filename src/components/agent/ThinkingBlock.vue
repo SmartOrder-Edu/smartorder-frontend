@@ -38,7 +38,7 @@ const props = defineProps<{
   streaming?: boolean
 }>()
 
-const expanded = ref(false)
+const expanded = ref(true)
 
 const formattedDuration = computed(() => {
   if (!props.durationMs) return ''
