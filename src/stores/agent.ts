@@ -141,6 +141,22 @@ export const useAgentStore = defineStore('agent', () => {
   }
 
   /**
+   * 将全局 reasoningSegments 同步到当前运行中 task 的 execState
+   */
+  function syncReasoningToRunningTask() {
+    if (!taskExecutionMap.value || taskExecutionMap.value.size === 0) return
+    for (const [, execState] of taskExecutionMap.value) {
+      if (execState.status === 'running') {
+        execState.reasoningSegments = reasoningSegments.value.map(seg => ({
+          ...seg,
+          toolCall: seg.toolCall ? { ...seg.toolCall } : undefined,
+        }))
+        break
+      }
+    }
+  }
+
+  /**
    * 处理 SSE 事件
    */
   function handleEvent(eventName: string, data: AgentTraceEvent) {
@@ -188,6 +204,7 @@ export const useAgentStore = defineStore('agent', () => {
             lastSeg.thinkingText += data.payload.text
           }
         }
+        syncReasoningToRunningTask()
         break
 
       case 'agent.tool.started': {
@@ -210,6 +227,7 @@ export const useAgentStore = defineStore('agent', () => {
             toolCall: newTool,
           })
         }
+        syncReasoningToRunningTask()
         break
       }
 
@@ -231,6 +249,7 @@ export const useAgentStore = defineStore('agent', () => {
           seg.toolCall.result = data.payload?.result
           seg.toolCall.durationMs = data.payload?.durationMs
         }
+        syncReasoningToRunningTask()
         break
       }
 
@@ -250,6 +269,7 @@ export const useAgentStore = defineStore('agent', () => {
           segF.toolCall.status = 'failed'
           segF.toolCall.durationMs = data.payload?.durationMs
         }
+        syncReasoningToRunningTask()
         break
       }
 
@@ -266,21 +286,47 @@ export const useAgentStore = defineStore('agent', () => {
         currentPlan.value = data.payload?.taskList || data.payload?.plan || null
         planNeedsConfirmation.value = data.payload?.needsConfirmation === true
 
-        // 如果携带 TaskList（新架构 TASK_LIST 类型），初始化执行状态
+        // 如果携带 TaskList（新架构 TASK_LIST 类型），初始化或增量更新执行状态
         const taskList = data.payload?.taskList
         if (taskList && taskList.tasks) {
           currentTaskList.value = taskList as TaskList
-          taskExecutionMap.value = new Map()
-          for (const task of taskList.tasks as TaskItem[]) {
-            taskExecutionMap.value.set(task.taskId, {
-              taskItem: task,
-              status: (task.status?.toLowerCase() as TaskExecutionState['status']) || 'pending',
-              retryCount: task.retryCount || 0,
-              reasoningSegments: [],
-              thinkText: '',
-            })
+          if (!taskExecutionMap.value || taskExecutionMap.value.size === 0) {
+            // 首次创建：全量初始化
+            taskExecutionMap.value = new Map()
+            for (const task of taskList.tasks as TaskItem[]) {
+              taskExecutionMap.value.set(task.taskId, {
+                taskItem: task,
+                status: (task.status?.toLowerCase() as TaskExecutionState['status']) || 'pending',
+                retryCount: task.retryCount || 0,
+                reasoningSegments: [],
+                thinkText: '',
+              })
+            }
+          } else {
+            // 后续快照：增量更新，保留已有执行状态（时间、推理过程等）
+            for (const task of taskList.tasks as TaskItem[]) {
+              const existing = taskExecutionMap.value.get(task.taskId)
+              if (existing) {
+                existing.taskItem = task
+                // 如果后端状态比前端更新，同步过来
+                const backendStatus = task.status?.toLowerCase()
+                if (backendStatus && backendStatus !== existing.status && backendStatus !== 'running') {
+                  existing.status = backendStatus as TaskExecutionState['status']
+                }
+                existing.retryCount = task.retryCount || 0
+              } else {
+                taskExecutionMap.value.set(task.taskId, {
+                  taskItem: task,
+                  status: (task.status?.toLowerCase() as TaskExecutionState['status']) || 'pending',
+                  retryCount: task.retryCount || 0,
+                  reasoningSegments: [],
+                  thinkText: '',
+                })
+              }
+            }
           }
           planPauseInfo.value = null
+          planExecuting.value = taskList.status === 'EXECUTING'
           // TASK_LIST 模式不打开 PlanRevealOverlay（使用 PlanChecklist 代替）
           planDialogVisible.value = false
         } else {
@@ -436,6 +482,26 @@ export const useAgentStore = defineStore('agent', () => {
           }
         }
         if (payload?.type === 'plan_replanned') {
+          const newTaskList = payload?.taskList as TaskList | undefined
+          if (newTaskList && newTaskList.tasks) {
+            currentTaskList.value = newTaskList
+            const newMap = new Map<string, TaskExecutionState>()
+            for (const task of newTaskList.tasks) {
+              const existing = taskExecutionMap.value.get(task.taskId)
+              if (existing && (existing.status === 'completed' || existing.status === 'failed')) {
+                newMap.set(task.taskId, { ...existing, taskItem: task })
+              } else {
+                newMap.set(task.taskId, {
+                  taskItem: task,
+                  status: (task.status?.toLowerCase() as TaskExecutionState['status']) || 'pending',
+                  retryCount: task.retryCount || 0,
+                  reasoningSegments: [],
+                  thinkText: '',
+                })
+              }
+            }
+            taskExecutionMap.value = newMap
+          }
           if (currentTaskList.value) {
             currentTaskList.value.status = 'EXECUTING'
           }

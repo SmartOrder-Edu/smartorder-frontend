@@ -886,7 +886,6 @@ function isPlanAwaitingConfirmation(taskList: TaskList): boolean {
   return taskList.status === 'DRAFT'
     || taskList.status === 'PENDING_CONFIRM'
     || taskList.status === 'PAUSED_CONFIRMATION'
-    || taskList.status === 'PAUSED_CLARIFICATION'
 }
 
 /** 判断消息是否包含推理过程（思考或工具调用） */

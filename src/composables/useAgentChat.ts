@@ -42,6 +42,81 @@ function computeTotalKPs(plan: any): number {
   return plan.phases.reduce((sum: number, p: any) => sum + (p.knowledgePoints?.length || 0), 0)
 }
 
+/**
+ * 从 traceEvents 中重建每个 task 的 reasoningSegments
+ */
+function rebuildTaskReasoningFromTrace(
+  execMap: Map<string, TaskExecutionState>,
+  traceEvents: AgentTraceEvent[],
+) {
+  type Range = { startIdx: number; endIdx: number }
+  const taskRanges = new Map<string, Range>()
+  let activeTaskId: string | null = null
+  let activeStart = -1
+
+  for (let i = 0; i < traceEvents.length; i++) {
+    const et = traceEvents[i].eventType || ''
+    if (et === 'agent.plan.task.started') {
+      activeTaskId = traceEvents[i].payload?.taskId || ''
+      activeStart = i
+    } else if (
+      (et === 'agent.plan.task.completed' || et === 'agent.plan.task.failed') &&
+      activeTaskId
+    ) {
+      taskRanges.set(activeTaskId, { startIdx: activeStart, endIdx: i })
+      activeTaskId = null
+    }
+  }
+  // 最后一个 task 未正常结束，延伸到尾部
+  if (activeTaskId) {
+    taskRanges.set(activeTaskId, { startIdx: activeStart, endIdx: traceEvents.length - 1 })
+  }
+
+  for (const [taskId, { startIdx, endIdx }] of taskRanges) {
+    const execState = execMap.get(taskId)
+    if (!execState) continue
+
+    const segments: ReasoningSegment[] = []
+    let currentThinkText = ''
+
+    for (let i = startIdx; i <= endIdx; i++) {
+      const evt = traceEvents[i]
+      const et = evt.eventType || ''
+
+      if (et === 'agent.think.delta' && evt.payload?.text) {
+        currentThinkText += evt.payload.text
+      } else if (et === 'agent.tool.started') {
+        segments.push({
+          thinkingText: currentThinkText,
+          toolCall: {
+            toolName: evt.payload?.toolName || '未知工具',
+            status: 'running',
+            arguments: evt.payload?.arguments,
+            startedAt: evt.timestamp,
+          },
+        })
+        currentThinkText = ''
+      } else if (et === 'agent.tool.completed' || et === 'agent.tool.failed') {
+        for (let s = segments.length - 1; s >= 0; s--) {
+          const tc = segments[s].toolCall
+          if (tc && tc.toolName === (evt.payload?.toolName || '') && tc.status === 'running') {
+            tc.status = et === 'agent.tool.completed' ? 'completed' : 'failed'
+            if (et === 'agent.tool.completed') tc.result = evt.payload?.result
+            tc.durationMs = evt.payload?.durationMs
+            break
+          }
+        }
+      }
+    }
+
+    if (currentThinkText) {
+      segments.push({ thinkingText: currentThinkText })
+    }
+
+    execState.reasoningSegments = segments
+  }
+}
+
 export function useAgentChat(scrollCallback?: () => void) {
   const agentStore = useAgentStore()
   const messages = ref<ChatMessage[]>([])
@@ -176,11 +251,13 @@ export function useAgentChat(scrollCallback?: () => void) {
             const data = JSON.parse(event.data) as AgentTraceEvent
             agentStore.handleEvent(event.event, data)
 
-            // plan.created 时设置 planExecuting = false（进入审阅阶段）
-            // 不提前推送消息——让计划摘要通过 TEXT_DELTA 累积到 answerText，
-            // 等 done 事件时统一推送完整消息（含 taskList/taskExecutionMap）
+            // plan.created 时根据 taskList.status 推导 planExecuting
+            // （后端 EXECUTING 状态时不应强制改为 false）
             if (event.event === 'agent.plan.created') {
-              agentStore.planExecuting = false
+              const tl = data.payload?.taskList
+              if (tl) {
+                agentStore.planExecuting = tl.status === 'EXECUTING'
+              }
             }
           } catch {
             // 非 JSON 忽略
@@ -210,6 +287,14 @@ export function useAgentChat(scrollCallback?: () => void) {
   const confirmPlan = async (draftId: string) => {
     agentStore.planConfirmLoading = true
     agentStore.resetExecutionSteps()
+    // 清空上一轮规划的 trace/推理/工具，避免与执行轮次混合
+    // （后端确认接口创建新的 traceId，前端也需重置对应状态）
+    agentStore.thinkingText = ''
+    agentStore.thinkingStartTime = null
+    agentStore.toolCalls = []
+    agentStore.reasoningSegments = []
+    agentStore.traceEvents = []
+    agentStore.routeResult = null
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
 
     // SSE 请求前主动刷新 accessToken
@@ -575,6 +660,11 @@ export function useAgentChat(scrollCallback?: () => void) {
           }
           if (traceEvents.length > 0) {
             chatMsg.traceEvents = traceEvents
+          }
+
+          // 重建每个 task 的推理过程（从 trace events 中提取 think/tool 事件）
+          if (chatMsg.taskExecutionMap && chatMsg.taskExecutionMap.size > 0) {
+            rebuildTaskReasoningFromTrace(chatMsg.taskExecutionMap, traceEvents)
           }
 
           // 重建 reasoningSegments（仅在 API 未提供时用旧逻辑）
