@@ -12,7 +12,7 @@
         <span class="header-label">学习计划</span>
         <span class="header-goal">{{ taskList.userGoal }}</span>
       </div>
-      <button class="confirm-btn" @click="$emit('confirm')" :disabled="confirming">
+      <button v-if="!taskList.spaceCreated" class="confirm-btn" @click="$emit('confirm')" :disabled="confirming">
         <svg v-if="!confirming" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
@@ -76,6 +76,29 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- 学习空间创建成功提示 -->
+    <div v-if="taskList.spaceCreated" class="space-created-banner">
+      <div class="space-created-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <div class="space-created-text">
+        <span class="space-created-title">学习空间已创建</span>
+        <span class="space-created-name">{{ taskList.spaceCreated.spaceName }}</span>
+      </div>
+      <router-link
+        :to="`/space/${taskList.spaceCreated.spaceId}`"
+        class="space-created-link"
+      >
+        进入学习空间
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </router-link>
     </div>
 
     <!-- 统计栏 -->
@@ -539,6 +562,74 @@ const maxChainDepth = computed(() => {
   margin: 6px 0 0;
   font-size: 0.625rem;
   color: var(--text-muted, #94a3b8);
+}
+
+.space-created-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04));
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-md, 0.5rem);
+}
+
+.space-created-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.space-created-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.space-created-title {
+  font-size: 0.625rem;
+  color: #059669;
+  font-weight: 600;
+}
+
+.space-created-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dark, #0f172a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space-created-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: none;
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.space-created-link:hover {
+  background: rgba(16, 185, 129, 0.2);
+  transform: translateY(-1px);
 }
 
 @keyframes cardIn {

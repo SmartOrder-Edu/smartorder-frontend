@@ -481,6 +481,18 @@ export const useAgentStore = defineStore('agent', () => {
             execState.status = 'running'
           }
         }
+        if (payload?.type === 'space_created') {
+          // 学习空间创建成功：更新 TaskList 和回答文本
+          if (currentTaskList.value) {
+            currentTaskList.value.spaceCreated = {
+              spaceId: payload.spaceId,
+              spaceName: payload.spaceName || '',
+            }
+          }
+          if (payload.message) {
+            answerText.value += '\n\n' + payload.message
+          }
+        }
         if (payload?.type === 'plan_replanned') {
           const newTaskList = payload?.taskList as TaskList | undefined
           if (newTaskList && newTaskList.tasks) {

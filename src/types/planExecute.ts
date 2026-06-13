@@ -68,6 +68,11 @@ export interface TaskList {
   clarificationQuestion: string
   /** 确认草稿ID（PAUSED_CONFIRMATION 时填写） */
   confirmationDraftId: string
+  /** 学习空间创建成功后返回的信息 */
+  spaceCreated?: {
+    spaceId: number
+    spaceName: string
+  }
 }
 
 /** 任务执行状态（前端扩展，用于跟踪实时执行细节） */
