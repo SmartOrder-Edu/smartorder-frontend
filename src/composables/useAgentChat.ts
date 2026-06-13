@@ -124,7 +124,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   let abortController: AbortController | null = null
 
   /** 用户手动选择的运行模式，null 表示走意图路由 */
-  const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>(null)
+  const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>('REACT')
 
   // 流式输出时自动滚动
   watch(
