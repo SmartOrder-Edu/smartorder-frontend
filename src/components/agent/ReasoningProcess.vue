@@ -2,8 +2,8 @@
   <div class="reasoning-process" :class="{ collapsed: !expanded && !streaming, streaming }">
     <button class="reasoning-header" @click="toggleExpand" :aria-expanded="expanded">
       <span class="reasoning-icon">
-        <svg v-if="streaming" class="reasoning-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-          <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="32" />
+        <svg v-if="streaming" class="reasoning-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+          <circle cx="12" cy="12" r="10" stroke-dasharray="48" stroke-dashoffset="32" stroke-linecap="round" />
         </svg>
         <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <circle cx="12" cy="12" r="10"/>
@@ -15,9 +15,18 @@
       <span class="reasoning-label">
         <template v-if="streaming">思考与执行中...</template>
         <template v-else>
-          思考与执行过程
-          <span class="reasoning-stats" v-if="stepCount > 0">· {{ stepCount }}步</span>
-          <span class="reasoning-stats" v-if="formattedDuration">· {{ formattedDuration }}</span>
+          <span class="reasoning-title">思考与执行过程</span>
+          <span class="reasoning-stats-group">
+            <span class="reasoning-stats" v-if="stepCount > 0">
+              <span class="stats-sep">·</span>
+              <span class="stats-num">{{ stepCount }}</span>
+              <span class="stats-unit">步</span>
+            </span>
+            <span class="reasoning-stats" v-if="formattedDuration">
+              <span class="stats-sep">·</span>
+              <span class="stats-num">{{ formattedDuration }}</span>
+            </span>
+          </span>
         </template>
       </span>
       <span class="reasoning-chevron">
@@ -106,46 +115,48 @@ function toggleExpand() {
 <style scoped>
 .reasoning-process {
   margin-bottom: 10px;
-  border-radius: 8px;
-  background: rgba(59, 91, 219, 0.025);
-  border: 1px solid rgba(59, 91, 219, 0.08);
+  border-radius: 10px;
+  background: rgba(59, 91, 219, 0.035);
+  border: 1px solid rgba(59, 91, 219, 0.1);
   overflow: hidden;
-  transition: background 0.2s;
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .reasoning-process.streaming {
-  background: rgba(59, 91, 219, 0.04);
-  border-color: rgba(59, 91, 219, 0.12);
+  background: rgba(59, 91, 219, 0.055);
+  border-color: rgba(59, 91, 219, 0.16);
 }
 
 .reasoning-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  padding: 7px 10px;
+  padding: 8px 12px;
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   transition: background 0.15s;
 }
 
 .reasoning-header:hover {
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(59, 91, 219, 0.05);
 }
 
 .reasoning-icon {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  color: var(--primary-color, #3b5bdb);
+  width: 16px;
+  height: 16px;
+  color: #3b5bdb;
 }
 
 .reasoning-spinner {
-  animation: rp-spin 1.4s linear infinite;
-  opacity: 0.7;
+  animation: rp-spin 1.2s linear infinite;
 }
 
 @keyframes rp-spin {
@@ -155,20 +166,57 @@ function toggleExpand() {
 .reasoning-label {
   flex: 1;
   text-align: left;
-  font-weight: 500;
-  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: var(--text-dark, #303133);
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.reasoning-title {
+  flex-shrink: 0;
+}
+
+.reasoning-stats-group {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .reasoning-stats {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
   font-weight: 400;
-  opacity: 0.7;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.stats-sep {
+  opacity: 0.5;
+  margin-right: 1px;
+}
+
+.stats-num {
+  display: inline-block;
+  min-width: 2.4em;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-unit {
+  margin-left: -1px;
 }
 
 .reasoning-chevron {
   display: flex;
   align-items: center;
   color: var(--text-muted);
-  opacity: 0.5;
+  opacity: 0.55;
   transition: transform 0.2s;
 }
 
@@ -177,8 +225,25 @@ function toggleExpand() {
 }
 
 .reasoning-body {
-  padding: 0 8px 6px 8px;
-  border-top: 1px solid rgba(59, 91, 219, 0.06);
+  padding: 4px 8px 8px 8px;
+  border-top: 1px solid rgba(59, 91, 219, 0.08);
+  position: relative;
+}
+
+/* 左侧 timeline 竖线 */
+.reasoning-body::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(59, 91, 219, 0.18) 0%,
+    rgba(59, 91, 219, 0.1) 100%
+  );
+  pointer-events: none;
 }
 
 .inline-tool-calls {

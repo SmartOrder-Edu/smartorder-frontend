@@ -1505,6 +1505,13 @@ watch(windowWidth, (newWidth) => {
   max-width: 50%;
 }
 
+.message-wrapper.ai .message-content {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 820px;
+}
+
 .message-avatar {
   display: none;
 }
