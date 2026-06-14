@@ -2,8 +2,8 @@
   <div class="thinking-block" :class="{ collapsed: !expanded && !streaming }">
     <button class="thinking-header" @click="toggleExpand" :aria-expanded="expanded">
       <span class="thinking-icon">
-        <svg v-if="streaming" class="thinking-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-          <circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="32" />
+        <svg v-if="streaming" class="thinking-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+          <circle cx="12" cy="12" r="10" stroke-dasharray="48" stroke-dashoffset="32" stroke-linecap="round" />
         </svg>
         <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <circle cx="12" cy="12" r="10"/>
@@ -38,7 +38,7 @@ const props = defineProps<{
   streaming?: boolean
 }>()
 
-const expanded = ref(false)
+const expanded = ref(true)
 
 const formattedDuration = computed(() => {
   if (!props.durationMs) return ''
@@ -57,20 +57,18 @@ function toggleExpand() {
 
 <style scoped>
 .thinking-block {
-  margin-bottom: 8px;
-  border-radius: 8px;
-  background: rgba(59, 91, 219, 0.03);
-  border: 1px solid rgba(59, 91, 219, 0.08);
+  margin-bottom: 4px;
   overflow: hidden;
 }
 
 .thinking-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  padding: 6px 10px;
+  padding: 5px 8px 5px 10px;
   border: none;
+  border-radius: 4px;
   background: transparent;
   cursor: pointer;
   font-size: 0.75rem;
@@ -79,19 +77,21 @@ function toggleExpand() {
 }
 
 .thinking-header:hover {
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(59, 91, 219, 0.05);
 }
 
 .thinking-icon {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  color: var(--primary-color);
+  width: 16px;
+  height: 16px;
+  color: #3b5bdb;
 }
 
 .thinking-spinner {
-  animation: think-spin 1.4s linear infinite;
-  opacity: 0.7;
+  animation: think-spin 1.2s linear infinite;
 }
 
 @keyframes think-spin {
@@ -102,7 +102,8 @@ function toggleExpand() {
   flex: 1;
   text-align: left;
   font-weight: 500;
-  color: var(--text-muted);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
 }
 
 .thinking-chevron {
@@ -118,17 +119,17 @@ function toggleExpand() {
 }
 
 .thinking-body {
-  padding: 0 10px 8px 30px;
-  border-top: 1px solid rgba(59, 91, 219, 0.06);
+  padding: 2px 10px 6px 34px;
 }
 
 .thinking-text {
   margin: 0;
   font-size: 0.75rem;
-  line-height: 1.6;
-  color: var(--text-muted);
+  line-height: 1.65;
+  color: var(--text-secondary);
   white-space: pre-wrap;
   max-height: 300px;
   overflow-y: auto;
+  opacity: 0.92;
 }
 </style>

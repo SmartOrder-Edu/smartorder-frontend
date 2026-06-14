@@ -88,45 +88,48 @@ const formattedDuration = computed(() => {
 
 <style scoped>
 .tool-call-card {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   border-radius: 6px;
-  background: rgba(59, 130, 246, 0.03);
-  border: 1px solid rgba(59, 130, 246, 0.08);
   overflow: hidden;
   font-size: 0.75rem;
 }
 
 .tool-call-card.status-failed {
   background: rgba(245, 108, 108, 0.04);
-  border-color: rgba(245, 108, 108, 0.12);
+  border: 1px solid rgba(245, 108, 108, 0.12);
 }
 
 .tool-call-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 8px;
+  gap: 8px;
+  padding: 5px 8px 5px 10px;
+  position: relative;
 }
 
 .tool-icon {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   width: 16px;
   height: 16px;
 }
 
 .icon-completed {
-  color: #67c23a;
+  color: #52c41a;
+  font-size: 14px;
 }
 
 .icon-failed {
   color: #f56c6c;
+  font-size: 14px;
 }
 
 .tool-spinner {
   animation: tool-spin 1.2s linear infinite;
-  color: #409eff;
+  color: #3b5bdb;
+  font-size: 14px;
 }
 
 @keyframes tool-spin {
@@ -138,13 +141,15 @@ const formattedDuration = computed(() => {
   color: var(--text-dark);
   flex: 1;
   line-height: 1.4;
+  font-size: 0.75rem;
 }
 
 .tool-duration {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+  opacity: 0.75;
 }
 
 .tool-toggle-btn {
@@ -177,24 +182,22 @@ const formattedDuration = computed(() => {
 
 /* 结果区域 */
 .tool-result-area {
-  padding: 0 8px 6px 28px;
-  border-top: 1px solid rgba(59, 130, 246, 0.06);
-  margin-top: 0;
-  padding-top: 4px;
+  padding: 4px 8px 6px 34px;
 }
 
 .tool-result-text {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  line-height: 1.5;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
 }
 
 .tool-draft-note {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 3px;
-  font-size: 0.625rem;
-  color: #e6a23c;
+  margin-top: 4px;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  opacity: 0.85;
 }
 </style>

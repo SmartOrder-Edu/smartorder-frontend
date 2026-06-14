@@ -81,9 +81,9 @@
             </button>
             <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
           </div>
-          <div class="chat-flow" ref="chatContainer">
+          <div class="chat-flow">
             <div class="chat-flow-inner">
-            <div class="chat-messages" v-loading="loadingHistory">
+            <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
             <!-- 欢迎消息 -->
             <div class="welcome-message" v-if="messages.length === 0 && !agentStore.loading">
               <div class="welcome-avatar">
@@ -130,31 +130,26 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble" :class="{ 'user-bubble': msg.role === 'user' }">
-                  <!-- 思考与工具调用交错展示 -->
-                  <template v-if="msg.role === 'ai' && msg.reasoningSegments?.length">
-                    <template v-for="(seg, segIdx) in msg.reasoningSegments" :key="'seg-' + segIdx">
-                      <ThinkingBlock v-if="seg.thinkingText" :text="seg.thinkingText" />
-                      <ToolCallCard v-if="seg.toolCall" v-bind="seg.toolCall" />
-                    </template>
-                  </template>
-                  <template v-else>
-                    <!-- 向后兼容：旧消息格式 -->
-                    <ThinkingBlock
-                      v-if="msg.role === 'ai' && msg.thinkingText"
-                      :text="msg.thinkingText"
-                      :duration-ms="msg.thinkingDurationMs"
-                    />
-                    <div v-if="msg.role === 'ai' && msg.toolCalls?.length" class="inline-tool-calls">
-                      <ToolCallCard
-                        v-for="tc in msg.toolCalls"
-                        :key="tc.toolName + tc.startedAt"
-                        v-bind="tc"
-                      />
-                    </div>
-                  </template>
+                  <!-- 思考与工具调用过程（默认折叠） -->
+                  <ReasoningProcess
+                    v-if="msg.role === 'ai' && hasReasoningContent(msg)"
+                    :segments="msg.reasoningSegments || []"
+                    :thinking-text="msg.thinkingText || ''"
+                    :tool-calls="msg.toolCalls || []"
+                    :streaming="false"
+                    :duration-ms="msg.thinkingDurationMs || null"
+                  />
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
-                  <p v-else class="message-text">{{ msg.content }}</p>
+                  <template v-else>
+                    <p class="message-text">{{ msg.content }}</p>
+                    <div v-if="msg.attachmentFileIds?.length" class="message-attachment-hint">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                      </svg>
+                      <span>{{ msg.attachmentFileIds.length }}个附件</span>
+                    </div>
+                  </template>
 
                   <!-- 资源卡片 -->
                   <div v-if="msg.resources" class="message-resources">
@@ -197,8 +192,30 @@
                   </button>
                 </div>
 
-                <!-- 计划创建卡片 -->
-                <PlanCreatedCard v-if="msg.planSummary" :plan="msg.planSummary" />
+                <!-- 计划创建卡片（LEGACY 模式） -->
+                <PlanCreatedCard v-if="msg.planSummary && !msg.taskList" :plan="msg.planSummary" />
+
+                <!-- Plan-and-Execute: 规划审阅阶段（所有任务待执行） -->
+                <!-- 注意：不使用 msg.planExecuting 判断，因为自动确认竞态会导致该值不准确；
+                     改用 isPlanAwaitingConfirmation 根据 TaskList.status 精确判断 -->
+                <PlanChecklist
+                  v-if="msg.taskList && isPlanAwaitingConfirmation(msg.taskList) && !agentStore.showLearningPlanPreview"
+                  :task-list="msg.taskList"
+                  :confirming="agentStore.planConfirmLoading"
+                  @confirm="confirmPlan(msg.taskList.confirmationDraftId || agentStore.currentDraftId)"
+                />
+
+                <!-- Plan-and-Execute: 执行中/已完成的手风琴 -->
+                <PlanExecutionAccordion
+                  v-if="msg.taskList && !isPlanAwaitingConfirmation(msg.taskList)"
+                  :task-list="msg.taskList"
+                  :task-execution-map="msg.taskExecutionMap || new Map()"
+                  :pause-info="msg.pauseInfo || null"
+                  @gate-answer="handleGateAnswer"
+                  @gate-confirm="handleGateConfirm"
+                  @gate-cancel="handleGateCancel"
+                />
+
                 <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
               </div>
             </div>
@@ -215,40 +232,76 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble">
-                  <!-- 思考与工具调用交错展示（流式） -->
-                  <template v-if="agentStore.reasoningSegments.length">
-                    <template v-for="(seg, segIdx) in agentStore.reasoningSegments" :key="'seg-live-' + segIdx">
-                      <ThinkingBlock
-                        v-if="seg.thinkingText"
-                        :text="seg.thinkingText"
-                        :streaming="seg.thinkingStreaming"
-                      />
-                      <ToolCallCard v-if="seg.toolCall" v-bind="seg.toolCall" />
-                    </template>
-                  </template>
-                  <template v-else>
-                    <!-- 向后兼容：无 think 事件的引擎 -->
-                    <ThinkingBlock
-                      v-if="agentStore.thinkingText"
-                      :text="agentStore.thinkingText"
-                      :streaming="true"
-                    />
-                    <div v-if="agentStore.toolCalls.length" class="inline-tool-calls">
-                      <ToolCallCard
-                        v-for="tc in agentStore.toolCalls"
-                        :key="tc.toolName + tc.startedAt"
-                        v-bind="tc"
-                      />
-                    </div>
-                  </template>
+                  <!-- 阶段指示器 -->
+                  <div v-if="agentStore.currentPhase === 'PLANNING' && !agentStore.currentTaskList" class="phase-indicator">
+                    <span class="phase-spinner"></span>
+                    <span class="phase-label">正在分析目标并生成任务计划...</span>
+                  </div>
+                  <!-- 思考与工具调用过程（流式，自动展开） -->
+                  <ReasoningProcess
+                    v-if="hasLiveReasoningContent()"
+                    :segments="agentStore.reasoningSegments"
+                    :thinking-text="agentStore.thinkingText"
+                    :tool-calls="agentStore.toolCalls"
+                    :streaming="true"
+                  />
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
-                  <span class="streaming-cursor" v-if="agentStore.answerText"></span>
+                  <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
+
+                  <!-- 学习计划预览（LEARNING_PLAN 草稿审阅） -->
+                  <LearningPlanPreview
+                    v-if="agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
+                    :learning-plan="agentStore.learningPlanDraft"
+                    :confirming="agentStore.planConfirmLoading"
+                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
+                  />
+
+                  <!-- Plan-and-Execute: 紧凑状态卡片（任务详情在右侧面板） -->
+                  <PlanStatusCard
+                    v-if="agentStore.currentTaskList && !agentStore.showLearningPlanPreview"
+                    :task-list="agentStore.currentTaskList"
+                    :confirming="agentStore.planConfirmLoading"
+                    :completed-count="planCompletedCount"
+                    :total-count="planTotalCount"
+                    :current-running-desc="planCurrentRunningDesc"
+                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
+                  />
+
                   <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
-                  <div v-if="!agentStore.reasoningSegments.length && !agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText" class="loading-dots">
+                  <div v-if="!agentStore.reasoningSegments.length && !agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText && !agentStore.currentTaskList" class="loading-dots">
                     <span></span><span></span><span></span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <!-- 学习计划预览需要在 SSE 结束后继续保留，直到用户确认创建学习空间 -->
+            <div
+              class="message-wrapper ai learning-plan-review-wrapper"
+              v-if="!agentStore.loading && agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
+            >
+              <div class="message-avatar"></div>
+              <div class="message-content">
+                <LearningPlanPreview
+                  :learning-plan="agentStore.learningPlanDraft"
+                  :confirming="agentStore.planConfirmLoading"
+                  @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
+                />
+              </div>
+            </div>
+
+            <div
+              class="message-wrapper ai clarification-reply-wrapper"
+              v-if="!agentStore.loading && clarificationPauseInfo"
+            >
+              <div class="message-avatar"></div>
+              <div class="message-content">
+                <GateCard
+                  reason="CLARIFICATION"
+                  :question="clarificationPauseInfo.question"
+                  @answer="answer => handleGateAnswer(clarificationPauseInfo!.taskId, answer)"
+                />
               </div>
             </div>
           </div>
@@ -260,12 +313,19 @@
             <div class="chat-flow-inner">
             <div class="input-composer">
               <div class="composer-toolbar">
-                <button class="toolbar-btn" @click="handleUploadClick" title="上传文件（即将上线）">
+                <button class="toolbar-btn" @click="handleUploadClick" title="上传文件">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
                   </svg>
                   <span>上传</span>
                 </button>
+                <input
+                  ref="fileInputRef"
+                  class="hidden-file-input"
+                  type="file"
+                  multiple
+                  @change="handleFileSelected"
+                />
                 <button class="toolbar-btn" @click="handleContextClick" title="设置上下文（即将上线）">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -273,10 +333,54 @@
                   <span>上下文</span>
                 </button>
               </div>
+              <div class="attachment-strip" v-if="attachments.length || uploadProgress.status !== 'idle'">
+                <div class="attachment-chip uploading" v-if="uploadProgress.status !== 'idle' && uploadProgress.status !== 'success'">
+                  <span class="attachment-name">{{ uploadProgress.statusText || '正在上传附件...' }}</span>
+                  <span class="attachment-status">{{ uploadProgress.percentage }}%</span>
+                </div>
+                <div
+                  v-for="att in attachments"
+                  :key="att.fileId"
+                  class="attachment-chip"
+                  :class="att.status"
+                >
+                  <span class="attachment-name">{{ att.fileName }}</span>
+                  <span class="attachment-status">{{ attachmentStatusLabel(att) }}</span>
+                  <button class="attachment-remove" @click="removeAttachment(att)" title="移除附件">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="mode-selector">
+                <button
+                  class="mode-btn"
+                  :class="{ active: currentMode === 'REACT' }"
+                  @click="switchMode('REACT')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <polyline points="13,2 3,14 12,14 11,22 21,10 12,10"/>
+                  </svg>
+                  <span>快速回答</span>
+                </button>
+                <button
+                  class="mode-btn"
+                  :class="{ active: currentMode === 'PLAN_AND_EXECUTE' }"
+                  @click="switchMode('PLAN_AND_EXECUTE')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="8,12 11,15 16,9"/>
+                  </svg>
+                  <span>目标规划</span>
+                </button>
+              </div>
               <div class="composer-body">
                 <textarea
                   v-model="inputMessage"
-                  placeholder="输入你的问题，AI 会结合你的学习画像给出个性化回答…"
+                  :placeholder="inputPlaceholder"
                   rows="1"
                   @keydown.enter.exact.prevent="sendMessage"
                   @keydown.enter.shift.exact.stop
@@ -320,7 +424,7 @@
           </div>
         </main>
 
-        <!-- 右侧：快捷工具 -->
+        <!-- 右侧：快捷工具 + 任务执行面板 -->
         <aside class="tutor-sidebar">
           <!-- 知识库引用选择与展示区 -->
           <div class="sidebar-section">
@@ -365,7 +469,7 @@
                 </div>
               </div>
 
-              <!-- 清空按钮 - 移到底部 -->
+              <!-- 清空按钮 -->
               <button class="clear-all-btn-bottom" @click="confirmClearAll">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                   <polyline points="3,6 5,6 21,6"/>
@@ -390,7 +494,6 @@
             </div>
           </div>
 
-          <!-- 快捷工具 -->
           <div class="sidebar-section">
             <h3 class="section-title">快捷工具</h3>
             <div class="tools-grid">
@@ -406,6 +509,20 @@
               </button>
             </div>
           </div>
+
+          <!-- 任务执行面板（Plan-and-Execute 模式下出现） -->
+          <TaskExecutionPanel
+            v-if="!agentStore.showLearningPlanPreview"
+            :task-list="agentStore.currentTaskList"
+            :task-execution-map="agentStore.taskExecutionMap"
+            :pause-info="agentStore.planPauseInfo"
+            :confirming="agentStore.planConfirmLoading"
+            :live-reasoning-segments="agentStore.reasoningSegments"
+            @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
+            @gate-answer="handleGateAnswer"
+            @gate-confirm="handleGateConfirm"
+            @gate-cancel="handleGateCancel"
+          />
         </aside>
       </div>
       <!-- 移动端历史侧边栏遮罩 -->
@@ -414,9 +531,9 @@
     <!-- 追踪面板（抽屉式） -->
     <AgentTracePanel />
 
-    <!-- 学习蓝图揭幕面板 -->
+    <!-- 学习蓝图揭幕面板（LEGACY 模式） -->
     <PlanRevealOverlay
-      :visible="agentStore.planDialogVisible"
+      :visible="agentStore.planDialogVisible && !agentStore.currentTaskList"
       :plan="agentStore.currentPlan"
       :draft-id="agentStore.currentDraftId"
       :loading="agentStore.planConfirmLoading"
@@ -428,22 +545,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { useAgentChat } from '@/composables/useAgentChat'
+import { useAgentChat, type ChatMessage } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationVO } from '@/api/agent'
 import { agentApi } from '@/api/agent'
+import { agentAttachmentApi, type AttachmentStatus } from '@/api/agentAttachment'
 import type { AgentTraceEvent, ReasoningSegment } from '@/stores/agent'
+import type { TaskList } from '@/types/planExecute'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
-import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
-import ToolCallCard from '@/components/agent/ToolCallCard.vue'
+import ReasoningProcess from '@/components/agent/ReasoningProcess.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
+import PlanChecklist from '@/components/plan/PlanChecklist.vue'
+import PlanExecutionAccordion from '@/components/plan/PlanExecutionAccordion.vue'
+import TaskExecutionPanel from '@/components/plan/TaskExecutionPanel.vue'
+import GateCard from '@/components/plan/GateCard.vue'
+import PlanStatusCard from '@/components/plan/PlanStatusCard.vue'
+import LearningPlanPreview from '@/components/plan/LearningPlanPreview.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
+import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
 import type { RagReference } from '@/composables/useAgentChat'
 
@@ -453,9 +578,13 @@ const agentStore = useAgentStore()
 const inputMessage = ref('')
 const chatContainer = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
+const fileInputRef = ref<HTMLInputElement>()
 const activeContext = ref('global')
 const historySidebarOpen = ref(false)
 const copiedIndex = ref<number | null>(null)
+const attachments = ref<AttachmentStatus[]>([])
+const pollingTimers = new Map<number, number>()
+const { upload: uploadAttachment, uploadProgress, resetProgress } = useAgentAttachmentUpload()
 const selectedReferences = ref<RagReference[]>([])
 
 const { width: windowWidth } = useWindowSize()
@@ -480,15 +609,23 @@ const scrollToBottom = () => {
 const {
   messages,
   loadingHistory,
+  currentForceMode,
   sendMessage: agentSend,
   stopGeneration,
   confirmPlan,
   cancelPlan,
   loadConversation,
   startNewConversation,
-  clearMessages: agentClear,
   deleteConversation
 } = useAgentChat(scrollToBottom)
+
+// 用户手动选择的对话模式
+const currentMode = ref<'REACT' | 'PLAN_AND_EXECUTE'>('REACT')
+
+const switchMode = (mode: 'REACT' | 'PLAN_AND_EXECUTE') => {
+  currentMode.value = mode
+  currentForceMode.value = mode
+}
 
 const contextOptions = ref([
   { id: 'global', label: '全局学习', color: '#6b7280' },
@@ -557,13 +694,35 @@ const welcomeFeatures = [
   }
 ]
 
-const quickHints = [
-  '帮我制定一个学习计划',
-  '我今天应该重点学什么？',
-  '生成一组洛必达法则的练习题',
-  '软件工程项目帮我拆一下任务',
-  '帮我分析最近的薄弱点'
-]
+const inputPlaceholder = computed(() =>
+  currentMode.value === 'PLAN_AND_EXECUTE'
+    ? '描述你的学习目标，AI 将为你制定学习路径和计划…'
+    : '输入你的问题，AI 会结合你的学习画像给出个性化回答…'
+)
+
+const clarificationPauseInfo = computed(() => {
+  const pauseInfo = agentStore.planPauseInfo
+  if (!pauseInfo || pauseInfo.reason !== 'CLARIFICATION') return null
+  return pauseInfo
+})
+
+const quickHints = computed(() =>
+  currentMode.value === 'PLAN_AND_EXECUTE'
+    ? [
+        '帮我制定操作系统复习计划',
+        '帮我规划考研408备考方案',
+        '制定英语六级备考计划',
+        '帮我拆解软件工程项目任务',
+        '帮我安排计算机基础学习路径',
+      ]
+    : [
+        '帮我制定一个学习计划',
+        '我今天应该重点学什么？',
+        '生成一组洛必达法则的练习题',
+        '软件工程项目帮我拆一下任务',
+        '帮我分析最近的薄弱点',
+      ]
+)
 
 const quickTools = [
   {
@@ -619,13 +778,25 @@ const autoResize = () => {
 
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || agentStore.loading) return
+  if (attachments.value.some(a => a.status === 'processing' || a.status === 'uploading')) {
+    ElMessage.warning('附件仍在解析中，请稍后再提问')
+    return
+  }
   const msg = inputMessage.value
   inputMessage.value = ''
-  // 传递引用参数
-  const refs = selectedReferences.value.length > 0 ? selectedReferences.value : undefined
-  await agentSend(msg, refs)
-  // 发送后清空引用（可选，根据需求决定是否清空）
-  // selectedReferences.value = []
+  // 从 ready 附件构造 RagReference 列表
+  const attachmentRefs: RagReference[] = attachments.value
+    .filter(a => a.status === 'ready')
+    .map(a => ({
+      id: String(a.fileId),
+      name: a.fileName,
+      type: 'file' as const,
+    }))
+  // 合并附件引用和知识库引用（去重）
+  const existingIds = new Set(attachmentRefs.map(r => r.id))
+  const uniqueSelectedRefs = selectedReferences.value.filter(r => !existingIds.has(r.id))
+  const allRefs = [...attachmentRefs, ...uniqueSelectedRefs]
+  await agentSend(msg, allRefs.length > 0 ? allRefs : undefined)
 }
 
 const sendQuickMessage = (msg: string) => {
@@ -635,6 +806,7 @@ const sendQuickMessage = (msg: string) => {
 
 const handleNewChat = async () => {
   startNewConversation()
+  clearAttachmentState()
   await agentStore.fetchConversations()
 }
 
@@ -666,8 +838,126 @@ const handleDeleteConversation = async (conv: ConversationVO) => {
   }
 }
 
+const readyAttachmentIds = computed(() => {
+  return attachments.value
+    .filter(att => att.status === 'ready')
+    .map(att => att.fileId)
+})
+
 const handleUploadClick = () => {
-  ElMessage.info('文件上传功能即将上线，敬请期待')
+  fileInputRef.value?.click()
+}
+
+const handleFileSelected = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ''
+  if (!files.length) return
+
+  for (const file of files) {
+    try {
+      const result = await uploadAttachment(file, agentStore.currentConversationId || undefined)
+      if (result.conversationId && !agentStore.currentConversationId) {
+        agentStore.currentConversationId = result.conversationId
+      }
+      if (result.fileId) {
+        upsertAttachment({
+          conversationId: result.conversationId,
+          fileId: result.fileId,
+          jobId: result.jobId,
+          fileName: result.fileName || file.name,
+          fileSize: file.size,
+          status: result.status || 'processing',
+          parseStatus: result.parseStatus,
+          chunkStatus: result.chunkStatus,
+          embeddingStatus: result.embeddingStatus,
+          progress: result.progress,
+          currentStep: result.currentStep,
+          errorMessage: result.errorMessage,
+        })
+        startAttachmentPolling(result.conversationId, result.fileId)
+      }
+      ElMessage.success(`${file.name} 已上传，正在解析`)
+    } catch (error: any) {
+      ElMessage.error(error?.message || `${file.name} 上传失败`)
+    }
+  }
+  setTimeout(resetProgress, 800)
+}
+
+const upsertAttachment = (attachment: AttachmentStatus) => {
+  const index = attachments.value.findIndex(att => att.fileId === attachment.fileId)
+  if (index >= 0) {
+    attachments.value[index] = { ...attachments.value[index], ...attachment }
+  } else {
+    attachments.value.push(attachment)
+  }
+}
+
+const startAttachmentPolling = (conversationId: string, fileId: number) => {
+  if (pollingTimers.has(fileId)) {
+    window.clearInterval(pollingTimers.get(fileId))
+  }
+  const poll = async () => {
+    try {
+      const status = await agentAttachmentApi.getStatus(conversationId, fileId)
+      upsertAttachment(status)
+      if (status.status === 'ready' || status.status === 'failed' || status.status === 'deleted') {
+        const timer = pollingTimers.get(fileId)
+        if (timer) {
+          window.clearInterval(timer)
+          pollingTimers.delete(fileId)
+        }
+      }
+    } catch (e) {
+      console.warn('[AITutor] 附件状态轮询失败:', e)
+    }
+  }
+  poll()
+  pollingTimers.set(fileId, window.setInterval(poll, 2500))
+}
+
+const loadConversationAttachments = async (conversationId: string) => {
+  try {
+    const list = await agentAttachmentApi.list(conversationId)
+    attachments.value = list || []
+    attachments.value
+      .filter(att => att.status === 'processing' || att.status === 'uploading')
+      .forEach(att => startAttachmentPolling(conversationId, att.fileId))
+  } catch (e) {
+    console.warn('[AITutor] 加载附件失败:', e)
+    attachments.value = []
+  }
+}
+
+const removeAttachment = async (attachment: AttachmentStatus) => {
+  try {
+    await agentAttachmentApi.remove(attachment.conversationId, attachment.fileId)
+    attachments.value = attachments.value.filter(att => att.fileId !== attachment.fileId)
+    const timer = pollingTimers.get(attachment.fileId)
+    if (timer) {
+      window.clearInterval(timer)
+      pollingTimers.delete(attachment.fileId)
+    }
+  } catch {
+    ElMessage.error('移除附件失败，请重试')
+  }
+}
+
+const attachmentStatusLabel = (attachment: AttachmentStatus) => {
+  if (attachment.status === 'ready') return '可提问'
+  if (attachment.status === 'failed') return '解析失败'
+  if (attachment.progress != null) return `${attachment.currentStep || '解析中'} ${attachment.progress}%`
+  return '解析中'
+}
+
+const clearAttachmentState = () => {
+  for (const timer of pollingTimers.values()) {
+    window.clearInterval(timer)
+  }
+  pollingTimers.clear()
+  attachments.value = []
+  resetProgress()
 }
 
 const handleContextClick = () => {
@@ -729,6 +1019,7 @@ const copyMessage = async (content: string) => {
 
 const loadConversationFromSidebar = async (conv: ConversationVO) => {
   await loadConversation(conv.conversationId)
+  await loadConversationAttachments(conv.conversationId)
   if (isMobile.value) {
     historySidebarOpen.value = false
   }
@@ -736,6 +1027,64 @@ const loadConversationFromSidebar = async (conv: ConversationVO) => {
 
 const hasTraceEventsForMsg = (msg: any): boolean => {
   return !!(msg.traceEvents?.length) || !!msg.traceId
+}
+
+/**
+ * 判断计划是否正在等待用户确认执行。
+ */
+function isPlanAwaitingConfirmation(taskList: TaskList): boolean {
+  return taskList.status === 'DRAFT'
+    || taskList.status === 'PENDING_CONFIRM'
+    || taskList.status === 'PAUSED_CONFIRMATION'
+}
+
+/** PlanStatusCard 所需的计算属性 */
+const planCompletedCount = computed(() => {
+  let count = 0
+  for (const [, state] of agentStore.taskExecutionMap) {
+    if (state.status === 'completed') count++
+  }
+  return count
+})
+
+const planTotalCount = computed(() => {
+  return agentStore.currentTaskList?.tasks.length || 0
+})
+
+const planCurrentRunningDesc = computed(() => {
+  for (const [, state] of agentStore.taskExecutionMap) {
+    if (state.status === 'running') return state.taskItem.description
+  }
+  // 规划阶段或全部完成时返回空
+  return ''
+})
+
+/** 判断消息是否包含推理过程（思考或工具调用） */
+function hasReasoningContent(msg: ChatMessage): boolean {
+  return !!(
+    msg.reasoningSegments?.length ||
+    msg.thinkingText ||
+    msg.toolCalls?.length
+  )
+}
+
+/** 判断当前流式状态是否有推理内容 */
+function hasLiveReasoningContent(): boolean {
+  return !!(
+    agentStore.reasoningSegments.length ||
+    agentStore.thinkingText ||
+    agentStore.toolCalls.length
+  )
+}
+
+/** 取消自动执行倒计时 */
+function cancelAutoConfirm() {
+  if (autoConfirmTimer) {
+    clearInterval(autoConfirmTimer)
+    autoConfirmTimer = null
+  }
+  autoConfirmCountdown.value = 0
+  autoConfirmPending.value = false
 }
 
 const openMsgTrace = async (msg: any) => {
@@ -770,6 +1119,23 @@ const openMsgTrace = async (msg: any) => {
     }
   }
   agentStore.openTracePanel(msg.traceId)
+}
+
+// === Plan-and-Execute Gate 事件处理 ===
+
+const handleGateAnswer = (taskId: string, answer: string) => {
+  // CLARIFICATION gate: 用户回答后通过普通聊天发送
+  agentSend(answer, [])
+}
+
+const handleGateConfirm = (taskId: string) => {
+  // CONFIRMATION gate: 确认执行
+  confirmPlan(agentStore.currentDraftId)
+}
+
+const handleGateCancel = (_taskId: string) => {
+  // 取消执行
+  cancelPlan()
 }
 
 /**
@@ -908,10 +1274,81 @@ function interleaveThinkFromSegments(
   return result
 }
 
+// Plan-and-Execute 自动确认（纯 NORMAL 门计划无需手动确认）
+const autoConfirmPending = ref(false)
+const autoConfirmCountdown = ref(0)
+let autoConfirmTimer: ReturnType<typeof setInterval> | null = null
+
+// 监听 currentTaskList 变化，标记是否需要自动确认
+watch(
+  () => agentStore.currentTaskList,
+  (taskList) => {
+    // 清除上一次的定时器
+    if (autoConfirmTimer) {
+      clearInterval(autoConfirmTimer)
+      autoConfirmTimer = null
+    }
+    autoConfirmCountdown.value = 0
+    autoConfirmPending.value = false
+
+    // 只有纯 NORMAL 门（无 CONFIRMATION/CLARIFICATION）计划才能自动执行
+    const allNormal = taskList
+      && taskList.tasks.every(t => t.gate === 'NORMAL' && t.status === 'PENDING')
+
+    if (
+      taskList &&
+      allNormal &&
+      !agentStore.planExecuting &&
+      !agentStore.planNeedsConfirmation
+    ) {
+      autoConfirmPending.value = true
+      autoConfirmCountdown.value = 3
+      autoConfirmTimer = setInterval(() => {
+        autoConfirmCountdown.value--
+        if (autoConfirmCountdown.value <= 0) {
+          if (autoConfirmTimer) {
+            clearInterval(autoConfirmTimer)
+            autoConfirmTimer = null
+          }
+          if (autoConfirmPending.value && agentStore.currentTaskList && agentStore.currentDraftId && !agentStore.loading) {
+            autoConfirmPending.value = false
+            confirmPlan(agentStore.currentDraftId)
+          }
+        }
+      }, 750)
+    }
+  },
+)
+
+// 监听 loading 变化：当 SSE 流结束且需要自动确认时，立即触发
+watch(
+  () => agentStore.loading,
+  (loading) => {
+    if (!loading && autoConfirmPending.value && agentStore.currentDraftId) {
+      // 清除倒计时
+      if (autoConfirmTimer) {
+        clearInterval(autoConfirmTimer)
+        autoConfirmTimer = null
+      }
+      autoConfirmCountdown.value = 0
+      autoConfirmPending.value = false
+      confirmPlan(agentStore.currentDraftId)
+    }
+  },
+)
+
 onMounted(() => {
   agentStore.fetchConversations()
   if (window.innerWidth < 768) {
     historySidebarOpen.value = false
+  }
+})
+
+onUnmounted(() => {
+  clearAttachmentState()
+  if (autoConfirmTimer) {
+    clearInterval(autoConfirmTimer)
+    autoConfirmTimer = null
   }
 })
 
@@ -1218,6 +1655,13 @@ watch(windowWidth, (newWidth) => {
   max-width: 50%;
 }
 
+.message-wrapper.ai .message-content {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 820px;
+}
+
 .message-avatar {
   display: none;
 }
@@ -1253,6 +1697,19 @@ watch(windowWidth, (newWidth) => {
   margin: 0;
 }
 
+.message-attachment-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  width: fit-content;
+}
+
 /* 流式光标 */
 .streaming-cursor {
   display: inline-block;
@@ -1267,6 +1724,34 @@ watch(windowWidth, (newWidth) => {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* 阶段指示器 */
+.phase-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: var(--spacing-sm);
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.06), rgba(59, 91, 219, 0.04));
+  border: 1px solid rgba(18, 184, 134, 0.15);
+  border-radius: var(--radius-lg);
+  font-size: 0.8125rem;
+  color: #047857;
+}
+
+.phase-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(18, 184, 134, 0.2);
+  border-top-color: #10b981;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+.phase-label {
+  font-weight: 500;
 }
 
 .message-resources {
@@ -1406,11 +1891,58 @@ watch(windowWidth, (newWidth) => {
   box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.08);
 }
 
+/* 模式选择器 */
+.mode-selector {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px 0;
+}
+
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-btn svg {
+  flex-shrink: 0;
+}
+
+.mode-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: rgba(59, 91, 219, 0.04);
+}
+
+.mode-btn.active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
+}
+
+.mode-btn.active:hover {
+  background: #2c4fcc;
+  border-color: #2c4fcc;
+}
+
 .composer-toolbar {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 6px 8px 0;
+}
+
+.hidden-file-input {
+  display: none;
 }
 
 .toolbar-btn {
@@ -1431,6 +1963,83 @@ watch(windowWidth, (newWidth) => {
 .toolbar-btn:hover {
   background: rgba(59, 91, 219, 0.06);
   color: var(--primary-color);
+}
+
+.attachment-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px 0;
+}
+
+.attachment-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 8px;
+  border: 1px solid #dbe3ef;
+  background: white;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.attachment-chip.ready {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.attachment-chip.processing,
+.attachment-chip.uploading {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.attachment-chip.failed {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
+.attachment-status {
+  color: inherit;
+  opacity: 0.78;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+}
+
+.attachment-remove {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.attachment-remove:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.attachment-remove svg {
+  width: 12px;
+  height: 12px;
 }
 
 .composer-body {
@@ -1524,9 +2133,15 @@ watch(windowWidth, (newWidth) => {
 
 .footer-hints {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   justify-content: flex-end;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+  mask-image: linear-gradient(to right, transparent 0%, black 6px, black calc(100% - 6px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 6px, black calc(100% - 6px), transparent 100%);
 }
 
 .hint-chip {
@@ -1539,6 +2154,7 @@ watch(windowWidth, (newWidth) => {
   cursor: pointer;
   transition: all var(--transition-fast);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .hint-chip:hover {
@@ -1570,6 +2186,37 @@ watch(windowWidth, (newWidth) => {
   margin: 0 0 var(--spacing-sm);
 }
 
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-xs);
+}
+
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--spacing-sm);
+  background: var(--background-color-base);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+}
+
+.tool-card:hover {
+  background: white;
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.tool-icon { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
+.tool-icon :deep(svg) { width: 100%; height: 100%; }
+.tool-label { font-size: 0.6875rem; font-weight: 600; color: var(--text-dark); }
+.tool-desc { font-size: 0.5625rem; color: var(--text-muted); }
+
 /* 知识库引用列表包裹层 */
 .references-list-wrapper {
   display: flex;
@@ -1585,22 +2232,12 @@ watch(windowWidth, (newWidth) => {
   max-height: 400px;
   overflow-y: auto;
   padding-right: 4px;
-
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-  &::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 2px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 2px;
-  }
-  &::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-  }
 }
+
+.references-list::-webkit-scrollbar { width: 4px; }
+.references-list::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 2px; }
+.references-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+.references-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
 .reference-item {
   display: flex;
@@ -1620,13 +2257,8 @@ watch(windowWidth, (newWidth) => {
   box-shadow: var(--shadow-sm);
 }
 
-.reference-item.ref-kb {
-  border-left: 3px solid #10b981;
-}
-
-.reference-item.ref-file {
-  border-left: 3px solid #3b82f6;
-}
+.reference-item.ref-kb { border-left: 3px solid #10b981; }
+.reference-item.ref-file { border-left: 3px solid #3b82f6; }
 
 .ref-icon {
   width: 20px;
@@ -1679,9 +2311,7 @@ watch(windowWidth, (newWidth) => {
   opacity: 0;
 }
 
-.reference-item:hover .ref-remove-btn {
-  opacity: 1;
-}
+.reference-item:hover .ref-remove-btn { opacity: 1; }
 
 .ref-remove-btn:hover {
   color: #ef4444;
@@ -1705,12 +2335,9 @@ watch(windowWidth, (newWidth) => {
   color: #64748b;
   cursor: pointer;
   transition: all var(--transition-fast);
-
-  svg {
-    width: 14px;
-    height: 14px;
-  }
 }
+
+.clear-all-btn-bottom svg { width: 14px; height: 14px; }
 
 .clear-all-btn-bottom:hover {
   border-color: #ef4444;
@@ -1720,9 +2347,7 @@ watch(windowWidth, (newWidth) => {
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
 }
 
-.clear-all-btn-bottom:active {
-  transform: translateY(0);
-}
+.clear-all-btn-bottom:active { transform: translateY(0); }
 
 /* 空状态 */
 .empty-references {
@@ -1747,10 +2372,7 @@ watch(windowWidth, (newWidth) => {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
 }
 
-.empty-icon svg {
-  width: 28px;
-  height: 28px;
-}
+.empty-icon svg { width: 28px; height: 28px; }
 
 .empty-text {
   font-size: 0.8125rem;
@@ -1766,9 +2388,7 @@ watch(windowWidth, (newWidth) => {
 }
 
 /* RAG 选择器容器 */
-.rag-selector-container {
-  margin-bottom: var(--spacing-sm);
-}
+.rag-selector-container { margin-bottom: var(--spacing-sm); }
 
 .rag-selector-container :deep(.rag-reference-selector) {
   display: flex;
@@ -1788,61 +2408,21 @@ watch(windowWidth, (newWidth) => {
   font-weight: 500;
   transition: all 0.2s;
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
-
-  svg {
-    width: 16px;
-    height: 16px;
-  }
-
-  &:hover {
-    background: #2c4fcc;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
 }
 
-.rag-selector-container :deep(.rag-reference-selector .el-button svg) {
-  color: white;
+.rag-selector-container :deep(.rag-reference-selector .el-button svg) { color: white; }
+
+.rag-selector-container :deep(.rag-reference-selector .el-button):hover {
+  background: #2c4fcc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
 }
+
+.rag-selector-container :deep(.rag-reference-selector .el-button):active { transform: translateY(0); }
 
 .rag-selector-container :deep(.rag-reference-selector .reference-tags) {
-  display: none; /* 在右侧不显示标签，使用下面的引用列表代替 */
+  display: none;
 }
-
-.tools-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-xs);
-}
-
-.tool-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: var(--spacing-sm);
-  background: var(--background-color-base);
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  text-align: center;
-}
-
-.tool-card:hover {
-  background: white;
-  border-color: var(--primary-color);
-  box-shadow: var(--shadow-sm);
-}
-
-.tool-icon { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
-.tool-icon :deep(svg) { width: 100%; height: 100%; }
-.tool-label { font-size: 0.6875rem; font-weight: 600; color: var(--text-dark); }
-.tool-desc { font-size: 0.5625rem; color: var(--text-muted); }
 
 .history-list { display: flex; flex-direction: column; gap: 2px; }
 
@@ -1955,9 +2535,6 @@ watch(windowWidth, (newWidth) => {
   }
   .footer-hints {
     justify-content: flex-start;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
   }
 }
 </style>

@@ -1,6 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { agentApi, type ConversationVO, type ExecutionStep, type PlanSummary } from '@/api/agent'
+import type {
+  TaskList,
+  TaskItem,
+  TaskExecutionState,
+  PauseReason,
+  PlanPauseInfo,
+  LearningPlanDraft,
+  PhaseInfo,
+} from '@/types/planExecute'
 
 export interface AgentTraceEvent<T = any> {
   traceId: string
@@ -84,6 +93,21 @@ export const useAgentStore = defineStore('agent', () => {
   const planConfirmResult = ref<PlanSummary | null>(null)
   const planDialogClosing = ref(false)
 
+  // === Plan-and-Execute 状态 ===
+  const currentTaskList = ref<TaskList | null>(null)
+  const taskExecutionMap = ref<Map<string, TaskExecutionState>>(new Map())
+  const planPauseInfo = ref<PlanPauseInfo | null>(null)
+  /** 计划执行阶段是否正在运行（区别于普通 loading） */
+  const planExecuting = ref(false)
+  /** 计划是否需要用户确认（CONFIRMATION gate 为 true，全 NORMAL 为 false） */
+  const planNeedsConfirmation = ref(false)
+  /** 当前阶段（PLANNING / EXECUTING 等） */
+  const currentPhase = ref<string>('')
+
+  // === 学习计划草稿状态（LEARNING_PLAN 类型） ===
+  const learningPlanDraft = ref<LearningPlanDraft | null>(null)
+  const showLearningPlanPreview = ref(false)
+
   // === 追踪面板状态 ===
   const tracePanelVisible = ref(false)
   const activeTraceId = ref<string>('')
@@ -112,6 +136,33 @@ export const useAgentStore = defineStore('agent', () => {
     executionSteps.value = []
     planConfirmResult.value = null
     planDialogClosing.value = false
+    currentPhase.value = ''
+    // Plan-and-Execute 状态在 planExecuting 为 true 时不清除（跨消息保持）
+    if (!planExecuting.value) {
+      currentTaskList.value = null
+      taskExecutionMap.value = new Map()
+      planPauseInfo.value = null
+      planNeedsConfirmation.value = false
+    }
+    // 学习计划草稿状态——每次新对话重置
+    learningPlanDraft.value = null
+    showLearningPlanPreview.value = false
+  }
+
+  /**
+   * 将全局 reasoningSegments 同步到当前运行中 task 的 execState
+   */
+  function syncReasoningToRunningTask() {
+    if (!taskExecutionMap.value || taskExecutionMap.value.size === 0) return
+    for (const [, execState] of taskExecutionMap.value) {
+      if (execState.status === 'running') {
+        execState.reasoningSegments = reasoningSegments.value.map(seg => ({
+          ...seg,
+          toolCall: seg.toolCall ? { ...seg.toolCall } : undefined,
+        }))
+        break
+      }
+    }
   }
 
   /**
@@ -162,6 +213,7 @@ export const useAgentStore = defineStore('agent', () => {
             lastSeg.thinkingText += data.payload.text
           }
         }
+        syncReasoningToRunningTask()
         break
 
       case 'agent.tool.started': {
@@ -184,6 +236,7 @@ export const useAgentStore = defineStore('agent', () => {
             toolCall: newTool,
           })
         }
+        syncReasoningToRunningTask()
         break
       }
 
@@ -198,13 +251,14 @@ export const useAgentStore = defineStore('agent', () => {
         }
         // 同步更新 reasoningSegments
         const seg = reasoningSegments.value.find(
-          s => s.toolCall?.toolName === data.payload?.toolName && s.toolCall.status === 'running'
+          s => s.toolCall?.toolName === data.payload?.toolName && s.toolCall?.status === 'running'
         )
         if (seg?.toolCall) {
           seg.toolCall.status = 'completed'
           seg.toolCall.result = data.payload?.result
           seg.toolCall.durationMs = data.payload?.durationMs
         }
+        syncReasoningToRunningTask()
         break
       }
 
@@ -218,12 +272,13 @@ export const useAgentStore = defineStore('agent', () => {
         }
         // 同步更新 reasoningSegments
         const segF = reasoningSegments.value.find(
-          s => s.toolCall?.toolName === data.payload?.toolName && s.toolCall.status === 'running'
+          s => s.toolCall?.toolName === data.payload?.toolName && s.toolCall?.status === 'running'
         )
         if (segF?.toolCall) {
           segF.toolCall.status = 'failed'
           segF.toolCall.durationMs = data.payload?.durationMs
         }
+        syncReasoningToRunningTask()
         break
       }
 
@@ -231,11 +286,192 @@ export const useAgentStore = defineStore('agent', () => {
         routeResult.value = data.payload
         break
 
-      case 'agent.plan.created':
-        currentDraftId.value = data.payload?.draftId || ''
-        currentPlan.value = data.payload?.plan || null
-        planDialogVisible.value = true
+      case 'agent.phase.change':
+        currentPhase.value = data.payload?.phase || ''
         break
+
+      case 'agent.plan.created': {
+        currentDraftId.value = data.payload?.draftId || ''
+        currentPlan.value = data.payload?.taskList || data.payload?.plan || null
+        planNeedsConfirmation.value = data.payload?.needsConfirmation === true
+
+        // 如果携带 TaskList（新架构 TASK_LIST 类型），初始化或增量更新执行状态
+        const taskList = data.payload?.taskList
+        if (taskList && taskList.tasks) {
+          currentTaskList.value = taskList as TaskList
+          if (!taskExecutionMap.value || taskExecutionMap.value.size === 0) {
+            // 首次创建：全量初始化
+            taskExecutionMap.value = new Map()
+            for (const task of taskList.tasks as TaskItem[]) {
+              taskExecutionMap.value.set(task.taskId, {
+                taskItem: task,
+                status: (task.status?.toLowerCase() as TaskExecutionState['status']) || 'pending',
+                retryCount: task.retryCount || 0,
+                reasoningSegments: [],
+                thinkText: '',
+              })
+            }
+          } else {
+            // 后续快照：增量更新，保留已有执行状态（时间、推理过程等）
+            for (const task of taskList.tasks as TaskItem[]) {
+              const existing = taskExecutionMap.value.get(task.taskId)
+              if (existing) {
+                existing.taskItem = task
+                // 如果后端状态比前端更新，同步过来
+                const backendStatus = task.status?.toLowerCase()
+                if (backendStatus && backendStatus !== existing.status && backendStatus !== 'running') {
+                  existing.status = backendStatus as TaskExecutionState['status']
+                }
+                existing.retryCount = task.retryCount || 0
+              } else {
+                taskExecutionMap.value.set(task.taskId, {
+                  taskItem: task,
+                  status: (task.status?.toLowerCase() as TaskExecutionState['status']) || 'pending',
+                  retryCount: task.retryCount || 0,
+                  reasoningSegments: [],
+                  thinkText: '',
+                })
+              }
+            }
+          }
+          planPauseInfo.value = null
+          planExecuting.value = taskList.status === 'EXECUTING'
+          // TASK_LIST 模式不打开 PlanRevealOverlay（使用 PlanChecklist 代替）
+          planDialogVisible.value = false
+        } else {
+          // LEGACY 模式使用 PlanRevealOverlay
+          planDialogVisible.value = true
+        }
+        break
+      }
+
+      case 'agent.learning_plan.created': {
+        const plan = data.payload?.plan
+        if (plan) {
+          learningPlanDraft.value = {
+            draftId: data.payload?.draftId || '',
+            spaceName: plan.spaceName || '',
+            type: plan.type || 'course',
+            description: plan.description || '',
+            goals: parseGoals(plan.goals),
+            startDate: plan.startDate || '',
+            targetEndDate: plan.targetEndDate || '',
+            phases: parsePhases(plan.phases) || [],
+            knowledgeGraph: plan.knowledgeGraph || { nodes: [], edges: [] },
+          }
+          showLearningPlanPreview.value = true
+        }
+        break
+      }
+
+      // ====== Plan-and-Execute 事件 ======
+
+      case 'agent.plan.task.started': {
+        const taskId = data.payload?.taskId || ''
+        const execState = taskExecutionMap.value.get(taskId)
+        if (execState) {
+          execState.status = 'running'
+          execState.startedAt = Date.now()
+          execState.reasoningSegments = []
+          execState.thinkText = ''
+        }
+        if (currentTaskList.value) {
+          const task = currentTaskList.value.tasks.find(t => t.taskId === taskId)
+          if (task) task.status = 'RUNNING'
+        }
+        planExecuting.value = true
+        addExecutionStep({
+          stepName: `${taskId} - ${data.payload?.description || ''}`,
+          status: 'running',
+          startedAt: Date.now(),
+        })
+        break
+      }
+
+      case 'agent.plan.task.completed': {
+        const taskId = data.payload?.taskId || ''
+        const execState = taskExecutionMap.value.get(taskId)
+        if (execState) {
+          execState.status = 'completed'
+          execState.resultSummary = data.payload?.resultSummary || ''
+          execState.completedAt = Date.now()
+        }
+        if (currentTaskList.value) {
+          const task = currentTaskList.value.tasks.find(t => t.taskId === taskId)
+          if (task) {
+            task.status = 'COMPLETED'
+            task.resultSummary = data.payload?.resultSummary || ''
+          }
+        }
+        addExecutionStep({
+          stepName: `${taskId} - ${data.payload?.description || ''}`,
+          status: 'completed',
+          completedAt: Date.now(),
+        })
+        break
+      }
+
+      case 'agent.plan.task.failed': {
+        const taskId = data.payload?.taskId || ''
+        const execState = taskExecutionMap.value.get(taskId)
+        if (execState) {
+          execState.status = 'failed'
+          execState.errorMessage = data.payload?.errorMessage || ''
+          execState.completedAt = Date.now()
+        }
+        if (currentTaskList.value) {
+          const task = currentTaskList.value.tasks.find(t => t.taskId === taskId)
+          if (task) {
+            task.status = 'FAILED'
+            task.errorMessage = data.payload?.errorMessage || ''
+          }
+        }
+        addExecutionStep({
+          stepName: `${taskId} - ${data.payload?.description || ''}`,
+          status: 'failed',
+          message: data.payload?.errorMessage,
+        })
+        break
+      }
+
+      case 'agent.plan.paused': {
+        const reason = data.payload?.reason as PauseReason
+        const taskId = data.payload?.taskId || ''
+        const question = data.payload?.question || ''
+        planPauseInfo.value = { reason, taskId, question }
+
+        const execState = taskExecutionMap.value.get(taskId)
+        if (execState) {
+          execState.status = 'paused'
+        }
+        if (currentTaskList.value) {
+          if (reason === 'CLARIFICATION') {
+            currentTaskList.value.status = 'PAUSED_CLARIFICATION'
+            currentTaskList.value.clarificationQuestion = question
+          } else if (reason === 'CONFIRMATION') {
+            currentTaskList.value.status = 'PAUSED_CONFIRMATION'
+          }
+        }
+
+        if (reason === 'CLARIFICATION') {
+          const q = question || '请提供更多信息'
+          answerText.value += '\n\n' + q
+        }
+        break
+      }
+
+      case 'agent.plan.resumed': {
+        planPauseInfo.value = null
+        const taskId = data.payload?.taskId || ''
+        const execState = taskExecutionMap.value.get(taskId)
+        if (execState) {
+          execState.status = 'running'
+        }
+        if (currentTaskList.value) {
+          currentTaskList.value.status = 'EXECUTING'
+        }
+        break
+      }
 
       case 'agent.plan.step.started':
         addExecutionStep({
@@ -261,16 +497,66 @@ export const useAgentStore = defineStore('agent', () => {
         })
         break
 
-      // agent.status 在 plan confirm SSE 中可能包含执行步骤信息
-      case 'agent.status':
-        if (data.payload?.message) {
+      case 'agent.status': {
+        const payload = data.payload
+        if (payload?.type === 'task_retry') {
+          const taskId = payload.taskId || ''
+          const execState = taskExecutionMap.value.get(taskId)
+          if (execState) {
+            execState.retryCount = payload.attempt || (execState.retryCount + 1)
+            execState.reasoningSegments = []
+            execState.thinkText = ''
+            execState.status = 'running'
+          }
+        }
+        if (payload?.type === 'space_created') {
+          // 学习空间创建成功：更新 TaskList 和回答文本
+          if (currentTaskList.value) {
+            currentTaskList.value.spaceCreated = {
+              spaceId: payload.spaceId,
+              spaceName: payload.spaceName || '',
+            }
+          }
+          if (payload.message) {
+            answerText.value += '\n\n' + payload.message
+          }
+          // 隐藏学习计划预览（LEARNING_PLAN 路径确认后）
+          showLearningPlanPreview.value = false
+        }
+        if (payload?.type === 'plan_replanned') {
+          const newTaskList = payload?.taskList as TaskList | undefined
+          if (newTaskList && newTaskList.tasks) {
+            currentTaskList.value = newTaskList
+            const newMap = new Map<string, TaskExecutionState>()
+            for (const task of newTaskList.tasks) {
+              const existing = taskExecutionMap.value.get(task.taskId)
+              if (existing && (existing.status === 'completed' || existing.status === 'failed')) {
+                newMap.set(task.taskId, { ...existing, taskItem: task })
+              } else {
+                newMap.set(task.taskId, {
+                  taskItem: task,
+                  status: (task.status?.toLowerCase() as TaskExecutionState['status']) || 'pending',
+                  retryCount: task.retryCount || 0,
+                  reasoningSegments: [],
+                  thinkText: '',
+                })
+              }
+            }
+            taskExecutionMap.value = newMap
+          }
+          if (currentTaskList.value) {
+            currentTaskList.value.status = 'EXECUTING'
+          }
+        }
+        if (payload?.message) {
           addExecutionStep({
-            stepName: data.payload.message,
+            stepName: payload.message,
             status: 'running',
             startedAt: Date.now(),
           })
         }
         break
+      }
 
       case 'agent.error':
         if (data.payload?.message) {
@@ -307,6 +593,8 @@ export const useAgentStore = defineStore('agent', () => {
    */
   function finishTurn() {
     loading.value = false
+    answerText.value = ''
+    currentPhase.value = ''
     if (thinkingStartTime.value) {
       thinkingDurationMs.value = Date.now() - thinkingStartTime.value
     }
@@ -360,6 +648,24 @@ export const useAgentStore = defineStore('agent', () => {
     }
   }
 
+  /** 解析 goals（可能为数组或 JSON 字符串） */
+  function parseGoals(goals: any): string[] {
+    if (Array.isArray(goals)) return goals
+    if (typeof goals === 'string') {
+      try { return JSON.parse(goals) } catch { return [] }
+    }
+    return []
+  }
+
+  /** 解析 phases（可能为数组或 JSON 字符串） */
+  function parsePhases(phases: any): PhaseInfo[] {
+    if (Array.isArray(phases)) return phases
+    if (typeof phases === 'string') {
+      try { return JSON.parse(phases) } catch { return [] }
+    }
+    return []
+  }
+
   function reset() {
     currentConversationId.value = ''
     currentTraceId.value = ''
@@ -380,6 +686,14 @@ export const useAgentStore = defineStore('agent', () => {
     executionSteps.value = []
     planConfirmResult.value = null
     planDialogClosing.value = false
+    currentTaskList.value = null
+    taskExecutionMap.value = new Map()
+    planPauseInfo.value = null
+    planExecuting.value = false
+    planNeedsConfirmation.value = false
+    currentPhase.value = ''
+    learningPlanDraft.value = null
+    showLearningPlanPreview.value = false
   }
 
   return {
@@ -406,6 +720,15 @@ export const useAgentStore = defineStore('agent', () => {
     activeTraceId,
     conversations,
     conversationsLoading,
+    // Plan-and-Execute
+    currentTaskList,
+    taskExecutionMap,
+    planPauseInfo,
+    planExecuting,
+    planNeedsConfirmation,
+    currentPhase,
+    learningPlanDraft,
+    showLearningPlanPreview,
     startNewTurn,
     handleEvent,
     finishTurn,

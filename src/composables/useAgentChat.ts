@@ -3,8 +3,9 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent, type ToolCallState, type ReasoningSegment } from '@/stores/agent'
 import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
+import type { TaskList, TaskExecutionState, PlanPauseInfo, PauseReason } from '@/types/planExecute'
 
-export type AgentRunMode = 'REACT' | 'PLAN_EXECUTE' | 'MULTI_AGENT'
+export type AgentRunMode = 'REACT' | 'PLAN_AND_EXECUTE'
 
 export interface RagReference {
   id: string
@@ -27,6 +28,17 @@ export interface ChatMessage {
   timestamp: number
   planSummary?: PlanSummary
   executionSteps?: ExecutionStep[]
+  /** 本条消息关联的附件文件ID列表 */
+  attachmentFileIds?: number[]
+  /** Plan-and-Execute: TaskList（规划审阅阶段） */
+  taskList?: TaskList
+  /** Plan-and-Execute: 任务执行状态快照 */
+  taskExecutionMap?: Map<string, TaskExecutionState>
+  /** Plan-and-Execute: 暂停信息 */
+  pauseInfo?: PlanPauseInfo | null
+  /** Plan-and-Execute: 是否处于执行阶段 */
+  planExecuting?: boolean
+  /** RAG 引用（知识库/文件） */
   references?: RagReference[]
 }
 
@@ -40,11 +52,89 @@ function computeTotalKPs(plan: any): number {
   return plan.phases.reduce((sum: number, p: any) => sum + (p.knowledgePoints?.length || 0), 0)
 }
 
+/**
+ * 从 traceEvents 中重建每个 task 的 reasoningSegments
+ */
+function rebuildTaskReasoningFromTrace(
+  execMap: Map<string, TaskExecutionState>,
+  traceEvents: AgentTraceEvent[],
+) {
+  type Range = { startIdx: number; endIdx: number }
+  const taskRanges = new Map<string, Range>()
+  let activeTaskId: string | null = null
+  let activeStart = -1
+
+  for (let i = 0; i < traceEvents.length; i++) {
+    const et = traceEvents[i].eventType || ''
+    if (et === 'agent.plan.task.started') {
+      activeTaskId = traceEvents[i].payload?.taskId || ''
+      activeStart = i
+    } else if (
+      (et === 'agent.plan.task.completed' || et === 'agent.plan.task.failed') &&
+      activeTaskId
+    ) {
+      taskRanges.set(activeTaskId, { startIdx: activeStart, endIdx: i })
+      activeTaskId = null
+    }
+  }
+  // 最后一个 task 未正常结束，延伸到尾部
+  if (activeTaskId) {
+    taskRanges.set(activeTaskId, { startIdx: activeStart, endIdx: traceEvents.length - 1 })
+  }
+
+  for (const [taskId, { startIdx, endIdx }] of taskRanges) {
+    const execState = execMap.get(taskId)
+    if (!execState) continue
+
+    const segments: ReasoningSegment[] = []
+    let currentThinkText = ''
+
+    for (let i = startIdx; i <= endIdx; i++) {
+      const evt = traceEvents[i]
+      const et = evt.eventType || ''
+
+      if (et === 'agent.think.delta' && evt.payload?.text) {
+        currentThinkText += evt.payload.text
+      } else if (et === 'agent.tool.started') {
+        segments.push({
+          thinkingText: currentThinkText,
+          toolCall: {
+            toolName: evt.payload?.toolName || '未知工具',
+            status: 'running',
+            arguments: evt.payload?.arguments,
+            startedAt: evt.timestamp,
+          },
+        })
+        currentThinkText = ''
+      } else if (et === 'agent.tool.completed' || et === 'agent.tool.failed') {
+        for (let s = segments.length - 1; s >= 0; s--) {
+          const tc = segments[s].toolCall
+          if (tc && tc.toolName === (evt.payload?.toolName || '') && tc.status === 'running') {
+            tc.status = et === 'agent.tool.completed' ? 'completed' : 'failed'
+            if (et === 'agent.tool.completed') tc.result = evt.payload?.result
+            tc.durationMs = evt.payload?.durationMs
+            break
+          }
+        }
+      }
+    }
+
+    if (currentThinkText) {
+      segments.push({ thinkingText: currentThinkText })
+    }
+
+    execState.reasoningSegments = segments
+  }
+}
+
 export function useAgentChat(scrollCallback?: () => void) {
   const agentStore = useAgentStore()
   const messages = ref<ChatMessage[]>([])
   const loadingHistory = ref(false)
   let abortController: AbortController | null = null
+
+  /** 用户手动选择的运行模式，null 表示走意图路由 */
+  const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>('REACT')
 
   // 流式输出时自动滚动
   watch(
@@ -65,7 +155,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       abortController = null
     }
     // 将当前已累积的文本保存为消息
-    if (agentStore.answerText) {
+    if (agentStore.answerText || agentStore.currentTaskList) {
       messages.value.push({
         role: 'ai',
         content: agentStore.answerText + '\n\n*[已停止生成]*',
@@ -78,6 +168,12 @@ export function useAgentChat(scrollCallback?: () => void) {
           ? [...agentStore.reasoningSegments] : undefined,
         routeResult: agentStore.routeResult || undefined,
         timestamp: Date.now(),
+        // Plan-and-Execute: 附加计划状态到消息
+        taskList: agentStore.currentTaskList || undefined,
+        taskExecutionMap: agentStore.taskExecutionMap.size
+          ? new Map(agentStore.taskExecutionMap) : undefined,
+        pauseInfo: agentStore.planPauseInfo,
+        planExecuting: agentStore.planExecuting,
       })
     }
     agentStore.finishTurn()
@@ -90,16 +186,22 @@ export function useAgentChat(scrollCallback?: () => void) {
   const sendMessage = async (message: string, references?: RagReference[]) => {
     if (!message.trim() || agentStore.loading) return
 
+    // 从 references 中提取 fileIds（用于向下兼容）
+    const attachmentFileIds = references
+      ?.filter(r => r.type === 'file')
+      .map(r => Number(r.id))
+      .filter(id => !isNaN(id))
+
     // 添加用户消息到本地列表
     messages.value.push({
       role: 'user',
       content: message,
       timestamp: Date.now(),
+      attachmentFileIds: attachmentFileIds && attachmentFileIds.length > 0 ? attachmentFileIds : undefined,
       references: references && references.length > 0 ? [...references] : undefined,
     })
 
     agentStore.startNewTurn()
-    scrollCallback?.()
 
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -114,19 +216,19 @@ export function useAgentChat(scrollCallback?: () => void) {
     // 创建新的 AbortController
     abortController = new AbortController()
 
+    const isClarificationReply = agentStore.planPauseInfo?.reason === 'CLARIFICATION'
+      && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
+
     try {
       // 从 references 中提取 fileIds 和 knowledgeBaseIds
       let fileIds: number[] | undefined
       let knowledgeBaseIds: number[] | undefined
 
       if (references && references.length > 0) {
-        // 提取文件ID（type为'file'的引用）
         const files = references.filter(r => r.type === 'file')
         if (files.length > 0) {
           fileIds = files.map(r => parseInt(r.id))
         }
-
-        // 提取知识库ID（type为'kb'的引用）
         const kbs = references.filter(r => r.type === 'kb')
         if (kbs.length > 0) {
           knowledgeBaseIds = kbs.map(r => parseInt(r.id))
@@ -144,6 +246,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           conversationId: agentStore.currentConversationId || undefined,
           fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
           knowledgeBaseIds: knowledgeBaseIds && knowledgeBaseIds.length > 0 ? knowledgeBaseIds : undefined,
+          forceMode: isClarificationReply ? undefined : (currentForceMode.value || undefined),
         }),
         openWhenHidden: true,
         signal: abortController.signal,
@@ -152,8 +255,8 @@ export function useAgentChat(scrollCallback?: () => void) {
           if (!event.data) return
 
           if (event.event === 'done') {
-            // 将 AI 回复添加到消息列表
-            if (agentStore.answerText) {
+            // 将 AI 回复添加到消息列表（含 Plan-and-Execute 状态）
+            if (agentStore.answerText || agentStore.currentTaskList) {
               messages.value.push({
                 role: 'ai',
                 content: agentStore.answerText,
@@ -166,6 +269,12 @@ export function useAgentChat(scrollCallback?: () => void) {
                   ? [...agentStore.reasoningSegments] : undefined,
                 routeResult: agentStore.routeResult || undefined,
                 timestamp: Date.now(),
+                // Plan-and-Execute: 附加计划状态到消息
+                taskList: agentStore.currentTaskList || undefined,
+                taskExecutionMap: agentStore.taskExecutionMap.size
+                  ? new Map(agentStore.taskExecutionMap) : undefined,
+                pauseInfo: agentStore.planPauseInfo,
+                planExecuting: agentStore.planExecuting,
               })
             }
             agentStore.finishTurn()
@@ -178,19 +287,12 @@ export function useAgentChat(scrollCallback?: () => void) {
             const data = JSON.parse(event.data) as AgentTraceEvent
             agentStore.handleEvent(event.event, data)
 
-            // plan.created 时立即推送 AI 消息占位
+            // plan.created 时根据 taskList.status 推导 planExecuting
+            // （后端 EXECUTING 状态时不应强制改为 false）
             if (event.event === 'agent.plan.created') {
-              if (agentStore.answerText) {
-                messages.value.push({
-                  role: 'ai',
-                  content: agentStore.answerText,
-                  traceId: agentStore.currentTraceId,
-                  traceEvents: [...agentStore.traceEvents],
-                  reasoningSegments: agentStore.reasoningSegments?.length
-                    ? [...agentStore.reasoningSegments] : undefined,
-                  timestamp: Date.now(),
-                })
-                agentStore.answerText = ''
+              const tl = data.payload?.taskList
+              if (tl) {
+                agentStore.planExecuting = tl.status === 'EXECUTING'
               }
             }
           } catch {
@@ -219,8 +321,17 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 确认学习规划
    */
   const confirmPlan = async (draftId: string) => {
+    if (!draftId) return
     agentStore.planConfirmLoading = true
     agentStore.resetExecutionSteps()
+    // 清空上一轮规划的 trace/推理/工具，避免与执行轮次混合
+    // （后端确认接口创建新的 traceId，前端也需重置对应状态）
+    agentStore.thinkingText = ''
+    agentStore.thinkingStartTime = null
+    agentStore.toolCalls = []
+    agentStore.reasoningSegments = []
+    agentStore.traceEvents = []
+    agentStore.routeResult = null
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
 
     // SSE 请求前主动刷新 accessToken
@@ -254,6 +365,14 @@ export function useAgentChat(scrollCallback?: () => void) {
           if (event.event === 'done') {
             agentStore.planConfirmLoading = false
             agentStore.planDialogVisible = false
+            agentStore.planExecuting = false
+            if (agentStore.currentTaskList) {
+              const hasFailedTask = agentStore.currentTaskList.tasks.some(t => t.status === 'FAILED')
+              const hasRunningTask = agentStore.currentTaskList.tasks.some(t => t.status === 'RUNNING')
+              if (!hasRunningTask) {
+                agentStore.currentTaskList.status = hasFailedTask ? 'FAILED' : 'COMPLETED'
+              }
+            }
 
             // 构造 PlanSummary
             const plan = agentStore.currentPlan
@@ -285,6 +404,11 @@ export function useAgentChat(scrollCallback?: () => void) {
                 timestamp: Date.now(),
                 planSummary,
                 executionSteps: [...agentStore.executionSteps],
+                taskList: agentStore.currentTaskList || undefined,
+                taskExecutionMap: agentStore.taskExecutionMap.size
+                  ? new Map(agentStore.taskExecutionMap) : undefined,
+                pauseInfo: agentStore.planPauseInfo,
+                planExecuting: false,
               })
               agentStore.answerText = ''
             }
@@ -346,6 +470,18 @@ export function useAgentChat(scrollCallback?: () => void) {
           content: msg.content || '',
           traceId: msg.traceId || undefined,
           timestamp: new Date(msg.createTime).getTime(),
+        }
+
+        // 解析附件文件ID列表
+        if (msg.attachmentFileIds) {
+          try {
+            const parsed = JSON.parse(msg.attachmentFileIds)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              chatMsg.attachmentFileIds = parsed
+            }
+          } catch {
+            // 解析失败忽略
+          }
         }
 
         if (msg.role === 'assistant') {
@@ -452,6 +588,97 @@ export function useAgentChat(scrollCallback?: () => void) {
                 if (key !== null) pendingTools.delete(key)
                 break
               }
+              // ===== Plan-and-Execute 事件：恢复计划 / 任务状态 =====
+              case 'agent.plan.created': {
+                const tl = evt.payload?.taskList as TaskList | undefined
+                if (tl && tl.tasks) {
+                  chatMsg.taskList = tl
+                  const execMap = new Map<string, TaskExecutionState>()
+                  for (const task of tl.tasks) {
+                    execMap.set(task.taskId, {
+                      taskItem: task,
+                      status: (task.status?.toLowerCase() as TaskExecutionState['status']) || 'pending',
+                      retryCount: task.retryCount || 0,
+                      reasoningSegments: [],
+                      thinkText: '',
+                    })
+                  }
+                  chatMsg.taskExecutionMap = execMap
+                  chatMsg.planExecuting = tl.status === 'EXECUTING'
+                }
+                break
+              }
+              case 'agent.plan.task.started': {
+                const taskId = evt.payload?.taskId || ''
+                if (chatMsg.taskExecutionMap) {
+                  const es = chatMsg.taskExecutionMap.get(taskId)
+                  if (es) { es.status = 'running'; es.startedAt = evt.timestamp }
+                }
+                if (chatMsg.taskList) {
+                  const t = chatMsg.taskList.tasks.find(tk => tk.taskId === taskId)
+                  if (t) t.status = 'RUNNING'
+                }
+                chatMsg.planExecuting = true
+                break
+              }
+              case 'agent.plan.task.completed': {
+                const taskId = evt.payload?.taskId || ''
+                if (chatMsg.taskExecutionMap) {
+                  const es = chatMsg.taskExecutionMap.get(taskId)
+                  if (es) {
+                    es.status = 'completed'
+                    es.resultSummary = evt.payload?.resultSummary || ''
+                    es.completedAt = evt.timestamp
+                  }
+                }
+                if (chatMsg.taskList) {
+                  const t = chatMsg.taskList.tasks.find(tk => tk.taskId === taskId)
+                  if (t) { t.status = 'COMPLETED'; t.resultSummary = evt.payload?.resultSummary || '' }
+                }
+                break
+              }
+              case 'agent.plan.task.failed': {
+                const taskId = evt.payload?.taskId || ''
+                if (chatMsg.taskExecutionMap) {
+                  const es = chatMsg.taskExecutionMap.get(taskId)
+                  if (es) {
+                    es.status = 'failed'
+                    es.errorMessage = evt.payload?.errorMessage || ''
+                  }
+                }
+                if (chatMsg.taskList) {
+                  const t = chatMsg.taskList.tasks.find(tk => tk.taskId === taskId)
+                  if (t) { t.status = 'FAILED'; t.errorMessage = evt.payload?.errorMessage || '' }
+                }
+                break
+              }
+              case 'agent.plan.paused': {
+                chatMsg.pauseInfo = {
+                  reason: evt.payload?.reason || 'CLARIFICATION',
+                  taskId: evt.payload?.taskId || '',
+                  question: evt.payload?.question || '',
+                }
+                if (chatMsg.taskExecutionMap) {
+                  const es = chatMsg.taskExecutionMap.get(evt.payload?.taskId || '')
+                  if (es) es.status = 'paused'
+                }
+                if (chatMsg.taskList) {
+                  const reason = evt.payload?.reason
+                  if (reason === 'CLARIFICATION') {
+                    chatMsg.taskList.status = 'PAUSED_CLARIFICATION'
+                  } else if (reason === 'CONFIRMATION') {
+                    chatMsg.taskList.status = 'PAUSED_CONFIRMATION'
+                  }
+                }
+                break
+              }
+              case 'agent.plan.resumed': {
+                chatMsg.pauseInfo = null
+                if (chatMsg.taskList) {
+                  chatMsg.taskList.status = 'EXECUTING'
+                }
+                break
+              }
             }
           }
 
@@ -470,6 +697,11 @@ export function useAgentChat(scrollCallback?: () => void) {
           }
           if (traceEvents.length > 0) {
             chatMsg.traceEvents = traceEvents
+          }
+
+          // 重建每个 task 的推理过程（从 trace events 中提取 think/tool 事件）
+          if (chatMsg.taskExecutionMap && chatMsg.taskExecutionMap.size > 0) {
+            rebuildTaskReasoningFromTrace(chatMsg.taskExecutionMap, traceEvents)
           }
 
           // 重建 reasoningSegments（仅在 API 未提供时用旧逻辑）
@@ -544,6 +776,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   return {
     messages,
     loadingHistory,
+    currentForceMode,
     sendMessage,
     stopGeneration,
     confirmPlan,
