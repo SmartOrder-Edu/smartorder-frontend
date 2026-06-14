@@ -103,6 +103,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '测评中心 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/exam/session',
+    name: 'ExamSession',
+    component: () => import('@/views/ExamSession/index.vue'),
+    meta: { title: '开始测评 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import('@/views/Profile/index.vue'),
@@ -119,6 +125,24 @@ const routes: Array<RouteRecordRaw> = [
     name: 'FilePreview',
     component: () => import('@/views/CloudDrive/preview.vue'),
     meta: { title: '在线文件预览 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/feedback',
+    name: 'FeedbackSubmit',
+    component: () => import('@/views/feedback/FeedbackSubmit.vue'),
+    meta: { title: '意见反馈 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/admin/feedback',
+    name: 'FeedbackReviewList',
+    component: () => import('@/views/feedback/FeedbackReviewList.vue'),
+    meta: { title: '反馈智能管理台 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/admin/prize',
+    name: 'PrizeManagement',
+    component: () => import('@/views/feedback/PrizeManagement.vue'),
+    meta: { title: '反馈奖品管理 - 知序智学', requiresAuth: true }
   },
   {
     path: '/:pathMatch(.*)*',

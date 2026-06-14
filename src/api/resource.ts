@@ -76,9 +76,9 @@ export function batchMoveToFolder(data: {
 }
 
 /** 更新解析状态 */
-export function updateParseStatus(id: string, status: string) {
-  return request.put<string>(`/yun-resource/${id}/parse-status`, null, {
-    params: { status }
+export function updateParseStatus(id: string, parseStatus: string) {
+  return request.put<string>(`/yun-resource/file/${id}/parse-status`, null, {
+    params: { parseStatus }
   })
 }
 
@@ -95,6 +95,7 @@ export interface InitUploadRes {
   uploadId: string
   uploadedChunksParts: number[]
   fileId: string
+  isFinished?: boolean
 }
 
 /** 初始化分片上传（支持秒传和断点续传检查） */

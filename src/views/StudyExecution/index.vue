@@ -5,13 +5,15 @@
       <div class="study-nav">
         <button class="back-btn" @click="$router.back()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-            <polyline points="15,18 9,12 15,6"/>
+            <polyline points="15,18 9,12 15,6" />
           </svg>
           返回
         </button>
         <div class="breadcrumb">
           <span>学习空间</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="9,18 15,12 9,6"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+            <polyline points="9,18 15,12 9,6" />
+          </svg>
           <span class="current">学习执行</span>
         </div>
       </div>
@@ -31,21 +33,16 @@
           </div>
 
           <div class="steps-list" v-if="stepStore.steps.length">
-            <div
-              v-for="(step, index) in stepStore.steps"
-              :key="step.id"
-              class="step-item"
-              :class="{
-                active: stepStore.currentStepIndex === index,
-                completed: step.status === 'completed',
-                skipped: step.status === 'skipped',
-              }"
-              @click="stepStore.goToStep(index)"
-            >
+            <div v-for="(step, index) in stepStore.steps" :key="step.id" class="step-item" :class="{
+              active: stepStore.currentStepIndex === index,
+              completed: step.status === 'completed',
+              skipped: step.status === 'skipped',
+            }" @click="stepStore.goToStep(index)">
               <div class="step-indicator">
                 <div class="step-dot">
-                  <svg v-if="step.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="14" height="14">
-                    <polyline points="20,6 9,17 4,12"/>
+                  <svg v-if="step.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="3" width="14" height="14">
+                    <polyline points="20,6 9,17 4,12" />
                   </svg>
                   <span v-else>{{ index + 1 }}</span>
                 </div>
@@ -63,7 +60,8 @@
           <div class="sidebar-footer">
             <div class="summary-stat">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12,6 12,12 16,14" />
               </svg>
               <span>预计 {{ stepStore.totalEstimatedMinutes }} 分钟</span>
             </div>
@@ -90,28 +88,17 @@
 
             <!-- Navigation -->
             <div class="content-nav">
-              <el-button
-                :disabled="stepStore.currentStepIndex === 0"
-                @click="stepStore.prevStep()"
-              >
+              <el-button :disabled="stepStore.currentStepIndex === 0" @click="stepStore.prevStep()">
                 ← 上一步
               </el-button>
               <span class="nav-position">
                 {{ stepStore.currentStepIndex + 1 }} / {{ stepStore.steps.length }}
               </span>
-              <el-button
-                type="primary"
-                v-if="stepStore.currentStepIndex < stepStore.steps.length - 1"
-                @click="stepStore.nextStep()"
-              >
+              <el-button type="primary" v-if="stepStore.currentStepIndex < stepStore.steps.length - 1"
+                @click="stepStore.nextStep()">
                 下一步 →
               </el-button>
-              <el-button
-                v-else
-                type="success"
-                @click="handleFinish"
-                :loading="finishing"
-              >
+              <el-button v-else type="success" @click="handleFinish" :loading="finishing">
                 完成学习
               </el-button>
             </div>
@@ -120,13 +107,8 @@
         </main>
 
         <!-- Right: Agent Companion -->
-        <StudyAgentPanel
-          :hint="agentHint"
-          :loading-complete="finishing"
-          @feedback="handleFeedback"
-          @send-message="handleAgentMessage"
-          @complete="handleFinish"
-        />
+        <StudyAgentPanel :hint="agentHint" :loading-complete="finishing" @feedback="handleFeedback"
+          @send-message="handleAgentMessage" @complete="handleFinish" />
       </div>
     </div>
   </AppLayout>
@@ -240,7 +222,11 @@ onMounted(async () => {
   font-size: 0.8125rem;
   color: #6b7280;
   cursor: pointer;
-  &:hover { background: #f9fafb; color: #374151; }
+
+  &:hover {
+    background: #f9fafb;
+    color: #374151;
+  }
 }
 
 .breadcrumb {
@@ -250,7 +236,10 @@ onMounted(async () => {
   font-size: 0.8125rem;
   color: #9ca3af;
 
-  .current { color: #374151; font-weight: 500; }
+  .current {
+    color: #374151;
+    font-weight: 500;
+  }
 }
 
 /* ========== Container ========== */
@@ -272,14 +261,22 @@ onMounted(async () => {
   position: sticky;
   top: 100px;
 
-  @media (max-width: 1024px) { width: 100%; position: static; }
+  @media (max-width: 1024px) {
+    width: 100%;
+    position: static;
+  }
 }
 
 .sidebar-header {
   padding: 16px 16px 12px;
   border-bottom: 1px solid #f3f4f6;
 
-  h3 { font-size: 0.9375rem; font-weight: 600; color: #1a1a2e; margin: 0 0 8px; }
+  h3 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin: 0 0 8px;
+  }
 }
 
 .progress-mini {
@@ -287,7 +284,11 @@ onMounted(async () => {
   align-items: center;
   gap: 10px;
 
-  span { font-size: 0.6875rem; color: #9ca3af; white-space: nowrap; }
+  span {
+    font-size: 0.6875rem;
+    color: #9ca3af;
+    white-space: nowrap;
+  }
 }
 
 .progress-bar {
@@ -318,17 +319,36 @@ onMounted(async () => {
   padding: 10px 16px;
   cursor: pointer;
   transition: background 0.1s;
-  &:hover { background: #f9fafb; }
+
+  &:hover {
+    background: #f9fafb;
+  }
 
   &.active {
     background: #eff6ff;
-    .step-dot { background: #3b82f6; border-color: #3b82f6; color: white; }
+
+    .step-dot {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      color: white;
+    }
   }
+
   &.completed {
-    .step-dot { background: #10b981; border-color: #10b981; color: white; }
-    .step-line { background: #10b981; }
+    .step-dot {
+      background: #10b981;
+      border-color: #10b981;
+      color: white;
+    }
+
+    .step-line {
+      background: #10b981;
+    }
   }
-  &.skipped { opacity: 0.5; }
+
+  &.skipped {
+    opacity: 0.5;
+  }
 }
 
 .step-indicator {
@@ -339,11 +359,15 @@ onMounted(async () => {
 }
 
 .step-dot {
-  width: 24px; height: 24px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 2px solid #e5e7eb;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.6875rem; font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 600;
   color: #9ca3af;
   background: white;
 }
@@ -364,22 +388,54 @@ onMounted(async () => {
 }
 
 .step-title {
-  font-size: 0.8125rem; font-weight: 500; color: #374151;
-  .step-item.active & { color: #1a1a2e; font-weight: 600; }
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+
+  .step-item.active & {
+    color: #1a1a2e;
+    font-weight: 600;
+  }
 }
 
 .step-type-badge {
-  font-size: 0.625rem; padding: 0 6px; border-radius: 99px;
+  font-size: 0.625rem;
+  padding: 0 6px;
+  border-radius: 99px;
   align-self: flex-start;
-  &.learn { background: #eff6ff; color: #3b82f6; }
-  &.practice { background: #fef3c7; color: #d97706; }
-  &.review { background: #ede9fe; color: #7c3aed; }
-  &.rest { background: #ecfdf5; color: #10b981; }
+
+  &.learn {
+    background: #eff6ff;
+    color: #3b82f6;
+  }
+
+  &.practice {
+    background: #fef3c7;
+    color: #d97706;
+  }
+
+  &.review {
+    background: #ede9fe;
+    color: #7c3aed;
+  }
+
+  &.rest {
+    background: #ecfdf5;
+    color: #10b981;
+  }
 }
 
-.step-estimate { font-size: 0.6875rem; color: #9ca3af; }
+.step-estimate {
+  font-size: 0.6875rem;
+  color: #9ca3af;
+}
 
-.steps-empty { padding: 24px; text-align: center; color: #9ca3af; font-size: 0.8125rem; }
+.steps-empty {
+  padding: 24px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.8125rem;
+}
 
 .sidebar-footer {
   padding: 12px 16px;
@@ -387,8 +443,11 @@ onMounted(async () => {
 }
 
 .summary-stat {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 0.8125rem; color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: #6b7280;
 }
 
 /* ========== Center Content ========== */
@@ -409,19 +468,42 @@ onMounted(async () => {
 }
 
 .content-badge {
-  font-size: 0.6875rem; padding: 2px 10px; border-radius: 99px;
-  &.learn { background: #eff6ff; color: #3b82f6; }
-  &.practice { background: #fef3c7; color: #d97706; }
-  &.review { background: #ede9fe; color: #7c3aed; }
-  &.rest { background: #ecfdf5; color: #10b981; }
+  font-size: 0.6875rem;
+  padding: 2px 10px;
+  border-radius: 99px;
+
+  &.learn {
+    background: #eff6ff;
+    color: #3b82f6;
+  }
+
+  &.practice {
+    background: #fef3c7;
+    color: #d97706;
+  }
+
+  &.review {
+    background: #ede9fe;
+    color: #7c3aed;
+  }
+
+  &.rest {
+    background: #ecfdf5;
+    color: #10b981;
+  }
 }
 
 .content-header h2 {
-  font-size: 1.25rem; font-weight: 700; color: #1a1a2e; margin: 8px 0 4px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 8px 0 4px;
 }
 
 .content-desc {
-  font-size: 0.8125rem; color: #6b7280; margin: 0 0 8px;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0 0 8px;
 }
 
 .content-body {
@@ -433,23 +515,111 @@ onMounted(async () => {
   color: #374151;
   line-height: 1.8;
 
-  :deep(h2) { font-size: 1.25rem; font-weight: 700; color: #1a1a2e; margin: 20px 0 10px; }
-  :deep(h3) { font-size: 1.1rem; font-weight: 600; color: #1a1a2e; margin: 16px 0 8px; }
-  :deep(h4) { font-size: 1rem; font-weight: 600; color: #374151; margin: 12px 0 6px; }
-  :deep(hr) { border: none; border-top: 1px solid #f0f0f0; margin: 16px 0; }
-  :deep(strong) { color: #1a1a2e; }
-  :deep(ul) { padding-left: 20px; }
-  :deep(li) { margin: 4px 0; }
-  :deep(.math-block) { display: block; padding: 10px 16px; background: #f9fafb; border-radius: 8px; margin: 10px 0; font-style: italic; }
-  :deep(.math-inline) { font-style: italic; background: #f9fafb; padding: 1px 4px; border-radius: 4px; }
-  :deep(details) { margin: 10px 0; }
-  :deep(summary) { cursor: pointer; color: #3b82f6; font-weight: 500; }
-  :deep(table) { border-collapse: collapse; margin: 10px 0; width: 100%; }
-  :deep(th), :deep(td) { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left; font-size: 0.875rem; }
-  :deep(th) { background: #f9fafb; font-weight: 600; }
-  :deep(pre) { background: #1e1e2e; color: #e5e7eb; padding: 12px 16px; border-radius: 10px; overflow-x: auto; font-size: 0.8125rem; line-height: 1.6; }
-  :deep(code) { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 0.875rem; }
-  :deep(pre code) { background: none; padding: 0; }
+  :deep(h2) {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 20px 0 10px;
+  }
+
+  :deep(h3) {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin: 16px 0 8px;
+  }
+
+  :deep(h4) {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 12px 0 6px;
+  }
+
+  :deep(hr) {
+    border: none;
+    border-top: 1px solid #f0f0f0;
+    margin: 16px 0;
+  }
+
+  :deep(strong) {
+    color: #1a1a2e;
+  }
+
+  :deep(ul) {
+    padding-left: 20px;
+  }
+
+  :deep(li) {
+    margin: 4px 0;
+  }
+
+  :deep(.math-block) {
+    display: block;
+    padding: 10px 16px;
+    background: #f9fafb;
+    border-radius: 8px;
+    margin: 10px 0;
+    font-style: italic;
+  }
+
+  :deep(.math-inline) {
+    font-style: italic;
+    background: #f9fafb;
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+
+  :deep(details) {
+    margin: 10px 0;
+  }
+
+  :deep(summary) {
+    cursor: pointer;
+    color: #3b82f6;
+    font-weight: 500;
+  }
+
+  :deep(table) {
+    border-collapse: collapse;
+    margin: 10px 0;
+    width: 100%;
+  }
+
+  :deep(th),
+  :deep(td) {
+    border: 1px solid #e5e7eb;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.875rem;
+  }
+
+  :deep(th) {
+    background: #f9fafb;
+    font-weight: 600;
+  }
+
+  :deep(pre) {
+    background: #1e1e2e;
+    color: #e5e7eb;
+    padding: 12px 16px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+
+  :deep(code) {
+    background: #f3f4f6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.875rem;
+  }
+
+  :deep(pre code) {
+    background: none;
+    padding: 0;
+  }
 }
 
 .content-nav {

@@ -426,6 +426,74 @@
 
         <!-- 右侧：快捷工具 + 任务执行面板 -->
         <aside class="tutor-sidebar">
+          <!-- 知识库引用选择与展示区 -->
+          <div class="sidebar-section">
+            <h3 class="section-title">知识库引用</h3>
+
+            <!-- RAG 选择器 -->
+            <div class="rag-selector-container">
+              <RagReferenceSelector v-model="selectedReferences" />
+            </div>
+
+            <!-- 已选引用列表 -->
+            <div class="references-list-wrapper" v-if="selectedReferences.length > 0">
+              <div class="references-list">
+                <div
+                  v-for="ref in selectedReferences"
+                  :key="ref.id"
+                  class="reference-item"
+                  :class="'ref-' + ref.type"
+                >
+                  <div class="ref-icon">
+                    <svg v-if="ref.type === 'kb'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14,2 14,8 20,8"/>
+                    </svg>
+                  </div>
+                  <div class="ref-info">
+                    <span class="ref-name">{{ ref.name }}</span>
+                    <span class="ref-meta" v-if="ref.kbName">
+                      所属知识库：{{ ref.kbName }}
+                    </span>
+                  </div>
+                  <button class="ref-remove-btn" @click="removeReference(ref)" title="移除">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 清空按钮 -->
+              <button class="clear-all-btn-bottom" @click="confirmClearAll">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <polyline points="3,6 5,6 21,6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <line x1="10" y1="11" x2="10" y2="17"/>
+                  <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+                清空所有引用
+              </button>
+            </div>
+
+            <!-- 空状态提示 -->
+            <div class="empty-references" v-else>
+              <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+              </div>
+              <p class="empty-text">暂无知识库引用</p>
+              <p class="empty-hint">点击上方按钮选择知识库或文件</p>
+            </div>
+          </div>
+
           <div class="sidebar-section">
             <h3 class="section-title">快捷工具</h3>
             <div class="tools-grid">
@@ -501,6 +569,8 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
+import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
+import type { RagReference } from '@/composables/useAgentChat'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
@@ -515,6 +585,7 @@ const copiedIndex = ref<number | null>(null)
 const attachments = ref<AttachmentStatus[]>([])
 const pollingTimers = new Map<number, number>()
 const { upload: uploadAttachment, uploadProgress, resetProgress } = useAgentAttachmentUpload()
+const selectedReferences = ref<RagReference[]>([])
 
 const { width: windowWidth } = useWindowSize()
 const isMobile = computed(() => windowWidth.value < 768)
@@ -713,7 +784,19 @@ const sendMessage = async () => {
   }
   const msg = inputMessage.value
   inputMessage.value = ''
-  await agentSend(msg, readyAttachmentIds.value)
+  // 从 ready 附件构造 RagReference 列表
+  const attachmentRefs: RagReference[] = attachments.value
+    .filter(a => a.status === 'ready')
+    .map(a => ({
+      id: String(a.fileId),
+      name: a.fileName,
+      type: 'file' as const,
+    }))
+  // 合并附件引用和知识库引用（去重）
+  const existingIds = new Set(attachmentRefs.map(r => r.id))
+  const uniqueSelectedRefs = selectedReferences.value.filter(r => !existingIds.has(r.id))
+  const allRefs = [...attachmentRefs, ...uniqueSelectedRefs]
+  await agentSend(msg, allRefs.length > 0 ? allRefs : undefined)
 }
 
 const sendQuickMessage = (msg: string) => {
@@ -879,6 +962,27 @@ const clearAttachmentState = () => {
 
 const handleContextClick = () => {
   ElMessage.info('上下文设置功能即将上线，敬请期待')
+}
+
+const removeReference = (ref: RagReference) => {
+  selectedReferences.value = selectedReferences.value.filter(r => r.id !== ref.id)
+}
+
+const confirmClearAll = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要清空所有知识库引用吗？`,
+      '确认清空',
+      {
+        confirmButtonText: '清空',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    selectedReferences.value = []
+  } catch {
+    // 用户取消
+  }
 }
 
 const formatTime = (ts: number) => {
@@ -2112,6 +2216,213 @@ watch(windowWidth, (newWidth) => {
 .tool-icon :deep(svg) { width: 100%; height: 100%; }
 .tool-label { font-size: 0.6875rem; font-weight: 600; color: var(--text-dark); }
 .tool-desc { font-size: 0.5625rem; color: var(--text-muted); }
+
+/* 知识库引用列表包裹层 */
+.references-list-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+/* 知识库引用列表 */
+.references-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.references-list::-webkit-scrollbar { width: 4px; }
+.references-list::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 2px; }
+.references-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+.references-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+.reference-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.reference-item:hover {
+  background: white;
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.reference-item.ref-kb { border-left: 3px solid #10b981; }
+.reference-item.ref-file { border-left: 3px solid #3b82f6; }
+
+.ref-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-color);
+}
+
+.ref-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ref-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-meta {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-remove-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.reference-item:hover .ref-remove-btn { opacity: 1; }
+
+.ref-remove-btn:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+/* 清空所有按钮 */
+.clear-all-btn-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-top: var(--spacing-xs);
+  border: 1px solid #e5e7eb;
+  background: white;
+  border-radius: var(--radius-lg);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.clear-all-btn-bottom svg { width: 14px; height: 14px; }
+
+.clear-all-btn-bottom:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+.clear-all-btn-bottom:active { transform: translateY(0); }
+
+/* 空状态 */
+.empty-references {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-xl) var(--spacing-md);
+  text-align: center;
+  gap: var(--spacing-sm);
+}
+
+.empty-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(16, 185, 129, 0.08));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-color);
+  margin-bottom: var(--spacing-xs);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.empty-icon svg { width: 28px; height: 28px; }
+
+.empty-text {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.empty-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* RAG 选择器容器 */
+.rag-selector-container { margin-bottom: var(--spacing-sm); }
+
+.rag-selector-container :deep(.rag-reference-selector) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.rag-selector-container :deep(.rag-reference-selector .el-button) {
+  width: 100%;
+  justify-content: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-lg);
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.rag-selector-container :deep(.rag-reference-selector .el-button svg) { color: white; }
+
+.rag-selector-container :deep(.rag-reference-selector .el-button):hover {
+  background: #2c4fcc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+}
+
+.rag-selector-container :deep(.rag-reference-selector .el-button):active { transform: translateY(0); }
+
+.rag-selector-container :deep(.rag-reference-selector .reference-tags) {
+  display: none;
+}
 
 .history-list { display: flex; flex-direction: column; gap: 2px; }
 

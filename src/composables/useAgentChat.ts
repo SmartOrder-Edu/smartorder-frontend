@@ -7,6 +7,14 @@ import type { TaskList, TaskExecutionState, PlanPauseInfo, PauseReason } from '@
 
 export type AgentRunMode = 'REACT' | 'PLAN_AND_EXECUTE'
 
+export interface RagReference {
+  id: string
+  name: string
+  type: 'kb' | 'file'
+  kbId?: string
+  kbName?: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'ai'
   content: string
@@ -30,6 +38,8 @@ export interface ChatMessage {
   pauseInfo?: PlanPauseInfo | null
   /** Plan-and-Execute: 是否处于执行阶段 */
   planExecuting?: boolean
+  /** RAG 引用（知识库/文件） */
+  references?: RagReference[]
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -173,15 +183,22 @@ export function useAgentChat(scrollCallback?: () => void) {
   /**
    * 发送消息给 Agent（使用 fetch-event-source POST SSE）
    */
-  const sendMessage = async (message: string, fileIds: number[] = []) => {
+  const sendMessage = async (message: string, references?: RagReference[]) => {
     if (!message.trim() || agentStore.loading) return
+
+    // 从 references 中提取 fileIds（用于向下兼容）
+    const attachmentFileIds = references
+      ?.filter(r => r.type === 'file')
+      .map(r => Number(r.id))
+      .filter(id => !isNaN(id))
 
     // 添加用户消息到本地列表
     messages.value.push({
       role: 'user',
       content: message,
       timestamp: Date.now(),
-      attachmentFileIds: fileIds.length > 0 ? [...fileIds] : undefined,
+      attachmentFileIds: attachmentFileIds && attachmentFileIds.length > 0 ? attachmentFileIds : undefined,
+      references: references && references.length > 0 ? [...references] : undefined,
     })
 
     agentStore.startNewTurn()
@@ -203,6 +220,21 @@ export function useAgentChat(scrollCallback?: () => void) {
       && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
 
     try {
+      // 从 references 中提取 fileIds 和 knowledgeBaseIds
+      let fileIds: number[] | undefined
+      let knowledgeBaseIds: number[] | undefined
+
+      if (references && references.length > 0) {
+        const files = references.filter(r => r.type === 'file')
+        if (files.length > 0) {
+          fileIds = files.map(r => parseInt(r.id))
+        }
+        const kbs = references.filter(r => r.type === 'kb')
+        if (kbs.length > 0) {
+          knowledgeBaseIds = kbs.map(r => parseInt(r.id))
+        }
+      }
+
       await fetchEventSource(`${base}/agent/chat/stream`, {
         method: 'POST',
         headers: {
@@ -212,7 +244,8 @@ export function useAgentChat(scrollCallback?: () => void) {
         body: JSON.stringify({
           message,
           conversationId: agentStore.currentConversationId || undefined,
-          fileIds,
+          fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
+          knowledgeBaseIds: knowledgeBaseIds && knowledgeBaseIds.length > 0 ? knowledgeBaseIds : undefined,
           forceMode: isClarificationReply ? undefined : (currentForceMode.value || undefined),
         }),
         openWhenHidden: true,
