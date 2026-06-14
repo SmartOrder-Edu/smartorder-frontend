@@ -302,6 +302,27 @@ export function useAgentChat(scrollCallback?: () => void) {
 
         onerror(err) {
           console.error('[useAgentChat] SSE error:', err)
+          // 保存已累积的内容，避免渲染突然消失（与 stopGeneration 一致）
+          if (agentStore.answerText || agentStore.currentTaskList) {
+            messages.value.push({
+              role: 'ai',
+              content: agentStore.answerText + '\n\n*[连接中断]*',
+              traceId: agentStore.currentTraceId,
+              traceEvents: [...agentStore.traceEvents],
+              thinkingText: agentStore.thinkingText || undefined,
+              thinkingDurationMs: agentStore.thinkingDurationMs,
+              toolCalls: agentStore.toolCalls.length ? [...agentStore.toolCalls] : undefined,
+              reasoningSegments: agentStore.reasoningSegments?.length
+                ? [...agentStore.reasoningSegments] : undefined,
+              routeResult: agentStore.routeResult || undefined,
+              timestamp: Date.now(),
+              taskList: agentStore.currentTaskList || undefined,
+              taskExecutionMap: agentStore.taskExecutionMap.size
+                ? new Map(agentStore.taskExecutionMap) : undefined,
+              pauseInfo: agentStore.planPauseInfo,
+              planExecuting: agentStore.planExecuting,
+            })
+          }
           agentStore.finishTurn()
           abortController = null
           scrollCallback?.()
