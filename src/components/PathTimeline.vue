@@ -1,18 +1,18 @@
 <template>
   <div class="path-timeline">
     <div
-      v-for="(node, idx) in nodes"
-      :key="node.id"
+      v-for="(stage, idx) in stageNodes"
+      :key="stage.id"
       class="path-node"
-      :class="[node.status, { 'has-children': expandedNodes.has(node.id) }]"
+      :class="[stage.status, { 'has-children': expandedNodes.has(stage.id) }]"
     >
       <div class="node-marker">
-        <div class="node-line" v-if="idx < nodes.length - 1" :class="node.status"></div>
-        <div class="node-dot" :class="node.status" @click="toggleNode(node)">
-          <svg v-if="node.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="14" height="14">
+        <div class="node-line" v-if="idx < stageNodes.length - 1" :class="stage.status"></div>
+        <div class="node-dot" :class="stage.status" @click="toggleNode(stage)">
+          <svg v-if="stage.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="14" height="14">
             <polyline points="20,6 9,17 4,12"/>
           </svg>
-          <svg v-else-if="node.status === 'current'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+          <svg v-else-if="stage.status === 'current'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
             <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
           </svg>
           <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -23,41 +23,67 @@
         </div>
       </div>
 
-      <div class="node-content" @click="toggleNode(node)">
+      <div class="node-content" @click="toggleNode(stage)">
         <div class="node-header">
-          <span class="node-index" v-if="node.isMilestone">阶段 {{ node.sortOrder }}</span>
-          <span class="node-index sub" v-else>模块 {{ node.sortOrder }}</span>
-          <span class="node-type-badge" v-if="node.nodeType">{{ nodeTypeLabel(node.nodeType) }}</span>
-          <span class="node-milestone" v-if="node.isMilestone">里程碑</span>
+          <span class="node-index" v-if="stage.isMilestone">阶段 {{ idx + 1 }}</span>
+          <span class="node-index sub" v-else>阶段 {{ idx + 1 }}</span>
+          <span class="node-type-badge" v-if="stage.nodeType">{{ nodeTypeLabel(stage.nodeType) }}</span>
+          <span class="node-milestone" v-if="stage.isMilestone">里程碑</span>
         </div>
-        <h4 class="node-title">{{ node.title }}</h4>
-        <p class="node-desc">{{ node.description }}</p>
+        <h4 class="node-title">{{ stage.title }}</h4>
+        <p class="node-desc" v-if="stage.description">{{ stage.description }}</p>
         <div class="node-meta">
-          <span class="node-duration">{{ node.estimatedDurationMinutes }}分钟</span>
-          <span class="node-difficulty">{{ node.difficultyLevel }}</span>
-          <span class="node-status-tag" :class="node.status">{{ statusLabel(node.status) }}</span>
+          <span class="node-duration" v-if="stage.plannedDurationDays">计划 {{ stage.plannedDurationDays }} 天</span>
+          <span class="node-duration" v-else-if="stage.estimatedDurationMinutes">{{ stage.estimatedDurationMinutes }} 分钟</span>
+          <span class="node-difficulty" v-if="stage.difficultyLevel">难度 {{ stage.difficultyLevel }}</span>
+          <span class="node-status-tag" :class="stage.status">{{ statusLabel(stage.status) }}</span>
+          <span class="node-kp-count" v-if="getChildKps(stage.id).length">{{ getChildKps(stage.id).length }} 个知识点</span>
         </div>
       </div>
 
-      <div class="node-chevron" :class="{ open: expandedNodes.has(node.id) }">
+      <div class="node-chevron" :class="{ open: expandedNodes.has(stage.id) }">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <polyline points="6,9 12,15 18,9"/>
         </svg>
       </div>
 
-      <!-- Expanded children: tasks & resources for this node -->
-      <div class="node-children" v-if="expandedNodes.has(node.id)">
-        <div class="node-tasks" v-if="getNodeTasks(node.id).length">
-          <span class="children-label">关联任务</span>
-          <div class="node-task-item" v-for="t in getNodeTasks(node.id)" :key="t.id">
+      <!-- Expanded children: KPs (with their own resources) + stage tasks/resources -->
+      <div class="node-children" v-if="expandedNodes.has(stage.id)">
+        <!-- 子知识点列表 -->
+        <div class="kp-list" v-if="getChildKps(stage.id).length">
+          <span class="children-label">知识点</span>
+          <div
+            v-for="kp in getChildKps(stage.id)"
+            :key="kp.id"
+            class="kp-item"
+            :class="kp.status"
+          >
+            <span class="kp-marker" :class="kp.status"></span>
+            <div class="kp-body">
+              <div class="kp-title">{{ kp.title }}</div>
+              <div class="kp-meta" v-if="getNodeResources(kp.id).length || getNodeTasks(kp.id).length">
+                <span v-if="getNodeTasks(kp.id).length">任务 {{ getNodeTasks(kp.id).length }}</span>
+                <span v-if="getNodeResources(kp.id).length">资源 {{ getNodeResources(kp.id).length }}</span>
+              </div>
+            </div>
+            <span class="kp-status-tag" :class="kp.status">{{ statusLabel(kp.status) }}</span>
+          </div>
+        </div>
+
+        <!-- 阶段任务 -->
+        <div class="node-tasks" v-if="getNodeTasks(stage.id).length">
+          <span class="children-label">阶段任务</span>
+          <div class="node-task-item" v-for="t in getNodeTasks(stage.id)" :key="t.id">
             <span class="mini-dot" :class="t.status"></span>
             <span>{{ t.title }}</span>
             <span class="mini-status" :class="t.status">{{ miniStatusLabel(t.status) }}</span>
           </div>
         </div>
-        <div class="node-resources" v-if="getNodeResources(node.id).length">
-          <span class="children-label">关联资源</span>
-          <div class="node-resource-item" v-for="r in getNodeResources(node.id)" :key="r.id">
+
+        <!-- 阶段资源 -->
+        <div class="node-resources" v-if="getNodeResources(stage.id).length">
+          <span class="children-label">阶段资源</span>
+          <div class="node-resource-item" v-for="r in getNodeResources(stage.id)" :key="r.id">
             <span class="res-type-icon" :class="r.resourceType">{{ resourceIcon(r.resourceType) }}</span>
             <span>{{ r.title }}</span>
             <span class="res-source">{{ r.isAiGenerated ? 'AI生成' : '精选' }}</span>
@@ -69,20 +95,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { PathNodeVO, TaskVO, ResourceVO } from '@/types/learningSpace'
-import { taskApi } from '@/api/spaceDashboard'
 
-const expandedNodes = ref(new Set<number>())
+const props = defineProps<{
+  nodes: PathNodeVO[]
+  tasks: TaskVO[]
+  resources: ResourceVO[]
+}>()
+
+const expandedNodes = ref(new Set<string>())
+
+// 顶层只展示 stage 节点（按 sortOrder 升序）
+const stageNodes = computed(() =>
+  [...props.nodes]
+    .filter(n => n.nodeType === 'stage' || n.parentNodeId == null)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+)
+
+function getChildKps(stageId: string): PathNodeVO[] {
+  return props.nodes
+    .filter(n => n.parentNodeId === stageId && n.nodeType === 'knowledge_point')
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+}
 
 function toggleNode(node: PathNodeVO) {
-  if (expandedNodes.value.has(node.id)) {
-    expandedNodes.value.delete(node.id)
+  const next = new Set(expandedNodes.value)
+  if (next.has(node.id)) {
+    next.delete(node.id)
   } else {
-    expandedNodes.value.add(node.id)
+    next.add(node.id)
   }
-  // Trigger reactivity
-  expandedNodes.value = new Set(expandedNodes.value)
+  expandedNodes.value = next
 }
 
 function nodeTypeLabel(t: string) {
@@ -101,21 +145,15 @@ function miniStatusLabel(s: string) {
 }
 
 function resourceIcon(t: string) {
-  const m: Record<string, string> = { doc: '📄', video: '🎬', mind_map: '🧠', quiz: '📝', case_study: '📋', flashcard_set: '🃏', image: '🖼', audio: '🎵', link: '🔗' }
+  const m: Record<string, string> = { doc: '📄', video: '🎬', mind_map: '🧠', quiz: '📝', case_study: '📋', flashcard_set: '🃏', image: '🖼', audio: '🎵', link: '🔗', ppt: '📊' }
   return m[t] || '📄'
 }
 
-const props = defineProps<{
-  nodes: PathNodeVO[]
-  tasks: TaskVO[]
-  resources: ResourceVO[]
-}>()
-
-function getNodeTasks(nodeId: number) {
+function getNodeTasks(nodeId: string) {
   return props.tasks.filter(t => t.pathNodeId === nodeId)
 }
 
-function getNodeResources(nodeId: number) {
+function getNodeResources(nodeId: string) {
   return props.resources.filter(r => r.pathNodeId === nodeId)
 }
 </script>
@@ -133,6 +171,7 @@ export default { name: 'PathTimeline' }
   display: flex;
   gap: 16px;
   padding-bottom: 8px;
+  flex-wrap: wrap;
 
   &.locked { opacity: 0.45; }
 }
@@ -237,6 +276,7 @@ export default { name: 'PathTimeline' }
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .node-duration {
@@ -262,6 +302,14 @@ export default { name: 'PathTimeline' }
   &.locked { background: #f3f4f6; color: #9ca3af; }
 }
 
+.node-kp-count {
+  font-size: 0.6875rem;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
 .node-chevron {
   display: flex;
   align-items: flex-start;
@@ -275,7 +323,7 @@ export default { name: 'PathTimeline' }
 
 /* Expanded children */
 .node-children {
-  flex: 1;
+  flex: 1 0 100%;
   margin-left: 44px;
   padding: 12px 16px;
   margin-bottom: 16px;
@@ -290,6 +338,63 @@ export default { name: 'PathTimeline' }
   font-weight: 600;
   color: #6b7280;
   margin-bottom: 8px;
+  margin-top: 4px;
+}
+
+.kp-list { margin-bottom: 12px; }
+
+.kp-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  font-size: 0.8125rem;
+  color: #374151;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  border: 1px solid #f0f0f0;
+
+  &.locked { opacity: 0.6; }
+}
+
+.kp-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #d1d5db;
+
+  &.completed { background: #10b981; }
+  &.current { background: #3b82f6; }
+}
+
+.kp-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.kp-title {
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.kp-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 0.6875rem;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.kp-status-tag {
+  font-size: 0.6875rem;
+  padding: 1px 8px;
+  border-radius: 99px;
+
+  &.completed { background: #ecfdf5; color: #10b981; }
+  &.current { background: #eff6ff; color: #3b82f6; }
+  &.locked { background: #f3f4f6; color: #9ca3af; }
 }
 
 .node-task-item, .node-resource-item {

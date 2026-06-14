@@ -421,9 +421,16 @@ async function handleDelete(space: LearningSpaceDisplay) {
       '确认删除',
       { confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning' }
     )
+  } catch {
+    // 用户取消删除
+    return
+  }
+  try {
     await spaceStore.deleteSpace(space.id)
     ElMessage.success('已删除')
-  } catch { /* cancelled */ }
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败，请稍后重试')
+  }
 }
 
 onMounted(() => { spaceStore.fetchSpaces() })

@@ -105,7 +105,7 @@ export const useLearningSpaceStore = defineStore('learningSpace', () => {
     }
   }
 
-  async function fetchSpaceDetail(id: number) {
+  async function fetchSpaceDetail(id: string) {
     detailLoading.value = true
     error.value = null
     try {
@@ -126,7 +126,7 @@ export const useLearningSpaceStore = defineStore('learningSpace', () => {
     return display
   }
 
-  async function updateSpace(id: number, data: LearningSpaceDTO) {
+  async function updateSpace(id: string, data: LearningSpaceDTO) {
     const vo = await learningSpaceApi.update(id, data)
     const display = toDisplaySpace(vo)
     const idx = spaces.value.findIndex(s => s.id === id)
@@ -135,13 +135,13 @@ export const useLearningSpaceStore = defineStore('learningSpace', () => {
     return display
   }
 
-  async function deleteSpace(id: number) {
+  async function deleteSpace(id: string) {
     await learningSpaceApi.remove(id)
     spaces.value = spaces.value.filter(s => s.id !== id)
     if (currentSpace.value?.id === id) currentSpace.value = null
   }
 
-  async function changeSpaceStatus(id: number, status: LearningSpaceStatus) {
+  async function changeSpaceStatus(id: string, status: LearningSpaceStatus) {
     const vo = await learningSpaceApi.changeStatus(id, status)
     const display = toDisplaySpace(vo)
     const idx = spaces.value.findIndex(s => s.id === id)

@@ -20,8 +20,8 @@ export interface LearningSpaceDTO {
 
 /** 匹配后端 LearningSpaceVO */
 export interface LearningSpaceVO {
-  id: number
-  userId: number
+  id: string
+  userId: string
   name: string
   type: LearningSpaceType
   description: string
@@ -98,22 +98,22 @@ export const learningSpaceApi = {
   },
 
   /** 获取单个学习空间详情 */
-  detail(id: number) {
+  detail(id: string) {
     return request.get<LearningSpaceVO>(`/learning-spaces/${id}`)
   },
 
   /** 更新学习空间 */
-  update(id: number, data: LearningSpaceDTO) {
+  update(id: string, data: LearningSpaceDTO) {
     return request.put<LearningSpaceVO>(`/learning-spaces/${id}`, data)
   },
 
   /** 删除学习空间（逻辑删除） */
-  remove(id: number) {
+  remove(id: string) {
     return request.delete<string>(`/learning-spaces/${id}`)
   },
 
   /** 变更学习空间状态 */
-  changeStatus(id: number, status: LearningSpaceStatus) {
+  changeStatus(id: string, status: LearningSpaceStatus) {
     return request.patch<LearningSpaceVO>(`/learning-spaces/${id}/status`, null, {
       params: { status }
     })

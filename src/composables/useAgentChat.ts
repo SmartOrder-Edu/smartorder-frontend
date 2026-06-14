@@ -15,6 +15,13 @@ export interface RagReference {
   kbName?: string
 }
 
+export interface WebSearchReference {
+  citationIndex: number
+  title: string
+  url: string
+  snippet: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'ai'
   content: string
@@ -40,6 +47,8 @@ export interface ChatMessage {
   planExecuting?: boolean
   /** RAG 引用（知识库/文件） */
   references?: RagReference[]
+  /** 网络搜索引用来源 */
+  webSearchReferences?: WebSearchReference[]
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -174,6 +183,8 @@ export function useAgentChat(scrollCallback?: () => void) {
           ? new Map(agentStore.taskExecutionMap) : undefined,
         pauseInfo: agentStore.planPauseInfo,
         planExecuting: agentStore.planExecuting,
+        webSearchReferences: agentStore.currentWebSearchReferences.length
+          ? [...agentStore.currentWebSearchReferences] : undefined,
       })
     }
     agentStore.finishTurn()
@@ -275,6 +286,8 @@ export function useAgentChat(scrollCallback?: () => void) {
                   ? new Map(agentStore.taskExecutionMap) : undefined,
                 pauseInfo: agentStore.planPauseInfo,
                 planExecuting: agentStore.planExecuting,
+                webSearchReferences: agentStore.currentWebSearchReferences.length
+                  ? [...agentStore.currentWebSearchReferences] : undefined,
               })
             }
             agentStore.finishTurn()
@@ -302,6 +315,29 @@ export function useAgentChat(scrollCallback?: () => void) {
 
         onerror(err) {
           console.error('[useAgentChat] SSE error:', err)
+          // 保存已累积的内容，避免渲染突然消失（与 stopGeneration 一致）
+          if (agentStore.answerText || agentStore.currentTaskList) {
+            messages.value.push({
+              role: 'ai',
+              content: agentStore.answerText + '\n\n*[连接中断]*',
+              traceId: agentStore.currentTraceId,
+              traceEvents: [...agentStore.traceEvents],
+              thinkingText: agentStore.thinkingText || undefined,
+              thinkingDurationMs: agentStore.thinkingDurationMs,
+              toolCalls: agentStore.toolCalls.length ? [...agentStore.toolCalls] : undefined,
+              reasoningSegments: agentStore.reasoningSegments?.length
+                ? [...agentStore.reasoningSegments] : undefined,
+              routeResult: agentStore.routeResult || undefined,
+              timestamp: Date.now(),
+              taskList: agentStore.currentTaskList || undefined,
+              taskExecutionMap: agentStore.taskExecutionMap.size
+                ? new Map(agentStore.taskExecutionMap) : undefined,
+              pauseInfo: agentStore.planPauseInfo,
+              planExecuting: agentStore.planExecuting,
+              webSearchReferences: agentStore.currentWebSearchReferences.length
+                ? [...agentStore.currentWebSearchReferences] : undefined,
+            })
+          }
           agentStore.finishTurn()
           abortController = null
           scrollCallback?.()
@@ -573,6 +609,10 @@ export function useAgentChat(scrollCallback?: () => void) {
                   startedAt: entry?.startedAt || evt.timestamp,
                 })
                 if (key !== null) pendingTools.delete(key)
+                // 提取网络搜索引用
+                if (toolName === 'webSearch' && evt.payload?.webSearchReferences) {
+                  chatMsg.webSearchReferences = evt.payload.webSearchReferences
+                }
                 break
               }
               case 'agent.tool.failed': {

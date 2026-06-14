@@ -139,6 +139,11 @@
                     :streaming="false"
                     :duration-ms="msg.thinkingDurationMs || null"
                   />
+                  <!-- 网络搜索来源卡片 -->
+                  <WebSearchSources
+                    v-if="msg.role === 'ai' && msg.webSearchReferences?.length"
+                    :references="msg.webSearchReferences"
+                  />
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
                   <template v-else>
@@ -567,6 +572,7 @@ import PlanStatusCard from '@/components/plan/PlanStatusCard.vue'
 import LearningPlanPreview from '@/components/plan/LearningPlanPreview.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import WebSearchSources from '@/components/agent/WebSearchSources.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'

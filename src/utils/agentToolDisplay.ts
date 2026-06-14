@@ -24,10 +24,10 @@ const TOOL_META: Record<string, ToolDisplayMeta> = {
   queryKnowledge:         { label: '知识图谱',  icon: 'Connection',  riskLevel: 'read' },
   queryLearningProgress:  { label: '学习进度',  icon: 'TrendCharts', riskLevel: 'read' },
   queryTasks:             { label: '学习任务',  icon: 'List',        riskLevel: 'read' },
-  manageLearningTask:     { label: '学习计划',  icon: 'EditPen',     riskLevel: 'write_draft' },
   manageLearningPlan:     { label: '学习规划',  icon: 'EditPen',     riskLevel: 'write_confirmed' },
   generateResource:       { label: '学习资料',  icon: 'Document',    riskLevel: 'write_confirmed' },
   generateQuiz:           { label: '练习题',    icon: 'Edit',        riskLevel: 'write_confirmed' },
+  webSearch:              { label: '网络搜索',  icon: 'Search',      riskLevel: 'read' },
   // 兼容旧名字（LangChain4j @Tool 注册名）
   profile_tool:           { label: '学习画像',  icon: 'User',        riskLevel: 'read' },
   knowledge_search_tool:  { label: '知识图谱',  icon: 'Connection',  riskLevel: 'read' },
@@ -53,7 +53,7 @@ export function getToolDisplayMeta(toolName: string): ToolDisplayMeta {
 function extractSubject(args: any): string | null {
   if (!args || typeof args !== 'object') return null
   // 优先级：topic > keyword > planDescription > goal > subject
-  const keys = ['topic', 'keyword', 'planDescription', 'goal', 'subject']
+  const keys = ['topic', 'keyword', 'query', 'planDescription', 'goal', 'subject']
   for (const k of keys) {
     const v = args[k]
     if (typeof v === 'string' && v.trim()) return v.trim()
@@ -117,7 +117,6 @@ export function formatRunningText(toolName: string, args?: any): string {
         : '正在查看你的学习任务...'
     }
 
-    case 'manageLearningTask':
     case 'learning_plan_tool':
       return subject
         ? `正在为你草拟关于「${subject}」的学习计划...`
@@ -134,6 +133,11 @@ export function formatRunningText(toolName: string, args?: any): string {
       return subject
         ? `正在出关于「${subject}」的练习题...`
         : '正在出练习题...'
+
+    case 'webSearch':
+      return subject
+        ? `正在搜索「${subject}」...`
+        : '正在搜索网络...'
 
     default:
       return `正在${meta.label}...`
@@ -173,7 +177,6 @@ export function formatCompletedText(toolName: string, args?: any): string {
         : '查看了你的学习任务'
     }
 
-    case 'manageLearningTask':
     case 'learning_plan_tool':
       return subject
         ? `为你草拟了关于「${subject}」的学习计划`
@@ -190,6 +193,11 @@ export function formatCompletedText(toolName: string, args?: any): string {
       return subject
         ? `出了关于「${subject}」的练习题`
         : '出了练习题'
+
+    case 'webSearch':
+      return subject
+        ? `搜索了「${subject}」`
+        : '搜索了网络'
 
     default:
       return `完成了${getToolDisplayMeta(toolName).label}`
@@ -258,7 +266,6 @@ export function formatResultText(toolName: string, result?: any): string | null 
         : `${scopeText}共 ${count} 个任务`
     }
 
-    case 'manageLearningTask':
     case 'learning_plan_tool': {
       const success = result.success
       if (success === false) return result.error ?? '生成失败'
@@ -279,6 +286,12 @@ export function formatResultText(toolName: string, result?: any): string | null 
       return count > 0
         ? `共 ${count} 道题，需要你确认后才会保存`
         : '练习题已生成，需要你确认后才会保存'
+    }
+
+    case 'webSearch': {
+      const refs = result?.references ?? result?.webSearchReferences
+      const refCount = Array.isArray(refs) ? refs.length : 0
+      return refCount > 0 ? `找到 ${refCount} 个来源` : '未找到相关结果'
     }
 
     default: {
@@ -318,7 +331,6 @@ export function formatFailedText(toolName: string): string {
       return '分析学习进度失败'
     case 'queryTasks':
       return '查询学习任务失败'
-    case 'manageLearningTask':
     case 'learning_plan_tool':
       return '生成学习计划失败'
     case 'generateResource':
@@ -327,6 +339,8 @@ export function formatFailedText(toolName: string): string {
     case 'generateQuiz':
     case 'assessment_tool':
       return '出题失败'
+    case 'webSearch':
+      return '搜索失败'
     default:
       return `${meta.label}失败`
   }
