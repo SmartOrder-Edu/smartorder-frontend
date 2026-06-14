@@ -10,6 +10,7 @@ import type {
   LearningPlanDraft,
   PhaseInfo,
 } from '@/types/planExecute'
+import type { WebSearchReference } from '@/composables/useAgentChat'
 
 export interface AgentTraceEvent<T = any> {
   traceId: string
@@ -108,6 +109,9 @@ export const useAgentStore = defineStore('agent', () => {
   const learningPlanDraft = ref<LearningPlanDraft | null>(null)
   const showLearningPlanPreview = ref(false)
 
+  // === 网络搜索引用状态 ===
+  const currentWebSearchReferences = ref<WebSearchReference[]>([])
+
   // === 追踪面板状态 ===
   const tracePanelVisible = ref(false)
   const activeTraceId = ref<string>('')
@@ -147,6 +151,8 @@ export const useAgentStore = defineStore('agent', () => {
     // 学习计划草稿状态——每次新对话重置
     learningPlanDraft.value = null
     showLearningPlanPreview.value = false
+    // 网络搜索引用状态——每次新对话重置
+    currentWebSearchReferences.value = []
   }
 
   /**
@@ -257,6 +263,10 @@ export const useAgentStore = defineStore('agent', () => {
           seg.toolCall.status = 'completed'
           seg.toolCall.result = data.payload?.result
           seg.toolCall.durationMs = data.payload?.durationMs
+        }
+        // 提取网络搜索引用（完整数据，不截断）
+        if (data.payload?.toolName === 'webSearch' && data.payload?.webSearchReferences) {
+          currentWebSearchReferences.value = data.payload.webSearchReferences
         }
         syncReasoningToRunningTask()
         break
@@ -694,6 +704,7 @@ export const useAgentStore = defineStore('agent', () => {
     currentPhase.value = ''
     learningPlanDraft.value = null
     showLearningPlanPreview.value = false
+    currentWebSearchReferences.value = []
   }
 
   return {
@@ -729,6 +740,7 @@ export const useAgentStore = defineStore('agent', () => {
     currentPhase,
     learningPlanDraft,
     showLearningPlanPreview,
+    currentWebSearchReferences,
     startNewTurn,
     handleEvent,
     finishTurn,

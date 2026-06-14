@@ -15,6 +15,13 @@ export interface RagReference {
   kbName?: string
 }
 
+export interface WebSearchReference {
+  citationIndex: number
+  title: string
+  url: string
+  snippet: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'ai'
   content: string
@@ -40,6 +47,8 @@ export interface ChatMessage {
   planExecuting?: boolean
   /** RAG 引用（知识库/文件） */
   references?: RagReference[]
+  /** 网络搜索引用来源 */
+  webSearchReferences?: WebSearchReference[]
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -174,6 +183,8 @@ export function useAgentChat(scrollCallback?: () => void) {
           ? new Map(agentStore.taskExecutionMap) : undefined,
         pauseInfo: agentStore.planPauseInfo,
         planExecuting: agentStore.planExecuting,
+        webSearchReferences: agentStore.currentWebSearchReferences.length
+          ? [...agentStore.currentWebSearchReferences] : undefined,
       })
     }
     agentStore.finishTurn()
@@ -275,6 +286,8 @@ export function useAgentChat(scrollCallback?: () => void) {
                   ? new Map(agentStore.taskExecutionMap) : undefined,
                 pauseInfo: agentStore.planPauseInfo,
                 planExecuting: agentStore.planExecuting,
+                webSearchReferences: agentStore.currentWebSearchReferences.length
+                  ? [...agentStore.currentWebSearchReferences] : undefined,
               })
             }
             agentStore.finishTurn()
@@ -321,6 +334,8 @@ export function useAgentChat(scrollCallback?: () => void) {
                 ? new Map(agentStore.taskExecutionMap) : undefined,
               pauseInfo: agentStore.planPauseInfo,
               planExecuting: agentStore.planExecuting,
+              webSearchReferences: agentStore.currentWebSearchReferences.length
+                ? [...agentStore.currentWebSearchReferences] : undefined,
             })
           }
           agentStore.finishTurn()
@@ -594,6 +609,10 @@ export function useAgentChat(scrollCallback?: () => void) {
                   startedAt: entry?.startedAt || evt.timestamp,
                 })
                 if (key !== null) pendingTools.delete(key)
+                // 提取网络搜索引用
+                if (toolName === 'webSearch' && evt.payload?.webSearchReferences) {
+                  chatMsg.webSearchReferences = evt.payload.webSearchReferences
+                }
                 break
               }
               case 'agent.tool.failed': {
