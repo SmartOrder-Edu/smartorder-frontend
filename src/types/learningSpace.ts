@@ -14,7 +14,7 @@ export type RiskStatus = 'good' | 'normal' | 'warning' | 'danger'
 export interface PathProgress {
   completedNodes: number
   totalNodes: number
-  currentNodeId: number | null
+  currentNodeId: string | null
   percent: number
 }
 
@@ -24,9 +24,9 @@ export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'overdue' | '
 export type TaskType = 'daily' | 'milestone' | 'exam' | 'review'
 
 export interface TaskVO {
-  id: number
-  spaceId: number
-  pathNodeId: number | null
+  id: string
+  spaceId: string
+  pathNodeId: string | null
   title: string
   description: string
   taskType: TaskType
@@ -50,8 +50,8 @@ export type PathNodeStatus = 'completed' | 'current' | 'locked'
 export type EdgeType = 'prerequisite_of' | 'recommended_before'
 
 export interface PathNodeVO {
-  id: number
-  spaceId: number
+  id: string
+  spaceId: string
   title: string
   description: string
   nodeType: PathNodeType
@@ -63,9 +63,9 @@ export interface PathNodeVO {
 }
 
 export interface PathEdgeVO {
-  id: number
-  fromNodeId: number
-  toNodeId: number
+  id: string
+  fromNodeId: string
+  toNodeId: string
   edgeType: EdgeType
 }
 
@@ -77,10 +77,10 @@ export type ResourceType =
 export type ResourceSource = 'ai' | 'user' | 'curated'
 
 export interface ResourceVO {
-  id: number
-  spaceId: number
-  pathNodeId: number | null
-  taskId: number | null
+  id: string
+  spaceId: string
+  pathNodeId: string | null
+  taskId: string | null
   title: string
   description: string
   resourceType: ResourceType
@@ -109,8 +109,8 @@ export type StepType = 'learn' | 'practice' | 'review' | 'rest'
 export type StepStatus = 'pending' | 'in_progress' | 'completed' | 'skipped'
 
 export interface TaskStepVO {
-  id: number
-  taskId: number
+  id: string
+  taskId: string
   title: string
   description: string
   stepType: StepType
@@ -119,7 +119,7 @@ export interface TaskStepVO {
   actualMinutes: number | null
   status: StepStatus
   sortOrder: number
-  resourceId: number | null
+  resourceId: string | null
 }
 
 // ---- Agent Action ----
@@ -127,11 +127,11 @@ export interface TaskStepVO {
 export type AgentActionStatus = 'pending' | 'running' | 'success' | 'failed' | 'waiting_user_confirm'
 
 export interface AgentActionVO {
-  id: number
+  id: string
   agentType: string
   actionType: string
   targetType: string
-  targetId: number | null
+  targetId: string | null
   reason: string
   status: AgentActionStatus
   createTime: string
@@ -176,7 +176,7 @@ export interface DailyTaskItem extends TaskVO {
 }
 
 export interface SpaceDailySummary {
-  spaceId: number
+  spaceId: string
   spaceName: string
   spaceType: LearningSpaceType
   color: string
