@@ -6,6 +6,7 @@ import { studentProfileApi } from '@/api/studentProfile'
 import { chatWebSocket } from '@/utils/websocket'
 
 const TOKEN_KEY = 'token'
+const SHORT_TOKEN_KEY = 'shortToken'
 const ACCOUNT_KEY = 'remembered_account'
 
 export interface UserInfo {
@@ -27,6 +28,7 @@ export interface UserInfo {
 
 export const useUserStore = defineStore('user', () => {
   const token = ref<string>(localStorage.getItem(TOKEN_KEY) || '')
+  const shortToken = ref<string>(localStorage.getItem(SHORT_TOKEN_KEY) || '')
   const userInfo = ref<UserInfo | null>(null)
 
   const isLogin = computed(() => !!token.value)
@@ -39,13 +41,19 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem(TOKEN_KEY, newToken)
   }
 
+  function setShortToken(newShortToken: string) {
+    shortToken.value = newShortToken
+    localStorage.setItem(SHORT_TOKEN_KEY, newShortToken)
+  }
+
   function setUserInfo(info: UserInfo) {
     userInfo.value = info
   }
 
   async function login(email: string, password: string) {
-    const accessToken = await userApi.login({ email, password })
-    setToken(accessToken)
+    const response = await userApi.login({ email, password })
+    setToken(response.accessToken)
+    setShortToken(response.shortToken)
   }
 
   async function register(params: {
@@ -71,8 +79,10 @@ export const useUserStore = defineStore('user', () => {
       await userApi.logout()
     } catch {}
     token.value = ''
+    shortToken.value = ''
     userInfo.value = null
     localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(SHORT_TOKEN_KEY)
     chatWebSocket.disconnect()
   }
 
@@ -113,12 +123,14 @@ export const useUserStore = defineStore('user', () => {
 
   return {
     token,
+    shortToken,
     userInfo,
     isLogin,
     userName,
     userRoles,
     profileInitialized,
     setToken,
+    setShortToken,
     setUserInfo,
     login,
     register,

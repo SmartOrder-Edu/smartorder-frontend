@@ -26,6 +26,25 @@ export async function refreshAccessToken(): Promise<string> {
   throw new Error('刷新Token失败')
 }
 
+/**
+ * 刷新 shortToken，供 WebSocket 使用。
+ * @returns 新的 shortToken
+ * @throws 刷新失败时抛出异常
+ */
+export async function refreshShortToken(): Promise<string> {
+  const { data } = await axios.post(
+    `${BASE_URL}/auth/refreshToken`,
+    {},
+    { withCredentials: true }
+  )
+  const newShortToken = data.data?.shortToken
+  if (newShortToken) {
+    localStorage.setItem('shortToken', newShortToken)
+    return newShortToken
+  }
+  throw new Error('刷新短Token失败')
+}
+
 class Request {
   private instance: AxiosInstance
   private baseURL: string

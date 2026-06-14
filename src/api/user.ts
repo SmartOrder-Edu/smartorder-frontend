@@ -6,6 +6,11 @@ export interface LoginParams {
   password: string
 }
 
+export interface LoginResponse {
+  accessToken: string
+  shortToken: string
+}
+
 export interface RegisterParams {
   username: string
   email?: string
@@ -51,9 +56,9 @@ export interface UserInfoResponse {
 }
 
 export const userApi = {
-  /** 密码登录，返回accessToken，refreshToken通过HttpOnly Cookie自动携带 */
+  /** 密码登录，返回accessToken和shortToken，refreshToken通过HttpOnly Cookie自动携带 */
   login(params: LoginParams) {
-    return request.post<string>('/auth/login', params)
+    return request.post<LoginResponse>('/auth/login', params)
   },
 
   /** 邮箱注册 */
@@ -66,9 +71,9 @@ export const userApi = {
     return request.get<string>('/auth/sendVerificationCode/email', { params: { email } })
   },
 
-  /** 刷新accessToken（refreshToken通过Cookie自动携带） */
+  /** 刷新shortToken（refreshToken通过Cookie自动携带） */
   refreshToken() {
-    return request.post<string>('/auth/refreshToken')
+    return request.post<{ shortToken: string }>('/auth/refreshToken')
   },
 
   /** 登出 */
