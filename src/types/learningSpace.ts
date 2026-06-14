@@ -47,15 +47,18 @@ export interface TaskVO {
 
 export type PathNodeType = 'module' | 'stage' | 'objective' | 'knowledge_point'
 export type PathNodeStatus = 'completed' | 'current' | 'locked'
-export type EdgeType = 'prerequisite_of' | 'recommended_before'
+export type EdgeType = 'prerequisite_of' | 'recommended_before' | 'contains'
 
 export interface PathNodeVO {
   id: string
   spaceId: string
+  parentNodeId: string | null
+  kpUid: string | null
   title: string
   description: string
   nodeType: PathNodeType
-  estimatedDurationMinutes: number
+  estimatedDurationMinutes: number | null
+  plannedDurationDays: number | null
   difficultyLevel: string
   sortOrder: number
   isMilestone: boolean
@@ -64,6 +67,7 @@ export interface PathNodeVO {
 
 export interface PathEdgeVO {
   id: string
+  spaceId: string
   fromNodeId: string
   toNodeId: string
   edgeType: EdgeType

@@ -124,10 +124,13 @@ const mockPathNodes: PathNodeVO[] = [
   {
     id: 1,
     spaceId: 1,
+    parentNodeId: null,
+    kpUid: null,
     title: '极限的基本概念',
     description: '理解数列极限与函数极限的定义，掌握极限的直观含义',
     nodeType: 'stage',
     estimatedDurationMinutes: 180,
+    plannedDurationDays: 7,
     difficultyLevel: '基础',
     sortOrder: 1,
     isMilestone: true,
@@ -136,10 +139,13 @@ const mockPathNodes: PathNodeVO[] = [
   {
     id: 2,
     spaceId: 1,
+    parentNodeId: null,
+    kpUid: null,
     title: '极限运算法则与洛必达法则',
     description: '掌握极限的四则运算、复合极限、洛必达法则及其适用条件',
     nodeType: 'stage',
     estimatedDurationMinutes: 240,
+    plannedDurationDays: 10,
     difficultyLevel: '中等',
     sortOrder: 2,
     isMilestone: true,
@@ -148,10 +154,13 @@ const mockPathNodes: PathNodeVO[] = [
   {
     id: 3,
     spaceId: 1,
+    parentNodeId: null,
+    kpUid: null,
     title: '连续与间断',
     description: '理解连续的定义、间断点分类、闭区间连续函数的性质',
     nodeType: 'stage',
     estimatedDurationMinutes: 200,
+    plannedDurationDays: 8,
     difficultyLevel: '中等',
     sortOrder: 3,
     isMilestone: true,
@@ -160,10 +169,13 @@ const mockPathNodes: PathNodeVO[] = [
   {
     id: 4,
     spaceId: 1,
+    parentNodeId: null,
+    kpUid: null,
     title: '综合复习与测试',
     description: '对极限与连续进行全面复习，通过综合测试检验掌握程度',
     nodeType: 'stage',
     estimatedDurationMinutes: 120,
+    plannedDurationDays: 5,
     difficultyLevel: '综合',
     sortOrder: 4,
     isMilestone: true,
@@ -172,10 +184,10 @@ const mockPathNodes: PathNodeVO[] = [
 ]
 
 const mockPathEdges: PathEdgeVO[] = [
-  { id: 1, fromNodeId: 1, toNodeId: 2, edgeType: 'prerequisite_of' },
-  { id: 2, fromNodeId: 2, toNodeId: 3, edgeType: 'prerequisite_of' },
-  { id: 3, fromNodeId: 3, toNodeId: 4, edgeType: 'prerequisite_of' },
-  { id: 4, fromNodeId: 1, toNodeId: 3, edgeType: 'recommended_before' },
+  { id: 1, spaceId: 1, fromNodeId: 1, toNodeId: 2, edgeType: 'prerequisite_of' },
+  { id: 2, spaceId: 1, fromNodeId: 2, toNodeId: 3, edgeType: 'prerequisite_of' },
+  { id: 3, spaceId: 1, fromNodeId: 3, toNodeId: 4, edgeType: 'prerequisite_of' },
+  { id: 4, spaceId: 1, fromNodeId: 1, toNodeId: 3, edgeType: 'recommended_before' },
 ]
 
 // ---- Resources ----

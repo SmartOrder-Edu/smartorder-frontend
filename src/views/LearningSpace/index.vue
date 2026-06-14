@@ -152,7 +152,7 @@
             <PathTimeline
               v-if="dashboard.pathNodes.length"
               :nodes="dashboard.pathNodes"
-              :tasks="dashboard.pendingTasks"
+              :tasks="allTasks"
               :resources="dashboard.resources"
             />
             <el-empty v-else description="学习路径即将由 Agent 生成" :image-size="100" />
@@ -308,6 +308,16 @@ const themeGradient = computed(() => 'linear-gradient(135deg, #3b82f6 0%, #2563e
 const maxDuration = computed(() => {
   if (!dashboard.value?.recentRecords.length) return 60
   return Math.max(...dashboard.value.recentRecords.map(r => r.studyDurationMinutes), 30)
+})
+
+// PathTimeline 需要的全集任务：合并今日 / 待办 / 逾期，按 id 去重
+const allTasks = computed<TaskVO[]>(() => {
+  const d = dashboard.value
+  if (!d) return []
+  const map = new Map<string, TaskVO>()
+  ;[...(d.todayTasks || []), ...(d.pendingTasks || []), ...(d.overdueTasks || [])]
+    .forEach(t => map.set(t.id, t))
+  return [...map.values()]
 })
 
 function riskLabel(s: RiskStatus) {
