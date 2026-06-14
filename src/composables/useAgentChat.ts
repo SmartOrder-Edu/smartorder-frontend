@@ -199,6 +199,9 @@ export function useAgentChat(scrollCallback?: () => void) {
     // 创建新的 AbortController
     abortController = new AbortController()
 
+    const isClarificationReply = agentStore.planPauseInfo?.reason === 'CLARIFICATION'
+      && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
+
     try {
       await fetchEventSource(`${base}/agent/chat/stream`, {
         method: 'POST',
@@ -210,7 +213,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           message,
           conversationId: agentStore.currentConversationId || undefined,
           fileIds,
-          forceMode: currentForceMode.value || undefined,
+          forceMode: isClarificationReply ? undefined : (currentForceMode.value || undefined),
         }),
         openWhenHidden: true,
         signal: abortController.signal,

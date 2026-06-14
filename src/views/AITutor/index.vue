@@ -290,6 +290,20 @@
                 />
               </div>
             </div>
+
+            <div
+              class="message-wrapper ai clarification-reply-wrapper"
+              v-if="!agentStore.loading && clarificationPauseInfo"
+            >
+              <div class="message-avatar"></div>
+              <div class="message-content">
+                <GateCard
+                  reason="CLARIFICATION"
+                  :question="clarificationPauseInfo.question"
+                  @answer="answer => handleGateAnswer(clarificationPauseInfo!.taskId, answer)"
+                />
+              </div>
+            </div>
           </div>
             </div>
           </div>
@@ -480,6 +494,7 @@ import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
 import PlanChecklist from '@/components/plan/PlanChecklist.vue'
 import PlanExecutionAccordion from '@/components/plan/PlanExecutionAccordion.vue'
 import TaskExecutionPanel from '@/components/plan/TaskExecutionPanel.vue'
+import GateCard from '@/components/plan/GateCard.vue'
 import PlanStatusCard from '@/components/plan/PlanStatusCard.vue'
 import LearningPlanPreview from '@/components/plan/LearningPlanPreview.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -613,6 +628,12 @@ const inputPlaceholder = computed(() =>
     ? '描述你的学习目标，AI 将为你制定学习路径和计划…'
     : '输入你的问题，AI 会结合你的学习画像给出个性化回答…'
 )
+
+const clarificationPauseInfo = computed(() => {
+  const pauseInfo = agentStore.planPauseInfo
+  if (!pauseInfo || pauseInfo.reason !== 'CLARIFICATION') return null
+  return pauseInfo
+})
 
 const quickHints = computed(() =>
   currentMode.value === 'PLAN_AND_EXECUTE'
