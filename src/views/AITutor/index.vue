@@ -199,7 +199,7 @@
                 <!-- 注意：不使用 msg.planExecuting 判断，因为自动确认竞态会导致该值不准确；
                      改用 isPlanAwaitingConfirmation 根据 TaskList.status 精确判断 -->
                 <PlanChecklist
-                  v-if="msg.taskList && isPlanAwaitingConfirmation(msg.taskList)"
+                  v-if="msg.taskList && isPlanAwaitingConfirmation(msg.taskList) && !agentStore.showLearningPlanPreview"
                   :task-list="msg.taskList"
                   :confirming="agentStore.planConfirmLoading"
                   @confirm="confirmPlan(msg.taskList.confirmationDraftId || agentStore.currentDraftId)"
@@ -254,12 +254,12 @@
                     v-if="agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
                     :learning-plan="agentStore.learningPlanDraft"
                     :confirming="agentStore.planConfirmLoading"
-                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
+                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
                   />
 
                   <!-- Plan-and-Execute: 紧凑状态卡片（任务详情在右侧面板） -->
                   <PlanStatusCard
-                    v-if="agentStore.currentTaskList"
+                    v-if="agentStore.currentTaskList && !agentStore.showLearningPlanPreview"
                     :task-list="agentStore.currentTaskList"
                     :confirming="agentStore.planConfirmLoading"
                     :completed-count="planCompletedCount"
@@ -273,6 +273,21 @@
                     <span></span><span></span><span></span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <!-- 学习计划预览需要在 SSE 结束后继续保留，直到用户确认创建学习空间 -->
+            <div
+              class="message-wrapper ai learning-plan-review-wrapper"
+              v-if="!agentStore.loading && agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
+            >
+              <div class="message-avatar"></div>
+              <div class="message-content">
+                <LearningPlanPreview
+                  :learning-plan="agentStore.learningPlanDraft"
+                  :confirming="agentStore.planConfirmLoading"
+                  @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
+                />
               </div>
             </div>
           </div>
@@ -415,6 +430,7 @@
 
           <!-- 任务执行面板（Plan-and-Execute 模式下出现） -->
           <TaskExecutionPanel
+            v-if="!agentStore.showLearningPlanPreview"
             :task-list="agentStore.currentTaskList"
             :task-execution-map="agentStore.taskExecutionMap"
             :pause-info="agentStore.planPauseInfo"

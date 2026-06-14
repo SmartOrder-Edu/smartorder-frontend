@@ -346,7 +346,6 @@ export const useAgentStore = defineStore('agent', () => {
       }
 
       case 'agent.learning_plan.created': {
-        currentDraftId.value = data.payload?.draftId || ''
         const plan = data.payload?.plan
         if (plan) {
           learningPlanDraft.value = {

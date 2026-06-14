@@ -285,6 +285,7 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 确认学习规划
    */
   const confirmPlan = async (draftId: string) => {
+    if (!draftId) return
     agentStore.planConfirmLoading = true
     agentStore.resetExecutionSteps()
     // 清空上一轮规划的 trace/推理/工具，避免与执行轮次混合
