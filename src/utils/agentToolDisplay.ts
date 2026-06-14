@@ -24,7 +24,6 @@ const TOOL_META: Record<string, ToolDisplayMeta> = {
   queryKnowledge:         { label: '知识图谱',  icon: 'Connection',  riskLevel: 'read' },
   queryLearningProgress:  { label: '学习进度',  icon: 'TrendCharts', riskLevel: 'read' },
   queryTasks:             { label: '学习任务',  icon: 'List',        riskLevel: 'read' },
-  manageLearningTask:     { label: '学习计划',  icon: 'EditPen',     riskLevel: 'write_draft' },
   manageLearningPlan:     { label: '学习规划',  icon: 'EditPen',     riskLevel: 'write_confirmed' },
   generateResource:       { label: '学习资料',  icon: 'Document',    riskLevel: 'write_confirmed' },
   generateQuiz:           { label: '练习题',    icon: 'Edit',        riskLevel: 'write_confirmed' },
@@ -117,7 +116,6 @@ export function formatRunningText(toolName: string, args?: any): string {
         : '正在查看你的学习任务...'
     }
 
-    case 'manageLearningTask':
     case 'learning_plan_tool':
       return subject
         ? `正在为你草拟关于「${subject}」的学习计划...`
@@ -173,7 +171,6 @@ export function formatCompletedText(toolName: string, args?: any): string {
         : '查看了你的学习任务'
     }
 
-    case 'manageLearningTask':
     case 'learning_plan_tool':
       return subject
         ? `为你草拟了关于「${subject}」的学习计划`
@@ -258,7 +255,6 @@ export function formatResultText(toolName: string, result?: any): string | null 
         : `${scopeText}共 ${count} 个任务`
     }
 
-    case 'manageLearningTask':
     case 'learning_plan_tool': {
       const success = result.success
       if (success === false) return result.error ?? '生成失败'
@@ -318,7 +314,6 @@ export function formatFailedText(toolName: string): string {
       return '分析学习进度失败'
     case 'queryTasks':
       return '查询学习任务失败'
-    case 'manageLearningTask':
     case 'learning_plan_tool':
       return '生成学习计划失败'
     case 'generateResource':
