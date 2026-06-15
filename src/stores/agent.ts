@@ -572,6 +572,8 @@ export const useAgentStore = defineStore('agent', () => {
         if (data.payload?.message) {
           answerText.value += `\n\n[错误] ${data.payload.message}`
         }
+        loading.value = false
+        planExecuting.value = false
         break
     }
   }
@@ -605,6 +607,7 @@ export const useAgentStore = defineStore('agent', () => {
     loading.value = false
     answerText.value = ''
     currentPhase.value = ''
+    planExecuting.value = false
     if (thinkingStartTime.value) {
       thinkingDurationMs.value = Date.now() - thinkingStartTime.value
     }

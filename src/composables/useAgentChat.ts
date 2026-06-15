@@ -188,6 +188,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       })
     }
     agentStore.finishTurn()
+    agentStore.planExecuting = false
     scrollCallback?.()
   }
 
@@ -291,6 +292,7 @@ export function useAgentChat(scrollCallback?: () => void) {
               })
             }
             agentStore.finishTurn()
+            agentStore.planExecuting = false
             abortController = null
             scrollCallback?.()
             return
@@ -339,6 +341,7 @@ export function useAgentChat(scrollCallback?: () => void) {
             })
           }
           agentStore.finishTurn()
+          agentStore.planExecuting = false
           abortController = null
           scrollCallback?.()
           throw err
@@ -348,6 +351,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       if (err.name !== 'AbortError') {
         console.error('[useAgentChat] fetch error:', err)
         agentStore.finishTurn()
+        agentStore.planExecuting = false
       }
       abortController = null
     }
@@ -465,6 +469,7 @@ export function useAgentChat(scrollCallback?: () => void) {
         onerror(err) {
           console.error('[confirmPlan] SSE error:', err)
           agentStore.planConfirmLoading = false
+          agentStore.planExecuting = false
           abortController = null
           throw err
         },
@@ -472,6 +477,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     } catch (err: any) {
       console.error('[confirmPlan] error:', err)
       agentStore.planConfirmLoading = false
+      agentStore.planExecuting = false
       abortController = null
     }
   }
