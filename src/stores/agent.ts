@@ -123,7 +123,7 @@ export const useAgentStore = defineStore('agent', () => {
   /**
    * 开始新的对话轮次
    */
-  function startNewTurn() {
+  function startNewTurn(options?: { preservePlanState?: boolean }) {
     answerText.value = ''
     thinkingText.value = ''
     thinkingStartTime.value = null
@@ -141,8 +141,8 @@ export const useAgentStore = defineStore('agent', () => {
     planConfirmResult.value = null
     planDialogClosing.value = false
     currentPhase.value = ''
-    // Plan-and-Execute 状态在 planExecuting 为 true 时不清除（跨消息保持）
-    if (!planExecuting.value) {
+    // Plan-and-Execute 状态在执行中或恢复澄清时不清除（跨消息保持）
+    if (!planExecuting.value && !options?.preservePlanState) {
       currentTaskList.value = null
       taskExecutionMap.value = new Map()
       planPauseInfo.value = null

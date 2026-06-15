@@ -204,6 +204,9 @@ export function useAgentChat(scrollCallback?: () => void) {
       .map(r => Number(r.id))
       .filter(id => !isNaN(id))
 
+    const isClarificationReply = agentStore.planPauseInfo?.reason === 'CLARIFICATION'
+      && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
+
     // 添加用户消息到本地列表
     messages.value.push({
       role: 'user',
@@ -213,7 +216,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       references: references && references.length > 0 ? [...references] : undefined,
     })
 
-    agentStore.startNewTurn()
+    agentStore.startNewTurn({ preservePlanState: isClarificationReply })
 
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -227,9 +230,6 @@ export function useAgentChat(scrollCallback?: () => void) {
 
     // 创建新的 AbortController
     abortController = new AbortController()
-
-    const isClarificationReply = agentStore.planPauseInfo?.reason === 'CLARIFICATION'
-      && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
 
     try {
       // 从 references 中提取 fileIds 和 knowledgeBaseIds
