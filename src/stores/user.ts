@@ -64,10 +64,10 @@ export const useUserStore = defineStore('user', () => {
 
   async function fetchUserInfo() {
     const info = await userApi.getUserInfo()
-    // 查询画像状态：confidenceScore > 0 表示已初始化
+    // 查询画像状态：profileConfidenceScore > 0 表示已初始化
     try {
       const profile = await studentProfileApi.getProfile()
-      info.profileInitialized = !!(profile && profile.confidenceScore && profile.confidenceScore > 0)
+      info.profileInitialized = !!(profile && profile.profileConfidenceScore && profile.profileConfidenceScore > 0)
     } catch {
       info.profileInitialized = false
     }
