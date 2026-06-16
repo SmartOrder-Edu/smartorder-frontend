@@ -3,7 +3,7 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent, type ToolCallState, type ReasoningSegment } from '@/stores/agent'
 import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
-import type { TaskList, TaskExecutionState, PlanPauseInfo, PauseReason } from '@/types/planExecute'
+import type { TaskList, TaskExecutionState, PlanPauseInfo, PauseReason, ClarificationInfo } from '@/types/planExecute'
 
 export type AgentRunMode = 'REACT' | 'PLAN_AND_EXECUTE'
 
@@ -43,6 +43,8 @@ export interface ChatMessage {
   taskExecutionMap?: Map<string, TaskExecutionState>
   /** Plan-and-Execute: 暂停信息 */
   pauseInfo?: PlanPauseInfo | null
+  /** Plan-and-Execute: 本次澄清的已回答值（历史回放只读模式显示） */
+  clarificationAnsweredValue?: string
   /** Plan-and-Execute: 是否处于执行阶段 */
   planExecuting?: boolean
   /** RAG 引用（知识库/文件） */
@@ -207,6 +209,15 @@ export function useAgentChat(scrollCallback?: () => void) {
     const isClarificationReply = agentStore.planPauseInfo?.reason === 'CLARIFICATION'
       && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
 
+    // 结构化澄清回答：如果当前有结构化 clarification，构建 clarificationAnswerJson
+    let clarificationAnswerJson: string | undefined
+    if (isClarificationReply && agentStore.planPauseInfo?.clarification) {
+      clarificationAnswerJson = JSON.stringify({
+        clarificationId: agentStore.planPauseInfo.clarification.clarificationId,
+        answer: message,
+      })
+    }
+
     // 添加用户消息到本地列表
     messages.value.push({
       role: 'user',
@@ -259,6 +270,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
           knowledgeBaseIds: knowledgeBaseIds && knowledgeBaseIds.length > 0 ? knowledgeBaseIds : undefined,
           forceMode: isClarificationReply ? undefined : (currentForceMode.value || undefined),
+          clarificationAnswerJson,
         }),
         openWhenHidden: true,
         signal: abortController.signal,
@@ -703,6 +715,7 @@ export function useAgentChat(scrollCallback?: () => void) {
                   reason: evt.payload?.reason || 'CLARIFICATION',
                   taskId: evt.payload?.taskId || '',
                   question: evt.payload?.question || '',
+                  clarification: evt.payload?.clarification as ClarificationInfo | undefined,
                 }
                 if (chatMsg.taskExecutionMap) {
                   const es = chatMsg.taskExecutionMap.get(evt.payload?.taskId || '')
@@ -769,6 +782,26 @@ export function useAgentChat(scrollCallback?: () => void) {
 
             chatMsg.reasoningSegments = segments
           }
+        }
+      }
+
+      // 后处理：为有 pauseInfo（CLARIFICATION）的历史消息匹配用户回答（只读回放用）
+      for (let i = 0; i < msgs.length; i++) {
+        const msg = msgs[i]
+        if (msg.role === 'ai' && msg.pauseInfo?.clarification) {
+          // 查找下一条用户消息作为回答
+          let answeredValue = ''
+          for (let k = i + 1; k < msgs.length; k++) {
+            if (msgs[k].role === 'user') {
+              answeredValue = msgs[k].content
+              break
+            }
+            // 如果遇到下一条 AI 消息（含 pauseInfo 或 taskList），说明用户已在下一个澄清阶段回答
+            if (msgs[k].role === 'ai' && (msgs[k].pauseInfo || msgs[k].taskList)) {
+              break
+            }
+          }
+          msg.clarificationAnsweredValue = answeredValue
         }
       }
 

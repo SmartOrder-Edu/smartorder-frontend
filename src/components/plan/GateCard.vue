@@ -13,23 +13,83 @@
         <span class="gate-title">Agent 需要你回答</span>
       </div>
       <p class="gate-question">{{ question }}</p>
-      <div class="gate-input-area">
-        <textarea
-          v-model="userAnswer"
-          placeholder="输入你的回答..."
-          rows="2"
-          @keydown.enter.exact.prevent="submitAnswer"
-          @keydown.enter.shift.exact.stop
-          ref="inputRef"
-        ></textarea>
-        <button class="gate-submit-btn" @click="submitAnswer" :disabled="!userAnswer.trim()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22,2 15,22 11,13 2,9"/>
-          </svg>
-          发送
-        </button>
-      </div>
+
+      <!-- 只读模式 (历史回放) -->
+      <template v-if="readonly">
+        <div class="gate-readonly-answer">
+          <span class="answer-label">你的回答：</span>
+          <span class="answer-value">{{ answeredValue || '—' }}</span>
+        </div>
+      </template>
+
+      <!-- 交互模式 -->
+      <template v-else>
+        <!-- TEXT answerType (默认 / 无 clarification) -->
+        <div v-if="!clarification || clarification.answerType === 'TEXT'" class="gate-input-area">
+          <textarea
+            v-model="userAnswer"
+            placeholder="输入你的回答..."
+            rows="2"
+            @keydown.enter.exact.prevent="submitAnswer"
+            @keydown.enter.shift.exact.stop
+            ref="inputRef"
+          ></textarea>
+          <button class="gate-submit-btn" @click="submitAnswer" :disabled="!userAnswer.trim()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22,2 15,22 11,13 2,9"/>
+            </svg>
+            发送
+          </button>
+        </div>
+
+        <!-- SINGLE_SELECT answerType -->
+        <div v-else-if="clarification.answerType === 'SINGLE_SELECT'" class="gate-options">
+          <div
+            v-for="opt in clarification.options"
+            :key="opt.value"
+            class="gate-option"
+            :class="{ selected: selectedOption === opt.value }"
+            @click="selectedOption = opt.value"
+          >
+            {{ opt.label }}
+          </div>
+          <button class="gate-submit-btn" @click="submitSelectAnswer" :disabled="!selectedOption">
+            确认选择
+          </button>
+        </div>
+
+        <!-- MULTI_SELECT answerType -->
+        <div v-else-if="clarification.answerType === 'MULTI_SELECT'" class="gate-options multi">
+          <div
+            v-for="opt in clarification.options"
+            :key="opt.value"
+            class="gate-option"
+            :class="{ selected: selectedOptions.includes(opt.value) }"
+            @click="toggleMultiSelect(opt.value)"
+          >
+            {{ opt.label }}
+          </div>
+          <button class="gate-submit-btn" @click="submitMultiSelectAnswer" :disabled="selectedOptions.length === 0">
+            确认选择
+          </button>
+        </div>
+
+        <!-- NUMBER answerType -->
+        <div v-else-if="clarification.answerType === 'NUMBER'" class="gate-input-area">
+          <input
+            type="number"
+            v-model="numericAnswer"
+            placeholder="输入数字..."
+            @keydown.enter.exact.prevent="submitNumericAnswer"
+            ref="inputRef"
+          />
+          <button class="gate-submit-btn" @click="submitNumericAnswer" :disabled="numericAnswer === ''">
+            确认
+          </button>
+        </div>
+      </template>
+
       <p class="gate-hint">回答后 Agent 将据此调整后续计划</p>
     </template>
 
@@ -66,32 +126,69 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import type { PauseReason } from '@/types/planExecute'
+import type { PauseReason, ClarificationInfo } from '@/types/planExecute'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   reason: PauseReason
   question: string
-}>()
+  clarification?: ClarificationInfo
+  readonly?: boolean
+  answeredValue?: string
+}>(), {
+  readonly: false,
+  answeredValue: '',
+})
 
 const emit = defineEmits<{
-  answer: [value: string]
+  answer: [clarificationId: string, value: string]
   confirm: []
   cancel: []
 }>()
 
 const userAnswer = ref('')
-const inputRef = ref<HTMLTextAreaElement>()
+const selectedOption = ref('')
+const selectedOptions = ref<string[]>([])
+const numericAnswer = ref('')
+const inputRef = ref<HTMLTextAreaElement | HTMLInputElement>()
 
 onMounted(() => {
-  if (props.reason === 'CLARIFICATION') {
+  if (props.reason === 'CLARIFICATION' && !props.readonly) {
     nextTick(() => inputRef.value?.focus())
   }
 })
 
 function submitAnswer() {
   if (!userAnswer.value.trim()) return
-  emit('answer', userAnswer.value.trim())
+  const id = props.clarification?.clarificationId || ''
+  emit('answer', id, userAnswer.value.trim())
   userAnswer.value = ''
+}
+
+function submitSelectAnswer() {
+  if (!selectedOption.value) return
+  emit('answer', props.clarification!.clarificationId, selectedOption.value)
+  selectedOption.value = ''
+}
+
+function submitMultiSelectAnswer() {
+  if (selectedOptions.value.length === 0) return
+  emit('answer', props.clarification!.clarificationId, JSON.stringify(selectedOptions.value))
+  selectedOptions.value = []
+}
+
+function submitNumericAnswer() {
+  if (numericAnswer.value === '') return
+  emit('answer', props.clarification!.clarificationId, numericAnswer.value)
+  numericAnswer.value = ''
+}
+
+function toggleMultiSelect(value: string) {
+  const idx = selectedOptions.value.indexOf(value)
+  if (idx >= 0) {
+    selectedOptions.value.splice(idx, 1)
+  } else {
+    selectedOptions.value.push(value)
+  }
 }
 </script>
 
@@ -147,13 +244,15 @@ function submitAnswer() {
   margin: 0 0 10px;
 }
 
+/* 文本输入区 */
 .gate-input-area {
   display: flex;
   gap: 8px;
   align-items: flex-end;
 }
 
-.gate-input-area textarea {
+.gate-input-area textarea,
+.gate-input-area input {
   flex: 1;
   border: 1px solid #e5e7eb;
   border-radius: var(--radius-md, 0.5rem);
@@ -166,10 +265,47 @@ function submitAnswer() {
   transition: border-color 0.2s;
 }
 
-.gate-input-area textarea:focus {
+.gate-input-area textarea:focus,
+.gate-input-area input:focus {
   border-color: var(--primary-color, #3b5bdb);
 }
 
+/* 选项卡片 */
+.gate-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.gate-options.multi {
+  /* 多选同样式 */
+}
+
+.gate-option {
+  padding: 6px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.gate-option:hover {
+  border-color: var(--primary-color, #3b5bdb);
+  color: var(--primary-color, #3b5bdb);
+}
+
+.gate-option.selected {
+  border-color: var(--primary-color, #3b5bdb);
+  background: rgba(59, 91, 219, 0.08);
+  color: var(--primary-color, #3b5bdb);
+  font-weight: 500;
+}
+
+/* 提交按钮 */
 .gate-submit-btn {
   display: flex;
   align-items: center;
@@ -202,6 +338,26 @@ function submitAnswer() {
   color: var(--text-muted, #94a3b8);
 }
 
+/* 只读模式（历史回放） */
+.gate-readonly-answer {
+  padding: 8px 10px;
+  background: rgba(59, 91, 219, 0.04);
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.answer-label {
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.75rem;
+}
+
+.answer-value {
+  color: var(--text-dark, #0f172a);
+  font-weight: 500;
+}
+
+/* CONFIRMATION 门样式 */
 .gate-desc {
   font-size: 0.75rem;
   color: var(--text-secondary, #475569);

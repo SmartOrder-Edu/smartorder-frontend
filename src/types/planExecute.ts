@@ -100,6 +100,31 @@ export interface TaskExecutionState {
 /** Gate 暂停原因 */
 export type PauseReason = 'CLARIFICATION' | 'CONFIRMATION'
 
+/** 澄清答案类型 */
+export type ClarificationAnswerType = 'TEXT' | 'SINGLE_SELECT' | 'MULTI_SELECT' | 'NUMBER'
+
+/** 澄清选项 */
+export interface ClarificationOption {
+  label: string
+  value: string
+}
+
+/** 结构化澄清信息 —— PLAN_PAUSED SSE 事件中的 clarification 字段 */
+export interface ClarificationInfo {
+  /** 澄清记录唯一 ID */
+  clarificationId: string
+  /** 槽位标识 (如 target_scope, current_level) */
+  slotKey: string
+  /** 向用户提出的问题 */
+  question: string
+  /** 答案类型：TEXT | SINGLE_SELECT | MULTI_SELECT | NUMBER */
+  answerType: ClarificationAnswerType
+  /** 选项列表（仅 SELECT 类型有值） */
+  options?: ClarificationOption[]
+  /** 槽位优先级（数字越小越先问） */
+  slotPriority: number
+}
+
 /** 暂停信息 */
 export interface PlanPauseInfo {
   /** 暂停原因 */
@@ -108,6 +133,8 @@ export interface PlanPauseInfo {
   taskId: string
   /** 暂停时的问题 */
   question: string
+  /** 结构化澄清信息（仅 reason=CLARIFICATION 时有值） */
+  clarification?: ClarificationInfo
 }
 
 // ============================================================

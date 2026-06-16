@@ -7,6 +7,7 @@ import type {
   TaskExecutionState,
   PauseReason,
   PlanPauseInfo,
+  ClarificationInfo,
   LearningPlanDraft,
   PhaseInfo,
 } from '@/types/planExecute'
@@ -448,7 +449,8 @@ export const useAgentStore = defineStore('agent', () => {
         const reason = data.payload?.reason as PauseReason
         const taskId = data.payload?.taskId || ''
         const question = data.payload?.question || ''
-        planPauseInfo.value = { reason, taskId, question }
+        const clarification = data.payload?.clarification as ClarificationInfo | undefined
+        planPauseInfo.value = { reason, taskId, question, clarification }
 
         const execState = taskExecutionMap.value.get(taskId)
         if (execState) {

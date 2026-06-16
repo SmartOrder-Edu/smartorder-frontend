@@ -6,6 +6,8 @@ export interface AgentChatRequest {
   fileIds?: number[]
   /** 强制运行模式：'REACT' 快速回答 / 'PLAN_AND_EXECUTE' 目标规划，不传则走意图路由 */
   forceMode?: 'REACT' | 'PLAN_AND_EXECUTE'
+  /** 结构化澄清回答 JSON（可选），格式: {"clarificationId": "uuid", "answer": "用户回答"} */
+  clarificationAnswerJson?: string
 }
 
 export interface PlanConfirmRequest {
@@ -97,6 +99,11 @@ export const agentApi = {
   /** 删除指定对话 */
   deleteConversation(conversationId: string) {
     return request.delete<string>(`/agent/conversations/${conversationId}`)
+  },
+
+  /** 获取指定会话的澄清记录（历史回放用） */
+  getClarifications(conversationId: string) {
+    return request.get<any[]>(`/agent/clarifications/${conversationId}`)
   },
 }
 

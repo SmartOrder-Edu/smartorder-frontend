@@ -90,6 +90,7 @@
             v-if="execState(task.taskId)?.status === 'paused' && pauseInfo && pauseInfo.taskId === task.taskId"
             :reason="pauseInfo.reason"
             :question="pauseInfo.question"
+            :clarification="pauseInfo.clarification"
             @answer="handleGateAnswer"
             @confirm="handleGateConfirm"
             @cancel="handleGateCancel"
@@ -242,7 +243,7 @@ watch(currentRunningTaskId, (newId, oldId) => {
   })
 }, { immediate: true })
 
-function handleGateAnswer(answer: string) {
+function handleGateAnswer(clarificationId: string, answer: string) {
   if (props.pauseInfo) {
     emit('gateAnswer', props.pauseInfo.taskId, answer)
   }

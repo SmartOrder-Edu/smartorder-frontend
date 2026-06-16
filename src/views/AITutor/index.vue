@@ -221,6 +221,16 @@
                   @gate-cancel="handleGateCancel"
                 />
 
+                <!-- 历史回放：已完成的澄清问答对（只读展示） -->
+                <GateCard
+                  v-if="msg.pauseInfo?.clarification && msg.clarificationAnsweredValue && agentStore.planPauseInfo?.clarification?.clarificationId !== msg.pauseInfo.clarification.clarificationId"
+                  reason="CLARIFICATION"
+                  :question="msg.pauseInfo.question"
+                  :clarification="msg.pauseInfo.clarification"
+                  :readonly="true"
+                  :answered-value="msg.clarificationAnsweredValue"
+                />
+
                 <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
               </div>
             </div>
@@ -305,7 +315,8 @@
                 <GateCard
                   reason="CLARIFICATION"
                   :question="clarificationPauseInfo.question"
-                  @answer="answer => handleGateAnswer(clarificationPauseInfo!.taskId, answer)"
+                  :clarification="clarificationPauseInfo.clarification"
+                  @answer="(clarificationId, answer) => handleGateAnswer(clarificationPauseInfo!.taskId, answer)"
                 />
               </div>
             </div>
