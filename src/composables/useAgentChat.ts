@@ -306,6 +306,7 @@ export function useAgentChat(scrollCallback?: () => void) {
             agentStore.finishTurn()
             // 优先以后端 done payload 的 runStatus 判断，其次从前端 taskList 推断
             const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
+            const terminalStatuses = ['COMPLETED', 'FAILED', 'PARTIAL_COMPLETED']
             let donePayload: any = null
             try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
             const runStatus = donePayload?.runStatus
@@ -314,6 +315,11 @@ export function useAgentChat(scrollCallback?: () => void) {
               if (agentStore.currentTaskList && agentStore.currentTaskList.status !== runStatus) {
                 agentStore.currentTaskList.status = runStatus
               }
+            } else if (runStatus && terminalStatuses.includes(runStatus)) {
+              if (agentStore.currentTaskList) {
+                agentStore.currentTaskList.status = runStatus
+              }
+              agentStore.planExecuting = false
             } else if (!agentStore.currentTaskList || !pausedStatuses.includes(agentStore.currentTaskList.status)) {
               agentStore.planExecuting = false
             }
@@ -586,11 +592,20 @@ export function useAgentChat(scrollCallback?: () => void) {
               }
               agentStore.finishTurn()
               const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
+              const terminalStatuses = ['COMPLETED', 'FAILED', 'PARTIAL_COMPLETED']
               let donePayload: any = null
               try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
               const runStatus = donePayload?.runStatus
               if (runStatus && pausedStatuses.includes(runStatus)) {
                 agentStore.planExecuting = true
+                if (agentStore.currentTaskList && agentStore.currentTaskList.status !== runStatus) {
+                  agentStore.currentTaskList.status = runStatus
+                }
+              } else if (runStatus && terminalStatuses.includes(runStatus)) {
+                if (agentStore.currentTaskList) {
+                  agentStore.currentTaskList.status = runStatus
+                }
+                agentStore.planExecuting = false
               } else if (!agentStore.currentTaskList || !pausedStatuses.includes(agentStore.currentTaskList.status)) {
                 agentStore.planExecuting = false
               }
@@ -688,11 +703,20 @@ export function useAgentChat(scrollCallback?: () => void) {
               }
               agentStore.finishTurn()
               const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
+              const terminalStatuses = ['COMPLETED', 'FAILED', 'PARTIAL_COMPLETED']
               let donePayload: any = null
               try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
               const runStatus = donePayload?.runStatus
               if (runStatus && pausedStatuses.includes(runStatus)) {
                 agentStore.planExecuting = true
+                if (agentStore.currentTaskList && agentStore.currentTaskList.status !== runStatus) {
+                  agentStore.currentTaskList.status = runStatus
+                }
+              } else if (runStatus && terminalStatuses.includes(runStatus)) {
+                if (agentStore.currentTaskList) {
+                  agentStore.currentTaskList.status = runStatus
+                }
+                agentStore.planExecuting = false
               } else if (!agentStore.currentTaskList || !pausedStatuses.includes(agentStore.currentTaskList.status)) {
                 agentStore.planExecuting = false
               }
