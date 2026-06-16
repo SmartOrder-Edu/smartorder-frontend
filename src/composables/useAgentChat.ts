@@ -549,6 +549,27 @@ export function useAgentChat(scrollCallback?: () => void) {
    */
   const answerClarificationViaSSE = async (draftId: string, clarificationId: string, answer: string) => {
     agentStore.startNewTurn({ preservePlanState: true })
+
+    // 乐观更新：立即追加用户回答气泡
+    const clarInfo = agentStore.planPauseInfo?.clarification
+    let displayAnswer = answer
+    if (clarInfo) {
+      if (clarInfo.answerType === 'SINGLE_SELECT') {
+        const opt = clarInfo.options?.find(o => o.value === answer)
+        displayAnswer = opt?.label || answer
+      } else if (clarInfo.answerType === 'MULTI_SELECT') {
+        try {
+          const vals: string[] = JSON.parse(answer)
+          displayAnswer = vals.map(v => clarInfo.options?.find(o => o.value === v)?.label || v).join('、')
+        } catch { displayAnswer = answer }
+      }
+    }
+    messages.value.push({
+      role: 'user',
+      content: displayAnswer,
+      timestamp: Date.now(),
+    })
+
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
     let token: string
     try { token = await refreshAccessToken() } catch { agentStore.finishTurn(); return }

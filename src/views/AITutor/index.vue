@@ -210,25 +210,17 @@
                   @confirm="confirmPlan(msg.taskList.confirmationDraftId || agentStore.currentDraftId)"
                 />
 
-                <!-- Plan-and-Execute: 执行中/已完成的手风琴 -->
+                <!-- Plan-and-Execute: 执行中/已完成的手风琴（历史消息中 GateCard 始终只读） -->
                 <PlanExecutionAccordion
                   v-if="msg.taskList && !isPlanAwaitingConfirmation(msg.taskList)"
                   :task-list="msg.taskList"
                   :task-execution-map="msg.taskExecutionMap || new Map()"
                   :pause-info="msg.pauseInfo || null"
+                  :is-current-active="false"
+                  :gate-submitting="false"
                   @gate-answer="handleGateAnswer"
                   @gate-confirm="handleGateConfirm"
                   @gate-cancel="handleGateCancel"
-                />
-
-                <!-- 历史回放：已完成的澄清问答对（只读展示） -->
-                <GateCard
-                  v-if="msg.pauseInfo?.clarification && msg.clarificationAnsweredValue && agentStore.planPauseInfo?.clarification?.clarificationId !== msg.pauseInfo.clarification.clarificationId"
-                  reason="CLARIFICATION"
-                  :question="msg.pauseInfo.question"
-                  :clarification="msg.pauseInfo.clarification"
-                  :readonly="true"
-                  :answered-value="msg.clarificationAnsweredValue"
                 />
 
                 <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
@@ -316,7 +308,8 @@
                   reason="CLARIFICATION"
                   :question="clarificationPauseInfo.question"
                   :clarification="clarificationPauseInfo.clarification"
-                  @answer="(clarificationId, answer) => handleGateAnswer(clarificationPauseInfo!.taskId, answer)"
+                  :submitting="gateSubmitting"
+                  @answer="(clarificationId: string, answer: string) => handleGateAnswer(clarificationId, answer)"
                 />
               </div>
             </div>
@@ -526,7 +519,7 @@
             </div>
           </div>
 
-          <!-- 任务执行面板（Plan-and-Execute 模式下出现） -->
+          <!-- 任务执行面板（Plan-and-Execute 模式下出现，GateCard 始终只读） -->
           <TaskExecutionPanel
             v-if="!agentStore.showLearningPlanPreview"
             :task-list="agentStore.currentTaskList"
@@ -534,6 +527,8 @@
             :pause-info="agentStore.planPauseInfo"
             :confirming="agentStore.planConfirmLoading"
             :live-reasoning-segments="agentStore.reasoningSegments"
+            :is-current-active="false"
+            :gate-submitting="false"
             @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
             @gate-answer="handleGateAnswer"
             @gate-confirm="handleGateConfirm"
@@ -719,10 +714,17 @@ const inputPlaceholder = computed(() =>
     : '输入你的问题，AI 会结合你的学习画像给出个性化回答…'
 )
 
+const gateSubmitting = ref(false)
+
 const clarificationPauseInfo = computed(() => {
   const pauseInfo = agentStore.planPauseInfo
   if (!pauseInfo || pauseInfo.reason !== 'CLARIFICATION') return null
   return pauseInfo
+})
+
+// 当暂停状态变化（next question / resumed）时，重置 submitting
+watch(() => agentStore.planPauseInfo?.clarification?.clarificationId, () => {
+  gateSubmitting.value = false
 })
 
 const quickHints = computed(() =>
@@ -1142,16 +1144,22 @@ const openMsgTrace = async (msg: any) => {
 
 // === Plan-and-Execute Gate 事件处理 ===
 
-const handleGateAnswer = (taskId: string, answer: string) => {
-  // 优先使用专用澄清 API（绑定 draftId + clarificationId），回退到普通聊天
-  const pauseInfo = agentStore.planPauseInfo
+const handleGateAnswer = (clarificationId: string, answer: string) => {
   const draftId = agentStore.currentDraftId
-  const clarificationId = pauseInfo?.clarification?.clarificationId
   if (clarificationId && draftId) {
+    // 乐观标记 submitting
+    gateSubmitting.value = true
     answerClarificationViaSSE(draftId, clarificationId, answer)
   } else {
-    // 回退：旧路径（向后兼容）
-    agentSend(answer, [])
+    // 回退：尝试从 store 取 active clarificationId
+    const sid = agentStore.planPauseInfo?.clarification?.clarificationId
+    if (sid && draftId) {
+      gateSubmitting.value = true
+      answerClarificationViaSSE(draftId, sid, answer)
+    } else {
+      // 最后回退：普通聊天路径
+      agentSend(answer, [])
+    }
   }
 }
 

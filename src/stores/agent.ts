@@ -99,6 +99,8 @@ export const useAgentStore = defineStore('agent', () => {
   const currentTaskList = ref<TaskList | null>(null)
   const taskExecutionMap = ref<Map<string, TaskExecutionState>>(new Map())
   const planPauseInfo = ref<PlanPauseInfo | null>(null)
+  /** 已提交回答的 clarificationId 集合（用于判断 GateCard 只读态） */
+  const clarificationAnsweredIds = ref<Set<string>>(new Set())
   /** 计划执行阶段是否正在运行（区别于普通 loading） */
   const planExecuting = ref(false)
   /** 计划是否需要用户确认（CONFIRMATION gate 为 true，全 NORMAL 为 false） */
@@ -148,6 +150,7 @@ export const useAgentStore = defineStore('agent', () => {
       taskExecutionMap.value = new Map()
       planPauseInfo.value = null
       planNeedsConfirmation.value = false
+      clarificationAnsweredIds.value.clear()
     }
     // 学习计划草稿状态——每次新对话重置
     learningPlanDraft.value = null
@@ -472,6 +475,17 @@ export const useAgentStore = defineStore('agent', () => {
         break
       }
 
+      case 'agent.gate.answered': {
+        const status = data.payload?.status as string
+        const answeredClarificationId = data.payload?.clarificationId as string
+        if (answeredClarificationId) {
+          clarificationAnsweredIds.value.add(answeredClarificationId)
+        }
+        // 全部回答完毕时，planPauseInfo 会在后续 agent.plan.resumed 中清除
+        // 还有更多待回答时，planPauseInfo 会在后续 agent.plan.paused 中更新
+        break
+      }
+
       case 'agent.plan.resumed': {
         planPauseInfo.value = null
         const taskId = data.payload?.taskId || ''
@@ -704,6 +718,7 @@ export const useAgentStore = defineStore('agent', () => {
     currentTaskList.value = null
     taskExecutionMap.value = new Map()
     planPauseInfo.value = null
+    clarificationAnsweredIds.value.clear()
     planExecuting.value = false
     planNeedsConfirmation.value = false
     currentPhase.value = ''
@@ -740,6 +755,7 @@ export const useAgentStore = defineStore('agent', () => {
     currentTaskList,
     taskExecutionMap,
     planPauseInfo,
+    clarificationAnsweredIds,
     planExecuting,
     planNeedsConfirmation,
     currentPhase,

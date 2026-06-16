@@ -33,16 +33,20 @@
             v-model="userAnswer"
             placeholder="输入你的回答..."
             rows="2"
+            :disabled="submitting"
             @keydown.enter.exact.prevent="submitAnswer"
             @keydown.enter.shift.exact.stop
             ref="inputRef"
           ></textarea>
-          <button class="gate-submit-btn" @click="submitAnswer" :disabled="!userAnswer.trim()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-              <line x1="22" y1="2" x2="11" y2="13"/>
-              <polygon points="22,2 15,22 11,13 2,9"/>
-            </svg>
-            发送
+          <button class="gate-submit-btn" @click="submitAnswer" :disabled="!userAnswer.trim() || submitting">
+            <span v-if="submitting" class="gate-submitting-spinner"></span>
+            <template v-else>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22,2 15,22 11,13 2,9"/>
+              </svg>
+              发送
+            </template>
           </button>
         </div>
 
@@ -53,12 +57,13 @@
             :key="opt.value"
             class="gate-option"
             :class="{ selected: selectedOption === opt.value }"
-            @click="selectedOption = opt.value"
+            @click="!submitting && (selectedOption = opt.value)"
           >
             {{ opt.label }}
           </div>
-          <button class="gate-submit-btn" @click="submitSelectAnswer" :disabled="!selectedOption">
-            确认选择
+          <button class="gate-submit-btn" @click="submitSelectAnswer" :disabled="!selectedOption || submitting">
+            <span v-if="submitting" class="gate-submitting-spinner"></span>
+            <template v-else>确认选择</template>
           </button>
         </div>
 
@@ -69,12 +74,13 @@
             :key="opt.value"
             class="gate-option"
             :class="{ selected: selectedOptions.includes(opt.value) }"
-            @click="toggleMultiSelect(opt.value)"
+            @click="!submitting && toggleMultiSelect(opt.value)"
           >
             {{ opt.label }}
           </div>
-          <button class="gate-submit-btn" @click="submitMultiSelectAnswer" :disabled="selectedOptions.length === 0">
-            确认选择
+          <button class="gate-submit-btn" @click="submitMultiSelectAnswer" :disabled="selectedOptions.length === 0 || submitting">
+            <span v-if="submitting" class="gate-submitting-spinner"></span>
+            <template v-else>确认选择</template>
           </button>
         </div>
 
@@ -84,11 +90,13 @@
             type="number"
             v-model="numericAnswer"
             placeholder="输入数字..."
+            :disabled="submitting"
             @keydown.enter.exact.prevent="submitNumericAnswer"
             ref="inputRef"
           />
-          <button class="gate-submit-btn" @click="submitNumericAnswer" :disabled="numericAnswer === ''">
-            确认
+          <button class="gate-submit-btn" @click="submitNumericAnswer" :disabled="numericAnswer === '' || submitting">
+            <span v-if="submitting" class="gate-submitting-spinner"></span>
+            <template v-else>确认</template>
           </button>
         </div>
       </template>
@@ -143,6 +151,7 @@ const props = withDefaults(defineProps<{
   clarification?: ClarificationInfo
   readonly?: boolean
   answeredValue?: string
+  submitting?: boolean
   /** 当前步骤索引 (0-based) */
   stepIndex?: number
   /** 总步骤数 */
@@ -153,6 +162,7 @@ const props = withDefaults(defineProps<{
   impactedTools?: string[]
 }>(), {
   readonly: false,
+  submitting: false,
   answeredValue: '',
   impactedTools: () => [],
 })
@@ -452,6 +462,20 @@ function toggleMultiSelect(value: string) {
 .gate-cancel-btn:hover {
   border-color: var(--text-muted, #94a3b8);
   background: var(--background-color-base, #f8fafc);
+}
+
+.gate-submitting-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: gate-spin 0.6s linear infinite;
+}
+
+@keyframes gate-spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes gateIn {

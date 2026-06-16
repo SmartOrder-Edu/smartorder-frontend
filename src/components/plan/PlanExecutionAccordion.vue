@@ -91,6 +91,10 @@
             :reason="pauseInfo.reason"
             :question="pauseInfo.question"
             :clarification="pauseInfo.clarification"
+            :readonly="!isCurrentActive"
+            :submitting="isCurrentActive && !!gateSubmitting"
+            :answered-value="!isCurrentActive && pauseInfo.clarification?.clarificationId
+              ? getClarificationAnsweredText(pauseInfo.clarification.clarificationId) : ''"
             @answer="handleGateAnswer"
             @confirm="handleGateConfirm"
             @cancel="handleGateCancel"
@@ -125,10 +129,14 @@ const props = defineProps<{
   pauseInfo: PlanPauseInfo | null
   /** 当前 agentStore 的 reasoningSegments（流式时的实时数据） */
   liveReasoningSegments?: any[]
+  /** 是否为当前活跃的计划（非历史消息），历史消息中的 GateCard 应为只读 */
+  isCurrentActive?: boolean
+  /** GateCard 是否正在提交中 */
+  gateSubmitting?: boolean
 }>()
 
 const emit = defineEmits<{
-  gateAnswer: [taskId: string, answer: string]
+  gateAnswer: [clarificationId: string, answer: string]
   gateConfirm: [taskId: string]
   gateCancel: [taskId: string]
 }>()
@@ -244,9 +252,16 @@ watch(currentRunningTaskId, (newId, oldId) => {
 }, { immediate: true })
 
 function handleGateAnswer(clarificationId: string, answer: string) {
-  if (props.pauseInfo) {
-    emit('gateAnswer', props.pauseInfo.taskId, answer)
+  // 直接透传 clarificationId，不再退化到 taskId
+  emit('gateAnswer', clarificationId, answer)
+}
+
+function getClarificationAnsweredText(clarificationId: string): string {
+  // 从 store 中查询该 clarification 是否已提交并返回答案
+  if (agentStore.clarificationAnsweredIds.has(clarificationId)) {
+    return '' // 有记录但不知道具体答案文本，由外部传入
   }
+  return ''
 }
 
 function handleGateConfirm() {

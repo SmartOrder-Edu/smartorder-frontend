@@ -32,7 +32,9 @@
           :task-execution-map="taskExecutionMap"
           :pause-info="pauseInfo"
           :live-reasoning-segments="liveReasoningSegments"
-          @gate-answer="(taskId: string, answer: string) => $emit('gateAnswer', taskId, answer)"
+          :is-current-active="isCurrentActive"
+          :gate-submitting="gateSubmitting"
+          @gate-answer="(clarificationId: string, answer: string) => $emit('gateAnswer', clarificationId, answer)"
           @gate-confirm="(taskId: string) => $emit('gateConfirm', taskId)"
           @gate-cancel="(taskId: string) => $emit('gateCancel', taskId)"
         />
@@ -53,11 +55,13 @@ const props = defineProps<{
   pauseInfo: PlanPauseInfo | null
   confirming?: boolean
   liveReasoningSegments?: any[]
+  isCurrentActive?: boolean
+  gateSubmitting?: boolean
 }>()
 
 defineEmits<{
   confirm: []
-  gateAnswer: [taskId: string, answer: string]
+  gateAnswer: [clarificationId: string, answer: string]
   gateConfirm: [taskId: string]
   gateCancel: [taskId: string]
 }>()
