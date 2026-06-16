@@ -137,15 +137,15 @@ export const useAgentStore = defineStore('agent', () => {
     traceEvents.value = []
     loading.value = true
     planDialogVisible.value = false
-    currentDraftId.value = ''
-    currentPlan.value = null
     tracePanelVisible.value = false
     executionSteps.value = []
     planConfirmResult.value = null
     planDialogClosing.value = false
     currentPhase.value = ''
-    // Plan-and-Execute 状态在执行中或恢复澄清时不清除（跨消息保持）
-    if (!planExecuting.value && !options?.preservePlanState) {
+    // Plan-and-Execute 状态在 preservePlanState 时跨消息保持（多轮澄清等场景）
+    if (!options?.preservePlanState) {
+      currentDraftId.value = ''
+      currentPlan.value = null
       currentTaskList.value = null
       taskExecutionMap.value = new Map()
       planPauseInfo.value = null

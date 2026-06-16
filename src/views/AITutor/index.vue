@@ -218,6 +218,7 @@
                   :pause-info="msg.pauseInfo || null"
                   :is-current-active="false"
                   :gate-submitting="false"
+                  :clarification-answered-value="msg.clarificationAnsweredValue || ''"
                   @gate-answer="handleGateAnswer"
                   @gate-confirm="handleGateConfirm"
                   @gate-cancel="handleGateCancel"
@@ -805,6 +806,22 @@ const sendMessage = async () => {
   }
   const msg = inputMessage.value
   inputMessage.value = ''
+
+  // PAUSED_CLARIFICATION 态走专用澄清接口（有 draftId 和 clarificationId）
+  const pausedClarId = agentStore.planPauseInfo?.clarification?.clarificationId
+  if (agentStore.planPauseInfo?.reason === 'CLARIFICATION'
+      && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
+      && agentStore.currentDraftId
+      && pausedClarId) {
+    gateSubmitting.value = true
+    try {
+      await answerClarificationViaSSE(agentStore.currentDraftId, pausedClarId, msg)
+    } finally {
+      gateSubmitting.value = false
+    }
+    return
+  }
+
   // 从 ready 附件构造 RagReference 列表
   const attachmentRefs: RagReference[] = attachments.value
     .filter(a => a.status === 'ready')
@@ -1144,18 +1161,25 @@ const openMsgTrace = async (msg: any) => {
 
 // === Plan-and-Execute Gate 事件处理 ===
 
-const handleGateAnswer = (clarificationId: string, answer: string) => {
+const handleGateAnswer = async (clarificationId: string, answer: string) => {
   const draftId = agentStore.currentDraftId
   if (clarificationId && draftId) {
-    // 乐观标记 submitting
     gateSubmitting.value = true
-    answerClarificationViaSSE(draftId, clarificationId, answer)
+    try {
+      await answerClarificationViaSSE(draftId, clarificationId, answer)
+    } finally {
+      gateSubmitting.value = false
+    }
   } else {
     // 回退：尝试从 store 取 active clarificationId
     const sid = agentStore.planPauseInfo?.clarification?.clarificationId
     if (sid && draftId) {
       gateSubmitting.value = true
-      answerClarificationViaSSE(draftId, sid, answer)
+      try {
+        await answerClarificationViaSSE(draftId, sid, answer)
+      } finally {
+        gateSubmitting.value = false
+      }
     } else {
       // 最后回退：普通聊天路径
       agentSend(answer, [])

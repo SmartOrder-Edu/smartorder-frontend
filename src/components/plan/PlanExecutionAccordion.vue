@@ -93,8 +93,7 @@
             :clarification="pauseInfo.clarification"
             :readonly="!isCurrentActive"
             :submitting="isCurrentActive && !!gateSubmitting"
-            :answered-value="!isCurrentActive && pauseInfo.clarification?.clarificationId
-              ? getClarificationAnsweredText(pauseInfo.clarification.clarificationId) : ''"
+            :answered-value="!isCurrentActive ? clarificationAnsweredValue || '' : ''"
             @answer="handleGateAnswer"
             @confirm="handleGateConfirm"
             @cancel="handleGateCancel"
@@ -133,6 +132,8 @@ const props = defineProps<{
   isCurrentActive?: boolean
   /** GateCard 是否正在提交中 */
   gateSubmitting?: boolean
+  /** 历史回放时用户对该澄清的回答文本（只读模式展示用） */
+  clarificationAnsweredValue?: string
 }>()
 
 const emit = defineEmits<{
@@ -254,14 +255,6 @@ watch(currentRunningTaskId, (newId, oldId) => {
 function handleGateAnswer(clarificationId: string, answer: string) {
   // 直接透传 clarificationId，不再退化到 taskId
   emit('gateAnswer', clarificationId, answer)
-}
-
-function getClarificationAnsweredText(clarificationId: string): string {
-  // 从 store 中查询该 clarification 是否已提交并返回答案
-  if (agentStore.clarificationAnsweredIds.has(clarificationId)) {
-    return '' // 有记录但不知道具体答案文本，由外部传入
-  }
-  return ''
 }
 
 function handleGateConfirm() {

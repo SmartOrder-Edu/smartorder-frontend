@@ -547,7 +547,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   /**
    * 通过专用 API 提交澄清回答（SSE）——不经过 /agent/chat/stream
    */
-  const answerClarificationViaSSE = async (draftId: string, clarificationId: string, answer: string) => {
+  const answerClarificationViaSSE = async (draftId: string, clarificationId: string, answer: string): Promise<boolean> => {
     agentStore.startNewTurn({ preservePlanState: true })
 
     // 乐观更新：立即追加用户回答气泡
@@ -572,7 +572,7 @@ export function useAgentChat(scrollCallback?: () => void) {
 
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
     let token: string
-    try { token = await refreshAccessToken() } catch { agentStore.finishTurn(); return }
+    try { token = await refreshAccessToken() } catch { agentStore.finishTurn(); return false }
     abortController = new AbortController()
 
     try {
@@ -586,6 +586,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           },
           body: JSON.stringify({
             answer,
+            displayAnswer,
             conversationId: agentStore.currentConversationId || undefined,
           }),
           openWhenHidden: true,
@@ -617,6 +618,10 @@ export function useAgentChat(scrollCallback?: () => void) {
               let donePayload: any = null
               try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
               const runStatus = donePayload?.runStatus
+              // 多轮澄清时后端不发 plan.created，需从 done 恢复 draftId
+              if (donePayload?.draftId && !agentStore.currentDraftId) {
+                agentStore.currentDraftId = donePayload.draftId
+              }
               if (runStatus && pausedStatuses.includes(runStatus)) {
                 agentStore.planExecuting = true
                 if (agentStore.currentTaskList && agentStore.currentTaskList.status !== runStatus) {
@@ -668,6 +673,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           },
         },
       )
+      return true
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         console.error('[answerClarification] fetch error:', err)
@@ -675,6 +681,7 @@ export function useAgentChat(scrollCallback?: () => void) {
         agentStore.planExecuting = false
       }
       abortController = null
+      return false
     }
   }
 
