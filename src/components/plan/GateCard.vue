@@ -11,6 +11,9 @@
           </svg>
         </span>
         <span class="gate-title">Agent 需要你回答</span>
+        <span v-if="stepIndex !== undefined && totalSteps !== undefined" class="gate-step-context">
+          第 {{ stepIndex + 1 }}/{{ totalSteps }} 步{{ stepDescription ? ': ' + stepDescription : '' }}
+        </span>
       </div>
       <p class="gate-question">{{ question }}</p>
 
@@ -104,10 +107,16 @@
           </svg>
         </span>
         <span class="gate-title">需要你的确认</span>
+        <span v-if="stepIndex !== undefined && totalSteps !== undefined" class="gate-step-context">
+          第 {{ stepIndex + 1 }}/{{ totalSteps }} 步{{ stepDescription ? ': ' + stepDescription : '' }}
+        </span>
       </div>
       <p class="gate-question" v-if="question">{{ question }}</p>
       <div class="gate-actions" v-else>
-        <p class="gate-desc">以下操作将修改你的学习数据，确认执行？</p>
+        <p class="gate-desc">以下操作将修改你的学习数据：</p>
+        <ul v-if="impactedTools?.length" class="gate-impact-list">
+          <li v-for="tool in impactedTools" :key="tool">{{ toolLabel(tool) }}</li>
+        </ul>
       </div>
       <div class="gate-buttons">
         <button class="gate-confirm-btn" @click="$emit('confirm')">
@@ -134,9 +143,18 @@ const props = withDefaults(defineProps<{
   clarification?: ClarificationInfo
   readonly?: boolean
   answeredValue?: string
+  /** 当前步骤索引 (0-based) */
+  stepIndex?: number
+  /** 总步骤数 */
+  totalSteps?: number
+  /** 步骤描述（用于展示当前上下文） */
+  stepDescription?: string
+  /** CONFIRMATION 门涉及的工具列表（展示影响范围） */
+  impactedTools?: string[]
 }>(), {
   readonly: false,
   answeredValue: '',
+  impactedTools: () => [],
 })
 
 const emit = defineEmits<{
@@ -156,6 +174,19 @@ onMounted(() => {
     nextTick(() => inputRef.value?.focus())
   }
 })
+
+/** 将工具 ID 映射为可读标签 */
+function toolLabel(toolId: string): string {
+  const map: Record<string, string> = {
+    'getStudentProfile': '读取学生画像',
+    'createLearningPlan': '创建学习计划',
+    'generateResources': '生成学习资源',
+    'scheduleTask': '创建学习任务',
+    'updateKnowledgeGraph': '更新知识图谱',
+    'writeDatabase': '写入数据库',
+  }
+  return map[toolId] || toolId
+}
 
 function submitAnswer() {
   if (!userAnswer.value.trim()) return
@@ -368,6 +399,24 @@ function toggleMultiSelect(value: string) {
 .gate-buttons {
   display: flex;
   gap: 8px;
+}
+
+.gate-step-context {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary, #94a3b8);
+  font-weight: 400;
+  margin-left: auto;
+}
+
+.gate-impact-list {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #475569);
+}
+
+.gate-impact-list li {
+  line-height: 1.5;
 }
 
 .gate-confirm-btn {

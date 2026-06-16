@@ -105,6 +105,16 @@ export const agentApi = {
   getClarifications(conversationId: string) {
     return request.get<any[]>(`/agent/clarifications/${conversationId}`)
   },
+
+  /** 获取会话的活跃计划运行态——用于加载历史会话时恢复 agentStore 状态 */
+  getActiveRun(conversationId: string) {
+    return request.get<any>(`/agent/conversations/${conversationId}/active-run`)
+  },
+
+  /** 获取 Run 的标准化 Timeline */
+  getRunTimeline(runId: string) {
+    return request.get<any[]>(`/agent/runs/${runId}/timeline`)
+  },
 }
 
 export default { agentApi }

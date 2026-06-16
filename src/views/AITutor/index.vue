@@ -633,7 +633,9 @@ const {
   cancelPlan,
   loadConversation,
   startNewConversation,
-  deleteConversation
+  deleteConversation,
+  answerClarificationViaSSE,
+  confirmGateViaSSE,
 } = useAgentChat(scrollToBottom)
 
 // 用户手动选择的对话模式
@@ -1141,13 +1143,29 @@ const openMsgTrace = async (msg: any) => {
 // === Plan-and-Execute Gate 事件处理 ===
 
 const handleGateAnswer = (taskId: string, answer: string) => {
-  // CLARIFICATION gate: 用户回答后通过普通聊天发送
-  agentSend(answer, [])
+  // 优先使用专用澄清 API（绑定 draftId + clarificationId），回退到普通聊天
+  const pauseInfo = agentStore.planPauseInfo
+  const draftId = agentStore.currentDraftId
+  const clarificationId = pauseInfo?.clarification?.clarificationId
+  if (clarificationId && draftId) {
+    answerClarificationViaSSE(draftId, clarificationId, answer)
+  } else {
+    // 回退：旧路径（向后兼容）
+    agentSend(answer, [])
+  }
 }
 
 const handleGateConfirm = (taskId: string) => {
-  // CONFIRMATION gate: 确认执行
-  confirmPlan(agentStore.currentDraftId)
+  // 区分 CONFIRMATION gate 和 LEARNING_PLAN / DRAFT 确认
+  const draftId = agentStore.currentDraftId
+  const taskList = agentStore.currentTaskList
+  if (taskList?.status === 'PAUSED_CONFIRMATION' && draftId) {
+    // CONFIRMATION gate：使用专用 API
+    confirmGateViaSSE(draftId)
+  } else {
+    // LEARNING_PLAN / DRAFT / PENDING_CONFIRM：走原有 plan/confirm
+    confirmPlan(draftId)
+  }
 }
 
 const handleGateCancel = (_taskId: string) => {
@@ -1309,6 +1327,7 @@ watch(
     autoConfirmPending.value = false
 
     // 只有纯 NORMAL 门（无 CONFIRMATION/CLARIFICATION）计划才能自动执行
+    // 额外条件：SSE 已结束（!loading）、有有效 draftId、不在执行中、不需要确认
     const allNormal = taskList
       && taskList.tasks.every(t => t.gate === 'NORMAL' && t.status === 'PENDING')
 
@@ -1316,7 +1335,9 @@ watch(
       taskList &&
       allNormal &&
       !agentStore.planExecuting &&
-      !agentStore.planNeedsConfirmation
+      !agentStore.planNeedsConfirmation &&
+      !agentStore.loading &&
+      agentStore.currentDraftId
     ) {
       autoConfirmPending.value = true
       autoConfirmCountdown.value = 3
@@ -1327,29 +1348,19 @@ watch(
             clearInterval(autoConfirmTimer)
             autoConfirmTimer = null
           }
-          if (autoConfirmPending.value && agentStore.currentTaskList && agentStore.currentDraftId && !agentStore.loading) {
+          // 触发时再次检查所有条件
+          if (
+            autoConfirmPending.value &&
+            agentStore.currentDraftId &&
+            !agentStore.loading &&
+            !agentStore.planExecuting &&
+            agentStore.currentTaskList
+          ) {
             autoConfirmPending.value = false
             confirmPlan(agentStore.currentDraftId)
           }
         }
-      }, 750)
-    }
-  },
-)
-
-// 监听 loading 变化：当 SSE 流结束且需要自动确认时，立即触发
-watch(
-  () => agentStore.loading,
-  (loading) => {
-    if (!loading && autoConfirmPending.value && agentStore.currentDraftId) {
-      // 清除倒计时
-      if (autoConfirmTimer) {
-        clearInterval(autoConfirmTimer)
-        autoConfirmTimer = null
-      }
-      autoConfirmCountdown.value = 0
-      autoConfirmPending.value = false
-      confirmPlan(agentStore.currentDraftId)
+      }, 1000) // 3s 倒计时，每秒减 1
     }
   },
 )

@@ -304,7 +304,19 @@ export function useAgentChat(scrollCallback?: () => void) {
               })
             }
             agentStore.finishTurn()
-            agentStore.planExecuting = false
+            // 优先以后端 done payload 的 runStatus 判断，其次从前端 taskList 推断
+            const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
+            let donePayload: any = null
+            try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
+            const runStatus = donePayload?.runStatus
+            if (runStatus && pausedStatuses.includes(runStatus)) {
+              agentStore.planExecuting = true
+              if (agentStore.currentTaskList && agentStore.currentTaskList.status !== runStatus) {
+                agentStore.currentTaskList.status = runStatus
+              }
+            } else if (!agentStore.currentTaskList || !pausedStatuses.includes(agentStore.currentTaskList.status)) {
+              agentStore.planExecuting = false
+            }
             abortController = null
             scrollCallback?.()
             return
@@ -353,6 +365,7 @@ export function useAgentChat(scrollCallback?: () => void) {
             })
           }
           agentStore.finishTurn()
+          // 错误时暂停态也应保持，但连接中断时安全起见重置
           agentStore.planExecuting = false
           abortController = null
           scrollCallback?.()
@@ -417,13 +430,35 @@ export function useAgentChat(scrollCallback?: () => void) {
           if (event.event === 'done') {
             agentStore.planConfirmLoading = false
             agentStore.planDialogVisible = false
-            agentStore.planExecuting = false
+
+            // 优先以后端 done payload 的 runStatus 判断，其次从前端 taskList 推断
+            const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
+            let donePayload: any = null
+            try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
+            const runStatus = donePayload?.runStatus
+
             if (agentStore.currentTaskList) {
-              const hasFailedTask = agentStore.currentTaskList.tasks.some(t => t.status === 'FAILED')
-              const hasRunningTask = agentStore.currentTaskList.tasks.some(t => t.status === 'RUNNING')
-              if (!hasRunningTask) {
-                agentStore.currentTaskList.status = hasFailedTask ? 'FAILED' : 'COMPLETED'
+              if (runStatus && pausedStatuses.includes(runStatus)) {
+                // 后端明确告知暂停态
+                agentStore.planExecuting = true
+                if (agentStore.currentTaskList.status !== runStatus) {
+                  agentStore.currentTaskList.status = runStatus
+                }
+              } else {
+                const currentStatus = agentStore.currentTaskList.status
+                const isPaused = pausedStatuses.includes(currentStatus)
+                agentStore.planExecuting = isPaused
+                if (!isPaused) {
+                  const hasRunningTask = agentStore.currentTaskList.tasks.some(t => t.status === 'RUNNING')
+                  const hasPausedTask = agentStore.currentTaskList.tasks.some(t => t.status === 'PAUSED')
+                  if (!hasRunningTask && !hasPausedTask) {
+                    const hasFailedTask = agentStore.currentTaskList.tasks.some(t => t.status === 'FAILED')
+                    agentStore.currentTaskList.status = hasFailedTask ? 'FAILED' : 'COMPLETED'
+                  }
+                }
               }
+            } else {
+              agentStore.planExecuting = false
             }
 
             // 构造 PlanSummary
@@ -460,7 +495,7 @@ export function useAgentChat(scrollCallback?: () => void) {
                 taskExecutionMap: agentStore.taskExecutionMap.size
                   ? new Map(agentStore.taskExecutionMap) : undefined,
                 pauseInfo: agentStore.planPauseInfo,
-                planExecuting: false,
+                planExecuting: agentStore.planExecuting,
               })
               agentStore.answerText = ''
             }
@@ -504,12 +539,209 @@ export function useAgentChat(scrollCallback?: () => void) {
   }
 
   /**
+   * 通过专用 API 提交澄清回答（SSE）——不经过 /agent/chat/stream
+   */
+  const answerClarificationViaSSE = async (draftId: string, clarificationId: string, answer: string) => {
+    agentStore.startNewTurn({ preservePlanState: true })
+    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    let token: string
+    try { token = await refreshAccessToken() } catch { agentStore.finishTurn(); return }
+    abortController = new AbortController()
+
+    try {
+      await fetchEventSource(
+        `${base}/agent/plans/${draftId}/clarifications/${clarificationId}/answer`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            answer,
+            conversationId: agentStore.currentConversationId || undefined,
+          }),
+          openWhenHidden: true,
+          signal: abortController.signal,
+          onmessage(event) {
+            if (!event.data) return
+            if (event.event === 'done') {
+              // 处理与 sendMessage done 类似
+              if (agentStore.answerText || agentStore.currentTaskList) {
+                messages.value.push({
+                  role: 'ai',
+                  content: agentStore.answerText,
+                  traceId: agentStore.currentTraceId,
+                  traceEvents: [...agentStore.traceEvents],
+                  reasoningSegments: agentStore.reasoningSegments?.length
+                    ? [...agentStore.reasoningSegments] : undefined,
+                  timestamp: Date.now(),
+                  taskList: agentStore.currentTaskList || undefined,
+                  taskExecutionMap: agentStore.taskExecutionMap.size
+                    ? new Map(agentStore.taskExecutionMap) : undefined,
+                  pauseInfo: agentStore.planPauseInfo,
+                  planExecuting: agentStore.planExecuting,
+                })
+                agentStore.answerText = ''
+              }
+              agentStore.finishTurn()
+              const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
+              let donePayload: any = null
+              try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
+              const runStatus = donePayload?.runStatus
+              if (runStatus && pausedStatuses.includes(runStatus)) {
+                agentStore.planExecuting = true
+              } else if (!agentStore.currentTaskList || !pausedStatuses.includes(agentStore.currentTaskList.status)) {
+                agentStore.planExecuting = false
+              }
+              abortController = null
+              scrollCallback?.()
+              return
+            }
+            try {
+              const data = JSON.parse(event.data) as AgentTraceEvent
+              agentStore.handleEvent(event.event, data)
+              if (event.event === 'agent.plan.created') {
+                const tl = data.payload?.taskList
+                if (tl) {
+                  agentStore.planExecuting = tl.status === 'EXECUTING'
+                }
+              }
+            } catch { /* ignore */ }
+          },
+          onerror(err) {
+            console.error('[answerClarification] SSE error:', err)
+            if (agentStore.answerText || agentStore.currentTaskList) {
+              messages.value.push({
+                role: 'ai',
+                content: agentStore.answerText + '\n\n*[连接中断]*',
+                traceId: agentStore.currentTraceId,
+                traceEvents: [...agentStore.traceEvents],
+                timestamp: Date.now(),
+                taskList: agentStore.currentTaskList || undefined,
+                taskExecutionMap: agentStore.taskExecutionMap.size
+                  ? new Map(agentStore.taskExecutionMap) : undefined,
+                pauseInfo: agentStore.planPauseInfo,
+                planExecuting: false,
+              })
+            }
+            agentStore.finishTurn()
+            agentStore.planExecuting = false
+            abortController = null
+            throw err
+          },
+        },
+      )
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('[answerClarification] fetch error:', err)
+        agentStore.finishTurn()
+        agentStore.planExecuting = false
+      }
+      abortController = null
+    }
+  }
+
+  /**
+   * 通过专用 API 确认 CONFIRMATION 门（SSE）
+   */
+  const confirmGateViaSSE = async (draftId: string) => {
+    agentStore.startNewTurn({ preservePlanState: true })
+    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    let token: string
+    try { token = await refreshAccessToken() } catch { agentStore.finishTurn(); return }
+    abortController = new AbortController()
+
+    try {
+      await fetchEventSource(
+        `${base}/agent/plans/${draftId}/confirm-gate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            conversationId: agentStore.currentConversationId || undefined,
+          }),
+          openWhenHidden: true,
+          signal: abortController.signal,
+          onmessage(event) {
+            if (!event.data) return
+            if (event.event === 'done') {
+              if (agentStore.answerText || agentStore.currentTaskList) {
+                messages.value.push({
+                  role: 'ai',
+                  content: agentStore.answerText,
+                  traceId: agentStore.currentTraceId,
+                  traceEvents: [...agentStore.traceEvents],
+                  reasoningSegments: agentStore.reasoningSegments?.length
+                    ? [...agentStore.reasoningSegments] : undefined,
+                  timestamp: Date.now(),
+                  taskList: agentStore.currentTaskList || undefined,
+                  taskExecutionMap: agentStore.taskExecutionMap.size
+                    ? new Map(agentStore.taskExecutionMap) : undefined,
+                  pauseInfo: agentStore.planPauseInfo,
+                  planExecuting: agentStore.planExecuting,
+                })
+                agentStore.answerText = ''
+              }
+              agentStore.finishTurn()
+              const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
+              let donePayload: any = null
+              try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
+              const runStatus = donePayload?.runStatus
+              if (runStatus && pausedStatuses.includes(runStatus)) {
+                agentStore.planExecuting = true
+              } else if (!agentStore.currentTaskList || !pausedStatuses.includes(agentStore.currentTaskList.status)) {
+                agentStore.planExecuting = false
+              }
+              abortController = null
+              scrollCallback?.()
+              return
+            }
+            try {
+              const data = JSON.parse(event.data) as AgentTraceEvent
+              agentStore.handleEvent(event.event, data)
+              if (event.event === 'agent.plan.created') {
+                const tl = data.payload?.taskList
+                if (tl) {
+                  agentStore.planExecuting = tl.status === 'EXECUTING'
+                }
+              }
+            } catch { /* ignore */ }
+          },
+          onerror(err) {
+            console.error('[confirmGate] SSE error:', err)
+            agentStore.finishTurn()
+            agentStore.planExecuting = false
+            abortController = null
+            throw err
+          },
+        },
+      )
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('[confirmGate] fetch error:', err)
+        agentStore.finishTurn()
+        agentStore.planExecuting = false
+      }
+      abortController = null
+    }
+  }
+
+  /**
    * 加载指定对话的历史消息
    */
   const loadConversation = async (conversationId: string) => {
     loadingHistory.value = true
     try {
-      const result = await agentApi.getConversationMessages(conversationId, 1, 200)
+      // 倒序分页：先查总数，再请求最后一页，确保最新消息一定加载
+      const countResult = await agentApi.getConversationMessages(conversationId, 1, 1)
+      const total = countResult.total || 0
+      const pageSize = 200
+      const lastPage = Math.max(1, Math.ceil(total / pageSize))
+      const result = await agentApi.getConversationMessages(conversationId, lastPage, pageSize)
       const msgs: ChatMessage[] = []
 
       // 第一遍：从 MessageVO 构建消息（无 API 调用），收集 trace 拉取任务
@@ -807,6 +1039,35 @@ export function useAgentChat(scrollCallback?: () => void) {
 
       messages.value = msgs
       agentStore.currentConversationId = conversationId
+
+      // === 水合活跃计划状态 ===
+      // 查询后端是否有未完成的计划运行态，恢复 agentStore 中的关键状态
+      try {
+        const activeRunRes = await agentApi.getActiveRun(conversationId)
+        const activeRun = activeRunRes?.data ?? activeRunRes // 兼容 Result 包装
+        if (activeRun && activeRun.taskList) {
+          const s = activeRun.status
+          const activeStatuses = ['EXECUTING', 'PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION', 'DRAFT', 'PENDING_CONFIRM']
+          if (activeStatuses.includes(s)) {
+            agentStore.currentDraftId = activeRun.draftId || ''
+            agentStore.currentTaskList = activeRun.taskList
+            agentStore.planPauseInfo = activeRun.pauseInfo || null
+            agentStore.planExecuting = s === 'EXECUTING'
+            agentStore.planNeedsConfirmation = ['DRAFT', 'PENDING_CONFIRM', 'PAUSED_CONFIRMATION'].includes(s)
+            // 重建 taskExecutionMap
+            if (activeRun.taskList.tasks) {
+              const map = new Map<string, any>()
+              for (const task of activeRun.taskList.tasks) {
+                map.set(task.taskId, { status: task.status?.toLowerCase() || 'pending' })
+              }
+              agentStore.taskExecutionMap = map
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('[useAgentChat] 查询活跃计划状态失败（非关键）:', e)
+      }
+
       scrollCallback?.()
     } catch (e) {
       console.error('[useAgentChat] 加载对话消息失败:', e)
@@ -864,5 +1125,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     startNewConversation,
     clearMessages,
     deleteConversation,
+    answerClarificationViaSSE,
+    confirmGateViaSSE,
   }
 }
