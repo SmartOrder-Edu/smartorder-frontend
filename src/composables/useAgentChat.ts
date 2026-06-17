@@ -279,11 +279,19 @@ export function useAgentChat(scrollCallback?: () => void) {
           if (!event.data) return
 
           if (event.event === 'done') {
-            // 将 AI 回复添加到消息列表（含 Plan-and-Execute 状态）
-            if (agentStore.answerText || agentStore.currentTaskList) {
+            // 提前解析 done payload — 需要在消息保存前获取 clarificationPayload
+            let donePayload: any = null
+            try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
+
+            // 将 AI 回复添加到消息列表（ReAct / Plan-and-Execute）
+            const hasReActClarification = !!donePayload?.clarificationPayload
+              && !agentStore.currentTaskList
+            if (agentStore.answerText || agentStore.currentTaskList || hasReActClarification) {
               messages.value.push({
                 role: 'ai',
-                content: agentStore.answerText,
+                content: agentStore.answerText || (hasReActClarification
+                  ? (donePayload.clarificationPayload.question || '请提供更多信息')
+                  : ''),
                 traceId: agentStore.currentTraceId,
                 traceEvents: [...agentStore.traceEvents],
                 thinkingText: agentStore.thinkingText || undefined,
@@ -307,8 +315,6 @@ export function useAgentChat(scrollCallback?: () => void) {
             // 优先以后端 done payload 的 runStatus 判断，其次从前端 taskList 推断
             const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
             const terminalStatuses = ['COMPLETED', 'FAILED', 'PARTIAL_COMPLETED']
-            let donePayload: any = null
-            try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
             const runStatus = donePayload?.runStatus
             if (runStatus && pausedStatuses.includes(runStatus)) {
               agentStore.planExecuting = true
