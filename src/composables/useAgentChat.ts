@@ -1114,13 +1114,13 @@ export function useAgentChat(scrollCallback?: () => void) {
         const activeRun = activeRunRes?.data ?? activeRunRes // 兼容 Result 包装
         if (activeRun && activeRun.taskList) {
           const s = activeRun.status
-          const activeStatuses = ['EXECUTING', 'PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION', 'DRAFT', 'PENDING_CONFIRM']
+          const activeStatuses = ['EXECUTING', 'PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION', 'DRAFT', 'PENDING_CONFIRM', 'WAITING_CONFIRMATION']
           if (activeStatuses.includes(s)) {
             agentStore.currentDraftId = activeRun.draftId || ''
             agentStore.currentTaskList = activeRun.taskList
             agentStore.planPauseInfo = activeRun.pauseInfo || null
             agentStore.planExecuting = s === 'EXECUTING'
-            agentStore.planNeedsConfirmation = ['DRAFT', 'PENDING_CONFIRM', 'PAUSED_CONFIRMATION'].includes(s)
+            agentStore.planNeedsConfirmation = ['DRAFT', 'PENDING_CONFIRM', 'WAITING_CONFIRMATION', 'PAUSED_CONFIRMATION'].includes(s)
             // 重建 taskExecutionMap
             if (activeRun.taskList.tasks) {
               const map = new Map<string, any>()
