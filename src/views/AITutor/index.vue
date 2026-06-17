@@ -210,12 +210,15 @@
                   @confirm="confirmPlan(msg.taskList.confirmationDraftId || agentStore.currentDraftId)"
                 />
 
-                <!-- Plan-and-Execute: 执行中/已完成的手风琴 -->
+                <!-- Plan-and-Execute: 执行中/已完成的手风琴（历史消息中 GateCard 始终只读） -->
                 <PlanExecutionAccordion
                   v-if="msg.taskList && !isPlanAwaitingConfirmation(msg.taskList)"
                   :task-list="msg.taskList"
                   :task-execution-map="msg.taskExecutionMap || new Map()"
                   :pause-info="msg.pauseInfo || null"
+                  :is-current-active="false"
+                  :gate-submitting="false"
+                  :clarification-answered-value="msg.clarificationAnsweredValue || ''"
                   @gate-answer="handleGateAnswer"
                   @gate-confirm="handleGateConfirm"
                   @gate-cancel="handleGateCancel"
@@ -305,7 +308,9 @@
                 <GateCard
                   reason="CLARIFICATION"
                   :question="clarificationPauseInfo.question"
-                  @answer="answer => handleGateAnswer(clarificationPauseInfo!.taskId, answer)"
+                  :clarification="clarificationPauseInfo.clarification"
+                  :submitting="gateSubmitting"
+                  @answer="(clarificationId: string, answer: string) => handleGateAnswer(clarificationId, answer)"
                 />
               </div>
             </div>
@@ -515,7 +520,7 @@
             </div>
           </div>
 
-          <!-- 任务执行面板（Plan-and-Execute 模式下出现） -->
+          <!-- 任务执行面板（Plan-and-Execute 模式下出现，GateCard 始终只读） -->
           <TaskExecutionPanel
             v-if="!agentStore.showLearningPlanPreview"
             :task-list="agentStore.currentTaskList"
@@ -523,6 +528,8 @@
             :pause-info="agentStore.planPauseInfo"
             :confirming="agentStore.planConfirmLoading"
             :live-reasoning-segments="agentStore.reasoningSegments"
+            :is-current-active="false"
+            :gate-submitting="false"
             @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
             @gate-answer="handleGateAnswer"
             @gate-confirm="handleGateConfirm"
@@ -622,7 +629,9 @@ const {
   cancelPlan,
   loadConversation,
   startNewConversation,
-  deleteConversation
+  deleteConversation,
+  answerClarificationViaSSE,
+  confirmGateViaSSE,
 } = useAgentChat(scrollToBottom)
 
 // 用户手动选择的对话模式
@@ -706,10 +715,17 @@ const inputPlaceholder = computed(() =>
     : '输入你的问题，AI 会结合你的学习画像给出个性化回答…'
 )
 
+const gateSubmitting = ref(false)
+
 const clarificationPauseInfo = computed(() => {
   const pauseInfo = agentStore.planPauseInfo
   if (!pauseInfo || pauseInfo.reason !== 'CLARIFICATION') return null
   return pauseInfo
+})
+
+// 当暂停状态变化（next question / resumed）时，重置 submitting
+watch(() => agentStore.planPauseInfo?.clarification?.clarificationId, () => {
+  gateSubmitting.value = false
 })
 
 const quickHints = computed(() =>
@@ -790,6 +806,22 @@ const sendMessage = async () => {
   }
   const msg = inputMessage.value
   inputMessage.value = ''
+
+  // PAUSED_CLARIFICATION 态走专用澄清接口（有 draftId 和 clarificationId）
+  const pausedClarId = agentStore.planPauseInfo?.clarification?.clarificationId
+  if (agentStore.planPauseInfo?.reason === 'CLARIFICATION'
+      && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
+      && agentStore.currentDraftId
+      && pausedClarId) {
+    gateSubmitting.value = true
+    try {
+      await answerClarificationViaSSE(agentStore.currentDraftId, pausedClarId, msg)
+    } finally {
+      gateSubmitting.value = false
+    }
+    return
+  }
+
   // 从 ready 附件构造 RagReference 列表
   const attachmentRefs: RagReference[] = attachments.value
     .filter(a => a.status === 'ready')
@@ -1129,14 +1161,43 @@ const openMsgTrace = async (msg: any) => {
 
 // === Plan-and-Execute Gate 事件处理 ===
 
-const handleGateAnswer = (taskId: string, answer: string) => {
-  // CLARIFICATION gate: 用户回答后通过普通聊天发送
-  agentSend(answer, [])
+const handleGateAnswer = async (clarificationId: string, answer: string) => {
+  const draftId = agentStore.currentDraftId
+  if (clarificationId && draftId) {
+    gateSubmitting.value = true
+    try {
+      await answerClarificationViaSSE(draftId, clarificationId, answer)
+    } finally {
+      gateSubmitting.value = false
+    }
+  } else {
+    // 回退：尝试从 store 取 active clarificationId
+    const sid = agentStore.planPauseInfo?.clarification?.clarificationId
+    if (sid && draftId) {
+      gateSubmitting.value = true
+      try {
+        await answerClarificationViaSSE(draftId, sid, answer)
+      } finally {
+        gateSubmitting.value = false
+      }
+    } else {
+      // 最后回退：普通聊天路径
+      agentSend(answer, [])
+    }
+  }
 }
 
 const handleGateConfirm = (taskId: string) => {
-  // CONFIRMATION gate: 确认执行
-  confirmPlan(agentStore.currentDraftId)
+  // 区分 CONFIRMATION gate 和 LEARNING_PLAN / DRAFT 确认
+  const draftId = agentStore.currentDraftId
+  const taskList = agentStore.currentTaskList
+  if (taskList?.status === 'PAUSED_CONFIRMATION' && draftId) {
+    // CONFIRMATION gate：使用专用 API
+    confirmGateViaSSE(draftId)
+  } else {
+    // LEARNING_PLAN / DRAFT / PENDING_CONFIRM：走原有 plan/confirm
+    confirmPlan(draftId)
+  }
 }
 
 const handleGateCancel = (_taskId: string) => {
@@ -1298,6 +1359,7 @@ watch(
     autoConfirmPending.value = false
 
     // 只有纯 NORMAL 门（无 CONFIRMATION/CLARIFICATION）计划才能自动执行
+    // 额外条件：SSE 已结束（!loading）、有有效 draftId、不在执行中、不需要确认
     const allNormal = taskList
       && taskList.tasks.every(t => t.gate === 'NORMAL' && t.status === 'PENDING')
 
@@ -1305,7 +1367,10 @@ watch(
       taskList &&
       allNormal &&
       !agentStore.planExecuting &&
-      !agentStore.planNeedsConfirmation
+      !agentStore.planNeedsConfirmation &&
+      !agentStore.showLearningPlanPreview &&
+      !agentStore.loading &&
+      agentStore.currentDraftId
     ) {
       autoConfirmPending.value = true
       autoConfirmCountdown.value = 3
@@ -1316,29 +1381,20 @@ watch(
             clearInterval(autoConfirmTimer)
             autoConfirmTimer = null
           }
-          if (autoConfirmPending.value && agentStore.currentTaskList && agentStore.currentDraftId && !agentStore.loading) {
+          // 触发时再次检查所有条件（含学习计划预览未展示，避免确认错对象）
+          if (
+            autoConfirmPending.value &&
+            agentStore.currentDraftId &&
+            !agentStore.loading &&
+            !agentStore.planExecuting &&
+            !agentStore.showLearningPlanPreview &&
+            agentStore.currentTaskList
+          ) {
             autoConfirmPending.value = false
             confirmPlan(agentStore.currentDraftId)
           }
         }
-      }, 750)
-    }
-  },
-)
-
-// 监听 loading 变化：当 SSE 流结束且需要自动确认时，立即触发
-watch(
-  () => agentStore.loading,
-  (loading) => {
-    if (!loading && autoConfirmPending.value && agentStore.currentDraftId) {
-      // 清除倒计时
-      if (autoConfirmTimer) {
-        clearInterval(autoConfirmTimer)
-        autoConfirmTimer = null
-      }
-      autoConfirmCountdown.value = 0
-      autoConfirmPending.value = false
-      confirmPlan(agentStore.currentDraftId)
+      }, 1000) // 3s 倒计时，每秒减 1
     }
   },
 )

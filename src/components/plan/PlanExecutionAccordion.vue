@@ -90,6 +90,10 @@
             v-if="execState(task.taskId)?.status === 'paused' && pauseInfo && pauseInfo.taskId === task.taskId"
             :reason="pauseInfo.reason"
             :question="pauseInfo.question"
+            :clarification="pauseInfo.clarification"
+            :readonly="!isCurrentActive"
+            :submitting="isCurrentActive && !!gateSubmitting"
+            :answered-value="!isCurrentActive ? clarificationAnsweredValue || '' : ''"
             @answer="handleGateAnswer"
             @confirm="handleGateConfirm"
             @cancel="handleGateCancel"
@@ -124,10 +128,16 @@ const props = defineProps<{
   pauseInfo: PlanPauseInfo | null
   /** 当前 agentStore 的 reasoningSegments（流式时的实时数据） */
   liveReasoningSegments?: any[]
+  /** 是否为当前活跃的计划（非历史消息），历史消息中的 GateCard 应为只读 */
+  isCurrentActive?: boolean
+  /** GateCard 是否正在提交中 */
+  gateSubmitting?: boolean
+  /** 历史回放时用户对该澄清的回答文本（只读模式展示用） */
+  clarificationAnsweredValue?: string
 }>()
 
 const emit = defineEmits<{
-  gateAnswer: [taskId: string, answer: string]
+  gateAnswer: [clarificationId: string, answer: string]
   gateConfirm: [taskId: string]
   gateCancel: [taskId: string]
 }>()
@@ -193,8 +203,9 @@ function currentSegments(taskId: string) {
 function formatDepIds(ids: string[]): string {
   const circled = '①②③④⑤⑥⑦⑧⑨⑩'
   return ids.map(id => {
-    const num = parseInt(id.replace('task-', ''))
-    return circled[num - 1] || num
+    const raw = id.replace('task-', '')
+    const parsed = parseInt(raw)
+    return circled[parsed - 1] || raw
   }).join('')
 }
 
@@ -242,10 +253,9 @@ watch(currentRunningTaskId, (newId, oldId) => {
   })
 }, { immediate: true })
 
-function handleGateAnswer(answer: string) {
-  if (props.pauseInfo) {
-    emit('gateAnswer', props.pauseInfo.taskId, answer)
-  }
+function handleGateAnswer(clarificationId: string, answer: string) {
+  // 直接透传 clarificationId，不再退化到 taskId
+  emit('gateAnswer', clarificationId, answer)
 }
 
 function handleGateConfirm() {

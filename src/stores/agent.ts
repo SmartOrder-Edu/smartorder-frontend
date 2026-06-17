@@ -7,6 +7,7 @@ import type {
   TaskExecutionState,
   PauseReason,
   PlanPauseInfo,
+  ClarificationInfo,
   LearningPlanDraft,
   PhaseInfo,
 } from '@/types/planExecute'
@@ -98,6 +99,8 @@ export const useAgentStore = defineStore('agent', () => {
   const currentTaskList = ref<TaskList | null>(null)
   const taskExecutionMap = ref<Map<string, TaskExecutionState>>(new Map())
   const planPauseInfo = ref<PlanPauseInfo | null>(null)
+  /** 已提交回答的 clarificationId 集合（用于判断 GateCard 只读态） */
+  const clarificationAnsweredIds = ref<Set<string>>(new Set())
   /** 计划执行阶段是否正在运行（区别于普通 loading） */
   const planExecuting = ref(false)
   /** 计划是否需要用户确认（CONFIRMATION gate 为 true，全 NORMAL 为 false） */
@@ -123,7 +126,7 @@ export const useAgentStore = defineStore('agent', () => {
   /**
    * 开始新的对话轮次
    */
-  function startNewTurn() {
+  function startNewTurn(options?: { preservePlanState?: boolean }) {
     answerText.value = ''
     thinkingText.value = ''
     thinkingStartTime.value = null
@@ -134,19 +137,20 @@ export const useAgentStore = defineStore('agent', () => {
     traceEvents.value = []
     loading.value = true
     planDialogVisible.value = false
-    currentDraftId.value = ''
-    currentPlan.value = null
     tracePanelVisible.value = false
     executionSteps.value = []
     planConfirmResult.value = null
     planDialogClosing.value = false
     currentPhase.value = ''
-    // Plan-and-Execute 状态在 planExecuting 为 true 时不清除（跨消息保持）
-    if (!planExecuting.value) {
+    // Plan-and-Execute 状态在 preservePlanState 时跨消息保持（多轮澄清等场景）
+    if (!options?.preservePlanState) {
+      currentDraftId.value = ''
+      currentPlan.value = null
       currentTaskList.value = null
       taskExecutionMap.value = new Map()
       planPauseInfo.value = null
       planNeedsConfirmation.value = false
+      clarificationAnsweredIds.value.clear()
     }
     // 学习计划草稿状态——每次新对话重置
     learningPlanDraft.value = null
@@ -370,6 +374,11 @@ export const useAgentStore = defineStore('agent', () => {
             knowledgeGraph: plan.knowledgeGraph || { nodes: [], edges: [] },
           }
           showLearningPlanPreview.value = true
+          // 互斥：学习计划草稿出现时，执行计划不再需要确认。
+          // 学习计划草稿的确认由 LearningPlanPreview 卡片承担，
+          // 清空执行计划确认态避免 autoConfirm 等逻辑确认错对象。
+          planNeedsConfirmation.value = false
+          planPauseInfo.value = null
         }
         break
       }
@@ -448,7 +457,8 @@ export const useAgentStore = defineStore('agent', () => {
         const reason = data.payload?.reason as PauseReason
         const taskId = data.payload?.taskId || ''
         const question = data.payload?.question || ''
-        planPauseInfo.value = { reason, taskId, question }
+        const clarification = data.payload?.clarification as ClarificationInfo | undefined
+        planPauseInfo.value = { reason, taskId, question, clarification }
 
         const execState = taskExecutionMap.value.get(taskId)
         if (execState) {
@@ -467,6 +477,17 @@ export const useAgentStore = defineStore('agent', () => {
           const q = question || '请提供更多信息'
           answerText.value += '\n\n' + q
         }
+        break
+      }
+
+      case 'agent.gate.answered': {
+        const status = data.payload?.status as string
+        const answeredClarificationId = data.payload?.clarificationId as string
+        if (answeredClarificationId) {
+          clarificationAnsweredIds.value.add(answeredClarificationId)
+        }
+        // 全部回答完毕时，planPauseInfo 会在后续 agent.plan.resumed 中清除
+        // 还有更多待回答时，planPauseInfo 会在后续 agent.plan.paused 中更新
         break
       }
 
@@ -572,6 +593,8 @@ export const useAgentStore = defineStore('agent', () => {
         if (data.payload?.message) {
           answerText.value += `\n\n[错误] ${data.payload.message}`
         }
+        loading.value = false
+        planExecuting.value = false
         break
     }
   }
@@ -605,6 +628,7 @@ export const useAgentStore = defineStore('agent', () => {
     loading.value = false
     answerText.value = ''
     currentPhase.value = ''
+    planExecuting.value = false
     if (thinkingStartTime.value) {
       thinkingDurationMs.value = Date.now() - thinkingStartTime.value
     }
@@ -699,6 +723,7 @@ export const useAgentStore = defineStore('agent', () => {
     currentTaskList.value = null
     taskExecutionMap.value = new Map()
     planPauseInfo.value = null
+    clarificationAnsweredIds.value.clear()
     planExecuting.value = false
     planNeedsConfirmation.value = false
     currentPhase.value = ''
@@ -735,6 +760,7 @@ export const useAgentStore = defineStore('agent', () => {
     currentTaskList,
     taskExecutionMap,
     planPauseInfo,
+    clarificationAnsweredIds,
     planExecuting,
     planNeedsConfirmation,
     currentPhase,

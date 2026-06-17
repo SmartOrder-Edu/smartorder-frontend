@@ -11,25 +11,96 @@
           </svg>
         </span>
         <span class="gate-title">Agent 需要你回答</span>
+        <span v-if="stepIndex !== undefined && totalSteps !== undefined" class="gate-step-context">
+          第 {{ stepIndex + 1 }}/{{ totalSteps }} 步{{ stepDescription ? ': ' + stepDescription : '' }}
+        </span>
       </div>
       <p class="gate-question">{{ question }}</p>
-      <div class="gate-input-area">
-        <textarea
-          v-model="userAnswer"
-          placeholder="输入你的回答..."
-          rows="2"
-          @keydown.enter.exact.prevent="submitAnswer"
-          @keydown.enter.shift.exact.stop
-          ref="inputRef"
-        ></textarea>
-        <button class="gate-submit-btn" @click="submitAnswer" :disabled="!userAnswer.trim()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22,2 15,22 11,13 2,9"/>
-          </svg>
-          发送
-        </button>
-      </div>
+
+      <!-- 只读模式 (历史回放) -->
+      <template v-if="readonly">
+        <div class="gate-readonly-answer">
+          <span class="answer-label">你的回答：</span>
+          <span class="answer-value">{{ answeredValue || '—' }}</span>
+        </div>
+      </template>
+
+      <!-- 交互模式 -->
+      <template v-else>
+        <!-- TEXT answerType (默认 / 无 clarification) -->
+        <div v-if="!clarification || clarification.answerType === 'TEXT'" class="gate-input-area">
+          <textarea
+            v-model="userAnswer"
+            placeholder="输入你的回答..."
+            rows="2"
+            :disabled="submitting"
+            @keydown.enter.exact.prevent="submitAnswer"
+            @keydown.enter.shift.exact.stop
+            ref="inputRef"
+          ></textarea>
+          <button class="gate-submit-btn" @click="submitAnswer" :disabled="!userAnswer.trim() || submitting">
+            <span v-if="submitting" class="gate-submitting-spinner"></span>
+            <template v-else>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22,2 15,22 11,13 2,9"/>
+              </svg>
+              发送
+            </template>
+          </button>
+        </div>
+
+        <!-- SINGLE_SELECT answerType -->
+        <div v-else-if="clarification.answerType === 'SINGLE_SELECT'" class="gate-options">
+          <div
+            v-for="opt in clarification.options"
+            :key="opt.value"
+            class="gate-option"
+            :class="{ selected: selectedOption === opt.value }"
+            @click="!submitting && (selectedOption = opt.value)"
+          >
+            {{ opt.label }}
+          </div>
+          <button class="gate-submit-btn" @click="submitSelectAnswer" :disabled="!selectedOption || submitting">
+            <span v-if="submitting" class="gate-submitting-spinner"></span>
+            <template v-else>确认选择</template>
+          </button>
+        </div>
+
+        <!-- MULTI_SELECT answerType -->
+        <div v-else-if="clarification.answerType === 'MULTI_SELECT'" class="gate-options multi">
+          <div
+            v-for="opt in clarification.options"
+            :key="opt.value"
+            class="gate-option"
+            :class="{ selected: selectedOptions.includes(opt.value) }"
+            @click="!submitting && toggleMultiSelect(opt.value)"
+          >
+            {{ opt.label }}
+          </div>
+          <button class="gate-submit-btn" @click="submitMultiSelectAnswer" :disabled="selectedOptions.length === 0 || submitting">
+            <span v-if="submitting" class="gate-submitting-spinner"></span>
+            <template v-else>确认选择</template>
+          </button>
+        </div>
+
+        <!-- NUMBER answerType -->
+        <div v-else-if="clarification.answerType === 'NUMBER'" class="gate-input-area">
+          <input
+            type="number"
+            v-model="numericAnswer"
+            placeholder="输入数字..."
+            :disabled="submitting"
+            @keydown.enter.exact.prevent="submitNumericAnswer"
+            ref="inputRef"
+          />
+          <button class="gate-submit-btn" @click="submitNumericAnswer" :disabled="numericAnswer === '' || submitting">
+            <span v-if="submitting" class="gate-submitting-spinner"></span>
+            <template v-else>确认</template>
+          </button>
+        </div>
+      </template>
+
       <p class="gate-hint">回答后 Agent 将据此调整后续计划</p>
     </template>
 
@@ -44,10 +115,16 @@
           </svg>
         </span>
         <span class="gate-title">需要你的确认</span>
+        <span v-if="stepIndex !== undefined && totalSteps !== undefined" class="gate-step-context">
+          第 {{ stepIndex + 1 }}/{{ totalSteps }} 步{{ stepDescription ? ': ' + stepDescription : '' }}
+        </span>
       </div>
       <p class="gate-question" v-if="question">{{ question }}</p>
       <div class="gate-actions" v-else>
-        <p class="gate-desc">以下操作将修改你的学习数据，确认执行？</p>
+        <p class="gate-desc">以下操作将修改你的学习数据：</p>
+        <ul v-if="impactedTools?.length" class="gate-impact-list">
+          <li v-for="tool in impactedTools" :key="tool">{{ toolLabel(tool) }}</li>
+        </ul>
       </div>
       <div class="gate-buttons">
         <button class="gate-confirm-btn" @click="$emit('confirm')">
@@ -66,32 +143,93 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import type { PauseReason } from '@/types/planExecute'
+import type { PauseReason, ClarificationInfo } from '@/types/planExecute'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   reason: PauseReason
   question: string
-}>()
+  clarification?: ClarificationInfo
+  readonly?: boolean
+  answeredValue?: string
+  submitting?: boolean
+  /** 当前步骤索引 (0-based) */
+  stepIndex?: number
+  /** 总步骤数 */
+  totalSteps?: number
+  /** 步骤描述（用于展示当前上下文） */
+  stepDescription?: string
+  /** CONFIRMATION 门涉及的工具列表（展示影响范围） */
+  impactedTools?: string[]
+}>(), {
+  readonly: false,
+  submitting: false,
+  answeredValue: '',
+  impactedTools: () => [],
+})
 
 const emit = defineEmits<{
-  answer: [value: string]
+  answer: [clarificationId: string, value: string]
   confirm: []
   cancel: []
 }>()
 
 const userAnswer = ref('')
-const inputRef = ref<HTMLTextAreaElement>()
+const selectedOption = ref('')
+const selectedOptions = ref<string[]>([])
+const numericAnswer = ref('')
+const inputRef = ref<HTMLTextAreaElement | HTMLInputElement>()
 
 onMounted(() => {
-  if (props.reason === 'CLARIFICATION') {
+  if (props.reason === 'CLARIFICATION' && !props.readonly) {
     nextTick(() => inputRef.value?.focus())
   }
 })
 
+/** 将工具 ID 映射为可读标签 */
+function toolLabel(toolId: string): string {
+  const map: Record<string, string> = {
+    'getStudentProfile': '读取学生画像',
+    'createLearningPlan': '创建学习计划',
+    'generateResources': '生成学习资源',
+    'scheduleTask': '创建学习任务',
+    'updateKnowledgeGraph': '更新知识图谱',
+    'writeDatabase': '写入数据库',
+  }
+  return map[toolId] || toolId
+}
+
 function submitAnswer() {
   if (!userAnswer.value.trim()) return
-  emit('answer', userAnswer.value.trim())
+  const id = props.clarification?.clarificationId || ''
+  emit('answer', id, userAnswer.value.trim())
   userAnswer.value = ''
+}
+
+function submitSelectAnswer() {
+  if (!selectedOption.value) return
+  emit('answer', props.clarification!.clarificationId, selectedOption.value)
+  selectedOption.value = ''
+}
+
+function submitMultiSelectAnswer() {
+  if (selectedOptions.value.length === 0) return
+  emit('answer', props.clarification!.clarificationId, JSON.stringify(selectedOptions.value))
+  selectedOptions.value = []
+}
+
+function submitNumericAnswer() {
+  if (numericAnswer.value === '') return
+  emit('answer', props.clarification!.clarificationId, numericAnswer.value)
+  numericAnswer.value = ''
+}
+
+function toggleMultiSelect(value: string) {
+  const idx = selectedOptions.value.indexOf(value)
+  if (idx >= 0) {
+    selectedOptions.value.splice(idx, 1)
+  } else {
+    selectedOptions.value.push(value)
+  }
 }
 </script>
 
@@ -147,13 +285,15 @@ function submitAnswer() {
   margin: 0 0 10px;
 }
 
+/* 文本输入区 */
 .gate-input-area {
   display: flex;
   gap: 8px;
   align-items: flex-end;
 }
 
-.gate-input-area textarea {
+.gate-input-area textarea,
+.gate-input-area input {
   flex: 1;
   border: 1px solid #e5e7eb;
   border-radius: var(--radius-md, 0.5rem);
@@ -166,10 +306,47 @@ function submitAnswer() {
   transition: border-color 0.2s;
 }
 
-.gate-input-area textarea:focus {
+.gate-input-area textarea:focus,
+.gate-input-area input:focus {
   border-color: var(--primary-color, #3b5bdb);
 }
 
+/* 选项卡片 */
+.gate-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.gate-options.multi {
+  /* 多选同样式 */
+}
+
+.gate-option {
+  padding: 6px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #475569);
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.gate-option:hover {
+  border-color: var(--primary-color, #3b5bdb);
+  color: var(--primary-color, #3b5bdb);
+}
+
+.gate-option.selected {
+  border-color: var(--primary-color, #3b5bdb);
+  background: rgba(59, 91, 219, 0.08);
+  color: var(--primary-color, #3b5bdb);
+  font-weight: 500;
+}
+
+/* 提交按钮 */
 .gate-submit-btn {
   display: flex;
   align-items: center;
@@ -202,6 +379,26 @@ function submitAnswer() {
   color: var(--text-muted, #94a3b8);
 }
 
+/* 只读模式（历史回放） */
+.gate-readonly-answer {
+  padding: 8px 10px;
+  background: rgba(59, 91, 219, 0.04);
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.answer-label {
+  color: var(--text-muted, #94a3b8);
+  font-size: 0.75rem;
+}
+
+.answer-value {
+  color: var(--text-dark, #0f172a);
+  font-weight: 500;
+}
+
+/* CONFIRMATION 门样式 */
 .gate-desc {
   font-size: 0.75rem;
   color: var(--text-secondary, #475569);
@@ -212,6 +409,24 @@ function submitAnswer() {
 .gate-buttons {
   display: flex;
   gap: 8px;
+}
+
+.gate-step-context {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary, #94a3b8);
+  font-weight: 400;
+  margin-left: auto;
+}
+
+.gate-impact-list {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #475569);
+}
+
+.gate-impact-list li {
+  line-height: 1.5;
 }
 
 .gate-confirm-btn {
@@ -247,6 +462,20 @@ function submitAnswer() {
 .gate-cancel-btn:hover {
   border-color: var(--text-muted, #94a3b8);
   background: var(--background-color-base, #f8fafc);
+}
+
+.gate-submitting-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: gate-spin 0.6s linear infinite;
+}
+
+@keyframes gate-spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes gateIn {

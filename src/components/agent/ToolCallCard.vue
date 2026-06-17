@@ -12,7 +12,7 @@
         · {{ formattedDuration }}
       </span>
       <button
-        v-if="status !== 'running' && hasResultText"
+        v-if="status !== 'running' && (hasResultText || hasSearchRefs)"
         class="tool-toggle-btn"
         @click="expanded = !expanded"
       >
@@ -28,11 +28,36 @@
         <span>{{ draftNote }}</span>
       </div>
     </div>
+
+    <!-- 网络搜索来源（内联展示，仅标题） -->
+    <div class="tool-search-refs" v-if="showInlineSearchRefs">
+      <div class="search-refs-header">
+        <el-icon :size="12"><Search /></el-icon>
+        <span>搜索来源（{{ searchRefs.length }}）</span>
+      </div>
+      <a
+        v-for="ref in searchRefs"
+        :key="ref.citationIndex"
+        :href="ref.url"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="search-ref-item"
+      >
+        <span class="search-ref-index">{{ ref.citationIndex }}.</span>
+        <img
+          :src="faviconUrl(ref.url)"
+          class="search-ref-favicon"
+          @error="($event.target as HTMLImageElement).style.display = 'none'"
+        />
+        <span class="search-ref-title">{{ ref.title }}</span>
+      </a>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { Search } from '@element-plus/icons-vue'
 import {
   formatRunningText,
   formatCompletedText,
@@ -40,6 +65,13 @@ import {
   formatDraftNote,
   formatFailedText,
 } from '@/utils/agentToolDisplay'
+
+interface SearchReference {
+  citationIndex: number
+  title: string
+  url: string
+  snippet: string
+}
 
 const props = defineProps<{
   toolName: string
@@ -49,7 +81,49 @@ const props = defineProps<{
   durationMs?: number
 }>()
 
-const expanded = ref(false)
+const expanded = ref(true)
+
+function normalizeResult(result: any): Record<string, any> | null {
+  if (!result) return null
+  if (typeof result === 'string') {
+    try { return JSON.parse(result) } catch { return null }
+  }
+  if (typeof result === 'object') return result
+  return null
+}
+
+const searchRefs = computed<SearchReference[]>(() => {
+  if (props.toolName !== 'webSearch' || props.status !== 'completed' || !props.result) return []
+  const obj = normalizeResult(props.result)
+  if (!obj) return []
+  const refs = obj.references ?? obj.webSearchReferences
+  if (!Array.isArray(refs) || refs.length === 0) return []
+  return refs
+})
+
+const hasSearchRefs = computed(() => searchRefs.value.length > 0)
+
+// 搜索来源出现时自动展开
+watch(searchRefs, (refs) => {
+  if (refs.length > 0) expanded.value = true
+})
+
+// 内联搜索来源受 expanded 控制
+const showInlineSearchRefs = computed(() => expanded.value && hasSearchRefs.value)
+
+function domain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+function faviconUrl(url: string): string {
+  const d = domain(url)
+  if (!d || d === url) return ''
+  return `https://icon.horse/icon/${d}`
+}
 
 const actionText = computed(() => {
   if (props.status === 'running') return formatRunningText(props.toolName, props.arguments)
@@ -84,6 +158,7 @@ const formattedDuration = computed(() => {
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
   return `${Math.floor(ms / 60000)}m${Math.round((ms % 60000) / 1000)}s`
 })
+
 </script>
 
 <style scoped>
@@ -199,5 +274,71 @@ const formattedDuration = computed(() => {
   font-size: 0.6875rem;
   color: var(--text-muted);
   opacity: 0.85;
+}
+
+/* 网络搜索来源（内联，仅标题） */
+.tool-search-refs {
+  padding: 0 8px 6px 34px;
+  border-top: 1px solid rgba(59, 91, 219, 0.06);
+  margin-top: 2px;
+}
+
+.search-refs-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0 6px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.search-ref-item {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 0;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.search-ref-item:hover {
+  background: rgba(59, 91, 219, 0.04);
+}
+
+.search-ref-index {
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 1.4em;
+  text-align: right;
+  opacity: 0.7;
+}
+
+.search-ref-favicon {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.search-ref-title {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: #3b5bdb;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.search-ref-item:hover .search-ref-title {
+  text-decoration: underline;
 }
 </style>

@@ -209,15 +209,25 @@ export function formatCompletedText(toolName: string, args?: any): string {
  * 例："你有 3 个学习目标，2 个薄弱环节"
  *     "找到 12 个相关知识，18 条关联"
  */
+function normalizeResult(result: any): Record<string, any> | null {
+  if (!result) return null
+  if (typeof result === 'string') {
+    try { return JSON.parse(result) } catch { return null }
+  }
+  if (typeof result === 'object') return result
+  return null
+}
+
 export function formatResultText(toolName: string, result?: any): string | null {
-  if (!result || typeof result !== 'object') return null
+  const obj = normalizeResult(result)
+  if (!obj) return null
 
   switch (toolName) {
     case 'getStudentProfile':
     case 'profile_tool': {
       const parts: string[] = []
-      const goals = result.learningGoals ?? result.goals
-      const weaknesses = result.weaknesses
+      const goals = obj.learningGoals ?? obj.goals
+      const weaknesses = obj.weaknesses
       if (Array.isArray(goals)) parts.push(`${goals.length} 个学习目标`)
       if (Array.isArray(weaknesses)) parts.push(`${weaknesses.length} 个薄弱环节`)
       return parts.length ? parts.join('，') : null
@@ -225,8 +235,8 @@ export function formatResultText(toolName: string, result?: any): string | null 
 
     case 'queryKnowledge':
     case 'knowledge_search_tool': {
-      const nodeCount = result.nodeCount ?? result.nodes?.length ?? 0
-      const edgeCount = result.edgeCount ?? result.edges?.length ?? result.relations?.length ?? 0
+      const nodeCount = obj.nodeCount ?? obj.nodes?.length ?? 0
+      const edgeCount = obj.edgeCount ?? obj.edges?.length ?? obj.relations?.length ?? 0
       if (nodeCount === 0 && edgeCount === 0) return '暂未找到相关知识'
       const parts: string[] = []
       if (nodeCount > 0) parts.push(`${nodeCount} 个相关知识`)
@@ -236,11 +246,11 @@ export function formatResultText(toolName: string, result?: any): string | null 
 
     case 'queryLearningProgress': {
       const parts: string[] = []
-      const todayTotal = result.todayTasksCount ?? 0
-      const todayDone = result.todayCompletedCount ?? 0
-      const pending = result.pendingTasksCount ?? 0
-      const overdue = result.overdueTasksCount ?? 0
-      const minutes = result.totalStudyMinutes
+      const todayTotal = obj.todayTasksCount ?? 0
+      const todayDone = obj.todayCompletedCount ?? 0
+      const pending = obj.pendingTasksCount ?? 0
+      const overdue = obj.overdueTasksCount ?? 0
+      const minutes = obj.totalStudyMinutes
       if (todayTotal > 0) parts.push(`今天 ${todayDone}/${todayTotal} 个任务已完成`)
       if (pending > 0) parts.push(`${pending} 个待完成`)
       if (overdue > 0) parts.push(`${overdue} 个已延期`)
@@ -249,12 +259,12 @@ export function formatResultText(toolName: string, result?: any): string | null 
     }
 
     case 'queryTasks': {
-      const count = result.taskCount ?? result.tasks?.length ?? 0
-      const scope = result.scope
+      const count = obj.taskCount ?? obj.tasks?.length ?? 0
+      const scope = obj.scope
       const scopeText = scope === 'today' ? '今天' : scope === 'pending' ? '待完成' : scope === 'overdue' ? '已延期' : ''
       if (count === 0) return `${scopeText}没有任务`
       const parts: string[] = []
-      const tasks = result.tasks ?? result.list ?? []
+      const tasks = obj.tasks ?? obj.list ?? []
       if (Array.isArray(tasks)) {
         const done = tasks.filter((t: any) => t.status === 'done').length
         const inProgress = tasks.filter((t: any) => t.status === 'in_progress' || t.status === 'inProgress').length
@@ -267,14 +277,14 @@ export function formatResultText(toolName: string, result?: any): string | null 
     }
 
     case 'learning_plan_tool': {
-      const success = result.success
-      if (success === false) return result.error ?? '生成失败'
+      const success = obj.success
+      if (success === false) return obj.error ?? '生成失败'
       return '学习计划草稿已准备好，需要你确认后才会生效'
     }
 
     case 'generateResource':
     case 'resource_gen_tool': {
-      const title = result.title
+      const title = obj.title
       return title
         ? `「${title}」已生成，需要你确认后才会保存`
         : '学习资料草稿已生成，需要你确认后才会保存'
@@ -282,21 +292,21 @@ export function formatResultText(toolName: string, result?: any): string | null 
 
     case 'generateQuiz':
     case 'assessment_tool': {
-      const count = result.questionCount ?? result.questions?.length ?? 0
+      const count = obj.questionCount ?? obj.questions?.length ?? 0
       return count > 0
         ? `共 ${count} 道题，需要你确认后才会保存`
         : '练习题已生成，需要你确认后才会保存'
     }
 
     case 'webSearch': {
-      const refs = result?.references ?? result?.webSearchReferences
+      const refs = obj.references ?? obj.webSearchReferences
       const refCount = Array.isArray(refs) ? refs.length : 0
-      return refCount > 0 ? `找到 ${refCount} 个来源` : '未找到相关结果'
+      return refCount > 0 ? `参考 ${refCount} 篇资料` : '未找到相关结果'
     }
 
     default: {
       // 通用 fallback：尝试提取数量信息
-      const total = result.total ?? result.count
+      const total = obj.total ?? obj.count
       if (typeof total === 'number') return `共 ${total} 条`
       return null
     }
