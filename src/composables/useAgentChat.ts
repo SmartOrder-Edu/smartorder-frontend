@@ -920,6 +920,15 @@ export function useAgentChat(scrollCallback?: () => void) {
                 // 提取网络搜索引用
                 if (toolName === 'webSearch' && evt.payload?.webSearchReferences) {
                   chatMsg.webSearchReferences = evt.payload.webSearchReferences
+                  // 注入到 toolCall.result 中，避免 ToolCardCard 内联展示受 ToolResultTruncator 截断影响
+                  const lastTc = toolCalls[toolCalls.length - 1]
+                  if (lastTc && lastTc.toolName === 'webSearch') {
+                    if (lastTc.result && typeof lastTc.result === 'object' && !Array.isArray(lastTc.result)) {
+                      lastTc.result = { ...lastTc.result, webSearchReferences: evt.payload.webSearchReferences }
+                    } else {
+                      lastTc.result = { webSearchReferences: evt.payload.webSearchReferences }
+                    }
+                  }
                 }
                 break
               }

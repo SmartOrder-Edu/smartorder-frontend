@@ -253,6 +253,11 @@
                     :tool-calls="agentStore.toolCalls"
                     :streaming="true"
                   />
+                  <!-- 网络搜索来源卡片（流式实时展示） -->
+                  <WebSearchSources
+                    v-if="agentStore.currentWebSearchReferences?.length"
+                    :references="agentStore.currentWebSearchReferences"
+                  />
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
