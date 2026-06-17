@@ -1368,6 +1368,7 @@ watch(
       allNormal &&
       !agentStore.planExecuting &&
       !agentStore.planNeedsConfirmation &&
+      !agentStore.showLearningPlanPreview &&
       !agentStore.loading &&
       agentStore.currentDraftId
     ) {
@@ -1380,12 +1381,13 @@ watch(
             clearInterval(autoConfirmTimer)
             autoConfirmTimer = null
           }
-          // 触发时再次检查所有条件
+          // 触发时再次检查所有条件（含学习计划预览未展示，避免确认错对象）
           if (
             autoConfirmPending.value &&
             agentStore.currentDraftId &&
             !agentStore.loading &&
             !agentStore.planExecuting &&
+            !agentStore.showLearningPlanPreview &&
             agentStore.currentTaskList
           ) {
             autoConfirmPending.value = false

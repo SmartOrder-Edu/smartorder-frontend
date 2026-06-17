@@ -203,8 +203,9 @@ function currentSegments(taskId: string) {
 function formatDepIds(ids: string[]): string {
   const circled = '①②③④⑤⑥⑦⑧⑨⑩'
   return ids.map(id => {
-    const num = parseInt(id.replace('task-', ''))
-    return circled[num - 1] || num
+    const raw = id.replace('task-', '')
+    const parsed = parseInt(raw)
+    return circled[parsed - 1] || raw
   }).join('')
 }
 

@@ -374,6 +374,11 @@ export const useAgentStore = defineStore('agent', () => {
             knowledgeGraph: plan.knowledgeGraph || { nodes: [], edges: [] },
           }
           showLearningPlanPreview.value = true
+          // 互斥：学习计划草稿出现时，执行计划不再需要确认。
+          // 学习计划草稿的确认由 LearningPlanPreview 卡片承担，
+          // 清空执行计划确认态避免 autoConfirm 等逻辑确认错对象。
+          planNeedsConfirmation.value = false
+          planPauseInfo.value = null
         }
         break
       }
