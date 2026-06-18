@@ -253,6 +253,11 @@
                     :tool-calls="agentStore.toolCalls"
                     :streaming="true"
                   />
+                  <!-- 网络搜索来源卡片（流式实时展示） -->
+                  <WebSearchSources
+                    v-if="agentStore.currentWebSearchReferences?.length"
+                    :references="agentStore.currentWebSearchReferences"
+                  />
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
@@ -1073,6 +1078,7 @@ const hasTraceEventsForMsg = (msg: any): boolean => {
 function isPlanAwaitingConfirmation(taskList: TaskList): boolean {
   return taskList.status === 'DRAFT'
     || taskList.status === 'PENDING_CONFIRM'
+    || taskList.status === 'WAITING_CONFIRMATION'
     || taskList.status === 'PAUSED_CONFIRMATION'
 }
 
@@ -1346,10 +1352,35 @@ const autoConfirmPending = ref(false)
 const autoConfirmCountdown = ref(0)
 let autoConfirmTimer: ReturnType<typeof setInterval> | null = null
 
+function shouldAutoConfirmTaskList(taskList: TaskList | null): boolean {
+  const allNormalPending = !!taskList
+    && taskList.status === 'PENDING_CONFIRM'
+    && taskList.tasks.every(t => t.gate === 'NORMAL' && t.status === 'PENDING')
+
+  return !!(
+    taskList &&
+    allNormalPending &&
+    !agentStore.planPauseInfo &&
+    !agentStore.planExecuting &&
+    !agentStore.planNeedsConfirmation &&
+    !agentStore.showLearningPlanPreview &&
+    !agentStore.loading &&
+    agentStore.currentDraftId
+  )
+}
+
 // 监听 currentTaskList 变化，标记是否需要自动确认
 watch(
-  () => agentStore.currentTaskList,
-  (taskList) => {
+  () => [
+    agentStore.currentTaskList,
+    agentStore.loading,
+    agentStore.planExecuting,
+    agentStore.planNeedsConfirmation,
+    agentStore.showLearningPlanPreview,
+    agentStore.currentDraftId,
+    agentStore.planPauseInfo,
+  ] as const,
+  ([taskList]) => {
     // 清除上一次的定时器
     if (autoConfirmTimer) {
       clearInterval(autoConfirmTimer)
@@ -1358,20 +1389,7 @@ watch(
     autoConfirmCountdown.value = 0
     autoConfirmPending.value = false
 
-    // 只有纯 NORMAL 门（无 CONFIRMATION/CLARIFICATION）计划才能自动执行
-    // 额外条件：SSE 已结束（!loading）、有有效 draftId、不在执行中、不需要确认
-    const allNormal = taskList
-      && taskList.tasks.every(t => t.gate === 'NORMAL' && t.status === 'PENDING')
-
-    if (
-      taskList &&
-      allNormal &&
-      !agentStore.planExecuting &&
-      !agentStore.planNeedsConfirmation &&
-      !agentStore.showLearningPlanPreview &&
-      !agentStore.loading &&
-      agentStore.currentDraftId
-    ) {
+    if (shouldAutoConfirmTaskList(taskList)) {
       autoConfirmPending.value = true
       autoConfirmCountdown.value = 3
       autoConfirmTimer = setInterval(() => {
@@ -1381,15 +1399,8 @@ watch(
             clearInterval(autoConfirmTimer)
             autoConfirmTimer = null
           }
-          // 触发时再次检查所有条件（含学习计划预览未展示，避免确认错对象）
-          if (
-            autoConfirmPending.value &&
-            agentStore.currentDraftId &&
-            !agentStore.loading &&
-            !agentStore.planExecuting &&
-            !agentStore.showLearningPlanPreview &&
-            agentStore.currentTaskList
-          ) {
+          // 触发时再次检查所有条件，避免状态变化后确认错对象。
+          if (autoConfirmPending.value && shouldAutoConfirmTaskList(agentStore.currentTaskList)) {
             autoConfirmPending.value = false
             confirmPlan(agentStore.currentDraftId)
           }
