@@ -1,5 +1,8 @@
 <template>
   <div class="app-layout">
+    <!-- 动态背景 -->
+    <AnimatedBackground />
+
     <div class="layout-container" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <!-- 左侧边栏 -->
       <aside 
@@ -66,7 +69,7 @@
             class="nav-item"
             :class="{ active: isActive(item.path) }"
           >
-            <span class="nav-icon" v-html="item.icon"></span>
+            <AnimatedIcon :type="item.type" :isActive="isActive(item.path)" />
             <span class="nav-label" v-if="!sidebarCollapsed">{{ item.label }}</span>
           </router-link>
 
@@ -153,7 +156,7 @@
             class="nav-item"
             :class="{ active: isActive(item.path) }"
           >
-            <span class="nav-icon" v-html="item.icon"></span>
+            <AnimatedIcon :type="item.type" :isActive="isActive(item.path)" />
             <span class="nav-label" v-if="!sidebarCollapsed">{{ item.label }}</span>
           </router-link>
         </nav>
@@ -274,6 +277,8 @@ import { useUserStore } from '@/stores/user'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
 import { chatWebSocket } from '@/utils/websocket'
 import AIAssistant from '@/components/common/AIAssistant.vue'
+import AnimatedBackground from '@/components/common/AnimatedBackground.vue'
+import AnimatedIcon from '@/components/common/AnimatedIcon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -366,82 +371,19 @@ const displayedSpaces = computed(() => {
 })
 
 const topMenuItems = [
-  {
-    id: 'dashboard',
-    label: '总学习指挥台',
-    path: '/dashboard',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'
-  },
-  {
-    id: 'ai-partner',
-    label: 'AI 学习伙伴',
-    path: '/ai-tutor',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>'
-  },
-  {
-    id: 'daily-plan',
-    label: '今日总计划',
-    path: '/daily-plan',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
-  },
-  {
-    id: 'messages',
-    label: '消息',
-    path: '/messages',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
-  }
+  { id: 'dashboard', label: '总学习指挥台', path: '/dashboard', type: 'dashboard' },
+  { id: 'ai-partner', label: 'AI 学习伙伴', path: '/ai-tutor', type: 'ai-tutor' },
+  { id: 'daily-plan', label: '今日总计划', path: '/daily-plan', type: 'daily-plan' },
+  { id: 'messages', label: '消息', path: '/messages', type: 'messages' }
 ]
 
 const bottomMenuItems = [
-  {
-    id: 'tasks',
-    label: '任务日程',
-    path: '/tasks',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'
-  },
-  {
-    id: 'resources',
-    label: '资源广场',
-    path: '/resources',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>'
-  },
-  {
-    id: 'knowledge-base',
-    label: '知识库管理',
-    path: '/knowledge-base',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>'
-  },
-  {
-    id: 'exam',
-    label: '练习测评',
-    path: '/exam',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>'
-  },
-  {
-    id: 'profile',
-    label: '成长画像',
-    path: '/profile',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
-  },
-  {
-    id: 'cloud-drive',
-    label: '个人云盘',
-    path: '/cloud-drive',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>'
-  }
-  /* ,
-  {
-    id: 'admin-feedback',
-    label: '反馈智能管理',
-    path: '/admin/feedback',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M9 10h6"/><path d="M9 14h6"/></svg>'
-  },
-  {
-    id: 'admin-prize',
-    label: '反馈奖品管理',
-    path: '/admin/prize',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><path d="M12 12h.01"/></svg>'
-  } */
+  { id: 'tasks', label: '任务日程', path: '/tasks', type: 'tasks' },
+  { id: 'resources', label: '资源广场', path: '/resources', type: 'resources' },
+  { id: 'knowledge-base', label: '知识库管理', path: '/knowledge-base', type: 'knowledge-base' },
+  { id: 'exam', label: '练习测评', path: '/exam', type: 'exam' },
+  { id: 'profile', label: '成长画像', path: '/profile', type: 'profile' },
+  { id: 'cloud-drive', label: '个人云盘', path: '/cloud-drive', type: 'cloud-drive' }
 ]
 
 const isActive = (path: string) => {
@@ -494,6 +436,26 @@ const handleLogout = async () => {
   position: relative;
 }
 
+/* 动态背景效果 */
+.app-layout::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 60%, rgba(139, 92, 246, 0.1), transparent),
+    radial-gradient(ellipse 50% 30% at 20% 80%, rgba(59, 130, 246, 0.08), transparent),
+    radial-gradient(ellipse 40% 30% at 90% 20%, rgba(236, 72, 153, 0.06), transparent);
+  z-index: -1;
+  animation: bg-shift 20s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes bg-shift {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(20deg); }
+}
+
 /* 布局容器 */
 .layout-container {
   display: flex;
@@ -510,9 +472,13 @@ const handleLogout = async () => {
   padding: var(--spacing-sm) var(--spacing-lg);
   display: flex;
   flex-direction: column;
-  background: var(--bg-card);
-  border-right: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-sm);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-right: 1px solid rgba(139, 92, 246, 0.15);
+  box-shadow:
+    4px 0 30px rgba(139, 92, 246, 0.1),
+    inset -1px 0 0 rgba(255, 255, 255, 0.5);
   overflow: visible;
   transition: width var(--transition-base), padding var(--transition-base);
   z-index: 90;
@@ -537,11 +503,20 @@ const handleLogout = async () => {
 
 /* 侧边栏 Logo */
 .sidebar-logo {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
   cursor: pointer;
   width: 100%;
+  padding: 8px 12px;
+  border-radius: 16px;
+  transition: all 0.3s ease;
+}
+
+.sidebar-logo:hover {
+  background: rgba(139, 92, 246, 0.1);
+  transform: translateX(4px);
 }
 
 /* 折叠后的 Logo 区域 */
@@ -621,13 +596,28 @@ const handleLogout = async () => {
 }
 
 .sidebar-logo-img {
-  width: 40px;
-  height: 40px;
+  position: relative;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
   flex-shrink: 0;
+  z-index: 1;
+  transition: all 0.3s ease;
+}
+
+.sidebar-logo:hover .sidebar-logo-img {
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.5));
+}
+
+.sidebar-logo:hover .sidebar-logo-img {
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.5));
 }
 
 .sidebar-logo-text {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
 }
@@ -639,6 +629,8 @@ const handleLogout = async () => {
   background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
 }
 
 .sidebar-logo-subtitle {
@@ -646,6 +638,10 @@ const handleLogout = async () => {
   color: var(--text-muted);
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .sidebar.collapsed {
@@ -678,31 +674,51 @@ const handleLogout = async () => {
 }
 
 .nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  padding: 7px 14px;
+  padding: 10px 14px;
   border-radius: var(--radius-xl);
   color: var(--text-regular);
   text-decoration: none;
-  transition: all var(--transition-base);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   font-weight: 500;
+  overflow: hidden;
 }
 
-.nav-item .nav-icon {
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: transform var(--transition-fast);
+.nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 3px;
+  height: 60%;
+  background: var(--gradient-primary);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
+  transition: transform 0.3s ease;
 }
 
-.nav-item .nav-icon svg {
-  width: 100%;
-  height: 100%;
+/* 动态图标容器样式由AnimatedIcon组件处理 */
+.nav-item :deep(.animated-icon) {
+  background: rgba(139, 92, 246, 0.08);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.nav-item:hover :deep(.animated-icon) {
+  background: rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+}
+
+.nav-item.active :deep(.animated-icon) {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 0 20px rgba(255, 255, 255, 0.3),
+    inset 0 0 10px rgba(255, 255, 255, 0.1);
 }
 
 .nav-item .nav-label {
@@ -711,32 +727,68 @@ const handleLogout = async () => {
 }
 
 .nav-item:hover {
-  background: var(--bg-secondary);
-  color: var(--primary-color);
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
   transform: translateX(4px);
 }
 
 .nav-item:hover .nav-icon {
-  transform: scale(1.1) translateY(-2px);
-  animation: float 2s ease-in-out infinite;
+  background: rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+}
+
+.nav-item:hover .nav-icon svg {
+  transform: scale(1.1);
 }
 
 .nav-item.active {
-  background: var(--primary-color);
-  color: #fff;
+  background: var(--gradient-primary);
+  color: white;
   font-weight: 600;
-  box-shadow: var(--shadow-md);
+  box-shadow:
+    0 4px 15px rgba(139, 92, 246, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.nav-item.active::before {
+  transform: translateY(-50%) scaleY(1);
 }
 
 .nav-item.active .nav-icon {
-  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 0 20px rgba(255, 255, 255, 0.3),
+    inset 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.nav-item.active .nav-icon svg {
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
 }
 
 /* 导航分隔线 */
 .nav-divider {
+  position: relative;
   height: 1px;
-  background: var(--border-light);
-  margin: var(--spacing-sm) 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(139, 92, 246, 0.3) 50%,
+    transparent 100%
+  );
+  margin: var(--spacing-md) 0;
+}
+
+.nav-divider::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 4px;
+  background: var(--gradient-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
 }
 
 /* 导航分组 */
@@ -823,16 +875,52 @@ const handleLogout = async () => {
 }
 
 .space-indicator {
-  width: 8px;
-  height: 8px;
+  position: relative;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  transition: all var(--transition-base);
+  transition: all 0.3s ease;
 }
 
-.space-indicator.warning { opacity: 0.85; }
-.space-indicator.danger { animation: blink-warn 1s ease-in-out infinite; }
-.space-indicator.good { box-shadow: 0 0 6px currentColor; }
+.space-indicator.good {
+  box-shadow:
+    0 0 8px currentColor,
+    0 0 16px currentColor;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.space-indicator.warning {
+  box-shadow: 0 0 8px currentColor;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+.space-indicator.danger {
+  box-shadow: 0 0 8px currentColor;
+  animation: blink-dot 1s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes blink-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
 
 .nav-item .nav-space-label {
   flex: 1;
@@ -903,34 +991,60 @@ const handleLogout = async () => {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
-  padding-top: var(--spacing-sm);
-  border-top: 1px solid var(--border-light);
+  padding-top: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+  border-top: 1px solid rgba(139, 92, 246, 0.15);
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(139, 92, 246, 0.03) 100%
+  );
 }
 
 .collapse-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-md);
-  background: none;
-  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-lg);
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.15);
   cursor: pointer;
-  color: var(--text-muted);
+  color: var(--cyber-purple);
   margin-left: auto;
   flex-shrink: 0;
-  transition: all var(--transition-fast);
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.collapse-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .collapse-btn svg {
-  width: 16px;
-  height: 16px;
+  position: relative;
+  z-index: 1;
+  width: 18px;
+  height: 18px;
+  transition: all 0.3s ease;
 }
 
 .collapse-btn:hover {
-  background: rgba(59, 91, 219, 0.08);
-  color: var(--primary-color);
+  background: var(--gradient-primary);
+  color: white;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.5);
+  transform: scale(1.05);
+}
+
+.collapse-btn:hover::before {
+  opacity: 1;
 }
 
 .sidebar.collapsed .collapse-btn {
@@ -961,8 +1075,10 @@ const handleLogout = async () => {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background var(--transition-fast);
+}
 
-  &:hover { background: var(--background-color-base); }
+.sidebar-user-info:hover {
+  background: var(--background-color-base);
 }
 
 .sidebar-avatar-wrap {
@@ -994,17 +1110,29 @@ const handleLogout = async () => {
 }
 
 .sidebar-avatar {
-  width: 28px;
-  height: 28px;
+  position: relative;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
+  border: 2px solid rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+  transition: all 0.3s ease;
+}
+
+.sidebar-avatar:hover {
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
 }
 
 .sidebar-username {
   font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--text-dark);
+  font-weight: 600;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1035,51 +1163,84 @@ const handleLogout = async () => {
 
 .notif-fab-btn {
   position: relative;
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   border-radius: var(--radius-full);
-  background: white;
-  border: 1px solid var(--border-light);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(139, 92, 246, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: var(--text-secondary);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
-  transition: all var(--transition-base);
+  box-shadow:
+    0 4px 20px rgba(139, 92, 246, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.notif-fab-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-primary);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .notif-fab-btn:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  color: var(--primary-color);
-  border-color: rgba(59, 91, 219, 0.3);
-  transform: scale(1.05);
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow:
+    0 0 25px rgba(139, 92, 246, 0.4),
+    0 0 50px rgba(139, 92, 246, 0.2);
+  transform: scale(1.08);
+}
+
+.notif-fab-btn:hover::before {
+  opacity: 0.1;
 }
 
 .notif-fab-btn:hover svg {
-  animation: bell-swing 1s ease-in-out infinite;
-  transform-origin: top center;
+  color: #8b5cf6;
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.6));
+  animation: bell-bounce 0.6s ease-in-out;
 }
 
-@keyframes bell-swing {
-  0% { transform: rotate(0); }
-  20% { transform: rotate(15deg); }
-  40% { transform: rotate(-10deg); }
-  60% { transform: rotate(5deg); }
-  80% { transform: rotate(-2deg); }
-  100% { transform: rotate(0); }
+@keyframes bell-bounce {
+  0%, 100% { transform: rotate(0) scale(1); }
+  25% { transform: rotate(15deg) scale(1.1); }
+  50% { transform: rotate(-10deg) scale(1.05); }
+  75% { transform: rotate(5deg) scale(1.02); }
+}
+
+.notif-fab-btn svg {
+  position: relative;
+  z-index: 1;
+  width: 20px;
+  height: 20px;
+  transition: all 0.3s ease;
 }
 
 /* 未读状态脉冲动画 */
 .notif-fab.has-unread .notif-fab-btn {
-  color: var(--primary-color);
-  border-color: rgba(59, 91, 219, 0.3);
-  animation: notif-pulse 2s ease-in-out infinite;
+  border-color: rgba(139, 92, 246, 0.5);
+  color: #8b5cf6;
+  animation: notif-pulse-enhanced 2s ease-in-out infinite;
 }
 
-@keyframes notif-pulse {
-  0%, 100% { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06), 0 0 0 0 rgba(59, 91, 219, 0.3); }
-  50% { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06), 0 0 0 6px rgba(59, 91, 219, 0); }
+@keyframes notif-pulse-enhanced {
+  0%, 100% {
+    box-shadow:
+      0 4px 20px rgba(139, 92, 246, 0.15),
+      0 0 0 0 rgba(139, 92, 246, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 4px 20px rgba(139, 92, 246, 0.15),
+      0 0 0 10px rgba(139, 92, 246, 0);
+  }
 }
 
 .notif-fab-badge {
@@ -1147,9 +1308,14 @@ const handleLogout = async () => {
   padding: var(--spacing-sm) var(--spacing-md);
   border-bottom: 1px solid rgba(0, 0, 0, 0.03);
   transition: background var(--transition-fast);
+}
 
-  &:hover { background: var(--background-color-base); }
-  &.unread { background: rgba(59, 91, 219, 0.02); }
+.notif-panel-item:hover {
+  background: var(--background-color-base);
+}
+
+.notif-panel-item.unread {
+  background: rgba(99, 102, 241, 0.05);
 }
 
 .notif-panel-text {
@@ -1192,14 +1358,26 @@ const handleLogout = async () => {
   color: var(--text-regular);
   cursor: pointer;
   transition: background var(--transition-fast);
+}
 
-  &:hover { background: var(--background-color-base); }
-  &.logout { color: var(--danger-color); }
-  &.logout:hover { background: rgba(239, 68, 68, 0.06); }
-  &.profile-init-item {
-    color: #f59e0b;
-    &:hover { background: rgba(245, 158, 11, 0.06); }
-  }
+.user-menu-item:hover {
+  background: var(--background-color-base);
+}
+
+.user-menu-item.logout {
+  color: var(--danger-color);
+}
+
+.user-menu-item.logout:hover {
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.user-menu-item.profile-init-item {
+  color: #f59e0b;
+}
+
+.user-menu-item.profile-init-item:hover {
+  background: rgba(245, 158, 11, 0.06);
 }
 
 .user-menu-divider {
