@@ -279,11 +279,19 @@ export function useAgentChat(scrollCallback?: () => void) {
           if (!event.data) return
 
           if (event.event === 'done') {
-            // 将 AI 回复添加到消息列表（含 Plan-and-Execute 状态）
-            if (agentStore.answerText || agentStore.currentTaskList) {
+            // 提前解析 done payload — 需要在消息保存前获取 clarificationPayload
+            let donePayload: any = null
+            try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
+
+            // 将 AI 回复添加到消息列表（ReAct / Plan-and-Execute）
+            const hasReActClarification = !!donePayload?.clarificationPayload
+              && !agentStore.currentTaskList
+            if (agentStore.answerText || agentStore.currentTaskList || hasReActClarification) {
               messages.value.push({
                 role: 'ai',
-                content: agentStore.answerText,
+                content: agentStore.answerText || (hasReActClarification
+                  ? (donePayload.clarificationPayload.question || '请提供更多信息')
+                  : ''),
                 traceId: agentStore.currentTraceId,
                 traceEvents: [...agentStore.traceEvents],
                 thinkingText: agentStore.thinkingText || undefined,
@@ -307,8 +315,6 @@ export function useAgentChat(scrollCallback?: () => void) {
             // 优先以后端 done payload 的 runStatus 判断，其次从前端 taskList 推断
             const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
             const terminalStatuses = ['COMPLETED', 'FAILED', 'PARTIAL_COMPLETED']
-            let donePayload: any = null
-            try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
             const runStatus = donePayload?.runStatus
             if (runStatus && pausedStatuses.includes(runStatus)) {
               agentStore.planExecuting = true
@@ -914,6 +920,15 @@ export function useAgentChat(scrollCallback?: () => void) {
                 // 提取网络搜索引用
                 if (toolName === 'webSearch' && evt.payload?.webSearchReferences) {
                   chatMsg.webSearchReferences = evt.payload.webSearchReferences
+                  // 注入到 toolCall.result 中，避免 ToolCardCard 内联展示受 ToolResultTruncator 截断影响
+                  const lastTc = toolCalls[toolCalls.length - 1]
+                  if (lastTc && lastTc.toolName === 'webSearch') {
+                    if (lastTc.result && typeof lastTc.result === 'object' && !Array.isArray(lastTc.result)) {
+                      lastTc.result = { ...lastTc.result, webSearchReferences: evt.payload.webSearchReferences }
+                    } else {
+                      lastTc.result = { webSearchReferences: evt.payload.webSearchReferences }
+                    }
+                  }
                 }
                 break
               }
@@ -1099,13 +1114,13 @@ export function useAgentChat(scrollCallback?: () => void) {
         const activeRun = activeRunRes?.data ?? activeRunRes // 兼容 Result 包装
         if (activeRun && activeRun.taskList) {
           const s = activeRun.status
-          const activeStatuses = ['EXECUTING', 'PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION', 'DRAFT', 'PENDING_CONFIRM']
+          const activeStatuses = ['EXECUTING', 'PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION', 'DRAFT', 'PENDING_CONFIRM', 'WAITING_CONFIRMATION']
           if (activeStatuses.includes(s)) {
             agentStore.currentDraftId = activeRun.draftId || ''
             agentStore.currentTaskList = activeRun.taskList
             agentStore.planPauseInfo = activeRun.pauseInfo || null
             agentStore.planExecuting = s === 'EXECUTING'
-            agentStore.planNeedsConfirmation = ['DRAFT', 'PENDING_CONFIRM', 'PAUSED_CONFIRMATION'].includes(s)
+            agentStore.planNeedsConfirmation = ['DRAFT', 'PENDING_CONFIRM', 'WAITING_CONFIRMATION', 'PAUSED_CONFIRMATION'].includes(s)
             // 重建 taskExecutionMap
             if (activeRun.taskList.tasks) {
               const map = new Map<string, any>()

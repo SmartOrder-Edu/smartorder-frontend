@@ -271,6 +271,17 @@ export const useAgentStore = defineStore('agent', () => {
         // 提取网络搜索引用（完整数据，不截断）
         if (data.payload?.toolName === 'webSearch' && data.payload?.webSearchReferences) {
           currentWebSearchReferences.value = data.payload.webSearchReferences
+          // 注入到 toolCall.result 中，避免 ToolCallCard 内联展示受 ToolResultTruncator 截断影响
+          // （后端截断后 result 变成非法 JSON 字符串，normalizeResult 无法解析）
+          const wsr = data.payload.webSearchReferences
+          ;[tc, seg?.toolCall].forEach((t) => {
+            if (!t) return
+            if (t.result && typeof t.result === 'object' && !Array.isArray(t.result)) {
+              t.result = { ...t.result, webSearchReferences: wsr }
+            } else {
+              t.result = { webSearchReferences: wsr }
+            }
+          })
         }
         syncReasoningToRunningTask()
         break
@@ -379,6 +390,10 @@ export const useAgentStore = defineStore('agent', () => {
           // 清空执行计划确认态避免 autoConfirm 等逻辑确认错对象。
           planNeedsConfirmation.value = false
           planPauseInfo.value = null
+          planExecuting.value = false
+          if (currentTaskList.value) {
+            currentTaskList.value.status = 'COMPLETED'
+          }
         }
         break
       }
@@ -530,6 +545,13 @@ export const useAgentStore = defineStore('agent', () => {
 
       case 'agent.status': {
         const payload = data.payload
+        if (payload?.type === 'learning_plan_waiting_confirmation') {
+          planExecuting.value = false
+          if (currentTaskList.value) {
+            currentTaskList.value.status = 'COMPLETED'
+          }
+          break
+        }
         if (payload?.type === 'task_retry') {
           const taskId = payload.taskId || ''
           const execState = taskExecutionMap.value.get(taskId)

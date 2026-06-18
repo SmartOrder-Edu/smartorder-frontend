@@ -15,6 +15,7 @@ export type TaskItemStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'S
 export type TaskListStatus =
   | 'DRAFT'
   | 'PENDING_CONFIRM'
+  | 'WAITING_CONFIRMATION'
   | 'EXECUTING'
   | 'PAUSED_CLARIFICATION'
   | 'PAUSED_CONFIRMATION'
