@@ -121,6 +121,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '个人云盘 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/messages',
+    name: 'Messages',
+    component: () => import('@/views/Messages/index.vue'),
+    meta: { title: '消息 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/preview',
     name: 'FilePreview',
     component: () => import('@/views/CloudDrive/preview.vue'),

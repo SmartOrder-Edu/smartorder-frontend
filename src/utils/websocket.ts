@@ -73,15 +73,57 @@ class ChatWebSocket {
             // 如果是系统错误提示
             if (data.msgType === 'ERROR_TIP') {
                 ElMessage.error(data.content);
+                return;
             }
 
-            // 可以通过事件总线(EventBus)或Pinia把消息分发给其他组件
+            // 分发消息类型给其他组件
+            this.dispatchMessage(data);
         } catch (error) {
             // 解析失败，可能是纯文本心跳响应
             if (event.data === 'pong') {
                 return;
             }
             console.error('[WebSocket] Failed to parse message:', event.data);
+        }
+    }
+
+    /**
+     * 分发消息给其他组件
+     * 通过自定义事件实现组件间通信
+     */
+    private dispatchMessage(data: any) {
+        const { msgType, type } = data;
+        const messageType = msgType || type;
+
+        // 聊天消息
+        if (messageType === 'CHAT_MESSAGE') {
+            window.dispatchEvent(new CustomEvent('ws-message', {
+                detail: { type: 'CHAT_MESSAGE', data: data.data || data }
+            }));
+            return;
+        }
+
+        // 好友请求
+        if (messageType === 'FRIEND_REQUEST') {
+            window.dispatchEvent(new CustomEvent('ws-message', {
+                detail: { type: 'FRIEND_REQUEST', data: data.data || data }
+            }));
+            return;
+        }
+
+        // 消息已读回执
+        if (messageType === 'MESSAGE_READ') {
+            window.dispatchEvent(new CustomEvent('ws-message', {
+                detail: { type: 'MESSAGE_READ', data: data.data || data }
+            }));
+            return;
+        }
+
+        // 其他系统消息
+        if (data.content) {
+            window.dispatchEvent(new CustomEvent('ws-message', {
+                detail: { type: 'SYSTEM', data: data }
+            }));
         }
     }
 
