@@ -390,6 +390,10 @@ export const useAgentStore = defineStore('agent', () => {
           // 清空执行计划确认态避免 autoConfirm 等逻辑确认错对象。
           planNeedsConfirmation.value = false
           planPauseInfo.value = null
+          planExecuting.value = false
+          if (currentTaskList.value) {
+            currentTaskList.value.status = 'COMPLETED'
+          }
         }
         break
       }
@@ -541,6 +545,13 @@ export const useAgentStore = defineStore('agent', () => {
 
       case 'agent.status': {
         const payload = data.payload
+        if (payload?.type === 'learning_plan_waiting_confirmation') {
+          planExecuting.value = false
+          if (currentTaskList.value) {
+            currentTaskList.value.status = 'COMPLETED'
+          }
+          break
+        }
         if (payload?.type === 'task_retry') {
           const taskId = payload.taskId || ''
           const execState = taskExecutionMap.value.get(taskId)
