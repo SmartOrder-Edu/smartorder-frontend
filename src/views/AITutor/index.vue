@@ -268,6 +268,7 @@
                     :learning-plan="agentStore.learningPlanDraft"
                     :confirming="agentStore.planConfirmLoading"
                     @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
+                    @cancel="handleLearningPlanCancel"
                   />
 
                   <!-- Plan-and-Execute: 紧凑状态卡片（任务详情在右侧面板） -->
@@ -300,6 +301,7 @@
                   :learning-plan="agentStore.learningPlanDraft"
                   :confirming="agentStore.planConfirmLoading"
                   @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
+                  @cancel="handleLearningPlanCancel"
                 />
               </div>
             </div>
@@ -1209,6 +1211,13 @@ const handleGateConfirm = (taskId: string) => {
 const handleGateCancel = (_taskId: string) => {
   // 取消执行
   cancelPlan()
+}
+
+/** 取消学习计划预览，清空相关状态 */
+const handleLearningPlanCancel = () => {
+  agentStore.showLearningPlanPreview = false
+  agentStore.learningPlanDraft = null
+  ElMessage.info('已取消，你可以重新描述学习目标')
 }
 
 /**

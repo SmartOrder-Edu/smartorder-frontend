@@ -147,6 +147,9 @@ export function useAgentChat(scrollCallback?: () => void) {
   /** 用户手动选择的运行模式，null 表示走意图路由 */
   const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>('REACT')
 
+  /** 防双击/竞态：确保 confirmPlan 同一时刻只执行一次 */
+  const confirmPlanLocked = ref(false)
+
   // 流式输出时自动滚动
   watch(
     () => agentStore.answerText,
@@ -398,7 +401,8 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 确认学习规划
    */
   const confirmPlan = async (draftId: string) => {
-    if (!draftId) return
+    if (!draftId || confirmPlanLocked.value) return
+    confirmPlanLocked.value = true
     agentStore.planConfirmLoading = true
     agentStore.resetExecutionSteps()
     // 清空上一轮规划的 trace/推理/工具，避免与执行轮次混合
@@ -417,6 +421,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       token = await refreshAccessToken()
     } catch {
       agentStore.planConfirmLoading = false
+      confirmPlanLocked.value = false
       return
     }
 
@@ -513,6 +518,7 @@ export function useAgentChat(scrollCallback?: () => void) {
             }
             agentStore.finishTurn()
             abortController = null
+            confirmPlanLocked.value = false
             scrollCallback?.()
             return
           }
@@ -530,6 +536,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           agentStore.planConfirmLoading = false
           agentStore.planExecuting = false
           abortController = null
+          confirmPlanLocked.value = false
           throw err
         },
       })
@@ -538,6 +545,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       agentStore.planConfirmLoading = false
       agentStore.planExecuting = false
       abortController = null
+      confirmPlanLocked.value = false
     }
   }
 
@@ -1112,22 +1120,38 @@ export function useAgentChat(scrollCallback?: () => void) {
       try {
         const activeRunRes = await agentApi.getActiveRun(conversationId)
         const activeRun = activeRunRes?.data ?? activeRunRes // 兼容 Result 包装
-        if (activeRun && activeRun.taskList) {
-          const s = activeRun.status
-          const activeStatuses = ['EXECUTING', 'PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION', 'DRAFT', 'PENDING_CONFIRM', 'WAITING_CONFIRMATION']
-          if (activeStatuses.includes(s)) {
-            agentStore.currentDraftId = activeRun.draftId || ''
-            agentStore.currentTaskList = activeRun.taskList
-            agentStore.planPauseInfo = activeRun.pauseInfo || null
-            agentStore.planExecuting = s === 'EXECUTING'
-            agentStore.planNeedsConfirmation = ['DRAFT', 'PENDING_CONFIRM', 'WAITING_CONFIRMATION', 'PAUSED_CONFIRMATION'].includes(s)
-            // 重建 taskExecutionMap
-            if (activeRun.taskList.tasks) {
-              const map = new Map<string, any>()
-              for (const task of activeRun.taskList.tasks) {
-                map.set(task.taskId, { status: task.status?.toLowerCase() || 'pending' })
+        if (activeRun) {
+          // 活跃计划 → 恢复 agentStore 状态
+          if (activeRun.taskList) {
+            const s = activeRun.status
+            const activeStatuses = ['EXECUTING', 'PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION', 'DRAFT', 'PENDING_CONFIRM', 'WAITING_CONFIRMATION']
+            if (activeStatuses.includes(s)) {
+              agentStore.currentDraftId = activeRun.draftId || ''
+              agentStore.currentTaskList = activeRun.taskList
+              agentStore.planPauseInfo = activeRun.pauseInfo || null
+              agentStore.planExecuting = s === 'EXECUTING'
+              agentStore.planNeedsConfirmation = ['DRAFT', 'PENDING_CONFIRM', 'WAITING_CONFIRMATION', 'PAUSED_CONFIRMATION'].includes(s)
+              // 重建 taskExecutionMap
+              if (activeRun.taskList.tasks) {
+                const map = new Map<string, any>()
+                for (const task of activeRun.taskList.tasks) {
+                  map.set(task.taskId, { status: task.status?.toLowerCase() || 'pending' })
+                }
+                agentStore.taskExecutionMap = map
               }
-              agentStore.taskExecutionMap = map
+            }
+          }
+          // 已完成的计划但有 spaceCreated → 恢复到最后一条含 taskList 的消息（恢复"学习空间已创建"banner）
+          if (activeRun.spaceCreated && (activeRun.spaceCreated as any).spaceId) {
+            const spaceInfo = activeRun.spaceCreated as { spaceId: number; spaceName: string }
+            for (let i = msgs.length - 1; i >= 0; i--) {
+              if (msgs[i].role === 'ai' && msgs[i].taskList) {
+                msgs[i].taskList = {
+                  ...msgs[i].taskList,
+                  spaceCreated: spaceInfo,
+                }
+                break
+              }
             }
           }
         }

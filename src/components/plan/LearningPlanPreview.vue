@@ -116,6 +116,9 @@
 
     <!-- 确认按钮 -->
     <div class="preview-footer">
+      <button class="cancel-btn" @click="$emit('cancel')" :disabled="confirming">
+        不满意，重新规划
+      </button>
       <button class="confirm-btn" @click="$emit('confirm')" :disabled="confirming">
         <svg v-if="!confirming" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <polyline points="20 6 9 17 4 12"/>
@@ -138,6 +141,7 @@ const props = defineProps<{
 
 defineEmits<{
   confirm: []
+  cancel: []
 }>()
 
 const expandedPhase = ref<number | null>(null)
@@ -482,13 +486,43 @@ function getUniqueCategories() {
   color: #7c3aed;
 }
 
-/* 确认按钮 */
+/* 按钮 */
 .preview-footer {
   padding: 10px 14px;
   border-top: 1px solid rgba(59, 130, 246, 0.1);
+  display: flex;
+  gap: 8px;
+}
+
+.cancel-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-md, 0.5rem);
+  background: white;
+  color: var(--text-secondary, #475569);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.cancel-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .confirm-btn {
+  flex: 1;
   width: 100%;
   display: flex;
   align-items: center;
