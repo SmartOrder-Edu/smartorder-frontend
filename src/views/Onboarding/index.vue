@@ -300,7 +300,8 @@ const goalOptions = [
   { value: 'project', label: '做项目', emoji: '🛠️' },
   { value: 'skill', label: '掌握技能', emoji: '🎯' },
   { value: 'grad', label: '考研/留学', emoji: '🎓' },
-  { value: 'competition', label: '参加竞赛', emoji: '🏆' }
+  { value: 'competition', label: '参加竞赛', emoji: '🏆' },
+  { value: 'job', label: '找工作', emoji: '💼' }
 ]
 
 const timeOptions = [
