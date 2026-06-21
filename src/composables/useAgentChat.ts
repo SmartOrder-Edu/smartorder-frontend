@@ -198,6 +198,8 @@ export function useAgentChat(scrollCallback?: () => void) {
   const loadingHistory = ref(false)
   let abortController: AbortController | null = null
 
+  const getCurrentMindMaps = (): MindMapData[] => agentStore.currentMindMaps || []
+
   /** 用户手动选择的运行模式，null 表示走意图路由 */
   const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>('REACT')
 
@@ -223,10 +225,13 @@ export function useAgentChat(scrollCallback?: () => void) {
       abortController = null
     }
     // 将当前已累积的文本保存为消息
-    if (agentStore.answerText) {
+    const currentMindMaps = getCurrentMindMaps()
+    if (agentStore.answerText || currentMindMaps.length) {
       messages.value.push({
         role: 'ai',
-        content: agentStore.answerText + '\n\n*[已停止生成]*',
+        content: agentStore.answerText
+          ? agentStore.answerText + '\n\n*[已停止生成]*'
+          : '*[已停止生成]*',
         traceId: agentStore.currentTraceId,
         traceEvents: [...agentStore.traceEvents],
         thinkingText: agentStore.thinkingText || undefined,
@@ -238,8 +243,7 @@ export function useAgentChat(scrollCallback?: () => void) {
         timestamp: Date.now(),
         webSearchReferences: agentStore.currentWebSearchReferences.length
           ? [...agentStore.currentWebSearchReferences] : undefined,
-        mindMaps: agentStore.currentMindMaps.length
-          ? [...agentStore.currentMindMaps] : undefined,
+        mindMaps: currentMindMaps.length ? [...currentMindMaps] : undefined,
       })
     }
     agentStore.finishTurn()
@@ -339,7 +343,8 @@ export function useAgentChat(scrollCallback?: () => void) {
             // 将 AI 回复添加到消息列表（ReAct / Plan-and-Execute）
             const hasReActClarification = !!donePayload?.clarificationPayload
               && !agentStore.currentTaskList
-            if (agentStore.answerText || hasReActClarification) {
+            const currentMindMaps = getCurrentMindMaps()
+            if (agentStore.answerText || hasReActClarification || currentMindMaps.length) {
               messages.value.push({
                 role: 'ai',
                 content: agentStore.answerText || (hasReActClarification
@@ -356,8 +361,7 @@ export function useAgentChat(scrollCallback?: () => void) {
                 timestamp: Date.now(),
                 webSearchReferences: agentStore.currentWebSearchReferences.length
                   ? [...agentStore.currentWebSearchReferences] : undefined,
-                mindMaps: agentStore.currentMindMaps.length
-                  ? [...agentStore.currentMindMaps] : undefined,
+                mindMaps: currentMindMaps.length ? [...currentMindMaps] : undefined,
               })
             }
             agentStore.finishTurn()
@@ -403,10 +407,13 @@ export function useAgentChat(scrollCallback?: () => void) {
         onerror(err) {
           console.error('[useAgentChat] SSE error:', err)
           // 保存已累积的内容，避免渲染突然消失（与 stopGeneration 一致）
-          if (agentStore.answerText) {
+          const currentMindMaps = getCurrentMindMaps()
+          if (agentStore.answerText || currentMindMaps.length) {
             messages.value.push({
               role: 'ai',
-              content: agentStore.answerText + '\n\n*[连接中断]*',
+              content: agentStore.answerText
+                ? agentStore.answerText + '\n\n*[连接中断]*'
+                : '*[连接中断]*',
               traceId: agentStore.currentTraceId,
               traceEvents: [...agentStore.traceEvents],
               thinkingText: agentStore.thinkingText || undefined,
@@ -418,8 +425,7 @@ export function useAgentChat(scrollCallback?: () => void) {
               timestamp: Date.now(),
               webSearchReferences: agentStore.currentWebSearchReferences.length
                 ? [...agentStore.currentWebSearchReferences] : undefined,
-              mindMaps: agentStore.currentMindMaps.length
-                ? [...agentStore.currentMindMaps] : undefined,
+              mindMaps: currentMindMaps.length ? [...currentMindMaps] : undefined,
             })
           }
           agentStore.finishTurn()

@@ -777,6 +777,7 @@ export const useAgentStore = defineStore('agent', () => {
     learningPlanPreviewReadonly.value = false
     learningPlanSpaceCreated.value = null
     currentWebSearchReferences.value = []
+    currentMindMaps.value = []
   }
 
   return {
@@ -816,6 +817,7 @@ export const useAgentStore = defineStore('agent', () => {
     learningPlanPreviewReadonly,
     learningPlanSpaceCreated,
     currentWebSearchReferences,
+    currentMindMaps,
     startNewTurn,
     handleEvent,
     finishTurn,
