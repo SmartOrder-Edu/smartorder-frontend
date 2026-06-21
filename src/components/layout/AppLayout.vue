@@ -390,9 +390,8 @@ const isActive = (path: string) => {
   return route.path === path || route.path.startsWith(path + '/')
 }
 
-const isActiveSpace = (spaceId: number) => {
-  const pathId = Number(route.params.spaceId)
-  return pathId === spaceId
+const isActiveSpace = (spaceId: string) => {
+  return String(route.params.spaceId || '') === String(spaceId)
 }
 
 const goHome = () => {

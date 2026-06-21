@@ -8,7 +8,7 @@ export const useSpaceDashboardStore = defineStore('spaceDashboard', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  async function fetchDashboard(spaceId: number) {
+  async function fetchDashboard(spaceId: string) {
     loading.value = true
     error.value = null
     try {
@@ -20,7 +20,7 @@ export const useSpaceDashboardStore = defineStore('spaceDashboard', () => {
     }
   }
 
-  async function startTask(taskId: number) {
+  async function startTask(taskId: string) {
     try {
       await taskApi.updateStatus(taskId, 'in_progress')
       updateLocalTaskStatus(taskId, 'in_progress')
@@ -29,7 +29,7 @@ export const useSpaceDashboardStore = defineStore('spaceDashboard', () => {
     }
   }
 
-  async function completeTask(taskId: number, actualMinutes: number) {
+  async function completeTask(taskId: string, actualMinutes: number) {
     try {
       await taskApi.complete(taskId, { actualDurationMinutes: actualMinutes })
       updateLocalTaskStatus(taskId, 'completed')
@@ -46,14 +46,14 @@ export const useSpaceDashboardStore = defineStore('spaceDashboard', () => {
     }
   }
 
-  function findTask(taskId: number): TaskVO | undefined {
+  function findTask(taskId: string): TaskVO | undefined {
     if (!dashboard.value) return undefined
     return dashboard.value.todayTasks.find(t => t.id === taskId)
       || dashboard.value.pendingTasks.find(t => t.id === taskId)
       || dashboard.value.overdueTasks.find(t => t.id === taskId)
   }
 
-  function updateLocalTaskStatus(taskId: number, status: TaskStatus) {
+  function updateLocalTaskStatus(taskId: string, status: TaskStatus) {
     if (!dashboard.value) return
     for (const list of [dashboard.value.todayTasks, dashboard.value.pendingTasks, dashboard.value.overdueTasks]) {
       const task = list.find(t => t.id === taskId)

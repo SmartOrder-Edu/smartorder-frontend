@@ -113,7 +113,7 @@ export const useAgentStore = defineStore('agent', () => {
   const learningPlanDraft = ref<LearningPlanDraft | null>(null)
   const showLearningPlanPreview = ref(false)
   const learningPlanPreviewReadonly = ref(false)
-  const learningPlanSpaceCreated = ref<{ spaceId: number; spaceName: string } | null>(null)
+  const learningPlanSpaceCreated = ref<{ spaceId: string; spaceName: string } | null>(null)
 
   // === 网络搜索引用状态 ===
   const currentWebSearchReferences = ref<WebSearchReference[]>([])
@@ -589,7 +589,7 @@ export const useAgentStore = defineStore('agent', () => {
           // 学习空间创建成功：更新 TaskList 和回答文本
           if (currentTaskList.value) {
             currentTaskList.value.spaceCreated = {
-              spaceId: payload.spaceId,
+              spaceId: String(payload.spaceId),
               spaceName: payload.spaceName || '',
             }
           }

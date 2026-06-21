@@ -12,7 +12,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const totalEstimatedMinutes = computed(() => steps.value.reduce((s, st) => s + st.estimatedMinutes, 0))
   const completedSteps = computed(() => steps.value.filter(s => s.status === 'completed').length)
 
-  async function fetchSteps(taskId: number) {
+  async function fetchSteps(taskId: string) {
     loading.value = true
     try {
       steps.value = await taskStepApi.getSteps(taskId)

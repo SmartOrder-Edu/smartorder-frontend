@@ -164,7 +164,7 @@ function hydratePlanningSnapshot(agentStore: ReturnType<typeof useAgentStore>, s
   if (taskList) {
     if (snapshot.spaceCreated?.spaceId) {
       taskList.spaceCreated = {
-        spaceId: snapshot.spaceCreated.spaceId,
+        spaceId: String(snapshot.spaceCreated.spaceId),
         spaceName: snapshot.spaceCreated.spaceName || '',
       }
     }
@@ -184,8 +184,8 @@ function hydratePlanningSnapshot(agentStore: ReturnType<typeof useAgentStore>, s
     agentStore.showLearningPlanPreview = true
     agentStore.learningPlanPreviewReadonly = !!snapshot.spaceCreated?.spaceId
     agentStore.learningPlanSpaceCreated = snapshot.spaceCreated?.spaceId
-      ? {
-          spaceId: snapshot.spaceCreated.spaceId,
+        ? {
+          spaceId: String(snapshot.spaceCreated.spaceId),
           spaceName: snapshot.spaceCreated.spaceName || learningDraft.spaceName || '',
         }
       : null
@@ -533,7 +533,7 @@ export function useAgentChat(scrollCallback?: () => void) {
               try { return JSON.parse(event.data).payload } catch { return null }
             })()
             const planSummary: PlanSummary = {
-              spaceId: payload?.spaceId || 0,
+              spaceId: payload?.spaceId ? String(payload.spaceId) : '',
               spaceName: plan?.spaceName || '',
               spaceType: plan?.type || 'course',
               nodeCount: payload?.nodeCount || plan?.phases?.length || 0,

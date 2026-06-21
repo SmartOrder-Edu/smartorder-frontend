@@ -71,7 +71,7 @@ export interface TaskList {
   confirmationDraftId: string
   /** 学习空间创建成功后返回的信息 */
   spaceCreated?: {
-    spaceId: number
+    spaceId: string
     spaceName: string
   }
 }

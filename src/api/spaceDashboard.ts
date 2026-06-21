@@ -4,7 +4,7 @@ import type { SpaceDashboardVO, TaskVO, TaskStatus } from '@/types/learningSpace
 // ---- Space Dashboard ----
 
 export const spaceDashboardApi = {
-  async getDashboard(spaceId: number): Promise<SpaceDashboardVO> {
+  async getDashboard(spaceId: string): Promise<SpaceDashboardVO> {
     return request.get(`/learning-spaces/${spaceId}/dashboard`)
   },
 }
@@ -12,11 +12,11 @@ export const spaceDashboardApi = {
 // ---- Task ----
 
 export const taskApi = {
-  async updateStatus(taskId: number, status: TaskStatus): Promise<TaskVO> {
+  async updateStatus(taskId: string, status: TaskStatus): Promise<TaskVO> {
     return request.patch(`/tasks/${taskId}/status`, { status })
   },
 
-  async complete(taskId: number, data: { actualDurationMinutes: number }): Promise<TaskVO> {
+  async complete(taskId: string, data: { actualDurationMinutes: number }): Promise<TaskVO> {
     return request.patch(`/tasks/${taskId}/complete`, data)
   },
 }
@@ -27,7 +27,7 @@ import { getMockTaskSteps } from '@/mocks/taskSteps'
 import type { TaskStepVO } from '@/types/learningSpace'
 
 export const taskStepApi = {
-  async getSteps(taskId: number): Promise<TaskStepVO[]> {
+  async getSteps(taskId: string): Promise<TaskStepVO[]> {
     // TODO: 切换为真实 API
     // return request.get(`/tasks/${taskId}/steps`)
 
