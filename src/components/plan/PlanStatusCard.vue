@@ -76,6 +76,7 @@ defineEmits<{
 const isAwaitingConfirmation = computed(() => {
   return props.taskList.status === 'DRAFT'
     || props.taskList.status === 'PENDING_CONFIRM'
+    || props.taskList.status === 'WAITING_CONFIRMATION'
     || props.taskList.status === 'PAUSED_CONFIRMATION'
 })
 

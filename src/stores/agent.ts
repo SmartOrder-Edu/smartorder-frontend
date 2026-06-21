@@ -12,6 +12,7 @@ import type {
   PhaseInfo,
 } from '@/types/planExecute'
 import type { WebSearchReference } from '@/composables/useAgentChat'
+import type { MindMapData } from '@/types/mindMap'
 
 export interface AgentTraceEvent<T = any> {
   traceId: string
@@ -111,9 +112,14 @@ export const useAgentStore = defineStore('agent', () => {
   // === 学习计划草稿状态（LEARNING_PLAN 类型） ===
   const learningPlanDraft = ref<LearningPlanDraft | null>(null)
   const showLearningPlanPreview = ref(false)
+  const learningPlanPreviewReadonly = ref(false)
+  const learningPlanSpaceCreated = ref<{ spaceId: number; spaceName: string } | null>(null)
 
   // === 网络搜索引用状态 ===
   const currentWebSearchReferences = ref<WebSearchReference[]>([])
+
+  // === 思维导图状态（本轮生成的思维导图列表） ===
+  const currentMindMaps = ref<MindMapData[]>([])
 
   // === 追踪面板状态 ===
   const tracePanelVisible = ref(false)
@@ -155,8 +161,12 @@ export const useAgentStore = defineStore('agent', () => {
     // 学习计划草稿状态——每次新对话重置
     learningPlanDraft.value = null
     showLearningPlanPreview.value = false
+    learningPlanPreviewReadonly.value = false
+    learningPlanSpaceCreated.value = null
     // 网络搜索引用状态——每次新对话重置
     currentWebSearchReferences.value = []
+    // 思维导图状态——每次新对话重置
+    currentMindMaps.value = []
   }
 
   /**
@@ -385,6 +395,8 @@ export const useAgentStore = defineStore('agent', () => {
             knowledgeGraph: plan.knowledgeGraph || { nodes: [], edges: [] },
           }
           showLearningPlanPreview.value = true
+          learningPlanPreviewReadonly.value = false
+          learningPlanSpaceCreated.value = null
           // 互斥：学习计划草稿出现时，执行计划不再需要确认。
           // 学习计划草稿的确认由 LearningPlanPreview 卡片承担，
           // 清空执行计划确认态避免 autoConfirm 等逻辑确认错对象。
@@ -394,6 +406,14 @@ export const useAgentStore = defineStore('agent', () => {
           if (currentTaskList.value) {
             currentTaskList.value.status = 'COMPLETED'
           }
+        }
+        break
+      }
+
+      case 'agent.mindmap.created': {
+        const mm = data.payload as MindMapData
+        if (mm && Array.isArray(mm.nodes) && mm.nodes.length > 0) {
+          currentMindMaps.value.push(mm)
         }
         break
       }
@@ -470,6 +490,9 @@ export const useAgentStore = defineStore('agent', () => {
 
       case 'agent.plan.paused': {
         const reason = data.payload?.reason as PauseReason
+        if (showLearningPlanPreview.value && learningPlanDraft.value) {
+          break
+        }
         const taskId = data.payload?.taskId || ''
         const question = data.payload?.question || ''
         const clarification = data.payload?.clarification as ClarificationInfo | undefined
@@ -510,7 +533,7 @@ export const useAgentStore = defineStore('agent', () => {
         planPauseInfo.value = null
         const taskId = data.payload?.taskId || ''
         const execState = taskExecutionMap.value.get(taskId)
-        if (execState) {
+        if (execState && !['completed', 'failed', 'skipped'].includes(execState.status)) {
           execState.status = 'running'
         }
         if (currentTaskList.value) {
@@ -751,7 +774,10 @@ export const useAgentStore = defineStore('agent', () => {
     currentPhase.value = ''
     learningPlanDraft.value = null
     showLearningPlanPreview.value = false
+    learningPlanPreviewReadonly.value = false
+    learningPlanSpaceCreated.value = null
     currentWebSearchReferences.value = []
+    currentMindMaps.value = []
   }
 
   return {
@@ -788,7 +814,10 @@ export const useAgentStore = defineStore('agent', () => {
     currentPhase,
     learningPlanDraft,
     showLearningPlanPreview,
+    learningPlanPreviewReadonly,
+    learningPlanSpaceCreated,
     currentWebSearchReferences,
+    currentMindMaps,
     startNewTurn,
     handleEvent,
     finishTurn,

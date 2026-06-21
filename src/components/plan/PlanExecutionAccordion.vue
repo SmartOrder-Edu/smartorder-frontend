@@ -3,7 +3,7 @@
     <!-- 全局进度条 -->
     <div class="accordion-progress">
       <div class="progress-header">
-        <span class="progress-label">执行中</span>
+        <span class="progress-label">{{ progressLabel }}</span>
         <span class="progress-count">{{ completedCount }}/{{ totalCount }} 完成</span>
       </div>
       <div class="progress-bar">
@@ -87,7 +87,7 @@
 
           <!-- Gate 卡片（暂停时） -->
           <GateCard
-            v-if="execState(task.taskId)?.status === 'paused' && pauseInfo && pauseInfo.taskId === task.taskId"
+            v-if="showGateCard && execState(task.taskId)?.status === 'paused' && pauseInfo && pauseInfo.taskId === task.taskId"
             :reason="pauseInfo.reason"
             :question="pauseInfo.question"
             :clarification="pauseInfo.clarification"
@@ -122,7 +122,7 @@ import ThinkingBlock from '@/components/agent/ThinkingBlock.vue'
 import ToolCallCard from '@/components/agent/ToolCallCard.vue'
 import GateCard from '@/components/plan/GateCard.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   taskList: TaskList
   taskExecutionMap: Map<string, TaskExecutionState>
   pauseInfo: PlanPauseInfo | null
@@ -132,9 +132,13 @@ const props = defineProps<{
   isCurrentActive?: boolean
   /** GateCard 是否正在提交中 */
   gateSubmitting?: boolean
+  /** 是否在步骤详情里展示 GateCard。顶部执行面板使用独立的澄清/确认入口，因此会关闭。 */
+  showGateCard?: boolean
   /** 历史回放时用户对该澄清的回答文本（只读模式展示用） */
   clarificationAnsweredValue?: string
-}>()
+}>(), {
+  showGateCard: true,
+})
 
 const emit = defineEmits<{
   gateAnswer: [clarificationId: string, answer: string]
@@ -222,6 +226,14 @@ const totalCount = computed(() => props.taskList.tasks.length)
 const progressPercent = computed(() => {
   if (!totalCount.value) return 0
   return Math.round((completedCount.value / totalCount.value) * 100)
+})
+
+const progressLabel = computed(() => {
+  if (props.taskList.status === 'COMPLETED') return '已完成'
+  if (props.taskList.status === 'FAILED') return '执行失败'
+  if (props.taskList.status === 'PAUSED_CLARIFICATION') return '等待补充'
+  if (props.taskList.status === 'PAUSED_CONFIRMATION') return '等待确认'
+  return '执行中'
 })
 
 const statusMessage = computed(() => {

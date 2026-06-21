@@ -81,9 +81,32 @@
             </button>
             <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
           </div>
-          <div class="chat-flow">
-            <div class="chat-flow-inner">
+            <div class="chat-flow">
+              <div class="chat-flow-inner">
             <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
+            <!-- 目标规划执行面板：会话级唯一状态区，不再作为普通聊天消息重复出现 -->
+            <div
+              class="planning-execution-shelf"
+              v-if="agentStore.currentTaskList && !agentStore.showLearningPlanPreview"
+            >
+              <TaskExecutionPanel
+                :task-list="agentStore.currentTaskList"
+                :task-execution-map="agentStore.taskExecutionMap"
+                :pause-info="agentStore.planPauseInfo"
+                :confirming="agentStore.planConfirmLoading"
+                :live-reasoning-segments="agentStore.reasoningSegments"
+                :is-current-active="true"
+                :gate-submitting="gateSubmitting"
+                :show-gate-card="false"
+                collapsible
+                default-collapsed
+                @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
+                @gate-answer="handleGateAnswer"
+                @gate-confirm="handleGateConfirm"
+                @gate-cancel="handleGateCancel"
+              />
+            </div>
+
             <!-- 欢迎消息 -->
             <div class="welcome-message" v-if="messages.length === 0 && !agentStore.loading">
               <div class="welcome-avatar">
@@ -146,6 +169,14 @@
                   />
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
+                  <!-- 思维导图卡片（历史消息） -->
+                  <template v-if="msg.role === 'ai' && msg.mindMaps?.length">
+                    <MindMapCard
+                      v-for="(mm, idx) in msg.mindMaps"
+                      :key="'mm-' + idx"
+                      :data="mm"
+                    />
+                  </template>
                   <template v-else>
                     <p class="message-text">{{ msg.content }}</p>
                     <div v-if="msg.attachmentFileIds?.length" class="message-attachment-hint">
@@ -198,31 +229,7 @@
                 </div>
 
                 <!-- 计划创建卡片（LEGACY 模式） -->
-                <PlanCreatedCard v-if="msg.planSummary && !msg.taskList" :plan="msg.planSummary" />
-
-                <!-- Plan-and-Execute: 规划审阅阶段（所有任务待执行） -->
-                <!-- 注意：不使用 msg.planExecuting 判断，因为自动确认竞态会导致该值不准确；
-                     改用 isPlanAwaitingConfirmation 根据 TaskList.status 精确判断 -->
-                <PlanChecklist
-                  v-if="msg.taskList && isPlanAwaitingConfirmation(msg.taskList) && !agentStore.showLearningPlanPreview"
-                  :task-list="msg.taskList"
-                  :confirming="agentStore.planConfirmLoading"
-                  @confirm="confirmPlan(msg.taskList.confirmationDraftId || agentStore.currentDraftId)"
-                />
-
-                <!-- Plan-and-Execute: 执行中/已完成的手风琴（历史消息中 GateCard 始终只读） -->
-                <PlanExecutionAccordion
-                  v-if="msg.taskList && !isPlanAwaitingConfirmation(msg.taskList)"
-                  :task-list="msg.taskList"
-                  :task-execution-map="msg.taskExecutionMap || new Map()"
-                  :pause-info="msg.pauseInfo || null"
-                  :is-current-active="false"
-                  :gate-submitting="false"
-                  :clarification-answered-value="msg.clarificationAnsweredValue || ''"
-                  @gate-answer="handleGateAnswer"
-                  @gate-confirm="handleGateConfirm"
-                  @gate-cancel="handleGateCancel"
-                />
+                <PlanCreatedCard v-if="msg.planSummary" :plan="msg.planSummary" />
 
                 <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
               </div>
@@ -261,24 +268,24 @@
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
+                  <!-- 思维导图卡片（流式实时展示） -->
+                  <template v-if="agentStore.currentMindMaps?.length">
+                    <MindMapCard
+                      v-for="(mm, idx) in agentStore.currentMindMaps"
+                      :key="'mm-live-' + idx"
+                      :data="mm"
+                    />
+                  </template>
 
                   <!-- 学习计划预览（LEARNING_PLAN 草稿审阅） -->
                   <LearningPlanPreview
                     v-if="agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
                     :learning-plan="agentStore.learningPlanDraft"
                     :confirming="agentStore.planConfirmLoading"
+                    :readonly="agentStore.learningPlanPreviewReadonly"
+                    :space-created="agentStore.learningPlanSpaceCreated"
                     @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
-                  />
-
-                  <!-- Plan-and-Execute: 紧凑状态卡片（任务详情在右侧面板） -->
-                  <PlanStatusCard
-                    v-if="agentStore.currentTaskList && !agentStore.showLearningPlanPreview"
-                    :task-list="agentStore.currentTaskList"
-                    :confirming="agentStore.planConfirmLoading"
-                    :completed-count="planCompletedCount"
-                    :total-count="planTotalCount"
-                    :current-running-desc="planCurrentRunningDesc"
-                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
+                    @cancel="handleLearningPlanCancel"
                   />
 
                   <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
@@ -299,7 +306,10 @@
                 <LearningPlanPreview
                   :learning-plan="agentStore.learningPlanDraft"
                   :confirming="agentStore.planConfirmLoading"
+                  :readonly="agentStore.learningPlanPreviewReadonly"
+                  :space-created="agentStore.learningPlanSpaceCreated"
                   @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
+                  @cancel="handleLearningPlanCancel"
                 />
               </div>
             </div>
@@ -525,21 +535,6 @@
             </div>
           </div>
 
-          <!-- 任务执行面板（Plan-and-Execute 模式下出现，GateCard 始终只读） -->
-          <TaskExecutionPanel
-            v-if="!agentStore.showLearningPlanPreview"
-            :task-list="agentStore.currentTaskList"
-            :task-execution-map="agentStore.taskExecutionMap"
-            :pause-info="agentStore.planPauseInfo"
-            :confirming="agentStore.planConfirmLoading"
-            :live-reasoning-segments="agentStore.reasoningSegments"
-            :is-current-active="false"
-            :gate-submitting="false"
-            @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
-            @gate-answer="handleGateAnswer"
-            @gate-confirm="handleGateConfirm"
-            @gate-cancel="handleGateCancel"
-          />
         </aside>
       </div>
       <!-- 移动端历史侧边栏遮罩 -->
@@ -576,15 +571,13 @@ import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import ReasoningProcess from '@/components/agent/ReasoningProcess.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
-import PlanChecklist from '@/components/plan/PlanChecklist.vue'
-import PlanExecutionAccordion from '@/components/plan/PlanExecutionAccordion.vue'
 import TaskExecutionPanel from '@/components/plan/TaskExecutionPanel.vue'
 import GateCard from '@/components/plan/GateCard.vue'
-import PlanStatusCard from '@/components/plan/PlanStatusCard.vue'
 import LearningPlanPreview from '@/components/plan/LearningPlanPreview.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import WebSearchSources from '@/components/agent/WebSearchSources.vue'
+import MindMapCard from '@/components/agent/MindMapCard.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
@@ -723,6 +716,7 @@ const inputPlaceholder = computed(() =>
 const gateSubmitting = ref(false)
 
 const clarificationPauseInfo = computed(() => {
+  if (agentStore.showLearningPlanPreview) return null
   const pauseInfo = agentStore.planPauseInfo
   if (!pauseInfo || pauseInfo.reason !== 'CLARIFICATION') return null
   return pauseInfo
@@ -814,7 +808,8 @@ const sendMessage = async () => {
 
   // PAUSED_CLARIFICATION 态走专用澄清接口（有 draftId 和 clarificationId）
   const pausedClarId = agentStore.planPauseInfo?.clarification?.clarificationId
-  if (agentStore.planPauseInfo?.reason === 'CLARIFICATION'
+  if (!agentStore.showLearningPlanPreview
+      && agentStore.planPauseInfo?.reason === 'CLARIFICATION'
       && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
       && agentStore.currentDraftId
       && pausedClarId) {
@@ -1072,37 +1067,6 @@ const hasTraceEventsForMsg = (msg: any): boolean => {
   return !!(msg.traceEvents?.length) || !!msg.traceId
 }
 
-/**
- * 判断计划是否正在等待用户确认执行。
- */
-function isPlanAwaitingConfirmation(taskList: TaskList): boolean {
-  return taskList.status === 'DRAFT'
-    || taskList.status === 'PENDING_CONFIRM'
-    || taskList.status === 'WAITING_CONFIRMATION'
-    || taskList.status === 'PAUSED_CONFIRMATION'
-}
-
-/** PlanStatusCard 所需的计算属性 */
-const planCompletedCount = computed(() => {
-  let count = 0
-  for (const [, state] of agentStore.taskExecutionMap) {
-    if (state.status === 'completed') count++
-  }
-  return count
-})
-
-const planTotalCount = computed(() => {
-  return agentStore.currentTaskList?.tasks.length || 0
-})
-
-const planCurrentRunningDesc = computed(() => {
-  for (const [, state] of agentStore.taskExecutionMap) {
-    if (state.status === 'running') return state.taskItem.description
-  }
-  // 规划阶段或全部完成时返回空
-  return ''
-})
-
 /** 判断消息是否包含推理过程（思考或工具调用） */
 function hasReasoningContent(msg: ChatMessage): boolean {
   return !!(
@@ -1209,6 +1173,13 @@ const handleGateConfirm = (taskId: string) => {
 const handleGateCancel = (_taskId: string) => {
   // 取消执行
   cancelPlan()
+}
+
+/** 取消学习计划预览，清空相关状态 */
+const handleLearningPlanCancel = () => {
+  agentStore.showLearningPlanPreview = false
+  agentStore.learningPlanDraft = null
+  ElMessage.info('已取消，你可以重新描述学习目标')
 }
 
 /**
@@ -1633,6 +1604,23 @@ watch(windowWidth, (newWidth) => {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+}
+
+.planning-execution-shelf {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  width: 100%;
+  max-width: 920px;
+  align-self: stretch;
+  padding-bottom: 2px;
+  background: linear-gradient(180deg, var(--background-color, #f8fafc) 0%, rgba(248, 250, 252, 0.88) 78%, rgba(248, 250, 252, 0) 100%);
+}
+
+.planning-execution-shelf :deep(.task-execution-panel) {
+  max-height: min(48vh, 520px);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
 }
 
 /* 欢迎消息 */

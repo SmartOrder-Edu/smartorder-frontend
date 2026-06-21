@@ -1,4 +1,5 @@
 import request from './request'
+import type { LearningPlanDraft, PlanPauseInfo, TaskList } from '@/types/planExecute'
 
 export interface AgentChatRequest {
   message: string
@@ -65,6 +66,22 @@ export interface MessagePageResult {
   size: number
 }
 
+export interface PlanningSnapshot {
+  conversationId: string
+  runId?: string
+  executionDraftId?: string
+  learningPlanDraftId?: string
+  planType?: string
+  status?: string
+  taskList?: TaskList
+  pauseInfo?: PlanPauseInfo | null
+  learningPlanDraft?: LearningPlanDraft | null
+  spaceCreated?: {
+    spaceId: number
+    spaceName: string
+  } | null
+}
+
 /**
  * Agent 对话相关 API
  */
@@ -109,6 +126,11 @@ export const agentApi = {
   /** 获取会话的活跃计划运行态——用于加载历史会话时恢复 agentStore 状态 */
   getActiveRun(conversationId: string) {
     return request.get<any>(`/agent/conversations/${conversationId}/active-run`)
+  },
+
+  /** 获取会话级目标规划快照——用于实时/历史会话顶部唯一执行面板 */
+  getPlanningSnapshot(conversationId: string) {
+    return request.get<PlanningSnapshot | null>(`/agent/conversations/${conversationId}/planning-snapshot`)
   },
 
   /** 获取 Run 的标准化 Timeline */
