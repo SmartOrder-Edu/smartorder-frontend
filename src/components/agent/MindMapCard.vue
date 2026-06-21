@@ -28,24 +28,29 @@
       class="mindmap-dialog"
       append-to-body
     >
-      <div class="mindmap-toolbar">
-        <el-button size="small" @click="fitView">
-          <el-icon><Aim /></el-icon><span>适应屏幕</span>
-        </el-button>
-        <el-button size="small" @click="zoomOut">
-          <el-icon><ZoomOut /></el-icon><span>缩小</span>
-        </el-button>
-        <el-button size="small" @click="zoomIn">
-          <el-icon><ZoomIn /></el-icon><span>放大</span>
-        </el-button>
-        <el-button size="small" @click="exportPNG">
-          <el-icon><Picture /></el-icon><span>导出 PNG</span>
-        </el-button>
-        <el-button size="small" @click="exportSVG">
-          <el-icon><Download /></el-icon><span>导出 SVG</span>
-        </el-button>
+      <div ref="fullscreenWrapperRef" class="mindmap-fullscreen-wrapper" :class="{ 'is-fullscreen': isFullscreen }">
+        <div class="mindmap-toolbar">
+          <el-button size="small" @click="fitView">
+            <el-icon><Aim /></el-icon><span>适应屏幕</span>
+          </el-button>
+          <el-button size="small" @click="zoomOut">
+            <el-icon><ZoomOut /></el-icon><span>缩小</span>
+          </el-button>
+          <el-button size="small" @click="zoomIn">
+            <el-icon><ZoomIn /></el-icon><span>放大</span>
+          </el-button>
+          <el-button size="small" @click="exportPNG">
+            <el-icon><Picture /></el-icon><span>导出 PNG</span>
+          </el-button>
+          <el-button size="small" @click="exportSVG">
+            <el-icon><Download /></el-icon><span>导出 SVG</span>
+          </el-button>
+          <el-button size="small" @click="toggleFullscreen">
+            <el-icon><FullScreen /></el-icon><span>{{ isFullscreen ? '退出全屏' : '全屏' }}</span>
+          </el-button>
+        </div>
+        <div ref="fullContainerRef" class="mindmap-full-canvas"></div>
       </div>
-      <div ref="fullContainerRef" class="mindmap-full-canvas"></div>
     </el-dialog>
   </div>
 </template>
@@ -68,7 +73,9 @@ const props = withDefaults(defineProps<{
 
 const thumbContainerRef = ref<HTMLDivElement | null>(null)
 const fullContainerRef = ref<HTMLDivElement | null>(null)
+const fullscreenWrapperRef = ref<HTMLDivElement | null>(null)
 const fullscreenVisible = ref(false)
+const isFullscreen = ref(false)
 
 let thumbGraph: Graph | null = null
 let fullGraph: Graph | null = null
@@ -272,6 +279,35 @@ function openFullscreen() {
   })
 }
 
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement
+  if (fullGraph) {
+    // requestAnimationFrame 确保 fullscreen 布局完成后再重设画布
+    nextTick(() => {
+      requestAnimationFrame(() => {
+        const container = fullContainerRef.value
+        if (container && fullGraph) {
+          fullGraph.resize(container.clientWidth, container.clientHeight)
+          fullGraph.zoomToFit({ padding: 30, maxScale: 1.5 })
+        }
+      })
+    })
+  }
+}
+
+function toggleFullscreen() {
+  if (!fullscreenWrapperRef.value) return
+  if (!isFullscreen.value) {
+    fullscreenWrapperRef.value.requestFullscreen().catch((err) => {
+      console.warn('[MindMapCard] 进入全屏失败:', err)
+    })
+  } else {
+    document.exitFullscreen().catch((err) => {
+      console.warn('[MindMapCard] 退出全屏失败:', err)
+    })
+  }
+}
+
 function fitView() {
   fullGraph?.zoomToFit({ padding: 30, maxScale: 1.5 })
 }
@@ -348,14 +384,19 @@ watch(() => props.data, () => {
 
 watch(fullscreenVisible, (v) => {
   if (!v) {
+    document.removeEventListener('fullscreenchange', onFullscreenChange)
+    isFullscreen.value = false
     if (fullGraph) {
       try { fullGraph.dispose() } catch { /* */ }
       fullGraph = null
     }
+  } else {
+    document.addEventListener('fullscreenchange', onFullscreenChange)
   }
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
   if (thumbGraph) { try { thumbGraph.dispose() } catch { /* */ } thumbGraph = null }
   if (fullGraph) { try { fullGraph.dispose() } catch { /* */ } fullGraph = null }
 })
@@ -425,11 +466,43 @@ onBeforeUnmount(() => {
   padding: 8px 0;
   flex-wrap: wrap;
 }
+.mindmap-fullscreen-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
 .mindmap-full-canvas {
   width: 100%;
   height: 70vh;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #fafbfc;
+}
+
+/* 全屏模式样式（position: fixed 脱离 dialog body 布局约束） */
+.mindmap-fullscreen-wrapper.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: #fafbfc;
+  display: flex;
+  flex-direction: column;
+}
+.mindmap-fullscreen-wrapper.is-fullscreen .mindmap-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid #e5e7eb;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.mindmap-fullscreen-wrapper.is-fullscreen .mindmap-full-canvas {
+  flex: 1;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
 }
 </style>
