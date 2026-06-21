@@ -470,6 +470,9 @@ export const useAgentStore = defineStore('agent', () => {
 
       case 'agent.plan.paused': {
         const reason = data.payload?.reason as PauseReason
+        if (showLearningPlanPreview.value && learningPlanDraft.value) {
+          break
+        }
         const taskId = data.payload?.taskId || ''
         const question = data.payload?.question || ''
         const clarification = data.payload?.clarification as ClarificationInfo | undefined
@@ -510,7 +513,7 @@ export const useAgentStore = defineStore('agent', () => {
         planPauseInfo.value = null
         const taskId = data.payload?.taskId || ''
         const execState = taskExecutionMap.value.get(taskId)
-        if (execState) {
+        if (execState && !['completed', 'failed', 'skipped'].includes(execState.status)) {
           execState.status = 'running'
         }
         if (currentTaskList.value) {

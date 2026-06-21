@@ -725,6 +725,7 @@ const inputPlaceholder = computed(() =>
 const gateSubmitting = ref(false)
 
 const clarificationPauseInfo = computed(() => {
+  if (agentStore.showLearningPlanPreview) return null
   const pauseInfo = agentStore.planPauseInfo
   if (!pauseInfo || pauseInfo.reason !== 'CLARIFICATION') return null
   return pauseInfo
@@ -816,7 +817,8 @@ const sendMessage = async () => {
 
   // PAUSED_CLARIFICATION 态走专用澄清接口（有 draftId 和 clarificationId）
   const pausedClarId = agentStore.planPauseInfo?.clarification?.clarificationId
-  if (agentStore.planPauseInfo?.reason === 'CLARIFICATION'
+  if (!agentStore.showLearningPlanPreview
+      && agentStore.planPauseInfo?.reason === 'CLARIFICATION'
       && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
       && agentStore.currentDraftId
       && pausedClarId) {

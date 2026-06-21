@@ -3,7 +3,7 @@
     <!-- 全局进度条 -->
     <div class="accordion-progress">
       <div class="progress-header">
-        <span class="progress-label">执行中</span>
+        <span class="progress-label">{{ progressLabel }}</span>
         <span class="progress-count">{{ completedCount }}/{{ totalCount }} 完成</span>
       </div>
       <div class="progress-bar">
@@ -222,6 +222,14 @@ const totalCount = computed(() => props.taskList.tasks.length)
 const progressPercent = computed(() => {
   if (!totalCount.value) return 0
   return Math.round((completedCount.value / totalCount.value) * 100)
+})
+
+const progressLabel = computed(() => {
+  if (props.taskList.status === 'COMPLETED') return '已完成'
+  if (props.taskList.status === 'FAILED') return '执行失败'
+  if (props.taskList.status === 'PAUSED_CLARIFICATION') return '等待补充'
+  if (props.taskList.status === 'PAUSED_CONFIRMATION') return '等待确认'
+  return '执行中'
 })
 
 const statusMessage = computed(() => {
