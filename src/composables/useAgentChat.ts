@@ -238,6 +238,8 @@ export function useAgentChat(scrollCallback?: () => void) {
         timestamp: Date.now(),
         webSearchReferences: agentStore.currentWebSearchReferences.length
           ? [...agentStore.currentWebSearchReferences] : undefined,
+        mindMaps: agentStore.currentMindMaps.length
+          ? [...agentStore.currentMindMaps] : undefined,
       })
     }
     agentStore.finishTurn()
@@ -416,6 +418,8 @@ export function useAgentChat(scrollCallback?: () => void) {
               timestamp: Date.now(),
               webSearchReferences: agentStore.currentWebSearchReferences.length
                 ? [...agentStore.currentWebSearchReferences] : undefined,
+              mindMaps: agentStore.currentMindMaps.length
+                ? [...agentStore.currentMindMaps] : undefined,
             })
           }
           agentStore.finishTurn()

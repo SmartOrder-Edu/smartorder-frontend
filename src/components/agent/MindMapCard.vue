@@ -155,7 +155,9 @@ function buildGraph(container: HTMLDivElement, interactive: boolean): Graph {
     panning: interactive ? { enabled: true } : false,
     grid: interactive ? { visible: true, size: 10, type: 'dot' } : false,
   })
-  graph.use(new Export())
+  if (interactive) {
+    graph.use(new Export()) // 只有全屏交互模式才加载导出插件
+  }
   return graph
 }
 
@@ -233,14 +235,33 @@ function renderGraph(graph: Graph, interactive: boolean) {
 
 function initThumb() {
   if (!thumbContainerRef.value) return
-  thumbGraph = buildGraph(thumbContainerRef.value, false)
-  renderGraph(thumbGraph, false)
+  if (thumbGraph) return // 已初始化，避免重复
+  try {
+    const container = thumbContainerRef.value
+    if (container.clientWidth === 0 || container.clientHeight === 0) {
+      // 容器尺寸为零（布局未完成），跳过稍后由 watch fullscreenVisible 或外部重试
+      console.warn('[MindMapCard] 缩略图容器尺寸为零，跳过初始化')
+      return
+    }
+    thumbGraph = buildGraph(container, false)
+    renderGraph(thumbGraph, false)
+  } catch (e) {
+    console.error('[MindMapCard] 缩略图初始化失败:', e)
+    // 清理失败的 graph，防止内存泄漏
+    if (thumbGraph) { try { thumbGraph.dispose() } catch { /* */ } thumbGraph = null }
+  }
 }
 
 function initFull() {
   if (!fullContainerRef.value) return
-  fullGraph = buildGraph(fullContainerRef.value, true)
-  renderGraph(fullGraph, true)
+  if (fullGraph) { fullGraph.dispose(); fullGraph = null }
+  try {
+    fullGraph = buildGraph(fullContainerRef.value, true)
+    renderGraph(fullGraph, true)
+  } catch (e) {
+    console.error('[MindMapCard] 全屏画布初始化失败:', e)
+    if (fullGraph) { try { fullGraph.dispose() } catch { /* */ } fullGraph = null }
+  }
 }
 
 function openFullscreen() {
@@ -286,8 +307,38 @@ function downloadUrl(url: string, filename: string) {
   a.click()
 }
 
+const thumbInitDone = ref(false)
+
 onMounted(() => {
-  initThumb()
+  // 用 requestAnimationFrame 延迟初始化，确保浏览器完成 layout（容器有正确尺寸）
+  let rafId: number
+  let mounted = true
+  function tryInit() {
+    if (!mounted || thumbInitDone.value) return
+    // 检查容器是否有尺寸（浏览器 layout 后才有）
+    if (!thumbContainerRef.value || thumbContainerRef.value.clientWidth === 0 || thumbContainerRef.value.clientHeight === 0) {
+      rafId = requestAnimationFrame(tryInit) // 重试
+      return
+    }
+    initThumb()
+    thumbInitDone.value = true
+  }
+  rafId = requestAnimationFrame(tryInit)
+  // 安全兜底：最迟 500ms 后强制初始化
+  const fallbackTimer = setTimeout(() => {
+    if (!thumbInitDone.value && mounted) {
+      console.warn('[MindMapCard] rAF 超时，强制初始化缩略图')
+      cancelAnimationFrame(rafId)
+      initThumb()
+      thumbInitDone.value = true
+    }
+  }, 500)
+
+  onBeforeUnmount(() => {
+    mounted = false
+    cancelAnimationFrame(rafId)
+    clearTimeout(fallbackTimer)
+  })
 })
 
 watch(() => props.data, () => {
@@ -298,17 +349,15 @@ watch(() => props.data, () => {
 watch(fullscreenVisible, (v) => {
   if (!v) {
     if (fullGraph) {
-      fullGraph.dispose()
+      try { fullGraph.dispose() } catch { /* */ }
       fullGraph = null
     }
   }
 })
 
 onBeforeUnmount(() => {
-  thumbGraph?.dispose()
-  thumbGraph = null
-  fullGraph?.dispose()
-  fullGraph = null
+  if (thumbGraph) { try { thumbGraph.dispose() } catch { /* */ } thumbGraph = null }
+  if (fullGraph) { try { fullGraph.dispose() } catch { /* */ } fullGraph = null }
 })
 </script>
 
