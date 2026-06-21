@@ -17,7 +17,7 @@ export interface PlanConfirmRequest {
 }
 
 export interface PlanSummary {
-  spaceId: number
+  spaceId: string
   spaceName: string
   spaceType: string
   nodeCount: number
@@ -77,7 +77,7 @@ export interface PlanningSnapshot {
   pauseInfo?: PlanPauseInfo | null
   learningPlanDraft?: LearningPlanDraft | null
   spaceCreated?: {
-    spaceId: number
+    spaceId: string
     spaceName: string
   } | null
 }
@@ -131,6 +131,11 @@ export const agentApi = {
   /** 获取会话级目标规划快照——用于实时/历史会话顶部唯一执行面板 */
   getPlanningSnapshot(conversationId: string) {
     return request.get<PlanningSnapshot | null>(`/agent/conversations/${conversationId}/planning-snapshot`)
+  },
+
+  /** 获取创建某个学习空间时确认的 Agent 学习计划 */
+  getLearningPlanBySpace(spaceId: string) {
+    return request.get<LearningPlanDraft | null>(`/agent/learning-plans/by-space/${spaceId}`)
   },
 
   /** 获取 Run 的标准化 Timeline */

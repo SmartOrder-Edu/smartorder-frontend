@@ -143,6 +143,99 @@
             </div>
           </div>
 
+          <!-- Tab: Agent Plan -->
+          <div v-show="activeTab === 'plan'" class="tab-content">
+            <div class="section-header">
+              <h3>Agent 学习计划</h3>
+              <span class="task-count" v-if="planDraft">{{ planDraft.phases?.length || 0 }} 个阶段</span>
+            </div>
+
+            <div v-if="planLoading" class="plan-loading">
+              <div class="plan-skeleton"></div>
+              <div class="plan-skeleton short"></div>
+            </div>
+
+            <template v-else-if="planDraft">
+              <div class="plan-overview">
+                <div class="plan-overview-main">
+                  <span class="plan-eyebrow">用户确认的原始规划</span>
+                  <h4>{{ planDraft.spaceName }}</h4>
+                  <p>{{ planDraft.description }}</p>
+                </div>
+                <div class="plan-overview-stats">
+                  <div class="plan-stat">
+                    <strong>{{ planTotalWeeks }}</strong>
+                    <span>周</span>
+                  </div>
+                  <div class="plan-stat">
+                    <strong>{{ planKnowledgePointCount }}</strong>
+                    <span>知识点</span>
+                  </div>
+                  <div class="plan-stat">
+                    <strong>{{ planResourceCount }}</strong>
+                    <span>资源</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="plan-meta-row">
+                <span v-if="planDraft.startDate">开始：{{ planDraft.startDate }}</span>
+                <span v-if="planDraft.targetEndDate">目标完成：{{ planDraft.targetEndDate }}</span>
+              </div>
+
+              <div class="plan-goals" v-if="planDraft.goals?.length">
+                <span class="children-label">学习目标</span>
+                <span v-for="goal in planDraft.goals" :key="goal" class="goal-chip">{{ goal }}</span>
+              </div>
+
+              <div class="plan-phase-list">
+                <div
+                  v-for="phase in planDraft.phases"
+                  :key="phase.phaseIndex || phase.phaseName"
+                  class="plan-phase-card"
+                >
+                  <div class="plan-phase-head">
+                    <div>
+                      <span class="phase-index">阶段 {{ phase.phaseIndex }}</span>
+                      <h4>{{ phase.phaseName }}</h4>
+                    </div>
+                    <span class="phase-duration">{{ phase.weeks || 0 }} 周</span>
+                  </div>
+
+                  <div class="phase-section" v-if="phase.knowledgePoints?.length">
+                    <span class="children-label">知识点</span>
+                    <div class="phase-kps">
+                      <span v-for="kp in phase.knowledgePoints" :key="kp" class="kp-chip">{{ kp }}</span>
+                    </div>
+                  </div>
+
+                  <div class="phase-section" v-if="phase.resources?.length">
+                    <span class="children-label">计划资源</span>
+                    <div class="phase-resources">
+                      <div
+                        v-for="resource in phase.resources"
+                        :key="resource.resourceType + resource.title"
+                        class="phase-resource"
+                      >
+                        <span>{{ resourceIcon(resource.resourceType) }}</span>
+                        <div>
+                          <strong>{{ resource.title }}</strong>
+                          <em>{{ resourceTypeLabel(resource.resourceType) }}</em>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <el-empty v-else description="暂无 Agent 学习计划记录" :image-size="100">
+              <el-button type="primary" plain @click="$router.push({ path: '/ai-tutor', query: { action: 'create_space' } })">
+                与 Agent 重新规划
+              </el-button>
+            </el-empty>
+          </div>
+
           <!-- Tab: Path -->
           <div v-show="activeTab === 'path'" class="tab-content">
             <div class="section-header">
@@ -282,7 +375,9 @@ import TaskCard from '@/components/TaskCard.vue'
 import PathTimeline from '@/components/PathTimeline.vue'
 import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
+import { agentApi } from '@/api/agent'
 import type { RiskStatus, TaskVO } from '@/types/learningSpace'
+import type { LearningPlanDraft } from '@/types/planExecute'
 
 const route = useRoute()
 const router = useRouter()
@@ -290,12 +385,15 @@ const dashStore = useSpaceDashboardStore()
 
 const activeTab = ref('today')
 const showAddTask = ref(false)
+const planDraft = ref<LearningPlanDraft | null>(null)
+const planLoading = ref(false)
 
-const spaceId = computed(() => Number(route.params.spaceId))
+const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
 
 const tabs = [
   { id: 'today', label: '今日', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>', badge: dashboard.value?.todayTasks.length || 0 },
+  { id: 'plan', label: '计划', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>' },
   { id: 'path', label: '路径', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>' },
   { id: 'resources', label: '资源与测评', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
   { id: 'records', label: '记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>' },
@@ -309,6 +407,18 @@ const maxDuration = computed(() => {
   if (!dashboard.value?.recentRecords.length) return 60
   return Math.max(...dashboard.value.recentRecords.map(r => r.studyDurationMinutes), 30)
 })
+
+const planTotalWeeks = computed(() =>
+  (planDraft.value?.phases || []).reduce((sum, phase) => sum + (Number(phase.weeks) || 0), 0)
+)
+
+const planKnowledgePointCount = computed(() =>
+  (planDraft.value?.phases || []).reduce((sum, phase) => sum + (phase.knowledgePoints?.length || 0), 0)
+)
+
+const planResourceCount = computed(() =>
+  (planDraft.value?.phases || []).reduce((sum, phase) => sum + (phase.resources?.length || 0), 0)
+)
 
 // PathTimeline 需要的全集任务：合并今日 / 待办 / 逾期，按 id 去重
 const allTasks = computed<TaskVO[]>(() => {
@@ -374,10 +484,24 @@ function handleAgentMessage(text: string) {
   console.log('Agent message:', text, 'spaceId:', spaceId.value)
 }
 
+async function loadLearningPlan(id: string) {
+  planLoading.value = true
+  planDraft.value = null
+  try {
+    planDraft.value = await agentApi.getLearningPlanBySpace(id)
+  } catch (e) {
+    console.warn('Failed to load learning plan draft:', e)
+    planDraft.value = null
+  } finally {
+    planLoading.value = false
+  }
+}
+
 function loadDashboard() {
   const id = spaceId.value
-  if (id && !isNaN(id)) {
+  if (id) {
     dashStore.fetchDashboard(id)
+    loadLearningPlan(id)
   }
 }
 
@@ -631,6 +755,214 @@ watch(() => route.params.spaceId, () => {
   display: flex;
   gap: 10px;
   padding-top: 8px;
+}
+
+/* ========== Agent Plan ========== */
+.plan-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plan-skeleton {
+  height: 120px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+
+  &.short { height: 64px; }
+}
+
+.plan-overview {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: white;
+}
+
+.plan-overview-main {
+  flex: 1;
+  min-width: 0;
+
+  h4 {
+    margin: 4px 0 6px;
+    font-size: 1.0625rem;
+    color: #1a1a2e;
+  }
+
+  p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+}
+
+.plan-eyebrow {
+  font-size: 0.6875rem;
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.plan-overview-stats {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.plan-stat {
+  min-width: 72px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f9fafb;
+  text-align: center;
+
+  strong {
+    display: block;
+    color: #1a1a2e;
+    font-size: 1.125rem;
+    line-height: 1.2;
+  }
+
+  span {
+    color: #9ca3af;
+    font-size: 0.75rem;
+  }
+}
+
+.plan-meta-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  span {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #6b7280;
+    font-size: 0.75rem;
+  }
+}
+
+.children-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.plan-goals {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  background: white;
+
+  .children-label {
+    margin: 0 4px 0 0;
+  }
+}
+
+.goal-chip,
+.kp-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.plan-phase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plan-phase-card {
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid #f0f0f0;
+  background: white;
+}
+
+.plan-phase-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+
+  h4 {
+    margin: 3px 0 0;
+    font-size: 0.9375rem;
+    color: #1a1a2e;
+  }
+}
+
+.phase-index {
+  color: #8c8ca1;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.phase-duration {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #059669;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.phase-section + .phase-section {
+  margin-top: 14px;
+}
+
+.phase-kps {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.phase-resources {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.phase-resource {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f9fafb;
+  border: 1px solid #f3f4f6;
+
+  strong {
+    display: block;
+    color: #374151;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+
+  em {
+    display: block;
+    margin-top: 2px;
+    color: #9ca3af;
+    font-size: 0.6875rem;
+    font-style: normal;
+  }
 }
 
 /* ========== Resource Grid ========== */

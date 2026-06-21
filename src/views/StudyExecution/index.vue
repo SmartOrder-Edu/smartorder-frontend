@@ -130,7 +130,7 @@ const dashStore = useSpaceDashboardStore()
 
 const finishing = ref(false)
 
-const taskId = computed(() => Number(route.params.taskId))
+const taskId = computed(() => String(route.params.taskId || ''))
 
 const progressPercent = computed(() => {
   if (!stepStore.steps.length) return 0
@@ -188,7 +188,7 @@ function handleFinish() {
 
 onMounted(async () => {
   const id = taskId.value
-  if (id && !isNaN(id)) {
+  if (id) {
     await stepStore.fetchSteps(id)
   }
 })

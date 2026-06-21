@@ -155,7 +155,7 @@ const props = defineProps<{
   confirming?: boolean
   readonly?: boolean
   spaceCreated?: {
-    spaceId: number
+    spaceId: string
     spaceName: string
   } | null
 }>()
