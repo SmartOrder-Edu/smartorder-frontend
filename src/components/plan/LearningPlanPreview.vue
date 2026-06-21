@@ -14,6 +14,22 @@
       <span class="type-badge" :class="'type-' + learningPlan.type">{{ typeLabel }}</span>
     </div>
 
+    <div v-if="spaceCreated" class="space-created-banner">
+      <div class="space-created-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+      </div>
+      <div class="space-created-text">
+        <span class="space-created-title">学习空间已创建</span>
+        <span class="space-created-name">{{ spaceCreated.spaceName || learningPlan.spaceName }}</span>
+      </div>
+      <router-link :to="`/space/${spaceCreated.spaceId}`" class="space-created-link">
+        进入学习空间
+      </router-link>
+    </div>
+
     <!-- 基本信息区 -->
     <div class="preview-body">
       <p class="plan-description">{{ learningPlan.description }}</p>
@@ -116,10 +132,10 @@
 
     <!-- 确认按钮 -->
     <div class="preview-footer">
-      <button class="cancel-btn" @click="$emit('cancel')" :disabled="confirming">
+      <button class="cancel-btn" @click="$emit('cancel')" :disabled="confirming || readonly">
         不满意，重新规划
       </button>
-      <button class="confirm-btn" @click="$emit('confirm')" :disabled="confirming">
+      <button class="confirm-btn" @click="$emit('confirm')" :disabled="confirming || readonly">
         <svg v-if="!confirming" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
@@ -137,6 +153,11 @@ import type { LearningPlanDraft } from '@/types/planExecute'
 const props = defineProps<{
   learningPlan: LearningPlanDraft
   confirming?: boolean
+  readonly?: boolean
+  spaceCreated?: {
+    spaceId: number
+    spaceName: string
+  } | null
 }>()
 
 defineEmits<{
@@ -240,6 +261,66 @@ function getUniqueCategories() {
 
 .preview-body {
   padding: 10px 14px;
+}
+
+.space-created-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 14px 0;
+  padding: 10px 12px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-md, 0.5rem);
+}
+
+.space-created-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.space-created-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.space-created-title {
+  font-size: 0.625rem;
+  color: #059669;
+  font-weight: 600;
+}
+
+.space-created-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dark, #0f172a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space-created-link {
+  padding: 6px 10px;
+  border-radius: var(--radius-md, 0.5rem);
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.space-created-link:hover {
+  background: rgba(16, 185, 129, 0.2);
 }
 
 .plan-description {

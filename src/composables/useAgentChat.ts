@@ -149,6 +149,8 @@ function resetPlanningStateForConversation(agentStore: ReturnType<typeof useAgen
   agentStore.planNeedsConfirmation = false
   agentStore.learningPlanDraft = null
   agentStore.showLearningPlanPreview = false
+  agentStore.learningPlanPreviewReadonly = false
+  agentStore.learningPlanSpaceCreated = null
 }
 
 function hydratePlanningSnapshot(agentStore: ReturnType<typeof useAgentStore>, snapshot: any) {
@@ -173,10 +175,17 @@ function hydratePlanningSnapshot(agentStore: ReturnType<typeof useAgentStore>, s
   }
 
   const learningDraft = normalizeLearningPlanDraft(snapshot.learningPlanDraft)
-  if (learningDraft && !snapshot.spaceCreated?.spaceId) {
+  if (learningDraft) {
     agentStore.learningPlanDraft = learningDraft
     agentStore.currentPlan = learningDraft
     agentStore.showLearningPlanPreview = true
+    agentStore.learningPlanPreviewReadonly = !!snapshot.spaceCreated?.spaceId
+    agentStore.learningPlanSpaceCreated = snapshot.spaceCreated?.spaceId
+      ? {
+          spaceId: snapshot.spaceCreated.spaceId,
+          spaceName: snapshot.spaceCreated.spaceName || learningDraft.spaceName || '',
+        }
+      : null
   }
 }
 

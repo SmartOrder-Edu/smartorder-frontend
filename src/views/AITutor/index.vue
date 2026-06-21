@@ -266,6 +266,8 @@
                     v-if="agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
                     :learning-plan="agentStore.learningPlanDraft"
                     :confirming="agentStore.planConfirmLoading"
+                    :readonly="agentStore.learningPlanPreviewReadonly"
+                    :space-created="agentStore.learningPlanSpaceCreated"
                     @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
                     @cancel="handleLearningPlanCancel"
                   />
@@ -288,6 +290,8 @@
                 <LearningPlanPreview
                   :learning-plan="agentStore.learningPlanDraft"
                   :confirming="agentStore.planConfirmLoading"
+                  :readonly="agentStore.learningPlanPreviewReadonly"
+                  :space-created="agentStore.learningPlanSpaceCreated"
                   @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
                   @cancel="handleLearningPlanCancel"
                 />

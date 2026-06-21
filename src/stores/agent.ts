@@ -111,6 +111,8 @@ export const useAgentStore = defineStore('agent', () => {
   // === 学习计划草稿状态（LEARNING_PLAN 类型） ===
   const learningPlanDraft = ref<LearningPlanDraft | null>(null)
   const showLearningPlanPreview = ref(false)
+  const learningPlanPreviewReadonly = ref(false)
+  const learningPlanSpaceCreated = ref<{ spaceId: number; spaceName: string } | null>(null)
 
   // === 网络搜索引用状态 ===
   const currentWebSearchReferences = ref<WebSearchReference[]>([])
@@ -155,6 +157,8 @@ export const useAgentStore = defineStore('agent', () => {
     // 学习计划草稿状态——每次新对话重置
     learningPlanDraft.value = null
     showLearningPlanPreview.value = false
+    learningPlanPreviewReadonly.value = false
+    learningPlanSpaceCreated.value = null
     // 网络搜索引用状态——每次新对话重置
     currentWebSearchReferences.value = []
   }
@@ -385,6 +389,8 @@ export const useAgentStore = defineStore('agent', () => {
             knowledgeGraph: plan.knowledgeGraph || { nodes: [], edges: [] },
           }
           showLearningPlanPreview.value = true
+          learningPlanPreviewReadonly.value = false
+          learningPlanSpaceCreated.value = null
           // 互斥：学习计划草稿出现时，执行计划不再需要确认。
           // 学习计划草稿的确认由 LearningPlanPreview 卡片承担，
           // 清空执行计划确认态避免 autoConfirm 等逻辑确认错对象。
@@ -754,6 +760,8 @@ export const useAgentStore = defineStore('agent', () => {
     currentPhase.value = ''
     learningPlanDraft.value = null
     showLearningPlanPreview.value = false
+    learningPlanPreviewReadonly.value = false
+    learningPlanSpaceCreated.value = null
     currentWebSearchReferences.value = []
   }
 
@@ -791,6 +799,8 @@ export const useAgentStore = defineStore('agent', () => {
     currentPhase,
     learningPlanDraft,
     showLearningPlanPreview,
+    learningPlanPreviewReadonly,
+    learningPlanSpaceCreated,
     currentWebSearchReferences,
     startNewTurn,
     handleEvent,
