@@ -10,6 +10,7 @@ import type {
   PlanPauseInfo,
   LearningPlanDraft,
 } from '@/types/planExecute'
+import type { MindMapData } from '@/types/mindMap'
 
 export type AgentRunMode = 'REACT' | 'PLAN_AND_EXECUTE'
 
@@ -57,6 +58,8 @@ export interface ChatMessage {
   references?: RagReference[]
   /** 网络搜索引用来源 */
   webSearchReferences?: WebSearchReference[]
+  /** 思维导图列表（本轮 generateMindMap 工具产出） */
+  mindMaps?: MindMapData[]
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -351,6 +354,8 @@ export function useAgentChat(scrollCallback?: () => void) {
                 timestamp: Date.now(),
                 webSearchReferences: agentStore.currentWebSearchReferences.length
                   ? [...agentStore.currentWebSearchReferences] : undefined,
+                mindMaps: agentStore.currentMindMaps.length
+                  ? [...agentStore.currentMindMaps] : undefined,
               })
             }
             agentStore.finishTurn()
@@ -969,6 +974,14 @@ export function useAgentChat(scrollCallback?: () => void) {
               }
               // Plan-and-Execute 状态由会话级 planning snapshot / agentStore 维护。
               // 历史消息只保留 traceEvents，避免同一次规划在聊天流里重建多个执行面板。
+              case 'agent.mindmap.created': {
+                const mm = evt.payload as MindMapData
+                if (mm && Array.isArray(mm.nodes) && mm.nodes.length > 0) {
+                  if (!chatMsg.mindMaps) chatMsg.mindMaps = []
+                  chatMsg.mindMaps.push(mm)
+                }
+                break
+              }
             }
           }
 

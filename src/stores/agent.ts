@@ -12,6 +12,7 @@ import type {
   PhaseInfo,
 } from '@/types/planExecute'
 import type { WebSearchReference } from '@/composables/useAgentChat'
+import type { MindMapData } from '@/types/mindMap'
 
 export interface AgentTraceEvent<T = any> {
   traceId: string
@@ -117,6 +118,9 @@ export const useAgentStore = defineStore('agent', () => {
   // === 网络搜索引用状态 ===
   const currentWebSearchReferences = ref<WebSearchReference[]>([])
 
+  // === 思维导图状态（本轮生成的思维导图列表） ===
+  const currentMindMaps = ref<MindMapData[]>([])
+
   // === 追踪面板状态 ===
   const tracePanelVisible = ref(false)
   const activeTraceId = ref<string>('')
@@ -161,6 +165,8 @@ export const useAgentStore = defineStore('agent', () => {
     learningPlanSpaceCreated.value = null
     // 网络搜索引用状态——每次新对话重置
     currentWebSearchReferences.value = []
+    // 思维导图状态——每次新对话重置
+    currentMindMaps.value = []
   }
 
   /**
@@ -400,6 +406,14 @@ export const useAgentStore = defineStore('agent', () => {
           if (currentTaskList.value) {
             currentTaskList.value.status = 'COMPLETED'
           }
+        }
+        break
+      }
+
+      case 'agent.mindmap.created': {
+        const mm = data.payload as MindMapData
+        if (mm && Array.isArray(mm.nodes) && mm.nodes.length > 0) {
+          currentMindMaps.value.push(mm)
         }
         break
       }

@@ -14,6 +14,8 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@antv/x6": "^2.19.2",
+    "@antv/x6-plugin-export": "^2.1.6",
     "@element-plus/icons-vue": "^2.3.0",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@vue-office/docx": "^1.6.3",

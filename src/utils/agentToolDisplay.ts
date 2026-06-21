@@ -28,6 +28,7 @@ const TOOL_META: Record<string, ToolDisplayMeta> = {
   generateResource:       { label: '学习资料',  icon: 'Document',    riskLevel: 'write_confirmed' },
   generateQuiz:           { label: '练习题',    icon: 'Edit',        riskLevel: 'write_confirmed' },
   webSearch:              { label: '网络搜索',  icon: 'Search',      riskLevel: 'read' },
+  generateMindMap:        { label: '思维导图',  icon: 'Connection',  riskLevel: 'read' },
   // 兼容旧名字（LangChain4j @Tool 注册名）
   profile_tool:           { label: '学习画像',  icon: 'User',        riskLevel: 'read' },
   knowledge_search_tool:  { label: '知识图谱',  icon: 'Connection',  riskLevel: 'read' },
@@ -139,6 +140,11 @@ export function formatRunningText(toolName: string, args?: any): string {
         ? `正在搜索「${subject}」...`
         : '正在搜索网络...'
 
+    case 'generateMindMap':
+      return subject
+        ? `正在生成「${subject}」的思维导图...`
+        : '正在生成思维导图...'
+
     default:
       return `正在${meta.label}...`
   }
@@ -198,6 +204,11 @@ export function formatCompletedText(toolName: string, args?: any): string {
       return subject
         ? `搜索了「${subject}」`
         : '搜索了网络'
+
+    case 'generateMindMap':
+      return subject
+        ? `生成了「${subject}」的思维导图`
+        : '生成了思维导图'
 
     default:
       return `完成了${getToolDisplayMeta(toolName).label}`
@@ -304,6 +315,11 @@ export function formatResultText(toolName: string, result?: any): string | null 
       return refCount > 0 ? `参考 ${refCount} 篇资料` : '未找到相关结果'
     }
 
+    case 'generateMindMap': {
+      const count = obj.nodeCount ?? obj.nodes?.length ?? 0
+      return count > 0 ? `已生成 ${count} 个节点的思维导图` : '思维导图已生成'
+    }
+
     default: {
       // 通用 fallback：尝试提取数量信息
       const total = obj.total ?? obj.count
@@ -351,6 +367,8 @@ export function formatFailedText(toolName: string): string {
       return '出题失败'
     case 'webSearch':
       return '搜索失败'
+    case 'generateMindMap':
+      return '生成思维导图失败'
     default:
       return `${meta.label}失败`
   }

@@ -169,6 +169,14 @@
                   />
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
+                  <!-- 思维导图卡片（历史消息） -->
+                  <template v-if="msg.role === 'ai' && msg.mindMaps?.length">
+                    <MindMapCard
+                      v-for="(mm, idx) in msg.mindMaps"
+                      :key="'mm-' + idx"
+                      :data="mm"
+                    />
+                  </template>
                   <template v-else>
                     <p class="message-text">{{ msg.content }}</p>
                     <div v-if="msg.attachmentFileIds?.length" class="message-attachment-hint">
@@ -260,6 +268,14 @@
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
+                  <!-- 思维导图卡片（流式实时展示） -->
+                  <template v-if="agentStore.currentMindMaps?.length">
+                    <MindMapCard
+                      v-for="(mm, idx) in agentStore.currentMindMaps"
+                      :key="'mm-live-' + idx"
+                      :data="mm"
+                    />
+                  </template>
 
                   <!-- 学习计划预览（LEARNING_PLAN 草稿审阅） -->
                   <LearningPlanPreview
@@ -561,6 +577,7 @@ import LearningPlanPreview from '@/components/plan/LearningPlanPreview.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import WebSearchSources from '@/components/agent/WebSearchSources.vue'
+import MindMapCard from '@/components/agent/MindMapCard.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
