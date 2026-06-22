@@ -1556,8 +1556,8 @@ watch(windowWidth, (newWidth) => {
 }
 
 .chat-flow::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 3px;
+  height: 3px;
 }
 
 .chat-flow::-webkit-scrollbar-track {
@@ -1566,10 +1566,8 @@ watch(windowWidth, (newWidth) => {
 
 .chat-flow::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
-  background-clip: padding-box;
-  border: 3px solid transparent;
   border-radius: 999px;
-  min-height: 24px;
+  min-height: 8px;
 }
 
 .chat-flow::-webkit-scrollbar-thumb:hover {
