@@ -102,10 +102,7 @@
               </div>
               <div class="welcome-content">
                 <h3>{{ greetingText }}</h3>
-                <p class="welcome-summary">
-                  我正在管理你的 <strong>{{ learningSpaceCount }} 个学习空间</strong>。今天你预计可用 <strong>{{ todayAvailableHours }}</strong>。
-                  {{ todayFocusText }}
-                </p>
+                <p class="welcome-summary" v-html="welcomeSummary"></p>
                 <div class="welcome-features">
                   <div class="feature-item" v-for="f in welcomeFeatures" :key="f.label" @click="sendQuickMessage(f.label)">
                     <span class="feature-icon" v-html="f.icon"></span>
@@ -541,6 +538,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAgentChat, type ChatMessage } from '@/composables/useAgentChat'
@@ -568,6 +566,7 @@ import type { RagReference } from '@/composables/useAgentChat'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
+const route = useRoute()
 
 const inputMessage = ref('')
 const chatContainer = ref<HTMLElement>()
@@ -623,6 +622,28 @@ const switchMode = (mode: 'REACT' | 'PLAN_AND_EXECUTE') => {
   currentForceMode.value = mode
 }
 
+const activeContext = ref('global')
+
+const contextOptions = ref([
+  { id: 'global', label: '全局学习', color: '#6b7280' },
+  { id: 'evaluation', label: '练习评测', color: '#ec4899' },
+  { id: 'math', label: '高等数学', color: '#3b82f6' },
+  { id: 'english', label: '英语四级', color: '#10b981' },
+  { id: 'se', label: '软件工程', color: '#f59e0b' },
+  { id: 'os', label: '操作系统', color: '#8b5cf6' }
+])
+
+const switchContext = (ctxId: string) => {
+  activeContext.value = ctxId
+  const ctx = contextOptions.value.find(c => c.id === ctxId)
+  if (ctxId === 'global') {
+    ElMessage.success('已切换到全局学习上下文。总 Agent 将为你统筹所有学习空间。')
+  } else if (ctxId === 'evaluation') {
+    ElMessage.success('已切换到"练习评测"模式。测评 Agent 将协助你进行针对性小练与错题攻坚。')
+  } else if (ctx) {
+    ElMessage.success(`已切换到"${ctx.label}"学习空间。空间 Agent 将专注于该领域的解答。`)
+  }
+}
 const greetingText = computed(() => {
   const hour = new Date().getHours()
   const name = userStore.userName || '同学'
@@ -649,28 +670,58 @@ const todayFocusText = computed(() => {
   return '高等数学和软件工程今天是重点，操作系统昨天已完成复习可以暂缓。'
 })
 
-const welcomeFeatures = [
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
-    label: '解释知识点'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-    label: '生成练习题'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
-    label: '生成思维导图'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
-    label: '整理学习笔记'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-    label: '分析薄弱点'
+const welcomeSummary = computed(() => {
+  if (activeContext.value === 'evaluation') {
+    return '我是你的测评智友。在这里，你可以让我为你进行针对性的随堂小练，或者帮你想办法吃透错题、诊断你的能力薄弱环节。准备好开始了吗？'
   }
-]
+  return `我正在管理你的 <strong>${learningSpaceCount.value} 个学习空间</strong>。今天你预计可用 <strong>${todayAvailableHours.value}</strong>。<br/>${todayFocusText.value}`
+})
+
+const welcomeFeatures = computed(() => {
+  if (activeContext.value === 'evaluation') {
+    return [
+      {
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        label: '生成微测验随堂练'
+      },
+      {
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
+        label: '诊断我的错题'
+      },
+      {
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+        label: '帮我分析薄弱知识点'
+      },
+      {
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+        label: '查看已做测评历史'
+      }
+    ]
+  }
+
+  return [
+    {
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+      label: '解释知识点'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      label: '生成练习题'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
+      label: '生成思维导图'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
+      label: '整理学习笔记'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+      label: '分析薄弱点'
+    }
+  ]
+})
 
 const inputPlaceholder = computed(() =>
   currentMode.value === 'PLAN_AND_EXECUTE'
@@ -1350,6 +1401,22 @@ onMounted(() => {
   agentStore.fetchConversations()
   if (window.innerWidth < 768) {
     historySidebarOpen.value = false
+  }
+
+  // 检测路由 query 参数，实现错题回顾快捷对话唤起
+  const action = route.query.action
+  const jobId = route.query.jobId
+  const title = route.query.title
+  if (action === 'review_wrong' && jobId) {
+    // 1. 切换上下文到练习评测
+    switchContext('evaluation')
+    // 2. 自动发起错题讲解对话
+    nextTick(() => {
+      ElMessage.info(`正在为您加载 "${title || '本次'}" 测评的错题回顾...`)
+      setTimeout(() => {
+        sendQuickMessage(`分析我的测评错题，试卷ID为 ${jobId}`)
+      }, 500)
+    })
   }
 })
 
