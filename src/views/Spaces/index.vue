@@ -115,7 +115,7 @@
 
           <!-- Goal -->
           <div class="card-body" @click="$router.push(`/space/${space.id}`)">
-            <p class="card-goal" v-if="space.goal">🎯 目标：{{ space.goal }}</p>
+            <p class="card-goal" v-if="space.goal"><img src="@/assets/icons/flag.svg" class="goal-icon" alt="" /> 目标：{{ space.goal }}</p>
             <p class="card-desc" v-else-if="space.description">{{ space.description }}</p>
 
             <!-- Progress bar -->
@@ -646,14 +646,22 @@ onMounted(() => { spaceStore.fetchSpaces() })
   font-size: 0.875rem; color: #475569; margin: 0 0 20px; line-height: 1.6; 
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; 
 }
-.card-goal { 
-  font-weight: 600; 
-  color: #1e40af; 
+.card-goal {
+  font-weight: 600;
+  color: #1e40af;
   background: linear-gradient(to right, #eff6ff, #ffffff);
-  padding: 12px 16px; 
-  border-radius: 10px; 
-  border-left: 3px solid #3b82f6; 
+  padding: 12px 16px;
+  border-radius: 10px;
+  border-left: 3px solid #3b82f6;
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.goal-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex-shrink: 0;
 }
 
 /* Progress - Tech AI Style */
