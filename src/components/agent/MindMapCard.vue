@@ -487,6 +487,7 @@ onBeforeUnmount(() => {
   background: #fafbfc;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .mindmap-fullscreen-wrapper.is-fullscreen .mindmap-toolbar {
   flex-shrink: 0;
@@ -498,11 +499,15 @@ onBeforeUnmount(() => {
   border-top: 1px solid #e5e7eb;
   justify-content: center;
   flex-wrap: wrap;
+  order: 1;
 }
 .mindmap-fullscreen-wrapper.is-fullscreen .mindmap-full-canvas {
   flex: 1;
   min-height: 0;
+  width: 100%;
+  height: 100%;
   border: none;
   border-radius: 0;
+  overflow: hidden;
 }
 </style>
