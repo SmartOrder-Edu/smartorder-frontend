@@ -697,7 +697,14 @@ const startExam = (exam: any) => {
 }
 
 const reviewWrong = (exam: any) => {
-  console.log('Review wrong questions:', exam.title)
+  router.push({
+    name: 'AITutor',
+    query: {
+      action: 'review_wrong',
+      jobId: exam.id,
+      title: exam.title
+    }
+  })
 }
 
 const retakeExam = (exam: any) => {
