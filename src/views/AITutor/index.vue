@@ -1,23 +1,6 @@
 <template>
   <AppLayout>
     <div class="ai-tutor-page">
-      <!-- 对话上下文选择器 -->
-      <div class="context-switcher">
-        <span class="context-label">当前对话范围：</span>
-        <div class="context-chips">
-          <button
-            v-for="ctx in contextOptions"
-            :key="ctx.id"
-            class="context-chip"
-            :class="{ active: activeContext === ctx.id }"
-            @click="switchContext(ctx.id)"
-          >
-            <span class="chip-dot" :style="{ background: ctx.color }"></span>
-            {{ ctx.label }}
-          </button>
-        </div>
-      </div>
-
       <div class="tutor-container">
         <!-- 左侧：历史会话侧边栏 -->
         <aside class="history-sidebar" :class="{ open: historySidebarOpen }">
@@ -70,7 +53,7 @@
         </aside>
 
         <!-- 聊天区域 -->
-        <main class="chat-area">
+        <main class="chat-area" :class="{ 'sidebar-open': historySidebarOpen }">
           <div class="chat-area-top-bar">
             <button class="history-toggle-btn" @click="historySidebarOpen = !historySidebarOpen" :title="historySidebarOpen ? '收起历史' : '展开历史'">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -352,7 +335,7 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                   </svg>
-                  <span>上下文</span>
+                  <span>选择学习空间</span>
                 </button>
               </div>
               <div class="attachment-strip" v-if="attachments.length || uploadProgress.status !== 'idle'">
@@ -590,7 +573,6 @@ const chatContainer = ref<HTMLElement>()
 const chatFlowRef = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const fileInputRef = ref<HTMLInputElement>()
-const activeContext = ref('global')
 const historySidebarOpen = ref(false)
 const copiedIndex = ref<number | null>(null)
 const attachments = ref<AttachmentStatus[]>([])
@@ -640,6 +622,8 @@ const switchMode = (mode: 'REACT' | 'PLAN_AND_EXECUTE') => {
   currentForceMode.value = mode
 }
 
+const activeContext = ref('global')
+
 const contextOptions = ref([
   { id: 'global', label: '全局学习', color: '#6b7280' },
   { id: 'evaluation', label: '练习评测', color: '#ec4899' },
@@ -660,7 +644,6 @@ const switchContext = (ctxId: string) => {
     ElMessage.success(`已切换到"${ctx.label}"学习空间。空间 Agent 将专注于该领域的解答。`)
   }
 }
-
 const greetingText = computed(() => {
   const hour = new Date().getHours()
   const name = userStore.userName || '同学'
@@ -1462,59 +1445,10 @@ watch(windowWidth, (newWidth) => {
   padding: var(--spacing-xs) var(--spacing-2xl) 0;
 }
 
-/* 上下文选择器 */
-.context-switcher {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-lg);
-  background: white;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-}
-
-.context-label {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.context-chips {
-  display: flex;
-  gap: var(--spacing-xs);
-  flex-wrap: wrap;
-}
-
-.context-chip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-light);
-  background: white;
-  font-size: 0.6875rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-
-  .chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); }
-
-  &.active {
-    background: rgba(11, 183, 170, 0.08);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-    font-weight: 600;
-  }
-}
-
 .tutor-container {
   display: grid;
   grid-template-columns: auto 1fr 280px;
-  gap: var(--spacing-md);
+  gap: 0;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1529,9 +1463,12 @@ watch(windowWidth, (newWidth) => {
               opacity 0.2s ease;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: #f8fafc;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-light);
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .history-sidebar.open {
@@ -1544,7 +1481,8 @@ watch(windowWidth, (newWidth) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  min-height: 48px;
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
 }
@@ -1594,6 +1532,16 @@ watch(windowWidth, (newWidth) => {
   min-height: 0;
 }
 
+.chat-area.sidebar-open {
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.chat-area.sidebar-open .chat-area-top-bar {
+  border-top-left-radius: 0;
+}
+
 .chat-flow {
   flex: 1;
   height: 100%;
@@ -1633,6 +1581,7 @@ watch(windowWidth, (newWidth) => {
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-md);
+  min-height: 48px;
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
   background: white;
@@ -2302,6 +2251,7 @@ watch(windowWidth, (newWidth) => {
   gap: var(--spacing-md);
   min-height: 0;
   overflow-y: auto;
+  margin-left: var(--spacing-md);
 }
 
 .sidebar-section {

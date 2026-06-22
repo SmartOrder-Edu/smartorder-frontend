@@ -61,6 +61,7 @@
           :key="space.id"
           class="space-card"
           :class="space.riskStatus"
+          :style="{ '--space-bg': space.bgColor }"
         >
           <!-- Card Header -->
           <div class="card-head" @click="$router.push(`/space/${space.id}`)">
@@ -114,7 +115,7 @@
 
           <!-- Goal -->
           <div class="card-body" @click="$router.push(`/space/${space.id}`)">
-            <p class="card-goal" v-if="space.goal">🎯 目标：{{ space.goal }}</p>
+            <p class="card-goal" v-if="space.goal"><img src="@/assets/icons/flag.svg" class="goal-icon" alt="" /> 目标：{{ space.goal }}</p>
             <p class="card-desc" v-else-if="space.description">{{ space.description }}</p>
 
             <!-- Progress bar -->
@@ -439,7 +440,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
 <style scoped>
 .spaces-page {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -552,26 +553,27 @@ onMounted(() => { spaceStore.fetchSpaces() })
 .spaces-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: var(--spacing-3xl);
   min-height: 300px;
 }
 
 /* Card */
 .space-card {
-  background: #ffffff;
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: var(--space-bg, #ffffff);
+  border: 1px solid var(--border-default);
   border-radius: 20px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
 }
-.space-card:hover { 
-  transform: translateY(-6px) scale(1.01); 
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(67, 97, 238, 0.08); 
+.space-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(67, 97, 238, 0.08);
   border-color: rgba(67, 97, 238, 0.3);
+  filter: brightness(0.99);
 }
 
 /* AI Glowing Top Line */
@@ -597,7 +599,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 24px 16px;
+  padding: 20px 20px 14px;
   cursor: pointer;
 }
 .card-head-left {
@@ -636,7 +638,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
 
 /* Card Body */
 .card-body {
-  padding: 12px 24px 24px;
+  padding: 12px 20px 20px;
   cursor: pointer;
   flex: 1;
 }
@@ -644,14 +646,22 @@ onMounted(() => { spaceStore.fetchSpaces() })
   font-size: 0.875rem; color: #475569; margin: 0 0 20px; line-height: 1.6; 
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; 
 }
-.card-goal { 
-  font-weight: 600; 
-  color: #1e40af; 
+.card-goal {
+  font-weight: 600;
+  color: #1e40af;
   background: linear-gradient(to right, #eff6ff, #ffffff);
-  padding: 12px 16px; 
-  border-radius: 10px; 
-  border-left: 3px solid #3b82f6; 
+  padding: 12px 16px;
+  border-radius: 10px;
+  border-left: 3px solid #3b82f6;
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.goal-icon {
+  width: 1.1em;
+  height: 1.1em;
+  flex-shrink: 0;
 }
 
 /* Progress - Tech AI Style */
@@ -711,7 +721,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
 .card-actions {
   display: flex;
   background: rgba(248, 250, 252, 0.5);
-  padding: 16px 24px;
+  padding: 14px 20px;
   gap: 14px;
   border-top: 1px solid rgba(226, 232, 240, 0.8);
 }
@@ -770,9 +780,9 @@ onMounted(() => { spaceStore.fetchSpaces() })
 :deep(.danger-item) { color: #ef4444 !important; }
 
 /* Responsive */
-@media (max-width: 1200px) { .spaces-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 1200px) { .spaces-grid { grid-template-columns: repeat(2, 1fr); gap: var(--spacing-xl); } }
 @media (max-width: 768px) {
-  .spaces-grid { grid-template-columns: 1fr; }
+  .spaces-grid { grid-template-columns: 1fr; gap: var(--spacing-lg); }
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   .search-input { width: 100%; }
   .page-header { flex-direction: column; gap: 12px; }

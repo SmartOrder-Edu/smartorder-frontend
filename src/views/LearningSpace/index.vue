@@ -40,7 +40,7 @@
             <SpaceStatCard
               :value="dashboard.progress"
               label="完成进度"
-              emoji="📊"
+              :icon="BarChartIcon"
               bg-color="#eff6ff"
               value-color="#3b82f6"
             />
@@ -48,7 +48,7 @@
               :value="dashboard.streakDays"
               label="连续学习"
               suffix=" 天"
-              emoji="🔥"
+              :icon="FlameIcon"
               bg-color="#fef3c7"
               value-color="#d97706"
             />
@@ -56,14 +56,14 @@
               :value="dashboard.daysRemaining"
               label="剩余天数"
               suffix=" 天"
-              emoji="📅"
+              :icon="CalendarIcon"
               bg-color="#ecfdf5"
               value-color="#10b981"
             />
             <SpaceStatCard
               :value="riskLabel(dashboard.riskStatus)"
               label="风险状态"
-              emoji="⚡"
+              :icon="ZapIcon"
               bg-color="rgba(139, 92, 246, 0.08)"
               value-color="#7c3aed"
             />
@@ -371,6 +371,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SpaceStatCard from '@/components/SpaceStatCard.vue'
+import { BarChartIcon, FlameIcon, CalendarIcon, ZapIcon } from '@/assets/icons'
 import TaskCard from '@/components/TaskCard.vue'
 import PathTimeline from '@/components/PathTimeline.vue'
 import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'

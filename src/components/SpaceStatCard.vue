@@ -2,7 +2,19 @@
   <div class="stat-card" :class="{ clickable: !!to }" @click="to && $router.push(to)">
     <div class="stat-icon" :style="{ background: bgColor }">
       <slot name="icon">
-        <span class="stat-emoji">{{ emoji }}</span>
+        <svg
+          v-if="iconPaths"
+          class="stat-svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          :stroke="valueColor || 'currentColor'"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          v-html="iconPaths"
+        />
       </slot>
     </div>
     <div class="stat-body">
@@ -18,13 +30,18 @@ import { computed } from 'vue'
 const props = defineProps<{
   value: number | string
   label: string
-  emoji?: string
+  icon?: string[]
   bgColor?: string
   valueColor?: string
   suffix?: string
   to?: string
   max?: number
 }>()
+
+const iconPaths = computed(() => {
+  if (!props.icon || props.icon.length === 0) return ''
+  return props.icon.join('')
+})
 
 const formattedValue = computed(() => {
   if (props.max != null && typeof props.value === 'number') {
@@ -68,9 +85,8 @@ export default { name: 'SpaceStatCard' }
   flex-shrink: 0;
 }
 
-.stat-emoji {
-  font-size: 18px;
-  line-height: 1;
+.stat-svg {
+  display: block;
 }
 
 .stat-body {

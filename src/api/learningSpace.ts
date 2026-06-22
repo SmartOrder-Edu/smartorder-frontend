@@ -72,6 +72,7 @@ export interface LearningSpaceDisplay extends LearningSpaceVO {
   icon: string
   color: string
   colorGradient: string
+  bgColor: string
   goal: string
   streakDays: number
   todaySuggestion: string
