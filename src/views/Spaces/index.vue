@@ -61,6 +61,7 @@
           :key="space.id"
           class="space-card"
           :class="space.riskStatus"
+          :style="{ '--space-bg': space.bgColor }"
         >
           <!-- Card Header -->
           <div class="card-head" @click="$router.push(`/space/${space.id}`)">
@@ -558,7 +559,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
 
 /* Card */
 .space-card {
-  background: #ffffff;
+  background: var(--space-bg, #ffffff);
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 20px;
   overflow: hidden;
@@ -568,10 +569,11 @@ onMounted(() => { spaceStore.fetchSpaces() })
   position: relative;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
-.space-card:hover { 
-  transform: translateY(-6px) scale(1.01); 
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(67, 97, 238, 0.08); 
+.space-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(67, 97, 238, 0.08);
   border-color: rgba(67, 97, 238, 0.3);
+  filter: brightness(0.99);
 }
 
 /* AI Glowing Top Line */

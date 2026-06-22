@@ -55,6 +55,7 @@
           :key="space.id"
           class="space-card"
           :class="space.healthStatus"
+          :style="{ '--space-bg': space.bgColor }"
           @click="$router.push(`/space/${space.id}`)"
         >
           <div class="space-card-top">
@@ -497,7 +498,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 }
 
 .space-card {
-  background: white;
+  background: var(--space-bg, white);
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-light);
   overflow: hidden;
@@ -509,9 +510,10 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   &:hover {
     box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     transform: translateY(-2px);
+    filter: brightness(0.99);
   }
 
-  &.warning { border-top: 3px solid var(--warn-color); }
+  &.warning { border-top: 3px solid var(--warning-color); }
   &.danger { border-top: 3px solid var(--danger-color); }
   &.good { border-top: 3px solid var(--accent-color); }
   &.normal { border-top: 3px solid var(--primary-color); }
@@ -550,7 +552,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   font-weight: 500;
 
   &.normal { color: var(--primary-color); background: rgba(11, 183, 170, 0.06); }
-  &.warning { color: var(--warn-color); background: rgba(245, 158, 11, 0.06); }
+  &.warning { color: var(--warning-color); background: rgba(245, 158, 11, 0.06); }
   &.danger { color: var(--danger-color); background: rgba(239, 68, 68, 0.06); }
   &.good { color: var(--accent-color); background: rgba(16, 185, 129, 0.06); }
 }
