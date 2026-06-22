@@ -1456,7 +1456,7 @@ watch(windowWidth, (newWidth) => {
   &:hover { border-color: var(--primary-color); color: var(--primary-color); }
 
   &.active {
-    background: rgba(59, 91, 219, 0.08);
+    background: rgba(11, 183, 170, 0.08);
     border-color: var(--primary-color);
     color: var(--primary-color);
     font-weight: 600;
@@ -1514,7 +1514,7 @@ watch(windowWidth, (newWidth) => {
   padding: 4px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--primary-color);
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   font-size: 0.6875rem;
   font-weight: 600;
   color: var(--primary-color);
@@ -1523,7 +1523,7 @@ watch(windowWidth, (newWidth) => {
 }
 
 .new-chat-btn-sidebar:hover {
-  background: rgba(59, 91, 219, 0.12);
+  background: rgba(11, 183, 170, 0.12);
 }
 
 .history-sidebar-list {
@@ -1651,7 +1651,7 @@ watch(windowWidth, (newWidth) => {
   display: flex;
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.04), rgba(18, 184, 134, 0.04));
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.04), rgba(18, 184, 134, 0.04));
   border-radius: var(--radius-xl);
 }
 
@@ -1770,7 +1770,7 @@ watch(windowWidth, (newWidth) => {
 }
 
 .user-bubble {
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   color: var(--text-dark);
   border-bottom-right-radius: 4px;
   padding: var(--spacing-sm) var(--spacing-md);
@@ -1817,7 +1817,7 @@ watch(windowWidth, (newWidth) => {
   gap: 8px;
   padding: 8px 14px;
   margin-bottom: var(--spacing-sm);
-  background: linear-gradient(135deg, rgba(18, 184, 134, 0.06), rgba(59, 91, 219, 0.04));
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.06), rgba(11, 183, 170, 0.04));
   border: 1px solid rgba(18, 184, 134, 0.15);
   border-radius: var(--radius-lg);
   font-size: 0.8125rem;
@@ -1972,7 +1972,7 @@ watch(windowWidth, (newWidth) => {
 
 .input-composer:focus-within {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.08);
+  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.08);
 }
 
 /* 模式选择器 */
@@ -2004,7 +2004,7 @@ watch(windowWidth, (newWidth) => {
 .mode-btn:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(11, 183, 170, 0.04);
 }
 
 .mode-btn.active {
@@ -2014,8 +2014,8 @@ watch(windowWidth, (newWidth) => {
 }
 
 .mode-btn.active:hover {
-  background: #2c4fcc;
-  border-color: #2c4fcc;
+  background: #0a9e94;
+  border-color: #0a9e94;
 }
 
 .composer-toolbar {
@@ -2045,7 +2045,7 @@ watch(windowWidth, (newWidth) => {
 
 .toolbar-btn svg { width: 14px; height: 14px; }
 .toolbar-btn:hover {
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   color: var(--primary-color);
 }
 
@@ -2182,7 +2182,7 @@ watch(windowWidth, (newWidth) => {
 }
 
 .send-action.active:hover {
-  background: #2c4fcc;
+  background: #0a9e94;
   transform: scale(1.05);
 }
 
@@ -2244,7 +2244,7 @@ watch(windowWidth, (newWidth) => {
 .hint-chip:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(11, 183, 170, 0.04);
 }
 
 /* 侧边栏 */
@@ -2497,7 +2497,7 @@ watch(windowWidth, (newWidth) => {
 .rag-selector-container :deep(.rag-reference-selector .el-button svg) { color: white; }
 
 .rag-selector-container :deep(.rag-reference-selector .el-button):hover {
-  background: #2c4fcc;
+  background: #0a9e94;
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
 }
@@ -2552,8 +2552,8 @@ watch(windowWidth, (newWidth) => {
 .history-item:hover { background: var(--background-color-base); }
 
 .history-item.active {
-  background: rgba(59, 91, 219, 0.08);
-  border: 1px solid rgba(59, 91, 219, 0.15);
+  background: rgba(11, 183, 170, 0.08);
+  border: 1px solid rgba(11, 183, 170, 0.15);
 }
 
 .history-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--primary-color); flex-shrink: 0; }

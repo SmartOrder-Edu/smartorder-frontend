@@ -718,7 +718,7 @@ const handleQuickAction = (action: any) => {
   background: linear-gradient(135deg, #4f6ef6, #3b5bdb);
   color: #ffffff;
   border-top-right-radius: 6px;
-  box-shadow: 0 2px 8px rgba(59, 91, 219, 0.2);
+  box-shadow: 0 2px 8px rgba(11, 183, 170, 0.2);
 }
 
 .chat-message.ai .msg-text {

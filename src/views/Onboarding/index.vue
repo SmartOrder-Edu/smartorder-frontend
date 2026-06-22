@@ -374,7 +374,7 @@ const handleComplete = async () => {
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg,
-    rgba(59, 91, 219, 0.05) 0%,
+    rgba(11, 183, 170, 0.05) 0%,
     rgba(18, 184, 134, 0.05) 100%
   );
 }
@@ -397,7 +397,7 @@ const handleComplete = async () => {
 .onboarding-bg .blob-2 {
   width: 400px;
   height: 400px;
-  background: rgba(59, 91, 219, 0.1);
+  background: rgba(11, 183, 170, 0.1);
   bottom: -100px;
   left: -50px;
 }
@@ -598,7 +598,7 @@ const handleComplete = async () => {
 .option-card.selected {
   background: white;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1);
+  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
 }
 
 .option-card.selected .option-label {
@@ -701,7 +701,7 @@ const handleComplete = async () => {
 
 .next-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+  box-shadow: 0 8px 20px rgba(11, 183, 170, 0.3);
 }
 
 .next-btn:disabled {

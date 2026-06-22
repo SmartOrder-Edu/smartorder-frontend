@@ -408,10 +408,10 @@ const generateTasks = () => {
   height: 22px;
 }
 
-.review-icon { background: rgba(59, 91, 219, 0.1); color: var(--primary-color); }
+.review-icon { background: rgba(11, 183, 170, 0.1); color: var(--primary-color); }
 .practice-icon { background: rgba(18, 184, 134, 0.1); color: var(--accent-color); }
 .resource-icon { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); }
-.done-icon { background: rgba(59, 91, 219, 0.06); color: var(--text-secondary); }
+.done-icon { background: rgba(11, 183, 170, 0.06); color: var(--text-secondary); }
 
 .stat-info {
   display: flex;
@@ -521,7 +521,7 @@ const generateTasks = () => {
 
 .check-circle.doing {
   border-color: var(--primary-color);
-  background: rgba(59, 91, 219, 0.1);
+  background: rgba(11, 183, 170, 0.1);
 }
 
 .check-circle.done {
@@ -551,7 +551,7 @@ const generateTasks = () => {
   font-weight: 600;
 }
 
-.type-badge.review { background: rgba(59, 91, 219, 0.1); color: var(--primary-color); }
+.type-badge.review { background: rgba(11, 183, 170, 0.1); color: var(--primary-color); }
 .type-badge.practice { background: rgba(18, 184, 134, 0.1); color: var(--accent-color); }
 .type-badge.resource { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); }
 .type-badge.project { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
@@ -622,7 +622,7 @@ const generateTasks = () => {
 
 .task-tag {
   padding: 1px 8px;
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   border-radius: var(--radius-sm);
   font-size: 0.5625rem;
   color: var(--primary-color);

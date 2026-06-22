@@ -341,7 +341,7 @@ function toggleMultiSelect(value: string) {
 
 .gate-option.selected {
   border-color: var(--primary-color, #3b5bdb);
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   color: var(--primary-color, #3b5bdb);
   font-weight: 500;
 }
@@ -382,7 +382,7 @@ function toggleMultiSelect(value: string) {
 /* 只读模式（历史回放） */
 .gate-readonly-answer {
   padding: 8px 10px;
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(11, 183, 170, 0.04);
   border-radius: var(--radius-md, 0.5rem);
   font-size: 0.8125rem;
   line-height: 1.5;
