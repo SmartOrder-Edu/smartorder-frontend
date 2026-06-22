@@ -1,23 +1,6 @@
 <template>
   <AppLayout>
     <div class="ai-tutor-page">
-      <!-- 对话上下文选择器 -->
-      <div class="context-switcher">
-        <span class="context-label">当前对话范围：</span>
-        <div class="context-chips">
-          <button
-            v-for="ctx in contextOptions"
-            :key="ctx.id"
-            class="context-chip"
-            :class="{ active: activeContext === ctx.id }"
-            @click="switchContext(ctx.id)"
-          >
-            <span class="chip-dot" :style="{ background: ctx.color }"></span>
-            {{ ctx.label }}
-          </button>
-        </div>
-      </div>
-
       <div class="tutor-container">
         <!-- 左侧：历史会话侧边栏 -->
         <aside class="history-sidebar" :class="{ open: historySidebarOpen }">
@@ -355,7 +338,7 @@
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                   </svg>
-                  <span>上下文</span>
+                  <span>选择学习空间</span>
                 </button>
               </div>
               <div class="attachment-strip" v-if="attachments.length || uploadProgress.status !== 'idle'">
@@ -591,7 +574,6 @@ const chatContainer = ref<HTMLElement>()
 const chatFlowRef = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const fileInputRef = ref<HTMLInputElement>()
-const activeContext = ref('global')
 const historySidebarOpen = ref(false)
 const copiedIndex = ref<number | null>(null)
 const attachments = ref<AttachmentStatus[]>([])
@@ -639,24 +621,6 @@ const currentMode = ref<'REACT' | 'PLAN_AND_EXECUTE'>('REACT')
 const switchMode = (mode: 'REACT' | 'PLAN_AND_EXECUTE') => {
   currentMode.value = mode
   currentForceMode.value = mode
-}
-
-const contextOptions = ref([
-  { id: 'global', label: '全局学习', color: '#6b7280' },
-  { id: 'math', label: '高等数学', color: '#3b82f6' },
-  { id: 'english', label: '英语四级', color: '#10b981' },
-  { id: 'se', label: '软件工程', color: '#f59e0b' },
-  { id: 'os', label: '操作系统', color: '#8b5cf6' }
-])
-
-const switchContext = (ctxId: string) => {
-  activeContext.value = ctxId
-  const ctx = contextOptions.value.find(c => c.id === ctxId)
-  if (ctxId === 'global') {
-    ElMessage.success('已切换到全局学习上下文。总 Agent 将为你统筹所有学习空间。')
-  } else if (ctx) {
-    ElMessage.success(`已切换到"${ctx.label}"学习空间。空间 Agent 将专注于该领域的解答。`)
-  }
 }
 
 const greetingText = computed(() => {
@@ -1412,55 +1376,6 @@ watch(windowWidth, (newWidth) => {
   height: 100vh;
   margin: calc(var(--spacing-xl) * -1) calc(var(--spacing-2xl) * -1) calc(var(--spacing-xl) * -1);
   padding: var(--spacing-xs) var(--spacing-2xl) 0;
-}
-
-/* 上下文选择器 */
-.context-switcher {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-lg);
-  background: white;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-}
-
-.context-label {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.context-chips {
-  display: flex;
-  gap: var(--spacing-xs);
-  flex-wrap: wrap;
-}
-
-.context-chip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-light);
-  background: white;
-  font-size: 0.6875rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-
-  .chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); }
-
-  &.active {
-    background: rgba(11, 183, 170, 0.08);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-    font-weight: 600;
-  }
 }
 
 .tutor-container {
