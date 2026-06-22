@@ -313,7 +313,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 <style scoped lang="scss">
 .dashboard-page {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -493,8 +493,22 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 
 .space-cards-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--spacing-lg);
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-2xl);
+}
+
+@media (max-width: 1200px) {
+  .space-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-xl);
+  }
+}
+
+@media (max-width: 768px) {
+  .space-cards-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-lg);
+  }
 }
 
 .space-card {
