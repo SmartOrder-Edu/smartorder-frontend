@@ -468,9 +468,9 @@ const handleLogin = async () => {
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg,
-    rgba(59, 91, 219, 0.05) 0%,
+    rgba(11, 183, 170, 0.05) 0%,
     rgba(18, 184, 134, 0.05) 50%,
-    rgba(59, 91, 219, 0.08) 100%
+    rgba(11, 183, 170, 0.08) 100%
   );
 }
 
@@ -484,7 +484,7 @@ const handleLogin = async () => {
 .login-bg .blob-1 {
   width: 700px;
   height: 700px;
-  background: rgba(59, 91, 219, 0.15);
+  background: rgba(11, 183, 170, 0.15);
   top: -200px;
   right: -150px;
 }
@@ -514,7 +514,7 @@ const handleLogin = async () => {
 .login-bg .particle {
   position: absolute;
   bottom: -10px;
-  background: rgba(59, 91, 219, 0.2);
+  background: rgba(11, 183, 170, 0.2);
   border-radius: 50%;
   animation: floatUp 15s ease-in-out infinite;
 }
@@ -679,7 +679,7 @@ const handleLogin = async () => {
 
 .feature-tag:hover {
   border-color: var(--primary-color);
-  box-shadow: 0 4px 12px rgba(59, 91, 219, 0.1);
+  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.1);
   transform: translateY(-2px);
 }
 
@@ -923,7 +923,7 @@ const handleLogin = async () => {
 
 .login-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+  box-shadow: 0 8px 20px rgba(11, 183, 170, 0.3);
 }
 
 .login-btn:active {

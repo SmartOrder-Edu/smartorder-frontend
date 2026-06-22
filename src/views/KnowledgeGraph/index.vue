@@ -455,7 +455,7 @@ const toggleBranch = (branch: any) => {
 
 .branch-header:hover { background: var(--background-color-base); }
 .branch-header.mastered { border-left: 3px solid #12b886; }
-.branch-header.current { border-left: 3px solid #3b5bdb; background: rgba(59, 91, 219, 0.04); }
+.branch-header.current { border-left: 3px solid #3b5bdb; background: rgba(11, 183, 170, 0.04); }
 .branch-header.weak { border-left: 3px solid #f59e0b; }
 .branch-header.locked { border-left: 3px solid #cbd5e1; }
 
@@ -619,7 +619,7 @@ const toggleBranch = (branch: any) => {
 
 .prereq-tag {
   padding: 2px 10px;
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   color: var(--primary-color);
   border-radius: var(--radius-full);
   font-size: 0.6875rem;

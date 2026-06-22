@@ -1072,7 +1072,7 @@ onMounted(async () => {
 
 .user-tag {
   padding: 2px 10px;
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   color: var(--primary-color);
   border-radius: var(--radius-full);
   font-size: 0.75rem;
@@ -1170,7 +1170,7 @@ onMounted(async () => {
   border-radius: var(--radius-full);
   font-size: 0.625rem;
   font-weight: 600;
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   color: var(--primary-color);
 }
 
@@ -1214,7 +1214,7 @@ onMounted(async () => {
 
 .pref-tag {
   padding: 2px 8px;
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   border-radius: var(--radius-sm);
   font-size: 0.75rem;
   color: var(--primary-color);
@@ -1335,7 +1335,7 @@ onMounted(async () => {
 .action-tag {
   font-size: 0.625rem;
   padding: 1px 6px;
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   color: var(--primary-color);
   border-radius: var(--radius-sm);
 }
@@ -1381,7 +1381,7 @@ onMounted(async () => {
 .goal-priority.HIGH { background: rgba(239, 68, 68, 0.08); color: #ef4444; }
 .goal-priority.MEDIUM { background: rgba(245, 158, 11, 0.08); color: #f59e0b; }
 .goal-priority.LOW { background: rgba(100, 116, 139, 0.08); color: #64748b; }
-.goal-status.IN_PROGRESS { background: rgba(59, 91, 219, 0.08); color: var(--primary-color); }
+.goal-status.IN_PROGRESS { background: rgba(11, 183, 170, 0.08); color: var(--primary-color); }
 .goal-status.COMPLETED { background: rgba(16, 185, 129, 0.08); color: #10b981; }
 .goal-status.PAUSED { background: rgba(100, 116, 139, 0.08); color: #64748b; }
 
@@ -1426,7 +1426,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   padding: var(--spacing-xl);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.06), rgba(18, 184, 134, 0.06));
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.06), rgba(18, 184, 134, 0.06));
   border-radius: var(--radius-lg);
 }
 
@@ -1560,7 +1560,7 @@ onMounted(async () => {
 .intervention-tag {
   font-size: 0.625rem;
   padding: 2px 8px;
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   color: var(--primary-color);
   border-radius: var(--radius-sm);
 }
@@ -1612,7 +1612,7 @@ onMounted(async () => {
   border-radius: var(--radius-full);
 }
 
-.sp-status.normal { color: var(--primary-color); background: rgba(59, 91, 219, 0.06); }
+.sp-status.normal { color: var(--primary-color); background: rgba(11, 183, 170, 0.06); }
 .sp-status.warning { color: var(--warn-color); background: rgba(245, 158, 11, 0.06); }
 .sp-status.danger { color: var(--danger-color); background: rgba(239, 68, 68, 0.06); }
 .sp-status.good { color: var(--accent-color); background: rgba(16, 185, 129, 0.06); }

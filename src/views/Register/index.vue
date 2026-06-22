@@ -423,7 +423,7 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg,
-    rgba(59, 91, 219, 0.05) 0%,
+    rgba(11, 183, 170, 0.05) 0%,
     rgba(18, 184, 134, 0.05) 100%
   );
 }
@@ -446,7 +446,7 @@ onBeforeUnmount(() => {
 .register-bg .blob-2 {
   width: 400px;
   height: 400px;
-  background: rgba(59, 91, 219, 0.1);
+  background: rgba(11, 183, 170, 0.1);
   bottom: -100px;
   left: -50px;
 }
@@ -1043,7 +1043,7 @@ onBeforeUnmount(() => {
 
 .next-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+  box-shadow: 0 8px 20px rgba(11, 183, 170, 0.3);
 }
 
 /* Agent 引导 */
@@ -1286,7 +1286,7 @@ onBeforeUnmount(() => {
 .option-card.selected {
   background: white;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1);
+  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
 }
 
 .option-card.selected .option-label {
@@ -1394,7 +1394,7 @@ onBeforeUnmount(() => {
 .self-description-input :deep(.el-textarea__inner:focus) {
   background: white;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1);
+  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
 }
 
 .self-description-input :deep(.el-textarea__inner:hover) {
@@ -1449,7 +1449,7 @@ onBeforeUnmount(() => {
 
 .btn-group .create-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+  box-shadow: 0 8px 20px rgba(11, 183, 170, 0.3);
 }
 
 /* 补充说明输入框（视觉降级） */
@@ -1473,7 +1473,7 @@ onBeforeUnmount(() => {
 .detail-input-wrapper :deep(.el-input__wrapper.is-focus) {
   background: white;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.1) !important;
+  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1) !important;
 }
 
 .detail-input-wrapper :deep(.el-input__count) {
@@ -1510,7 +1510,7 @@ onBeforeUnmount(() => {
 
 .next-question-btn:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+  box-shadow: 0 8px 20px rgba(11, 183, 170, 0.3);
 }
 
 .next-question-btn:disabled {

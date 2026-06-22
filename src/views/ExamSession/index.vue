@@ -357,7 +357,7 @@ onMounted(fetchQuestions)
 .option-button.selected,
 .judge-list button.selected {
   border-color: var(--primary-color);
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
 }
 
 .answer-panel {

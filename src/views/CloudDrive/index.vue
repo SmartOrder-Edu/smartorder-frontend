@@ -1463,8 +1463,8 @@ onBeforeUnmount(() => {
 
 .compact-storage:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(59, 91, 219, 0.08);
-  border-color: rgba(59, 91, 219, 0.2);
+  box-shadow: 0 4px 16px rgba(11, 183, 170, 0.08);
+  border-color: rgba(11, 183, 170, 0.2);
 }
 
 .compact-storage .storage-text {
