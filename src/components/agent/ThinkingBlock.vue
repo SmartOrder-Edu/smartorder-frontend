@@ -77,7 +77,7 @@ function toggleExpand() {
 }
 
 .thinking-header:hover {
-  background: rgba(59, 91, 219, 0.05);
+  background: rgba(11, 183, 170, 0.05);
 }
 
 .thinking-icon {

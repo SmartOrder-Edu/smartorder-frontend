@@ -321,7 +321,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 
 /* 画像提醒横幅 */
 .profile-reminder-banner {
-  background: linear-gradient(135deg, rgba(18, 184, 134, 0.08) 0%, rgba(59, 91, 219, 0.08) 100%);
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.08) 0%, rgba(11, 183, 170, 0.08) 100%);
   border: 1px solid rgba(18, 184, 134, 0.2);
   border-radius: var(--radius-lg);
   padding: var(--spacing-md) var(--spacing-lg);
@@ -388,8 +388,8 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 .agent-hero {
   padding: var(--spacing-xl);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%);
-  border: 1px solid rgba(59, 91, 219, 0.1);
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%);
+  border: 1px solid rgba(11, 183, 170, 0.1);
 }
 
 .agent-hero-content {
@@ -486,7 +486,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
     font-size: 0.8125rem;
     cursor: pointer;
     transition: all var(--transition-fast);
-    &:hover { background: rgba(59, 91, 219, 0.04); }
+    &:hover { background: rgba(11, 183, 170, 0.04); }
   }
 }
 
@@ -549,7 +549,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   border-radius: var(--radius-full);
   font-weight: 500;
 
-  &.normal { color: var(--primary-color); background: rgba(59, 91, 219, 0.06); }
+  &.normal { color: var(--primary-color); background: rgba(11, 183, 170, 0.06); }
   &.warning { color: var(--warn-color); background: rgba(245, 158, 11, 0.06); }
   &.danger { color: var(--danger-color); background: rgba(239, 68, 68, 0.06); }
   &.good { color: var(--accent-color); background: rgba(16, 185, 129, 0.06); }
@@ -815,7 +815,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-base);
-  &:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 91, 219, 0.3); }
+  &:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(11, 183, 170, 0.3); }
 }
 
 .why-btn {

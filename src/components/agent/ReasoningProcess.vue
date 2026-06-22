@@ -116,15 +116,15 @@ function toggleExpand() {
 .reasoning-process {
   margin-bottom: 10px;
   border-radius: 10px;
-  background: rgba(59, 91, 219, 0.035);
-  border: 1px solid rgba(59, 91, 219, 0.1);
+  background: rgba(11, 183, 170, 0.035);
+  border: 1px solid rgba(11, 183, 170, 0.1);
   overflow: hidden;
   transition: background 0.2s, border-color 0.2s;
 }
 
 .reasoning-process.streaming {
-  background: rgba(59, 91, 219, 0.055);
-  border-color: rgba(59, 91, 219, 0.16);
+  background: rgba(11, 183, 170, 0.055);
+  border-color: rgba(11, 183, 170, 0.16);
 }
 
 .reasoning-header {
@@ -142,7 +142,7 @@ function toggleExpand() {
 }
 
 .reasoning-header:hover {
-  background: rgba(59, 91, 219, 0.05);
+  background: rgba(11, 183, 170, 0.05);
 }
 
 .reasoning-icon {
@@ -226,7 +226,7 @@ function toggleExpand() {
 
 .reasoning-body {
   padding: 4px 8px 8px 8px;
-  border-top: 1px solid rgba(59, 91, 219, 0.08);
+  border-top: 1px solid rgba(11, 183, 170, 0.08);
   position: relative;
 }
 
@@ -240,8 +240,8 @@ function toggleExpand() {
   width: 1px;
   background: linear-gradient(
     to bottom,
-    rgba(59, 91, 219, 0.18) 0%,
-    rgba(59, 91, 219, 0.1) 100%
+    rgba(11, 183, 170, 0.18) 0%,
+    rgba(11, 183, 170, 0.1) 100%
   );
   pointer-events: none;
 }

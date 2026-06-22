@@ -439,7 +439,7 @@ const submitAdjust = () => {
   width: 56px;
   height: 56px;
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.1), rgba(18, 184, 134, 0.1));
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.1), rgba(18, 184, 134, 0.1));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -595,7 +595,7 @@ const submitAdjust = () => {
 .timeline-item.current .node-circle {
   background: white;
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 4px rgba(59, 91, 219, 0.15);
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.15);
 }
 
 .timeline-item.current .node-label {
@@ -624,8 +624,8 @@ const submitAdjust = () => {
 }
 
 .timeline-item.current .timeline-card {
-  background: rgba(59, 91, 219, 0.04);
-  border-color: rgba(59, 91, 219, 0.15);
+  background: rgba(11, 183, 170, 0.04);
+  border-color: rgba(11, 183, 170, 0.15);
 }
 
 .timeline-item:hover .timeline-card {
@@ -654,7 +654,7 @@ const submitAdjust = () => {
 }
 
 .card-badge.learning {
-  background: rgba(59, 91, 219, 0.1);
+  background: rgba(11, 183, 170, 0.1);
   color: var(--primary-color);
 }
 
@@ -691,7 +691,7 @@ const submitAdjust = () => {
 
 .card-tag {
   padding: 1px 6px;
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   border-radius: var(--radius-sm);
   font-size: 0.5625rem;
   color: var(--primary-color);

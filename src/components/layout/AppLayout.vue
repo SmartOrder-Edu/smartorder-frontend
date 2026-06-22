@@ -835,7 +835,7 @@ const handleLogout = async () => {
 }
 
 .nav-section-action:hover {
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   color: var(--primary-color);
 }
 
@@ -947,7 +947,7 @@ const handleLogout = async () => {
 .nav-add-space:hover {
   color: var(--primary-color);
   border-color: var(--primary-color);
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(11, 183, 170, 0.04);
 }
 
 /* 收起时的迷你空间 */

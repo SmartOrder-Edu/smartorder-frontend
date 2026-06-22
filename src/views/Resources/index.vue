@@ -505,9 +505,9 @@ const generateResource = () => {
 .visual-card {
   width: 160px;
   height: 160px;
-  background: rgba(59, 91, 219, 0.2);
+  background: rgba(11, 183, 170, 0.2);
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(59, 91, 219, 0.3);
+  border: 1px solid rgba(11, 183, 170, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -518,7 +518,7 @@ const generateResource = () => {
 .card-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, rgba(59, 91, 219, 0.3), transparent 70%);
+  background: radial-gradient(circle at center, rgba(11, 183, 170, 0.3), transparent 70%);
   animation: glowPulse 3s ease-in-out infinite;
 }
 
@@ -604,7 +604,7 @@ const generateResource = () => {
   justify-content: center;
 }
 
-.card-type-icon.doc { background: rgba(59, 91, 219, 0.08); color: var(--primary-color); }
+.card-type-icon.doc { background: rgba(11, 183, 170, 0.08); color: var(--primary-color); }
 .card-type-icon.mindmap { background: rgba(18, 184, 134, 0.08); color: var(--accent-color); }
 .card-type-icon.video { background: rgba(245, 158, 11, 0.08); color: var(--warning-color); }
 .card-type-icon.quiz { background: rgba(168, 85, 247, 0.08); color: #a855f7; }
@@ -656,7 +656,7 @@ const generateResource = () => {
 }
 
 .card-reason {
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(11, 183, 170, 0.04);
   border-radius: var(--radius-md);
   padding: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
@@ -676,7 +676,7 @@ const generateResource = () => {
 
 .card-tag {
   padding: 2px 8px;
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   border-radius: var(--radius-sm);
   font-size: 0.5625rem;
   color: var(--primary-color);

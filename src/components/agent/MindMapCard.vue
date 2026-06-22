@@ -28,29 +28,31 @@
       class="mindmap-dialog"
       append-to-body
     >
-      <div ref="fullscreenWrapperRef" class="mindmap-fullscreen-wrapper" :class="{ 'is-fullscreen': isFullscreen }">
-        <div class="mindmap-toolbar">
-          <el-button size="small" @click="fitView">
-            <el-icon><Aim /></el-icon><span>适应屏幕</span>
-          </el-button>
-          <el-button size="small" @click="zoomOut">
-            <el-icon><ZoomOut /></el-icon><span>缩小</span>
-          </el-button>
-          <el-button size="small" @click="zoomIn">
-            <el-icon><ZoomIn /></el-icon><span>放大</span>
-          </el-button>
-          <el-button size="small" @click="exportPNG">
-            <el-icon><Picture /></el-icon><span>导出 PNG</span>
-          </el-button>
-          <el-button size="small" @click="exportSVG">
-            <el-icon><Download /></el-icon><span>导出 SVG</span>
-          </el-button>
-          <el-button size="small" @click="toggleFullscreen">
-            <el-icon><FullScreen /></el-icon><span>{{ isFullscreen ? '退出全屏' : '全屏' }}</span>
-          </el-button>
+      <Teleport to="body" :disabled="!isFullscreen">
+        <div ref="fullscreenWrapperRef" class="mindmap-fullscreen-wrapper" :class="{ 'is-fullscreen': isFullscreen }">
+          <div class="mindmap-toolbar">
+            <el-button size="small" @click="fitView">
+              <el-icon><Aim /></el-icon><span>适应屏幕</span>
+            </el-button>
+            <el-button size="small" @click="zoomOut">
+              <el-icon><ZoomOut /></el-icon><span>缩小</span>
+            </el-button>
+            <el-button size="small" @click="zoomIn">
+              <el-icon><ZoomIn /></el-icon><span>放大</span>
+            </el-button>
+            <el-button size="small" @click="exportPNG">
+              <el-icon><Picture /></el-icon><span>导出 PNG</span>
+            </el-button>
+            <el-button size="small" @click="exportSVG">
+              <el-icon><Download /></el-icon><span>导出 SVG</span>
+            </el-button>
+            <el-button size="small" @click="toggleFullscreen">
+              <el-icon><FullScreen /></el-icon><span>{{ isFullscreen ? '退出全屏' : '全屏' }}</span>
+            </el-button>
+          </div>
+          <div ref="fullContainerRef" class="mindmap-full-canvas"></div>
         </div>
-        <div ref="fullContainerRef" class="mindmap-full-canvas"></div>
-      </div>
+      </Teleport>
     </el-dialog>
   </div>
 </template>
@@ -298,8 +300,12 @@ function onFullscreenChange() {
 function toggleFullscreen() {
   if (!fullscreenWrapperRef.value) return
   if (!isFullscreen.value) {
-    fullscreenWrapperRef.value.requestFullscreen().catch((err) => {
-      console.warn('[MindMapCard] 进入全屏失败:', err)
+    isFullscreen.value = true
+    // 等待 Teleport 将 wrapper 移至 body 后再请求浏览器全屏
+    nextTick(() => {
+      fullscreenWrapperRef.value?.requestFullscreen().catch((err) => {
+        console.warn('[MindMapCard] 进入全屏失败:', err)
+      })
     })
   } else {
     document.exitFullscreen().catch((err) => {
@@ -487,6 +493,7 @@ onBeforeUnmount(() => {
   background: #fafbfc;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 .mindmap-fullscreen-wrapper.is-fullscreen .mindmap-toolbar {
   flex-shrink: 0;
@@ -498,11 +505,15 @@ onBeforeUnmount(() => {
   border-top: 1px solid #e5e7eb;
   justify-content: center;
   flex-wrap: wrap;
+  order: 1;
 }
 .mindmap-fullscreen-wrapper.is-fullscreen .mindmap-full-canvas {
   flex: 1;
   min-height: 0;
+  width: 100%;
+  height: 100%;
   border: none;
   border-radius: 0;
+  overflow: hidden;
 }
 </style>

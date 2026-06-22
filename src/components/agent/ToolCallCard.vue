@@ -279,7 +279,7 @@ const formattedDuration = computed(() => {
 /* 网络搜索来源（内联，仅标题） */
 .tool-search-refs {
   padding: 0 8px 6px 34px;
-  border-top: 1px solid rgba(59, 91, 219, 0.06);
+  border-top: 1px solid rgba(11, 183, 170, 0.06);
   margin-top: 2px;
 }
 
@@ -304,7 +304,7 @@ const formattedDuration = computed(() => {
 }
 
 .search-ref-item:hover {
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(11, 183, 170, 0.04);
 }
 
 .search-ref-index {

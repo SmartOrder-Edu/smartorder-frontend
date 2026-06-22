@@ -1161,7 +1161,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 .tab-item:not(.active) .tab-count {
-  background: rgba(59, 91, 219, 0.1);
+  background: rgba(11, 183, 170, 0.1);
   color: var(--primary-color);
 }
 
@@ -1213,7 +1213,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   color: var(--accent-color);
 }
 .status-badge.available {
-  background: rgba(59, 91, 219, 0.1);
+  background: rgba(11, 183, 170, 0.1);
   color: var(--primary-color);
 }
 .status-badge.ongoing {
@@ -1490,7 +1490,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   align-self: start;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(59, 91, 219, 0.06), rgba(18, 184, 134, 0.05));
+  background: linear-gradient(180deg, rgba(11, 183, 170, 0.06), rgba(18, 184, 134, 0.05));
   padding: var(--spacing-lg);
 }
 
@@ -1565,7 +1565,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
 .token-preview-item {
   padding: var(--spacing-xs) var(--spacing-sm);
-  border-left: 2px solid rgba(59, 91, 219, 0.4);
+  border-left: 2px solid rgba(11, 183, 170, 0.4);
   background: rgba(255, 255, 255, 0.68);
 }
 

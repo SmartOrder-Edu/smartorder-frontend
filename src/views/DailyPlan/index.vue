@@ -301,8 +301,8 @@ const doRedistribute = () => {
 .agent-summary {
   padding: var(--spacing-xl);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%);
-  border: 1px solid rgba(59, 91, 219, 0.1);
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%);
+  border: 1px solid rgba(11, 183, 170, 0.1);
 }
 
 .agent-header {
@@ -485,7 +485,7 @@ const doRedistribute = () => {
 }
 
 .strategy-btn.active {
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   border-color: var(--primary-color);
   color: var(--primary-color);
   font-weight: 500;
@@ -517,7 +517,7 @@ const doRedistribute = () => {
   cursor: pointer;
   transition: all var(--transition-fast);
 
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); background: rgba(59, 91, 219, 0.02); }
+  &:hover { border-color: var(--primary-color); color: var(--primary-color); background: rgba(11, 183, 170, 0.02); }
 
   &.primary {
     background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
@@ -652,7 +652,7 @@ const doRedistribute = () => {
 
   &.todo { color: var(--text-muted); background: var(--background-color-base); }
   &.delayed { color: var(--danger-color); background: rgba(239, 68, 68, 0.06); }
-  &.doing { color: var(--primary-color); background: rgba(59, 91, 219, 0.06); }
+  &.doing { color: var(--primary-color); background: rgba(11, 183, 170, 0.06); }
   &.done { color: var(--accent-color); background: rgba(16, 185, 129, 0.06); }
 }
 

@@ -200,7 +200,7 @@ export default { name: 'SpaceAgentPanel' }
   border: none;
   color: white;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(59, 91, 219, 0.3);
+  box-shadow: 0 4px 16px rgba(11, 183, 170, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
