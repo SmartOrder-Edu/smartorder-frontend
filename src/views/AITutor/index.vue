@@ -70,7 +70,7 @@
         </aside>
 
         <!-- 聊天区域 -->
-        <main class="chat-area">
+        <main class="chat-area" :class="{ 'sidebar-open': historySidebarOpen }">
           <div class="chat-area-top-bar">
             <button class="history-toggle-btn" @click="historySidebarOpen = !historySidebarOpen" :title="historySidebarOpen ? '收起历史' : '展开历史'">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1466,7 +1466,7 @@ watch(windowWidth, (newWidth) => {
 .tutor-container {
   display: grid;
   grid-template-columns: auto 1fr 280px;
-  gap: var(--spacing-md);
+  gap: 0;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1481,9 +1481,12 @@ watch(windowWidth, (newWidth) => {
               opacity 0.2s ease;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: #f8fafc;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-light);
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .history-sidebar.open {
@@ -1496,7 +1499,8 @@ watch(windowWidth, (newWidth) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  min-height: 48px;
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
 }
@@ -1546,6 +1550,16 @@ watch(windowWidth, (newWidth) => {
   min-height: 0;
 }
 
+.chat-area.sidebar-open {
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.chat-area.sidebar-open .chat-area-top-bar {
+  border-top-left-radius: 0;
+}
+
 .chat-flow {
   flex: 1;
   height: 100%;
@@ -1585,6 +1599,7 @@ watch(windowWidth, (newWidth) => {
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-md);
+  min-height: 48px;
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
   background: white;
@@ -2254,6 +2269,7 @@ watch(windowWidth, (newWidth) => {
   gap: var(--spacing-md);
   min-height: 0;
   overflow-y: auto;
+  margin-left: var(--spacing-md);
 }
 
 .sidebar-section {
