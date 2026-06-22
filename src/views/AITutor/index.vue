@@ -81,7 +81,7 @@
             </button>
             <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
           </div>
-            <div class="chat-flow">
+            <div class="chat-flow" ref="chatFlowRef">
               <div class="chat-flow-inner">
             <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
             <!-- 目标规划执行面板：会话级唯一状态区，不再作为普通聊天消息重复出现 -->
@@ -330,7 +330,7 @@
               </div>
             </div>
           </div>
-            </div>
+              </div>
           </div>
 
           <!-- 底部输入 -->
@@ -588,6 +588,7 @@ const agentStore = useAgentStore()
 
 const inputMessage = ref('')
 const chatContainer = ref<HTMLElement>()
+const chatFlowRef = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const fileInputRef = ref<HTMLInputElement>()
 const activeContext = ref('global')
@@ -611,8 +612,8 @@ const currentConvTitle = computed(() => {
 
 const scrollToBottom = () => {
   nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    if (chatFlowRef.value) {
+      chatFlowRef.value.scrollTop = chatFlowRef.value.scrollHeight
     }
   })
 }
@@ -1547,8 +1548,32 @@ watch(windowWidth, (newWidth) => {
 
 .chat-flow {
   flex: 1;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.chat-flow::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.chat-flow::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-flow::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  min-height: 24px;
+}
+
+.chat-flow::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
 }
 
 .chat-flow-inner {

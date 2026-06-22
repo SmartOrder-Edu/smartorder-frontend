@@ -268,6 +268,41 @@ ol {
   }
 }
 
+// 滑动条：作为数值输入控件，保持中性灰色，不跟随品牌主色
+.el-slider {
+  --el-slider-main-bg-color: transparent !important;
+  --el-slider-runway-bg-color: transparent !important;
+  --el-slider-stop-bg-color: transparent !important;
+  --el-slider-disabled-color: #e5e7eb !important;
+
+  .el-slider__runway {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  .el-slider__bar {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  .el-slider__stop {
+    background-color: transparent !important;
+  }
+
+  .el-slider__button {
+    border-color: #cbd5e1 !important;
+    background-color: #cbd5e1 !important;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+  }
+
+  .el-slider__button-wrapper:hover .el-slider__button,
+  .el-slider__button-wrapper.dragging .el-slider__button,
+  .el-slider__button-wrapper:focus-visible .el-slider__button {
+    border-color: #94a3b8 !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  }
+}
+
 // 输入框
 .el-input {
   .el-input__wrapper {
