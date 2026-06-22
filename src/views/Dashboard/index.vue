@@ -514,7 +514,8 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 .space-card {
   background: var(--space-bg, white);
   border-radius: var(--radius-xl);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-default);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   overflow: hidden;
   cursor: pointer;
   transition: all var(--transition-base);

@@ -560,14 +560,14 @@ onMounted(() => { spaceStore.fetchSpaces() })
 /* Card */
 .space-card {
   background: var(--space-bg, #ffffff);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  border: 1px solid var(--border-default);
   border-radius: 20px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02), inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
 }
 .space-card:hover {
   transform: translateY(-6px) scale(1.01);
