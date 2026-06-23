@@ -3,48 +3,49 @@
     <div
       v-for="(stage, idx) in stageNodes"
       :key="stage.id"
-      class="path-node"
-      :class="[stage.status, { 'has-children': expandedNodes.has(stage.id) }]"
+      class="path-node-wrapper"
+      :class="[stage.status, { 'is-last': idx === stageNodes.length - 1 }]"
     >
-      <div class="node-marker">
-        <div class="node-line" v-if="idx < stageNodes.length - 1" :class="stage.status"></div>
-        <div class="node-dot" :class="stage.status" @click="toggleNode(stage)">
-          <svg v-if="stage.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="14" height="14">
-            <polyline points="20,6 9,17 4,12"/>
-          </svg>
-          <svg v-else-if="stage.status === 'current'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
-          </svg>
-          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <rect x="3" y="3" width="18" height="18" rx="2"/>
-            <line x1="10" y1="11" x2="14" y2="11"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-          </svg>
+      <div class="path-node" :class="{ 'has-children': expandedNodes.has(stage.id) }">
+        <div class="node-marker">
+          <div class="node-dot" :class="stage.status" @click="toggleNode(stage)">
+            <svg v-if="stage.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="14" height="14">
+              <polyline points="20,6 9,17 4,12"/>
+            </svg>
+            <svg v-else-if="stage.status === 'current'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="10" y1="11" x2="14" y2="11"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+            </svg>
+          </div>
         </div>
-      </div>
 
-      <div class="node-content" @click="toggleNode(stage)">
-        <div class="node-header">
-          <span class="node-index" v-if="stage.isMilestone">阶段 {{ idx + 1 }}</span>
-          <span class="node-index sub" v-else>阶段 {{ idx + 1 }}</span>
-          <span class="node-type-badge" v-if="stage.nodeType">{{ nodeTypeLabel(stage.nodeType) }}</span>
-          <span class="node-milestone" v-if="stage.isMilestone">里程碑</span>
+        <div class="node-content" @click="toggleNode(stage)">
+          <div class="node-header">
+            <span class="node-index" v-if="stage.isMilestone">阶段 {{ idx + 1 }}</span>
+            <span class="node-index sub" v-else>阶段 {{ idx + 1 }}</span>
+            <span class="node-type-badge" v-if="stage.nodeType">{{ nodeTypeLabel(stage.nodeType) }}</span>
+            <span class="node-milestone" v-if="stage.isMilestone">里程碑</span>
+          </div>
+          <h4 class="node-title">{{ stage.title }}</h4>
+          <p class="node-desc" v-if="stage.description">{{ stage.description }}</p>
+          <div class="node-meta">
+            <span class="node-duration" v-if="stage.plannedDurationDays">计划 {{ stage.plannedDurationDays }} 天</span>
+            <span class="node-duration" v-else-if="stage.estimatedDurationMinutes">{{ stage.estimatedDurationMinutes }} 分钟</span>
+            <span class="node-difficulty" v-if="stage.difficultyLevel">难度 {{ stage.difficultyLevel }}</span>
+            <span class="node-status-tag" :class="stage.status">{{ statusLabel(stage.status) }}</span>
+            <span class="node-kp-count" v-if="getChildKps(stage.id).length">{{ getChildKps(stage.id).length }} 个知识点</span>
+          </div>
         </div>
-        <h4 class="node-title">{{ stage.title }}</h4>
-        <p class="node-desc" v-if="stage.description">{{ stage.description }}</p>
-        <div class="node-meta">
-          <span class="node-duration" v-if="stage.plannedDurationDays">计划 {{ stage.plannedDurationDays }} 天</span>
-          <span class="node-duration" v-else-if="stage.estimatedDurationMinutes">{{ stage.estimatedDurationMinutes }} 分钟</span>
-          <span class="node-difficulty" v-if="stage.difficultyLevel">难度 {{ stage.difficultyLevel }}</span>
-          <span class="node-status-tag" :class="stage.status">{{ statusLabel(stage.status) }}</span>
-          <span class="node-kp-count" v-if="getChildKps(stage.id).length">{{ getChildKps(stage.id).length }} 个知识点</span>
-        </div>
-      </div>
 
-      <div class="node-chevron" :class="{ open: expandedNodes.has(stage.id) }">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-          <polyline points="6,9 12,15 18,9"/>
-        </svg>
+        <div class="node-chevron" :class="{ open: expandedNodes.has(stage.id) }">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="6,9 12,15 18,9"/>
+          </svg>
+        </div>
       </div>
 
       <!-- Expanded children: KPs (with their own resources) + stage tasks/resources -->
@@ -167,32 +168,45 @@ export default { name: 'PathTimeline' }
   padding-left: 4px;
 }
 
+.path-node-wrapper {
+  position: relative;
+
+  &.locked { opacity: 0.45; }
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 13px;
+    top: 28px;
+    bottom: 0;
+    width: 2px;
+    background: #e5e7eb;
+  }
+
+  &.is-last::before {
+    display: none;
+  }
+
+  &.completed::before {
+    background: #10b981;
+  }
+
+  &.current::before {
+    background: linear-gradient(to bottom, #3b82f6 50%, #e5e7eb 50%);
+  }
+}
+
 .path-node {
   display: flex;
   gap: 16px;
   padding-bottom: 8px;
-  flex-wrap: wrap;
-
-  &.locked { opacity: 0.45; }
 }
 
 .node-marker {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   flex-shrink: 0;
-}
-
-.node-line {
-  position: absolute;
-  top: 28px;
-  width: 2px;
-  height: calc(100% + 8px);
-  background: #e5e7eb;
-
-  &.completed { background: #10b981; }
-  &.current { background: linear-gradient(to bottom, #3b82f6 50%, #e5e7eb 50%); }
 }
 
 .node-dot {
@@ -323,7 +337,6 @@ export default { name: 'PathTimeline' }
 
 /* Expanded children */
 .node-children {
-  flex: 1 0 100%;
   margin-left: 44px;
   padding: 12px 16px;
   margin-bottom: 16px;

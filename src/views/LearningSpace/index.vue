@@ -27,46 +27,74 @@
               </svg>
             </button>
             <div class="hero-info">
+              <span class="hero-eyebrow">学习空间</span>
               <h1 class="hero-title">{{ dashboard.space.name }}</h1>
-              <p class="hero-goal" v-if="dashboard.currentGoal">目标：{{ dashboard.currentGoal }}</p>
+              <p class="hero-goal" v-if="dashboard.currentGoal">{{ dashboard.currentGoal }}</p>
             </div>
-            <div class="hero-badge" :class="dashboard.riskStatus">
-              {{ riskLabel(dashboard.riskStatus) }}
+            <div class="hero-actions">
+              <div class="hero-badge" :class="dashboard.riskStatus">
+                <span class="hero-badge-dot"></span>
+                {{ riskLabel(dashboard.riskStatus) }}
+              </div>
+              <button class="hero-primary-action" @click="handleContinueToday">
+                <span>{{ nextTodayTask ? '继续今日学习' : '规划今日任务' }}</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                  <polyline points="12,5 19,12 12,19"/>
+                </svg>
+              </button>
             </div>
           </div>
 
-          <!-- Stats Row -->
-          <div class="stats-row">
-            <SpaceStatCard
-              :value="dashboard.progress"
-              label="完成进度"
-              :icon="BarChartIcon"
-              bg-color="#eff6ff"
-              value-color="#3b82f6"
-            />
-            <SpaceStatCard
-              :value="dashboard.streakDays"
-              label="连续学习"
-              suffix=" 天"
-              :icon="FlameIcon"
-              bg-color="#fef3c7"
-              value-color="#d97706"
-            />
-            <SpaceStatCard
-              :value="dashboard.daysRemaining"
-              label="剩余天数"
-              suffix=" 天"
-              :icon="CalendarIcon"
-              bg-color="#ecfdf5"
-              value-color="#10b981"
-            />
-            <SpaceStatCard
-              :value="riskLabel(dashboard.riskStatus)"
-              label="风险状态"
-              :icon="ZapIcon"
-              bg-color="rgba(139, 92, 246, 0.08)"
-              value-color="#7c3aed"
-            />
+          <div class="hero-dashboard">
+            <div class="progress-panel">
+              <div class="progress-ring" :style="heroProgressStyle">
+                <div class="progress-ring-inner">
+                  <strong>{{ Math.round(dashboard.progress) }}%</strong>
+                  <span>总进度</span>
+                </div>
+              </div>
+              <div class="progress-copy">
+                <span class="progress-label">今日焦点</span>
+                <strong>{{ nextTodayTask?.title || '等待 Agent 生成新的学习任务' }}</strong>
+                <p v-if="nextTodayTask?.aiSuggestion">{{ nextTodayTask.aiSuggestion }}</p>
+                <p v-else>保持节奏，按当前学习计划推进即可。</p>
+              </div>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="stats-row">
+              <SpaceStatCard
+                :value="dashboard.progress"
+                label="完成进度"
+                :icon="BarChartIcon"
+                bg-color="#e0f2fe"
+                value-color="#0284c7"
+              />
+              <SpaceStatCard
+                :value="dashboard.streakDays"
+                label="连续学习"
+                suffix=" 天"
+                :icon="FlameIcon"
+                bg-color="#fff7ed"
+                value-color="#ea580c"
+              />
+              <SpaceStatCard
+                :value="dashboard.daysRemaining"
+                label="剩余天数"
+                suffix=" 天"
+                :icon="CalendarIcon"
+                bg-color="#ecfdf5"
+                value-color="#059669"
+              />
+              <SpaceStatCard
+                :value="riskLabel(dashboard.riskStatus)"
+                label="风险状态"
+                :icon="ZapIcon"
+                bg-color="#f5f3ff"
+                value-color="#7c3aed"
+              />
+            </div>
           </div>
 
           <!-- Agent Insight Banner -->
@@ -78,7 +106,7 @@
               </svg>
             </div>
             <span class="insight-text">{{ dashboard.agentInsight }}</span>
-            <span class="insight-link">查看详情 →</span>
+            <span class="insight-link">查看建议 →</span>
           </div>
         </div>
       </section>
@@ -392,13 +420,13 @@ const planLoading = ref(false)
 const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
 
-const tabs = [
+const tabs = computed(() => [
   { id: 'today', label: '今日', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>', badge: dashboard.value?.todayTasks.length || 0 },
-  { id: 'plan', label: '计划', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>' },
-  { id: 'path', label: '路径', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>' },
-  { id: 'resources', label: '资源与测评', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
-  { id: 'records', label: '记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>' },
-]
+  { id: 'plan', label: '计划', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>', badge: planDraft.value?.phases?.length || 0 },
+  { id: 'path', label: '路径', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>', badge: dashboard.value?.pathProgress?.totalNodes || 0 },
+  { id: 'resources', label: '资源与测评', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>', badge: dashboard.value?.resources.length || 0 },
+  { id: 'records', label: '记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>', badge: dashboard.value?.recentRecords.length || 0 },
+])
 
 const weaknesses = ['洛必达法则适用条件', '无穷小阶数比较', '间断点分类']
 
@@ -407,6 +435,18 @@ const themeGradient = computed(() => 'linear-gradient(135deg, #3b82f6 0%, #2563e
 const maxDuration = computed(() => {
   if (!dashboard.value?.recentRecords.length) return 60
   return Math.max(...dashboard.value.recentRecords.map(r => r.studyDurationMinutes), 30)
+})
+
+const nextTodayTask = computed(() => {
+  const tasks = dashboard.value?.todayTasks || []
+  return tasks.find(t => t.status === 'in_progress') || tasks.find(t => t.status === 'pending') || tasks[0]
+})
+
+const heroProgressStyle = computed(() => {
+  const progress = Math.min(Math.max(Number(dashboard.value?.progress || 0), 0), 100)
+  return {
+    background: `conic-gradient(#0bb7aa ${progress * 3.6}deg, rgba(226, 232, 240, 0.75) 0deg)`,
+  }
 })
 
 const planTotalWeeks = computed(() =>
@@ -473,6 +513,19 @@ async function handleCompleteTask(task: TaskVO) {
   } catch {
     // cancelled
   }
+}
+
+function handleContinueToday() {
+  const task = nextTodayTask.value
+  if (!task) {
+    router.push({ path: '/ai-tutor', query: { action: 'adjust_today', spaceId: spaceId.value } })
+    return
+  }
+  if (task.status === 'pending') {
+    handleStartTask(task)
+    return
+  }
+  router.push(`/study/${task.id}`)
 }
 
 function handleAgentQuickAction(label: string) {
@@ -1129,5 +1182,520 @@ watch(() => route.params.spaceId, () => {
   font-size: 0.75rem;
   flex: 1;
   text-align: right;
+}
+
+/* ========== Refined Learning Space Experience ========== */
+.learning-space-page {
+  max-width: 1480px;
+  gap: 24px;
+  padding-bottom: 24px;
+}
+
+.space-hero {
+  border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
+.space-hero::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 21px;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(11, 183, 170, 0.18), transparent 30%),
+    radial-gradient(circle at 88% 18%, rgba(59, 130, 246, 0.15), transparent 28%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.9));
+  pointer-events: none;
+}
+
+.hero-bg {
+  opacity: 0.22;
+  filter: saturate(130%);
+}
+
+.hero-content {
+  padding: 26px;
+  background: rgba(255, 255, 255, 0.74);
+  border-color: rgba(148, 163, 184, 0.22);
+  border-radius: 22px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.hero-top {
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.back-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border-color: rgba(148, 163, 184, 0.24);
+  color: #475569;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+}
+
+.back-btn:hover {
+  background: #ecfdfb;
+  color: #0a9e94;
+  border-color: rgba(11, 183, 170, 0.28);
+  transform: translateX(-2px);
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 5px;
+  color: #0a9e94;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.hero-title {
+  font-size: clamp(1.55rem, 2vw, 2.15rem);
+  color: #0f172a;
+  letter-spacing: 0;
+}
+
+.hero-goal {
+  max-width: 720px;
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.hero-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.hero-badge.good,
+.hero-badge.normal {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.18);
+}
+
+.hero-badge.warning {
+  background: #fffbeb;
+  color: #d97706;
+  border-color: rgba(245, 158, 11, 0.22);
+}
+
+.hero-badge.danger {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.hero-primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 700;
+  box-shadow: 0 14px 28px rgba(11, 183, 170, 0.24);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.hero-primary-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px rgba(11, 183, 170, 0.28);
+}
+
+.hero-dashboard {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.88fr) minmax(420px, 1.12fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.progress-panel {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  padding: 18px;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(236, 253, 251, 0.78));
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.progress-ring {
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  padding: 10px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
+.progress-ring-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+}
+
+.progress-ring-inner strong {
+  color: #0f172a;
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.progress-ring-inner span {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.progress-copy {
+  min-width: 0;
+}
+
+.progress-label {
+  color: #0a9e94;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.progress-copy strong {
+  display: block;
+  margin-top: 5px;
+  color: #1e293b;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.progress-copy p {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.agent-insight-banner {
+  margin-top: 16px;
+  padding: 13px 15px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(11, 183, 170, 0.15);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+}
+
+.agent-insight-banner:hover {
+  border-color: rgba(11, 183, 170, 0.35);
+  transform: translateY(-1px);
+}
+
+.insight-icon {
+  background: linear-gradient(135deg, #ecfdfb, #e0f2fe);
+  color: #0a9e94;
+}
+
+.insight-text {
+  color: #334155;
+}
+
+.insight-link {
+  color: #0a9e94;
+  font-weight: 700;
+}
+
+.page-body {
+  gap: 22px;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-nav {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  gap: 6px;
+  padding: 6px;
+  margin-bottom: 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(14px);
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  overflow-x: auto;
+}
+
+.tab-btn {
+  min-height: 38px;
+  padding: 8px 16px;
+  border-radius: 11px;
+  color: #64748b;
+}
+
+.tab-btn:hover {
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.tab-btn.active {
+  color: #0a9e94;
+  background: #ecfdfb;
+  box-shadow: inset 0 0 0 1px rgba(11, 183, 170, 0.15);
+}
+
+.tab-badge {
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.tab-btn.active .tab-badge {
+  background: rgba(11, 183, 170, 0.14);
+  color: #0a9e94;
+}
+
+.tab-content {
+  padding: 20px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
+}
+
+.section-header {
+  margin-bottom: 8px;
+}
+
+.section-header h3 {
+  color: #0f172a;
+  font-size: 1.05rem;
+}
+
+.task-count {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.task-count.danger {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.task-list {
+  gap: 12px;
+}
+
+.quick-actions-row {
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.plan-overview,
+.plan-goals,
+.plan-phase-card,
+.resource-card,
+.assessment-summary,
+.record-row {
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+}
+
+.plan-overview {
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ffffff, #f8fafc);
+}
+
+.plan-stat {
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.plan-phase-card {
+  border-radius: 16px;
+}
+
+.resource-grid {
+  gap: 14px;
+}
+
+.resource-card {
+  border-radius: 16px;
+}
+
+.resource-card:hover {
+  border-color: rgba(11, 183, 170, 0.24);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
+}
+
+.records-chart {
+  padding: 18px 14px 12px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.bar-wrapper {
+  background: #e2e8f0;
+}
+
+.bar-fill {
+  background: linear-gradient(to top, #0bb7aa, #38bdf8);
+}
+
+@media (max-width: 1200px) {
+  .page-body {
+    flex-direction: column;
+  }
+
+  .main-content {
+    width: 100%;
+  }
+}
+
+@media (max-width: 980px) {
+  .hero-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-actions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .learning-space-page {
+    gap: 16px;
+  }
+
+  .hero-content,
+  .tab-content {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .space-hero {
+    border-radius: 18px;
+  }
+
+  .hero-top {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+  }
+
+  .hero-actions {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .progress-panel {
+    align-items: flex-start;
+  }
+
+  .progress-ring {
+    width: 94px;
+    height: 94px;
+  }
+
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+
+  .tab-nav {
+    margin-bottom: 14px;
+  }
+
+  .tab-btn {
+    flex: 0 0 auto;
+  }
+
+  .phase-resources,
+  .resource-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assessment-summary {
+    gap: 10px;
+    justify-content: space-between;
+  }
+
+  .record-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .record-reflection {
+    width: 100%;
+    text-align: left;
+  }
+}
+
+@media (max-width: 520px) {
+  .hero-actions,
+  .quick-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero-primary-action {
+    width: 100%;
+  }
+
+  .hero-badge {
+    justify-content: center;
+  }
+
+  .progress-panel {
+    flex-direction: column;
+  }
 }
 </style>
