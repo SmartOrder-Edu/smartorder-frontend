@@ -127,7 +127,7 @@
                 <p class="task-reason">{{ task.agentReason }}</p>
                 <div class="task-footer">
                   <span class="task-status" :class="task.status">{{ statusLabel(task.status) }}</span>
-                  <button class="task-start-btn" @click="startTask(task)">开始</button>
+                  <button class="task-start-btn" @click="startTask(task)">开始这次学习</button>
                 </div>
               </div>
             </div>
@@ -180,6 +180,9 @@
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { useStudyEntry } from '@/composables/useStudyEntry'
+
+const { enterStudy, enterTodayFirst } = useStudyEntry()
 
 const userName = ref('谢同学')
 const todayStr = computed(() => {
@@ -274,11 +277,11 @@ const statusLabel = (status: string) => {
 }
 
 const startTask = (task: PlanTask) => {
-  ElMessage.success(`开始任务：${task.title}`)
+  enterStudy(task.id, { spaceId: task.spaceId, source: 'daily_plan_task' })
 }
 
 const startAllTasks = () => {
-  ElMessage.success('已为你打开今日学习流程，开始第一个任务！')
+  enterTodayFirst(tasks.value[0], 'daily_plan_total')
 }
 
 const doRedistribute = () => {
