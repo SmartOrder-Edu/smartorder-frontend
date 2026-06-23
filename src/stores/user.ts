@@ -52,8 +52,13 @@ export const useUserStore = defineStore('user', () => {
 
   async function login(email: string, password: string) {
     const response = await userApi.login({ email, password })
-    setToken(response.accessToken)
-    setShortToken(response.shortToken)
+    // 后端 Result.success(tokens.get("accessToken"), ...) 返回纯字符串，拦截器解包后也是字符串
+    if (typeof response === 'string') {
+      setToken(response)
+    } else {
+      setToken(response.accessToken)
+      setShortToken(response.shortToken)
+    }
   }
 
   async function register(params: {
