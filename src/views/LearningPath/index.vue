@@ -112,14 +112,13 @@
                 <span class="card-duration">{{ node.duration }}h</span>
               </div>
               <div class="card-actions">
-                <el-button size="small" v-if="node.isCurrent" type="primary" @click="$router.push('/study/' + node.id)">
-                  继续学习
-                </el-button>
-                <el-button size="small" v-else-if="node.status === 'completed'" @click="$router.push('/study/' + node.id)">
-                  回顾
-                </el-button>
-                <el-button size="small" v-else :disabled="node.status === 'locked'">
-                  {{ node.status === 'locked' ? '前置未完成' : '开始' }}
+                <el-button
+                  size="small"
+                  :type="actionType(node.masteryStatus)"
+                  :disabled="node.masteryStatus === 'locked'"
+                  @click="enterNode(node)"
+                >
+                  {{ actionLabel(node.masteryStatus) }}
                 </el-button>
               </div>
             </div>
@@ -279,6 +278,49 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { useStudyEntry } from '@/composables/useStudyEntry'
+import type { StudyMode } from '@/types/study'
+
+type MasteryStatus = 'unlearned' | 'weak' | 'mastered' | 'fragile' | 'locked'
+
+const { enterStudy } = useStudyEntry()
+
+/** 按掌握状态返回按钮文案 */
+function actionLabel(status: MasteryStatus): string {
+  const map: Record<MasteryStatus, string> = {
+    unlearned: '开始',
+    weak: '复习',
+    mastered: '测一下',
+    fragile: '专项突破',
+    locked: '预览',
+  }
+  return map[status] || '开始'
+}
+
+/** 按掌握状态返回按钮样式 */
+function actionType(status: MasteryStatus): '' | 'primary' | 'success' | 'warning' | 'danger' {
+  if (status === 'fragile') return 'danger'
+  if (status === 'mastered') return 'success'
+  if (status === 'weak') return 'warning'
+  return 'primary'
+}
+
+/** 按掌握状态映射学习会话模式 */
+function modeForStatus(status: MasteryStatus): StudyMode {
+  const map: Record<MasteryStatus, StudyMode> = {
+    unlearned: 'learn',
+    weak: 'review',
+    mastered: 'assessment',
+    fragile: 'breakthrough',
+    locked: 'preview',
+  }
+  return map[status] || 'learn'
+}
+
+function enterNode(node: { id: number | string; masteryStatus: MasteryStatus }) {
+  enterStudy(node.id, { mode: modeForStatus(node.masteryStatus), source: 'path_node' })
+}
+
 
 const showAdjustDialog = ref(false)
 const learningIntensity = ref(2)
@@ -308,7 +350,8 @@ const pathNodes = ref([
     week: 1,
     duration: 8,
     tags: ['概念', '历史', '体系结构'],
-    locked: false
+    locked: false,
+    masteryStatus: 'mastered' as MasteryStatus,
   },
   {
     id: 2,
@@ -321,7 +364,8 @@ const pathNodes = ref([
     week: 2,
     duration: 10,
     tags: ['进程', 'PCB', '状态转换'],
-    locked: false
+    locked: false,
+    masteryStatus: 'mastered' as MasteryStatus,
   },
   {
     id: 3,
@@ -334,7 +378,8 @@ const pathNodes = ref([
     week: 3,
     duration: 12,
     tags: ['线程', 'PV操作', '同步互斥'],
-    locked: false
+    locked: false,
+    masteryStatus: 'fragile' as MasteryStatus,
   },
   {
     id: 4,
@@ -347,7 +392,8 @@ const pathNodes = ref([
     week: 4,
     duration: 14,
     tags: ['虚拟内存', '分页', '页面置换'],
-    locked: false
+    locked: false,
+    masteryStatus: 'unlearned' as MasteryStatus,
   },
   {
     id: 5,
@@ -360,7 +406,8 @@ const pathNodes = ref([
     week: 5,
     duration: 10,
     tags: ['inode', '目录', '磁盘管理'],
-    locked: false
+    locked: false,
+    masteryStatus: 'weak' as MasteryStatus,
   },
   {
     id: 6,
@@ -373,7 +420,8 @@ const pathNodes = ref([
     week: 6,
     duration: 16,
     tags: ['项目', '综合', '实践'],
-    locked: true
+    locked: true,
+    masteryStatus: 'locked' as MasteryStatus,
   }
 ])
 

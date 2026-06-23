@@ -25,14 +25,22 @@
           </div>
         </div>
         <div class="agent-hero-right">
-          <div class="hero-time-stat">
-            <span class="time-big">2h 30m</span>
-            <span class="time-label">今日可用时间</span>
+          <div class="hero-stats-row">
+            <div class="hero-time-stat">
+              <span class="time-big">2h 30m</span>
+              <span class="time-label">今日可用时间</span>
+            </div>
+            <div class="hero-space-stat">
+              <span class="space-count">{{ spaceStore.spaceCount }}</span>
+              <span class="space-label">进行中的学习空间</span>
+            </div>
           </div>
-          <div class="hero-space-stat">
-            <span class="space-count">{{ spaceStore.spaceCount }}</span>
-            <span class="space-label">进行中的学习空间</span>
-          </div>
+          <button class="start-today-btn" @click="enterTodayFirst(priorityTasks[0], 'dashboard_hero')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <polygon points="5,3 19,12 5,21"/>
+            </svg>
+            开始今日学习
+          </button>
         </div>
       </div>
     </section>
@@ -109,7 +117,7 @@
                 进入空间
               </button>
               <button class="space-action-btn" @click.stop="startSpaceToday(space)">
-                开始今日任务
+                开始这次学习
               </button>
             </div>
           </div>
@@ -179,12 +187,12 @@
               <h4 class="task-title">{{ task.title }}</h4>
               <p class="task-reason">{{ task.reason }}</p>
             </div>
-            <button class="task-go-btn" @click="doTask(task)">开始</button>
+            <button class="task-go-btn" @click="doTask(task)">开始这次学习</button>
           </div>
         </div>
 
         <div class="start-all-bar">
-          <button class="start-all-btn" @click="$router.push('/daily-plan')">
+          <button class="start-all-btn" @click="enterTodayFirst(priorityTasks[0], 'dashboard_hero')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
               <polygon points="5,3 19,12 5,21"/>
             </svg>
@@ -258,10 +266,13 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
+import { useStudyEntry } from '@/composables/useStudyEntry'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import type { LearningSpaceDisplay } from '@/api/learningSpace'
 
 const userStore = useUserStore()
 const spaceStore = useLearningSpaceStore()
+const { enterStudy, enterTodayFirst } = useStudyEntry()
 const userName = ref(userStore.userName || '谢同学')
 const showWhyDialog = ref(false)
 const showProfileReminder = ref(true)
@@ -271,9 +282,9 @@ onMounted(() => {
 })
 
 const priorityTasks = ref([
-  { id: 't1', spaceName: '高等数学', spaceColor: '#3b82f6', title: '洛必达法则 10 道专项练习', typeName: '练习', minutes: 35, reason: '连续 3 次出错，正确率降至 40%，今日是最佳巩固窗口' },
-  { id: 't2', spaceName: '软件工程', spaceColor: '#f59e0b', title: '补齐用户故事与用例图', typeName: '项目', minutes: 45, reason: '已延期 1 天，阻塞后续原型设计' },
-  { id: 't3', spaceName: '英语四级', spaceColor: '#10b981', title: '听力精听 + 词汇复习 40 个', typeName: '复习', minutes: 20, reason: '听力持续偏弱，需保持每日训练节奏' }
+  { id: 't1', spaceId: 's1', spaceName: '高等数学', spaceColor: '#3b82f6', title: '洛必达法则 10 道专项练习', typeName: '练习', minutes: 35, reason: '连续 3 次出错，正确率降至 40%，今日是最佳巩固窗口' },
+  { id: 't2', spaceId: 's2', spaceName: '软件工程', spaceColor: '#f59e0b', title: '补齐用户故事与用例图', typeName: '项目', minutes: 45, reason: '已延期 1 天，阻塞后续原型设计' },
+  { id: 't3', spaceId: 's3', spaceName: '英语四级', spaceColor: '#10b981', title: '听力精听 + 词汇复习 40 个', typeName: '复习', minutes: 20, reason: '听力持续偏弱，需保持每日训练节奏' }
 ])
 
 const timeAllocations = ref([
@@ -297,16 +308,24 @@ const rankingReasons = ref([
   { spaceId: 'os', spaceName: '操作系统', color: '#8b5cf6', level: 'low', levelLabel: '低优先', reason: '昨日已完成进程同步与 PV 操作复习，距离截止还有 6 天，今日可暂缓。' }
 ])
 
-import type { LearningSpaceDisplay } from '@/api/learningSpace'
-
 const healthStatusLabel = (s: string) => {
   const m: Record<string, string> = { normal: '正常', warning: '需关注', danger: '有风险', good: '良好' }
   return m[s] || s
 }
 
-const doTask = (task: any) => ElMessage.success(`开始任务：${task.title}`)
+const doTask = (task: any) => {
+  enterStudy(task.id, { spaceId: task.spaceId, source: 'dashboard_priority' })
+}
 const startSpaceToday = (space: LearningSpaceDisplay) => {
-  ElMessage.success(`开始 ${space.name} 的今日任务`)
+  // 优先用空间下第一个待办任务作为本次学习会话
+  const firstTodo = space.tasks?.find(t => t.status === 'todo') || space.tasks?.[0]
+  if (firstTodo?.id) {
+    enterStudy(firstTodo.id, { spaceId: space.id, source: 'dashboard_space' })
+  } else {
+    // 该空间今日 Agent 暂未排任务，进入空间详情查看"继续学习" hero
+    ElMessage.info(`${space.name} 今日 Agent 暂未排定具体任务，已为你打开空间详情。`)
+    window.location.assign(`/space/${space.id}`)
+  }
 }
 </script>
 
@@ -435,8 +454,37 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 
 .agent-hero-right {
   display: flex;
-  gap: var(--spacing-2xl);
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
   flex-shrink: 0;
+}
+
+.hero-stats-row {
+  display: flex;
+  gap: var(--spacing-2xl);
+}
+
+.start-today-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(11, 183, 170, 0.32);
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(11, 183, 170, 0.42);
+  }
+  &:active { transform: translateY(0); }
 }
 
 .hero-time-stat, .hero-space-stat {

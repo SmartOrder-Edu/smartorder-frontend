@@ -108,6 +108,38 @@
             <span class="insight-text">{{ dashboard.agentInsight }}</span>
             <span class="insight-link">查看建议 →</span>
           </div>
+
+          <!-- 继续学习 hero 区块：本空间主入口 -->
+          <div class="continue-study-block">
+            <div class="csb-head">
+              <span class="csb-eyebrow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                  <polygon points="5,3 19,12 5,21"/>
+                </svg>
+                继续本空间学习
+              </span>
+              <span class="csb-time" v-if="nextTodayTask?.estimatedDurationMinutes">
+                预计 {{ nextTodayTask.estimatedDurationMinutes }} 分钟
+              </span>
+            </div>
+            <h2 class="csb-title">
+              {{ nextTodayTask ? `继续学习：${nextTodayTask.title}` : '今日 Agent 暂未排定具体任务' }}
+            </h2>
+            <p class="csb-judge" v-if="dashboard.agentInsight">
+              Agent 判断：{{ dashboard.agentInsight }}
+            </p>
+            <p class="csb-judge" v-else-if="nextTodayTask?.aiSuggestion">
+              Agent 判断：{{ nextTodayTask.aiSuggestion }}
+            </p>
+            <div class="csb-actions">
+              <button class="csb-btn primary" :disabled="!nextTodayTask" @click="handleStartFromHero">
+                开始学习
+              </button>
+              <button class="csb-btn" @click="handleAdjustDuration">调整时长</button>
+              <button class="csb-btn" @click="handleSimplerExplain">换个更基础的讲解</button>
+              <button class="csb-btn" @click="handleAssessFirst">先测一下</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -404,6 +436,7 @@ import TaskCard from '@/components/TaskCard.vue'
 import PathTimeline from '@/components/PathTimeline.vue'
 import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
+import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
 import type { RiskStatus, TaskVO } from '@/types/learningSpace'
 import type { LearningPlanDraft } from '@/types/planExecute'
@@ -411,6 +444,7 @@ import type { LearningPlanDraft } from '@/types/planExecute'
 const route = useRoute()
 const router = useRouter()
 const dashStore = useSpaceDashboardStore()
+const { enterStudy } = useStudyEntry()
 
 const activeTab = ref('today')
 const showAddTask = ref(false)
@@ -493,8 +527,7 @@ function formatDateShort(date: string) {
 async function handleStartTask(task: TaskVO) {
   try {
     await dashStore.startTask(task.id)
-    ElMessage.success(`开始任务：${task.title}`)
-    router.push(`/study/${task.id}`)
+    enterStudy(task.id, { spaceId: spaceId.value, source: 'space_task' })
   } catch {
     ElMessage.error('开始任务失败')
   }
@@ -522,10 +555,49 @@ function handleContinueToday() {
     return
   }
   if (task.status === 'pending') {
-    handleStartTask(task)
+    dashStore.startTask(task.id).finally(() => {
+      enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero' })
+    })
     return
   }
-  router.push(`/study/${task.id}`)
+  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero' })
+}
+
+/** 继续学习 hero 区块的"开始学习"主按钮 */
+function handleStartFromHero() {
+  const task = nextTodayTask.value
+  if (!task) {
+    ElMessage.info('今日 Agent 暂未排定具体任务，已为你打开 AI 总学习伙伴。')
+    router.push({ path: '/ai-tutor', query: { action: 'adjust_today', spaceId: spaceId.value } })
+    return
+  }
+  if (task.status === 'pending') {
+    dashStore.startTask(task.id).catch(() => {})
+  }
+  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero' })
+}
+
+function handleAdjustDuration() {
+  ElMessage.info('Agent 已记录你的时长偏好，下次会话将据此调整（mock）。')
+}
+
+function handleSimplerExplain() {
+  const task = nextTodayTask.value
+  if (!task) {
+    ElMessage.info('暂无可调整的学习会话。')
+    return
+  }
+  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero', mode: 'learn' })
+  ElMessage.success('已为你切换到更基础的讲解节奏。')
+}
+
+function handleAssessFirst() {
+  const task = nextTodayTask.value
+  if (!task) {
+    ElMessage.info('暂无可测评的学习会话。')
+    return
+  }
+  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero', mode: 'assessment' })
 }
 
 function handleAgentQuickAction(label: string) {
@@ -1442,6 +1514,94 @@ watch(() => route.params.spaceId, () => {
 .insight-link {
   color: #0a9e94;
   font-weight: 700;
+}
+
+/* 继续学习 hero 区块 */
+.continue-study-block {
+  margin-top: 16px;
+  padding: 20px 22px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.1), rgba(2, 132, 199, 0.08));
+  border: 1px solid rgba(11, 183, 170, 0.25);
+  box-shadow: 0 10px 26px rgba(11, 183, 170, 0.12);
+
+  .csb-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .csb-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0a9e94;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    svg { color: #0bb7aa; }
+  }
+
+  .csb-time {
+    font-size: 12px;
+    color: #475569;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+
+  .csb-title {
+    margin: 6px 0 6px;
+    font-size: 19px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.35;
+  }
+
+  .csb-judge {
+    margin: 0 0 14px;
+    font-size: 13px;
+    color: #334155;
+    line-height: 1.55;
+  }
+
+  .csb-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .csb-btn {
+    padding: 8px 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    background: #fff;
+    color: #475569;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    &:hover:not(:disabled) {
+      border-color: #0bb7aa;
+      color: #0bb7aa;
+      transform: translateY(-1px);
+    }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    &.primary {
+      background: linear-gradient(135deg, #0bb7aa, #0284c7);
+      color: #fff;
+      border-color: transparent;
+      font-weight: 600;
+      box-shadow: 0 6px 16px rgba(11, 183, 170, 0.32);
+      &:hover:not(:disabled) { color: #fff; opacity: 0.92; }
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .continue-study-block .csb-btn { flex: 1 1 calc(50% - 4px); justify-content: center; }
 }
 
 .page-body {

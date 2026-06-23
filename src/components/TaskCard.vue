@@ -37,15 +37,22 @@
         class="task-btn start"
         @click.stop="$emit('start', task)"
       >
-        开始
+        开始这次学习
       </button>
-      <button
-        v-else-if="task.status === 'in_progress'"
-        class="task-btn complete"
-        @click.stop="$emit('complete', task)"
-      >
-        完成
-      </button>
+      <template v-else-if="task.status === 'in_progress'">
+        <button
+          class="task-btn continue"
+          @click.stop="$emit('start', task)"
+        >
+          继续学习
+        </button>
+        <button
+          class="task-btn complete"
+          @click.stop="$emit('complete', task)"
+        >
+          完成
+        </button>
+      </template>
       <span v-else-if="task.status === 'completed'" class="task-done-label">已完成</span>
       <span v-else-if="task.status === 'overdue'" class="task-overdue-label">已逾期</span>
     </div>
@@ -247,6 +254,15 @@ export default { name: 'TaskCard' }
     background: linear-gradient(135deg, #10b981, #059669);
     color: white;
     &:hover { transform: translateY(-1px); }
+  }
+  &.continue {
+    background: #fff;
+    color: #0bb7aa;
+    border: 1px solid rgba(11, 183, 170, 0.4);
+    &:hover {
+      background: rgba(11, 183, 170, 0.08);
+      border-color: #0bb7aa;
+    }
   }
 }
 
