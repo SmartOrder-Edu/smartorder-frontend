@@ -77,38 +77,65 @@ export default { name: 'TaskCard' }
 
 <style scoped lang="scss">
 .task-card {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  padding: 16px 20px;
-  background: white;
-  border-radius: 14px;
-  border: 1px solid #f0f0f0;
-  transition: all 0.2s;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  overflow: hidden;
 
-  &:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); }
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 14px;
+    bottom: 14px;
+    width: 3px;
+    border-radius: 0 999px 999px 0;
+    background: #cbd5e1;
+  }
+
+  &:hover {
+    border-color: rgba(11, 183, 170, 0.26);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.075);
+    transform: translateY(-1px);
+  }
 
   &.status-completed { opacity: 0.7; }
-  &.status-overdue { border-color: #fecaca; background: #fff5f5; }
+  &.status-overdue {
+    border-color: rgba(248, 113, 113, 0.34);
+    background: linear-gradient(135deg, #fff, #fff7f7);
+  }
+
+  &.status-in_progress::before { background: #0bb7aa; }
+  &.status-completed::before { background: #10b981; }
+  &.status-overdue::before { background: #ef4444; }
 }
 
 .task-status-indicator {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 2px;
 
   &.pending {
-    border: 2px solid #d0d5dd;
-    color: #d0d5dd;
+    border: 2px solid #cbd5e1;
+    color: #94a3b8;
+    background: #f8fafc;
   }
   &.in_progress {
-    background: #eff6ff;
-    border: 2px solid #3b82f6;
-    color: #3b82f6;
+    background: #ecfdfb;
+    border: 2px solid #0bb7aa;
+    color: #0a9e94;
   }
   &.completed {
     background: #10b981;
@@ -131,15 +158,16 @@ export default { name: 'TaskCard' }
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .task-type-badge {
   font-size: 0.6875rem;
-  padding: 1px 8px;
+  padding: 2px 8px;
   border-radius: 99px;
+  font-weight: 700;
 
-  &.daily { background: #eff6ff; color: #3b82f6; }
+  &.daily { background: #ecfdfb; color: #0a9e94; }
   &.milestone { background: #fef3c7; color: #d97706; }
   &.exam { background: #fce7f3; color: #db2777; }
   &.review { background: #ede9fe; color: #7c3aed; }
@@ -151,17 +179,18 @@ export default { name: 'TaskCard' }
 }
 
 .task-title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #1a1a2e;
-  margin: 0 0 4px;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 5px;
+  line-height: 1.45;
 }
 
 .task-suggestion {
-  font-size: 0.75rem;
-  color: #8c8ca1;
-  margin: 0 0 8px;
-  line-height: 1.4;
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 0 0 10px;
+  line-height: 1.55;
 }
 
 .task-meta {
@@ -172,7 +201,7 @@ export default { name: 'TaskCard' }
 
 .task-duration {
   font-size: 0.75rem;
-  color: #8c8ca1;
+  color: #64748b;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -192,26 +221,32 @@ export default { name: 'TaskCard' }
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  padding-top: 4px;
 }
 
 .task-btn {
-  padding: 6px 18px;
-  border-radius: 99px;
+  min-width: 72px;
+  padding: 7px 16px;
+  border-radius: 11px;
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.18s ease;
   border: none;
 
   &.start {
-    background: #3b82f6;
+    background: linear-gradient(135deg, #0bb7aa, #0284c7);
     color: white;
-    &:hover { background: #2563eb; }
+    box-shadow: 0 8px 18px rgba(11, 183, 170, 0.2);
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(11, 183, 170, 0.26);
+    }
   }
   &.complete {
-    background: #10b981;
+    background: linear-gradient(135deg, #10b981, #059669);
     color: white;
-    &:hover { background: #059669; }
+    &:hover { transform: translateY(-1px); }
   }
 }
 
@@ -225,5 +260,21 @@ export default { name: 'TaskCard' }
   font-size: 0.8125rem;
   color: #ef4444;
   font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .task-card {
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+
+  .task-actions {
+    width: 100%;
+    padding-left: 44px;
+  }
+
+  .task-btn {
+    width: 100%;
+  }
 }
 </style>

@@ -159,6 +159,10 @@ function sendMessage() {
   })
 }
 
+function openPanel() {
+  open.value = true
+}
+
 function mockAgentResponse(question: string): string {
   if (question.includes('薄弱')) return '根据最近的学习记录，你在**洛必达法则适用条件**上错误率较高（正确率42%），其次是**无穷小阶数比较**。建议优先完成洛必达法则专项练习。'
   if (question.includes('测试')) return '已为你生成10道极限与连续的综合测试题，涵盖洛必达法则、极限运算、连续性判定。'
@@ -178,6 +182,10 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
 })
+
+defineExpose({
+  open: openPanel,
+})
 </script>
 
 <script lang="ts">
@@ -196,11 +204,11 @@ export default { name: 'SpaceAgentPanel' }
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
   border: none;
   color: white;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(11, 183, 170, 0.3);
+  box-shadow: 0 14px 28px rgba(11, 183, 170, 0.28);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -219,9 +227,10 @@ export default { name: 'SpaceAgentPanel' }
 
 .agent-panel {
   width: 340px;
-  background: white;
-  border-radius: 16px;
-  border: 1px solid #f0f0f0;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -229,6 +238,7 @@ export default { name: 'SpaceAgentPanel' }
   position: sticky;
   top: 100px;
   overflow: hidden;
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.08);
 
   &.mobile {
     position: fixed;
@@ -251,7 +261,7 @@ export default { name: 'SpaceAgentPanel' }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 16px 0;
+  padding: 16px 16px 2px;
 }
 
 .panel-header-left {
@@ -261,26 +271,27 @@ export default { name: 'SpaceAgentPanel' }
 }
 
 .agent-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  box-shadow: 0 10px 20px rgba(11, 183, 170, 0.22);
 }
 
 .panel-title {
   display: block;
   font-size: 0.875rem;
-  font-weight: 600;
-  color: #1a1a2e;
+  font-weight: 800;
+  color: #0f172a;
 }
 
 .panel-subtitle {
   font-size: 0.6875rem;
-  color: #8c8ca1;
+  color: #64748b;
 }
 
 .panel-close {
@@ -301,13 +312,14 @@ export default { name: 'SpaceAgentPanel' }
 
   p {
     font-size: 0.8125rem;
-    color: #374151;
+    color: #334155;
     line-height: 1.6;
     margin: 0;
-    padding: 10px 12px;
-    background: #f9fafb;
-    border-radius: 10px;
-    border-left: 3px solid #3b82f6;
+    padding: 12px 13px;
+    background: linear-gradient(135deg, #ecfdfb, #f8fafc);
+    border-radius: 13px;
+    border: 1px solid rgba(11, 183, 170, 0.16);
+    border-left: 3px solid #0bb7aa;
   }
 }
 
@@ -322,24 +334,28 @@ export default { name: 'SpaceAgentPanel' }
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 10px;
-  border-radius: 99px;
-  border: 1px solid #e5e7eb;
-  background: white;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.8);
   font-size: 0.75rem;
-  color: #374151;
+  color: #334155;
   cursor: pointer;
   transition: all 0.15s;
 
-  &:hover { border-color: #3b82f6; color: #3b82f6; background: #f9fafb; }
+  &:hover {
+    border-color: rgba(11, 183, 170, 0.32);
+    color: #0a9e94;
+    background: #ecfdfb;
+  }
 }
 
 .panel-chat {
   flex: 1;
   overflow-y: auto;
   padding: 0 16px;
-  min-height: 100px;
-  max-height: 200px;
+  min-height: 130px;
+  max-height: 240px;
 }
 
 .chat-messages {
@@ -350,16 +366,17 @@ export default { name: 'SpaceAgentPanel' }
 
 .chat-msg {
   &.user .msg-content {
-    background: #eff6ff;
+    background: linear-gradient(135deg, #ecfdfb, #e0f2fe);
     border-radius: 12px 12px 4px 12px;
-    color: #1e40af;
+    color: #075985;
     margin-left: 24px;
   }
 
   &.agent .msg-content {
-    background: #f9fafb;
+    background: #f8fafc;
     border-radius: 12px 12px 12px 4px;
     margin-right: 24px;
+    border: 1px solid rgba(148, 163, 184, 0.14);
   }
 }
 
@@ -386,8 +403,8 @@ export default { name: 'SpaceAgentPanel' }
   cursor: pointer;
   transition: all 0.15s;
 
-  &.primary { background: #3b82f6; border-color: transparent; color: white; }
-  &.default:hover { border-color: #3b82f6; color: #3b82f6; }
+  &.primary { background: #0bb7aa; border-color: transparent; color: white; }
+  &.default:hover { border-color: #0bb7aa; color: #0a9e94; }
 }
 
 .chat-empty {
@@ -400,29 +417,33 @@ export default { name: 'SpaceAgentPanel' }
 .panel-input {
   display: flex;
   gap: 6px;
-  padding: 0 16px 16px;
+  padding: 2px 16px 16px;
 }
 
 .chat-input {
   flex: 1;
   padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
   font-size: 0.8125rem;
-  color: #374151;
-  background: #f9fafb;
+  color: #334155;
+  background: #f8fafc;
   outline: none;
   transition: border-color 0.15s;
 
-  &:focus { border-color: #3b82f6; background: white; }
+  &:focus {
+    border-color: #0bb7aa;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
+  }
 }
 
 .chat-send {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: 12px;
   border: none;
-  background: #3b82f6;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
   color: white;
   cursor: pointer;
   display: flex;
@@ -432,14 +453,29 @@ export default { name: 'SpaceAgentPanel' }
   transition: opacity 0.15s;
 
   &:disabled { opacity: 0.4; cursor: default; }
-  &:not(:disabled):hover { background: #2563eb; }
+  &:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(11, 183, 170, 0.2);
+  }
 }
 
 .panel-log {
   padding: 0 16px 16px;
   max-height: 180px;
   overflow-y: auto;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
   padding-top: 12px;
+}
+
+@media (max-width: 1200px) {
+  .space-agent-panel {
+    width: 100%;
+  }
+
+  .agent-panel:not(.mobile) {
+    width: 100%;
+    position: static;
+    max-height: none;
+  }
 }
 </style>
