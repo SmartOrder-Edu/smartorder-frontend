@@ -94,6 +94,67 @@ export interface CanvasContent {
   question?: PracticeQuestion
   /** Agent 临时补充讲解（由反馈触发更新） */
   agentNote?: string
+  /** v2: 分段式教学流（存在时走 Agent 教学模式，否则回退静态渲染） */
+  teachingFlow?: TeachingFlow
+}
+
+// ---- 分段式教学流（v2 Agent 主动教学交互）----
+
+/** 教学段类型 */
+export type TeachingSegmentType = 'text' | 'formula' | 'diagram' | 'quiz' | 'pause'
+
+/** 画布元素聚焦目标 */
+export interface FocusTarget {
+  /** CSS 选择器定位元素（如 .mermaid-block, .formula-block, .markdown-renderer h2） */
+  selector: string
+  /** 聚焦视觉特效 */
+  effect: 'pulse' | 'glow-border' | 'scale' | 'none'
+  /** 滚动行为 */
+  scroll: 'smooth' | 'auto' | 'none'
+}
+
+/** 画布内嵌弹题（中途检验理解） */
+export interface InlineQuiz {
+  id: string
+  prompt: string
+  answerType: 'text' | 'single_select' | 'multi_select' | 'number'
+  options?: { label: string; value: string }[]
+  correctAnswer?: string
+  /** 提交后展示的讲解（答对/答错通用） */
+  explanation?: string
+}
+
+/** 单个教学段（Agent 讲解的最小原子单元） */
+export interface TeachingSegment {
+  id: string
+  type: TeachingSegmentType
+  /** markdown 内容（quiz/pause 段可为空） */
+  markdown: string
+  /** 需要聚焦/高亮的画布元素 */
+  focusTarget?: FocusTarget
+  /** type=quiz 时的题面 */
+  quiz?: InlineQuiz
+  /** 0=等待用户点击"继续"，>0=自动推进毫秒数 */
+  autoAdvanceMs: number
+  /** Agent 在右侧面板同步的"台词" */
+  agentCommentary?: string
+}
+
+/** 教学流（一个 CanvasContent 内的分段序列） */
+export interface TeachingFlow {
+  segments: TeachingSegment[]
+  currentSegmentIndex: number
+  isActive: boolean
+  isPaused: boolean
+}
+
+/** 弹题回答状态 */
+export interface QuizState {
+  quizId: string
+  userAnswer: string
+  correct: boolean
+  answered: boolean
+  explanation?: string
 }
 
 /** 掌握判断等级 */

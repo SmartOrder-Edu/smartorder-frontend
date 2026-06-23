@@ -21,6 +21,14 @@
       <p class="agent-hint">点击下方按钮告诉 Agent 你的感受，或直接提问。Agent 会根据你的反馈调整讲解节奏。</p>
     </div>
 
+    <!-- 教学继续按钮（教学暂停 + 非弹题时） -->
+    <div class="teaching-continue-bar" v-if="stepStore.isTeachingPaused && !stepStore.quizState">
+      <button class="teaching-continue-btn" @click="stepStore.resumeTeaching()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
+        继续
+      </button>
+    </div>
+
     <!-- Feedback buttons grid -->
     <div class="feedback-grid">
       <button
@@ -149,6 +157,30 @@ export default { name: 'StudyAgentPanel' }
 
 .panel-top {
   padding: 16px 16px 6px;
+}
+
+.teaching-continue-bar {
+  padding: 0 16px 8px;
+}
+
+.teaching-continue-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 0;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(11, 183, 170, 0.25);
+  transition: all 0.15s ease;
+  animation: continuePulse 1.8s ease-in-out infinite;
+  &:hover { transform: translateY(-1px); }
 }
 
 .agent-mini-header {
