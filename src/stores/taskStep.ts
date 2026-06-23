@@ -7,9 +7,12 @@ import type {
   CanvasContent,
   FeedbackType,
   MasteryJudge,
+  QuizState,
   ScriptStep,
   StudyChatMessage,
   StudyMode,
+  TeachingFlow,
+  TeachingSegment,
 } from '@/types/study'
 import {
   getInitialChatMessages,
@@ -38,6 +41,11 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const sendingFeedback = ref(false)
   const completing = ref(false)
 
+  // ---- 教学流状态（v2 Agent 主动教学交互）----
+  const teachingActive = ref(false)
+  const quizState = ref<QuizState | null>(null)
+  const autoAdvanceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+
   const currentScriptStep = computed<ScriptStep | null>(
     () => scriptSteps.value[currentStepIndex.value] || null,
   )
@@ -51,6 +59,142 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     if (!scriptSteps.value.length) return 0
     return Math.round((completedSteps.value / scriptSteps.value.length) * 100)
   })
+
+  /** 当前教学流 */
+  const currentTeachingFlow = computed<TeachingFlow | null>(
+    () => canvasContent.value?.teachingFlow || null,
+  )
+  /** 当前教学段 */
+  const currentSegment = computed<TeachingSegment | null>(() => {
+    const flow = currentTeachingFlow.value
+    if (!flow?.segments.length) return null
+    return flow.segments[flow.currentSegmentIndex] || null
+  })
+  /** 教学流是否暂停 */
+  const isTeachingPaused = computed(
+    () => currentTeachingFlow.value?.isPaused || false,
+  )
+
+  // =============================================================
+  // 教学流控制方法
+  // =============================================================
+
+  function clearAutoAdvance() {
+    if (autoAdvanceTimer.value) {
+      clearTimeout(autoAdvanceTimer.value)
+      autoAdvanceTimer.value = null
+    }
+  }
+
+  /** 启动 Agent 教学流 */
+  function startTeaching() {
+    const flow = currentTeachingFlow.value
+    if (!flow || !flow.segments.length) return
+    endTeaching() // 清理上次遗留
+    teachingActive.value = true
+    flow.currentSegmentIndex = 0
+    flow.isActive = true
+    flow.isPaused = false
+    quizState.value = null
+    processSegment(0)
+  }
+
+  /** 推进到下一段 */
+  function advanceSegment() {
+    const flow = currentTeachingFlow.value
+    if (!flow || !teachingActive.value) return
+    clearAutoAdvance()
+    const next = flow.currentSegmentIndex + 1
+    if (next >= flow.segments.length) {
+      endTeaching()
+      return
+    }
+    flow.currentSegmentIndex = next
+    processSegment(next)
+  }
+
+  /** 处理指定段：弹题暂停 / 聚焦 / 自动推进 / 手动暂停 */
+  function processSegment(index: number) {
+    const flow = currentTeachingFlow.value
+    if (!flow) return
+    const seg = flow.segments[index]
+    if (!seg) return
+
+    // 弹题：暂停教学流
+    if (seg.type === 'quiz' && seg.quiz) {
+      flow.isPaused = true
+      quizState.value = {
+        quizId: seg.quiz.id,
+        userAnswer: '',
+        correct: false,
+        answered: false,
+      }
+      return
+    }
+
+    // 聚焦
+    if (seg.focusTarget?.scroll && seg.focusTarget.scroll !== 'none') {
+      // 聚焦效果由 TeachingSegmentView 的 onMounted 处理
+    }
+
+    // 自动推进或等待用户
+    if (seg.autoAdvanceMs > 0) {
+      flow.isPaused = false
+      autoAdvanceTimer.value = setTimeout(() => advanceSegment(), seg.autoAdvanceMs)
+    } else {
+      flow.isPaused = true
+    }
+
+    // 同步 commentary 到聊天面板
+    if (seg.agentCommentary) {
+      chatMessages.value.push({
+        id: `agent-teach-${Date.now()}`,
+        role: 'agent',
+        text: seg.agentCommentary,
+        markdown: false,
+        createTime: Date.now(),
+      })
+    }
+  }
+
+  /** 提交弹题答案 */
+  function submitQuizAnswer(answer: string): { correct: boolean; explanation: string } {
+    const seg = currentSegment.value
+    if (!seg?.quiz || !quizState.value) {
+      return { correct: false, explanation: '' }
+    }
+    const quiz = seg.quiz
+    const correct = answer === quiz.correctAnswer
+    quizState.value = {
+      ...quizState.value,
+      userAnswer: answer,
+      correct,
+      answered: true,
+      explanation: quiz.explanation || (correct ? '回答正确！' : '答案不太对，再看看。'),
+    }
+    return { correct, explanation: quizState.value.explanation }
+  }
+
+  /** 恢复教学（答题后或手动点继续） */
+  function resumeTeaching() {
+    const flow = currentTeachingFlow.value
+    if (!flow) return
+    flow.isPaused = false
+    quizState.value = null
+    advanceSegment()
+  }
+
+  /** 结束教学流 */
+  function endTeaching() {
+    teachingActive.value = false
+    clearAutoAdvance()
+    const flow = currentTeachingFlow.value
+    if (flow) {
+      flow.isActive = false
+      flow.isPaused = false
+    }
+    quizState.value = null
+  }
 
   /**
    * 拉取任务步骤 + 初始化学习会话
@@ -87,28 +231,34 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   function goToStep(index: number) {
     if (index < 0 || index >= scriptSteps.value.length) return
+    endTeaching()
     const cur = scriptSteps.value[currentStepIndex.value]
     if (cur && cur.status === 'in_progress') cur.status = 'completed'
     currentStepIndex.value = index
     const next = scriptSteps.value[index]
     if (next && next.status === 'pending') next.status = 'in_progress'
     refreshCanvas()
+    startTeaching()
   }
 
   function nextStep() {
     if (currentStepIndex.value >= scriptSteps.value.length - 1) return
+    endTeaching()
     const cur = scriptSteps.value[currentStepIndex.value]
     if (cur && cur.status === 'in_progress') cur.status = 'completed'
     currentStepIndex.value++
     const next = scriptSteps.value[currentStepIndex.value]
     if (next && next.status === 'pending') next.status = 'in_progress'
     refreshCanvas()
+    startTeaching()
   }
 
   function prevStep() {
     if (currentStepIndex.value <= 0) return
+    endTeaching()
     currentStepIndex.value--
     refreshCanvas()
+    startTeaching()
   }
 
   function updateStepStatus(index: number, status: StepStatus) {
@@ -240,6 +390,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   }
 
   function reset() {
+    endTeaching()
     steps.value = []
     scriptSteps.value = []
     canvasContent.value = null
@@ -249,6 +400,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     taskId.value = ''
     spaceId.value = null
     mode.value = 'learn'
+    teachingActive.value = false
+    quizState.value = null
   }
 
   return {
@@ -271,6 +424,12 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     totalEstimatedMinutes,
     completedSteps,
     progressPercent,
+    // 教学流
+    teachingActive,
+    quizState,
+    currentTeachingFlow,
+    currentSegment,
+    isTeachingPaused,
     // 方法
     fetchSteps,
     goToStep,
@@ -283,5 +442,11 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     submitPracticeAnswer,
     completeStudySession,
     reset,
+    // 教学流方法
+    startTeaching,
+    advanceSegment,
+    submitQuizAnswer,
+    resumeTeaching,
+    endTeaching,
   }
 })

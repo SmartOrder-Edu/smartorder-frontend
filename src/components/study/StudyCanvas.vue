@@ -10,49 +10,110 @@
           <h2>{{ stepStore.currentScriptStep.title }}</h2>
           <p>{{ stepStore.currentScriptStep.subtitle }}</p>
         </div>
+        <!-- Agent 讲解中指示器 -->
+        <span class="teaching-badge" v-if="stepStore.teachingActive">
+          <span class="teaching-dot"></span>
+          Agent 讲解中
+        </span>
       </div>
       <div class="header-right">
-        <button class="nav-btn" :disabled="stepStore.currentStepIndex === 0" @click="stepStore.prevStep()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15,18 9,12 15,6"/></svg>
-          上一步
-        </button>
-        <button class="nav-btn primary" @click="stepStore.nextStep()" :disabled="stepStore.currentStepIndex >= stepStore.scriptSteps.length - 1">
-          下一步
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9,18 15,12 9,6"/></svg>
-        </button>
+        <!-- 教学模式：隐藏导航，显示"跳过"按钮 -->
+        <template v-if="stepStore.teachingActive">
+          <button class="nav-btn skip" @click="stepStore.endTeaching()">
+            跳过教学
+          </button>
+        </template>
+        <template v-else>
+          <button class="nav-btn" :disabled="stepStore.currentStepIndex === 0" @click="stepStore.prevStep()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15,18 9,12 15,6"/></svg>
+            上一步
+          </button>
+          <button class="nav-btn primary" @click="stepStore.nextStep()" :disabled="stepStore.currentStepIndex >= stepStore.scriptSteps.length - 1">
+            下一步
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9,18 15,12 9,6"/></svg>
+          </button>
+        </template>
       </div>
     </header>
 
     <!-- 画布主体 -->
     <div class="canvas-body" v-if="stepStore.canvasContent">
-      <!-- Agent 临时补充讲解条 -->
-      <div class="agent-note" v-if="stepStore.canvasContent.agentNote">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-          <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
-        </svg>
-        <span>{{ stepStore.canvasContent.agentNote }}</span>
-      </div>
-
-      <!-- 渲染分支 -->
-      <template v-if="stepStore.canvasContent.type === 'example'">
-        <ExampleStage
-          :markdown="stepStore.canvasContent.markdown"
-          :steps="stepStore.canvasContent.exampleSteps || []"
-        />
-      </template>
-
-      <template v-else-if="stepStore.canvasContent.type === 'practice' || stepStore.canvasContent.type === 'assessment'">
-        <PracticeStage
-          :markdown="stepStore.canvasContent.markdown"
-          :question="stepStore.canvasContent.question!"
-          @submit="onSubmitAnswer"
-        />
-      </template>
-
-      <template v-else>
-        <div class="markdown-stage">
-          <MarkdownRenderer :content="stepStore.canvasContent.markdown" />
+      <!-- Agent 教学模式：分段式讲解 -->
+      <template v-if="stepStore.canvasContent.teachingFlow && stepStore.teachingActive">
+        <!-- Agent 讲解条 -->
+        <div class="agent-speaking-bar" v-if="stepStore.currentSegment?.agentCommentary">
+          <span class="agent-speaking-dot"></span>
+          <span>{{ stepStore.currentSegment.agentCommentary }}</span>
         </div>
+
+        <!-- 教学段列表（降序：所有已展示的段 + 当前段） -->
+        <div class="teaching-segments">
+          <template v-for="(seg, idx) in stepStore.canvasContent.teachingFlow.segments" :key="seg.id">
+            <TeachingSegmentView
+              v-if="idx <= stepStore.canvasContent.teachingFlow.currentSegmentIndex"
+              :segment="seg"
+              :visible="true"
+              :is-current="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex"
+              :quiz-state="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex ? stepStore.quizState : null"
+              @quiz-answer="onQuizAnswer"
+            />
+          </template>
+        </div>
+
+        <!-- 教学控制区 -->
+        <div class="teaching-controls">
+          <!-- 弹题激活且已回答 → 继续 -->
+          <button
+            v-if="stepStore.quizState?.answered"
+            class="continue-btn continue-btn-pulse"
+            @click="stepStore.resumeTeaching()"
+          >
+            继续讲解
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9,18 15,12 9,6"/></svg>
+          </button>
+          <!-- 教学暂停（非弹题）→ 继续 -->
+          <button
+            v-else-if="stepStore.isTeachingPaused"
+            class="continue-btn continue-btn-pulse"
+            @click="stepStore.resumeTeaching()"
+          >
+            继续
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9,18 15,12 9,6"/></svg>
+          </button>
+          <!-- 教学中 → 进度指示 -->
+          <div v-else class="teaching-progress-hint">
+            Agent 正在讲解…
+          </div>
+        </div>
+      </template>
+
+      <!-- 静态模式：无 teachingFlow 时回退 -->
+      <template v-else>
+        <div class="agent-note" v-if="stepStore.canvasContent.agentNote">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+          </svg>
+          <span>{{ stepStore.canvasContent.agentNote }}</span>
+        </div>
+
+        <template v-if="stepStore.canvasContent.type === 'example'">
+          <ExampleStage
+            :markdown="stepStore.canvasContent.markdown"
+            :steps="stepStore.canvasContent.exampleSteps || []"
+          />
+        </template>
+        <template v-else-if="stepStore.canvasContent.type === 'practice' || stepStore.canvasContent.type === 'assessment'">
+          <PracticeStage
+            :markdown="stepStore.canvasContent.markdown"
+            :question="stepStore.canvasContent.question!"
+            @submit="onSubmitAnswer"
+          />
+        </template>
+        <template v-else>
+          <div class="markdown-stage">
+            <MarkdownRenderer :content="stepStore.canvasContent.markdown" />
+          </div>
+        </template>
       </template>
     </div>
 
@@ -64,6 +125,7 @@
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import ExampleStage from './ExampleStage.vue'
 import PracticeStage from './PracticeStage.vue'
+import TeachingSegmentView from './TeachingSegmentView.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
 import { ElMessage } from 'element-plus'
 import type { ScriptPhaseType } from '@/types/study'
@@ -89,6 +151,11 @@ function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation
     ElMessage.warning('答案不对，Agent 已在画布下方给出讲解。')
   }
 }
+
+/** 教学流弹题提交 → 转到 store 处理 */
+function onQuizAnswer(quizId: string, answer: string) {
+  stepStore.submitQuizAnswer(answer)
+}
 </script>
 
 <style scoped lang="scss">
@@ -108,6 +175,8 @@ function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(8px);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .header-left {
@@ -151,6 +220,27 @@ function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation
   }
 }
 
+.teaching-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(11, 183, 170, 0.1);
+  border: 1px solid rgba(11, 183, 170, 0.25);
+  font-size: 11px;
+  font-weight: 600;
+  color: #0bb7aa;
+
+  .teaching-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #0bb7aa;
+    animation: agentDotPulse 1s ease-in-out infinite;
+  }
+}
+
 .header-right {
   display: flex;
   gap: 8px;
@@ -180,6 +270,11 @@ function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation
     border-color: transparent;
     &:hover:not(:disabled) { color: #fff; opacity: 0.92; }
   }
+  &.skip {
+    color: #94a3b8;
+    font-size: 12px;
+    &:hover { color: #ef4444; border-color: #ef4444; }
+  }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 
@@ -189,6 +284,53 @@ function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation
   padding: 22px 28px 28px;
 }
 
+// ---- 教学段列表 ----
+.teaching-segments {
+  display: flex;
+  flex-direction: column;
+}
+
+// ---- 教学控制区 ----
+.teaching-controls {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 4px;
+}
+
+.continue-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 28px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(11, 183, 170, 0.25);
+  transition: all 0.2s ease;
+  &:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(11, 183, 170, 0.35); }
+}
+
+.teaching-progress-hint {
+  font-size: 13px;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  &::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #0bb7aa;
+    animation: agentDotPulse 1s ease-in-out infinite;
+  }
+}
+
+// ---- 静态模式 ----
 .agent-note {
   display: flex;
   align-items: flex-start;
@@ -201,7 +343,6 @@ function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation
   font-size: 13px;
   color: #0f766e;
   line-height: 1.5;
-
   svg { flex-shrink: 0; margin-top: 2px; }
 }
 
@@ -223,7 +364,7 @@ function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation
 }
 
 @media (max-width: 1024px) {
-  .canvas-header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+  .canvas-header { padding: 12px 16px; }
   .header-left { width: 100%; }
   .canvas-body { padding: 16px; }
   .markdown-stage { padding: 18px; }

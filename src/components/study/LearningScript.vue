@@ -27,6 +27,7 @@
         class="script-step"
         :class="{
           active: stepStore.currentStepIndex === index,
+          teaching: stepStore.currentStepIndex === index && stepStore.teachingActive,
           completed: step.status === 'completed',
           skipped: step.status === 'skipped',
         }"
@@ -148,6 +149,16 @@ function phaseLabel(phase: ScriptPhaseType): string {
     background: rgba(11, 183, 170, 0.12);
     .step-title { color: #0bb7aa; font-weight: 600; }
     .marker-dot { background: #0bb7aa; color: #fff; border-color: #0bb7aa; }
+  }
+  &.teaching {
+    border-left: 3px solid #0bb7aa;
+    .step-title::after {
+      content: ' · 教学中';
+      font-size: 10px;
+      color: #0bb7aa;
+      font-weight: 500;
+      animation: agentDotPulse 1s ease-in-out infinite;
+    }
   }
   &.completed .marker-dot { background: #10b981; color: #fff; border-color: #10b981; }
   &.skipped {

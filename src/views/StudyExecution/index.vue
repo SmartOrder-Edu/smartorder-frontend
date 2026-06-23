@@ -84,6 +84,7 @@ const modeLabel = computed(() => {
 
 function onJump(index: number) {
   stepStore.goToStep(index)
+  // goToStep 内部已调用 startTeaching()，确保教学流重启
 }
 
 onMounted(async () => {
@@ -96,6 +97,8 @@ onMounted(async () => {
     dashStore.fetchDashboard(spaceId).catch(() => {})
   }
   await stepStore.fetchSteps(id, { mode, spaceId })
+  // 启动 Agent 教学流
+  stepStore.startTeaching()
 })
 
 onUnmounted(() => {
