@@ -181,7 +181,7 @@
 
           <!-- 用户下拉菜单 -->
           <transition name="slide-up">
-            <div class="sidebar-user-menu" v-if="showUserMenu && !sidebarCollapsed">
+            <div class="sidebar-user-menu" v-if="showUserMenu" :class="{ 'is-collapsed': sidebarCollapsed }">
               <button
                 v-if="!userStore.profileInitialized"
                 class="user-menu-item profile-init-item"
@@ -1343,6 +1343,12 @@ const handleLogout = async () => {
   border: 1px solid var(--border-light);
   overflow: hidden;
   z-index: 300;
+}
+
+/* 侧边栏收起时，菜单需要扩展到侧边栏外部 */
+.sidebar-user-menu.is-collapsed {
+  left: 0;
+  width: 200px;
 }
 
 .user-menu-item {
