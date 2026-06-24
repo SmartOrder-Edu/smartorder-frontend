@@ -1110,28 +1110,23 @@ const handleLogout = async () => {
 
 .sidebar-avatar {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  border: 2px solid rgba(139, 92, 246, 0.2);
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+  border: 2px solid var(--primary-color);
   transition: all 0.3s ease;
 }
 
 .sidebar-avatar:hover {
-  border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+  border-color: var(--primary-color);
 }
 
 .sidebar-username {
   font-size: 0.8125rem;
   font-weight: 600;
-  background: var(--gradient-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #000000;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
