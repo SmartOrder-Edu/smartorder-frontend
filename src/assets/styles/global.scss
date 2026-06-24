@@ -220,7 +220,7 @@ ol {
   position: relative;
   overflow: hidden;
 
-  &--primary:not(.is-plain) {
+  &--primary:not(.is-plain):not(.is-link) {
     background: linear-gradient(135deg, #60a5fa 0%, #38bdf8 100%) !important;
     border: none !important;
     box-shadow: 0 4px 15px rgba(96, 165, 250, 0.3) !important;
@@ -250,7 +250,7 @@ ol {
     }
   }
 
-  &--success:not(.is-plain) {
+  &--success:not(.is-plain):not(.is-link) {
     background: var(--gradient-accent) !important;
     border: none !important;
     box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3) !important;
@@ -263,7 +263,7 @@ ol {
     }
   }
 
-  &--warning:not(.is-plain) {
+  &--warning:not(.is-plain):not(.is-link) {
     background: var(--gradient-warm) !important;
     border: none !important;
     box-shadow: 0 4px 15px rgba(236, 72, 153, 0.3) !important;

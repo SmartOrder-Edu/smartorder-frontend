@@ -181,7 +181,7 @@
 
           <!-- 用户下拉菜单 -->
           <transition name="slide-up">
-            <div class="sidebar-user-menu" v-if="showUserMenu && !sidebarCollapsed">
+            <div class="sidebar-user-menu" v-if="showUserMenu" :class="{ 'is-collapsed': sidebarCollapsed }">
               <button
                 v-if="!userStore.profileInitialized"
                 class="user-menu-item profile-init-item"
@@ -1110,28 +1110,23 @@ const handleLogout = async () => {
 
 .sidebar-avatar {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  border: 2px solid rgba(139, 92, 246, 0.2);
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.2);
+  border: 2px solid var(--primary-color);
   transition: all 0.3s ease;
 }
 
 .sidebar-avatar:hover {
-  border-color: rgba(139, 92, 246, 0.5);
-  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+  border-color: var(--primary-color);
 }
 
 .sidebar-username {
   font-size: 0.8125rem;
   font-weight: 600;
-  background: var(--gradient-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #000000;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1343,6 +1338,12 @@ const handleLogout = async () => {
   border: 1px solid var(--border-light);
   overflow: hidden;
   z-index: 300;
+}
+
+/* 侧边栏收起时，菜单需要扩展到侧边栏外部 */
+.sidebar-user-menu.is-collapsed {
+  left: 0;
+  width: 200px;
 }
 
 .user-menu-item {
