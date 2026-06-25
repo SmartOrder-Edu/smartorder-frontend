@@ -166,7 +166,7 @@
           <div class="sidebar-user" v-if="!sidebarCollapsed">
             <div class="sidebar-user-info" @click="showUserMenu = !showUserMenu">
               <div class="sidebar-avatar-wrap">
-                <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar" />
+                <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="头像" class="sidebar-avatar" />
                 <span v-if="!userStore.profileInitialized" class="profile-dot" title="画像未完善"></span>
               </div>
               <span class="sidebar-username">{{ userStore.userName || '用户' }}</span>
@@ -174,7 +174,7 @@
           </div>
           <div class="sidebar-user-mini" v-else>
             <div class="sidebar-avatar-wrap">
-              <img :src="userStore.userInfo?.avatarUrl || '/default-avatar.png'" alt="头像" class="sidebar-avatar-mini" @click="showUserMenu = !showUserMenu" />
+              <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="头像" class="sidebar-avatar-mini" @click="showUserMenu = !showUserMenu" />
               <span v-if="!userStore.profileInitialized" class="profile-dot-mini" title="画像未完善"></span>
             </div>
           </div>

@@ -94,7 +94,7 @@
               @click="handleSelectConversation(conv)"
             >
               <div class="friend-avatar">
-                <img :src="conv.friendAvatarUrl || '/default-avatar.png'" :alt="conv.friendUsername" />
+                <img :src="conv.friendAvatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" :alt="conv.friendUsername" />
                 <span v-if="isFriendOnline(conv.friendId)" class="online-dot pulsing"></span>
               </div>
               <div class="friend-info">
@@ -137,11 +137,11 @@
               @click="handleSelectFriend(friend)"
             >
               <div class="friend-avatar">
-                <img :src="friend.avatarUrl || '/default-avatar.png'" :alt="friend.username" />
+                <img :src="friend.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" :alt="friend.username" />
                 <span class="online-dot pulsing"></span>
               </div>
               <div class="friend-info">
-                <div class="friend-name">{{ friend.username }}</div>
+                <div class="friend-name">{{ friend.friendAlias || friend.username }}</div>
                 <div class="friend-bio">{{ friend.bio || '这个人很懒，什么都没留下~' }}</div>
               </div>
             </div>
@@ -158,10 +158,10 @@
               @click="handleSelectFriend(friend)"
             >
               <div class="friend-avatar">
-                <img :src="friend.avatarUrl || '/default-avatar.png'" :alt="friend.username" />
+                <img :src="friend.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" :alt="friend.username" />
               </div>
               <div class="friend-info">
-                <div class="friend-name">{{ friend.username }}</div>
+                <div class="friend-name">{{ friend.friendAlias || friend.username }}</div>
                 <div class="friend-bio">{{ friend.bio || '这个人很懒，什么都没留下~' }}</div>
               </div>
             </div>
@@ -191,14 +191,14 @@
         <div class="notif-list" v-if="notificationsList.length > 0">
           <div v-for="n in notificationsList" :key="n.id" class="notif-card" :class="{ unread: n.unread }">
             <div class="notif-card-header">
-              <el-tag size="small" :type="n.type === 'friend_request' ? 'primary' : 'warning'" class="notif-tag">
-                {{ n.type === 'friend_request' ? '好友申请' : '群聊邀请' }}
+              <el-tag size="small" type="primary" class="notif-tag">
+                好友申请
               </el-tag>
               <span class="notif-time">{{ n.time }}</span>
             </div>
             
             <div class="notif-card-body">
-              <img :src="n.avatarUrl || '/default-avatar.png'" class="notif-avatar" />
+              <img :src="n.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" class="notif-avatar" />
               <div class="notif-detail">
                 <span class="notif-username">{{ n.username }}</span>
                 <span class="notif-text">{{ n.text }}</span>
@@ -212,11 +212,6 @@
                 class="action-btn accept" 
                 @click="handleNotifAction(n, 'accept')"
               >接受</el-button>
-              <el-button 
-                size="small" 
-                class="action-btn reject" 
-                @click="handleNotifAction(n, 'reject')"
-              >拒绝</el-button>
             </div>
           </div>
         </div>
@@ -235,16 +230,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Loading, Search, ChatDotRound, ChatRound, User, ArrowLeft, Bell } from '@element-plus/icons-vue'
+import { Plus, Search, ChatRound, User, ArrowLeft, Bell } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useMessageStore } from '@/stores/message'
-import type { FriendInfo, Conversation } from '@/api/message'
+import type { FriendVO, Conversation } from '@/api/message'
 
 const emit = defineEmits<{
   (e: 'show-search'): void
-  (e: 'select-friend', friend: FriendInfo): void
+  (e: 'select-friend', friend: FriendVO): void
 }>()
 
 const router = useRouter()
@@ -260,42 +255,29 @@ const pendingRequests = computed(() => messageStore.pendingRequests)
 // Modal dialog display state
 const showNotifDialog = ref(false)
 
-// Mock group chat invites state
-const mockGroupInvites = ref([
-  { id: 1, fromUsername: "张明宇", groupName: "物理高考提分冲刺群", message: "一起讨论物理压轴题吧！", time: "1小时前", unread: true },
-  { id: 2, fromUsername: "林舒婷 (AI助教)", groupName: "高考备战规划学习空间", message: "为你推荐的AI辅助协同学习空间。", time: "昨天", unread: true }
-])
+// 监听通知中心打开，获取最新好友请求
+watch(showNotifDialog, async (newVal) => {
+  if (newVal) {
+    await messageStore.fetchFriendRequests()
+  }
+})
 
 // Unified computed list of notifications
 const notificationsList = computed(() => {
   const list: any[] = []
 
-  // 1. Add friend requests
+  // Add friend requests
   pendingRequests.value.forEach(req => {
+    const sender = messageStore.friends.find(f => f.id === req.senderId)
     list.push({
       id: `friend-${req.id}`,
       type: 'friend_request',
-      username: req.fromUsername,
-      avatarUrl: req.fromAvatarUrl,
-      text: req.message || '请求添加你为好友',
-      time: formatTime(req.createdAt),
+      username: sender?.username || `用户${req.senderId}`,
+      avatarUrl: sender?.avatarUrl || '',
+      text: req.requestMsg || '请求添加你为好友',
+      time: formatTime(req.createTime),
       originalId: req.id,
       unread: true
-    })
-  })
-
-  // 2. Add group invitations
-  mockGroupInvites.value.forEach(inv => {
-    list.push({
-      id: `group-${inv.id}`,
-      type: 'group_invite',
-      username: inv.fromUsername,
-      avatarUrl: '',
-      text: `邀请你加入群聊 【${inv.groupName}】: "${inv.message}"`,
-      time: inv.time,
-      originalId: inv.id,
-      unread: inv.unread,
-      groupName: inv.groupName
     })
   })
 
@@ -305,26 +287,13 @@ const notificationsList = computed(() => {
 const notifUnreadCount = computed(() => notificationsList.value.length)
 
 // Unified notification actions
-async function handleNotifAction(n: any, action: 'accept' | 'reject') {
+async function handleNotifAction(n: any, action: 'accept') {
   if (n.type === 'friend_request') {
     try {
-      if (action === 'accept') {
-        await messageStore.acceptRequest(n.originalId)
-        ElMessage.success(`已接受 ${n.username} 的好友申请`)
-      } else {
-        await messageStore.rejectRequest(n.originalId)
-        ElMessage.success(`已拒绝 ${n.username} 的好友申请`)
-      }
+      await messageStore.acceptRequest(n.originalId)
+      ElMessage.success(`已接受 ${n.username} 的好友申请`)
     } catch {
       ElMessage.error('处理好友申请失败')
-    }
-  } else if (n.type === 'group_invite') {
-    if (action === 'accept') {
-      mockGroupInvites.value = mockGroupInvites.value.filter(i => i.id !== n.originalId)
-      ElMessage.success(`已同意加入群聊: ${n.groupName}`)
-    } else {
-      mockGroupInvites.value = mockGroupInvites.value.filter(i => i.id !== n.originalId)
-      ElMessage.success('已拒绝群聊邀请')
     }
   }
 }
@@ -333,10 +302,10 @@ function goBack() {
   router.push('/dashboard')
 }
 
-// Check if friend is online
+// Check if friend is online (基于status字段，1表示正常/在线)
 function isFriendOnline(friendId: number): boolean {
   const friend = messageStore.friends.find(f => f.id === friendId)
-  return friend?.online || false
+  return friend?.status === 1
 }
 
 // Conversation Filtering
@@ -354,7 +323,8 @@ const filteredOnlineFriends = computed(() => {
   const keyword = searchKeyword.value.toLowerCase().trim()
   if (!keyword) return messageStore.onlineFriends
   return messageStore.onlineFriends.filter(f =>
-    f.username.toLowerCase().includes(keyword)
+    f.username.toLowerCase().includes(keyword) ||
+    (f.friendAlias && f.friendAlias.toLowerCase().includes(keyword))
   )
 })
 
@@ -362,12 +332,13 @@ const filteredOfflineFriends = computed(() => {
   const keyword = searchKeyword.value.toLowerCase().trim()
   if (!keyword) return messageStore.offlineFriends
   return messageStore.offlineFriends.filter(f =>
-    f.username.toLowerCase().includes(keyword)
+    f.username.toLowerCase().includes(keyword) ||
+    (f.friendAlias && f.friendAlias.toLowerCase().includes(keyword))
   )
 })
 
 // Selection Handlers
-function handleSelectFriend(friend: FriendInfo) {
+function handleSelectFriend(friend: FriendVO) {
   emit('select-friend', friend)
 }
 
@@ -380,9 +351,7 @@ function handleSelectConversation(conv: Conversation) {
       id: conv.friendId,
       username: conv.friendUsername,
       avatarUrl: conv.friendAvatarUrl,
-      online: isFriendOnline(conv.friendId),
-      lastMessage: conv.lastMessage,
-      lastMessageTime: conv.lastMessageTime
+      status: 1
     })
   }
 }
@@ -934,11 +903,6 @@ function formatTime(time: string): string {
 .action-btn.accept {
   background: var(--gradient-accent) !important;
   border: none !important;
-}
-
-.action-btn.reject {
-  background: var(--bg-secondary) !important;
-  color: var(--text-regular) !important;
 }
 
 .notif-empty {

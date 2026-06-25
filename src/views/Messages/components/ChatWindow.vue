@@ -5,13 +5,13 @@
       <div class="chat-header glass">
         <div class="friend-info">
           <div class="avatar-wrapper">
-            <img :src="friend.avatarUrl || '/default-avatar.png'" :alt="friend.username" class="friend-avatar" />
-            <span class="status-dot" :class="{ online: friend.online }"></span>
+            <img :src="friend.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" :alt="friend.username" class="friend-avatar" />
+            <span class="status-dot" :class="{ online: isOnline }"></span>
           </div>
           <div class="friend-details">
-            <div class="friend-name">{{ friend.username }}</div>
+            <div class="friend-name">{{ friend.friendAlias || friend.username }}</div>
             <div class="friend-status-text">
-              {{ friend.online ? '在线' : '离线' }}
+              {{ isOnline ? '在线' : '离线' }}
             </div>
           </div>
         </div>
@@ -57,23 +57,29 @@
           >
             <!-- Time Divider -->
             <div v-if="showTimeDivider(index)" class="time-divider">
-              <span>{{ formatMessageTime(msg.createdAt) }}</span>
+              <span>{{ formatMessageTime(msg.createTime) }}</span>
             </div>
 
             <!-- Speech Bubble -->
-            <div class="message-bubble">
+            <div class="message-bubble" @contextmenu.prevent="showContextMenu($event, msg)">
               <img
                 v-if="msg.senderId !== currentUserId"
-                :src="friend.avatarUrl || '/default-avatar.png'"
+                :src="friend.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'"
                 class="message-avatar"
               />
               <div class="message-content-wrapper">
-                <div class="message-content">
+                <div class="message-content" :class="{ 'recalled': msg.status === 2 }">
+                  <!-- 已撤回消息 -->
+                  <div v-if="msg.status === 2" class="message-recalled">
+                    <el-icon><Warning /></el-icon>
+                    <span>消息已撤回</span>
+                  </div>
+                  
                   <!-- Text type -->
-                  <div v-if="msg.type === 'text'" class="message-text">{{ msg.content }}</div>
+                  <div v-else-if="msg.msgType === 'TEXT'" class="message-text">{{ msg.content }}</div>
                   
                   <!-- Image type -->
-                  <div v-else-if="msg.type === 'image'" class="message-image-container">
+                  <div v-else-if="msg.msgType === 'IMAGE'" class="message-image-container">
                     <el-image
                       :src="msg.content"
                       :preview-src-list="[msg.content]"
@@ -84,8 +90,14 @@
                     />
                   </div>
 
+                  <!-- Voice type -->
+                  <div v-else-if="msg.msgType === 'VOICE'" class="message-voice">
+                    <el-icon><Microphone /></el-icon>
+                    <span>语音消息</span>
+                  </div>
+
                   <!-- File type -->
-                  <div v-else-if="msg.type === 'file'" class="message-file-card">
+                  <div v-else-if="msg.msgType === 'FILE'" class="message-file-card">
                     <div class="file-icon-wrapper">
                       <el-icon><Document /></el-icon>
                     </div>
@@ -108,19 +120,30 @@
                 </div>
 
                 <!-- Message delivery/read status -->
-                <div class="message-status" v-if="msg.senderId === currentUserId">
-                  <span class="status-time">{{ formatTimeOnly(msg.createdAt) }}</span>
-                  <el-icon v-if="msg.status === 'sent'" class="status-icon"><Check /></el-icon>
-                  <el-icon v-else-if="msg.status === 'delivered'" class="status-icon"><Check /></el-icon>
-                  <el-icon v-else-if="msg.status === 'read'" class="status-icon read"><Select /></el-icon>
+                <div class="message-status" v-if="msg.senderId === currentUserId && msg.status !== 2">
+                  <span class="status-time">{{ formatTimeOnly(msg.createTime) }}</span>
+                  <el-icon v-if="msg.status === 0" class="status-icon"><Check /></el-icon>
+                  <el-icon v-else-if="msg.status === 1" class="status-icon read"><Select /></el-icon>
                 </div>
-                <div class="message-status" v-else>
-                  <span class="status-time">{{ formatTimeOnly(msg.createdAt) }}</span>
+                <div class="message-status" v-else-if="msg.status !== 2">
+                  <span class="status-time">{{ formatTimeOnly(msg.createTime) }}</span>
                 </div>
               </div>
             </div>
           </div>
         </template>
+      </div>
+
+      <!-- Context Menu -->
+      <div v-if="contextMenu.visible" class="context-menu" :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }">
+        <div class="context-menu-item" @click="handleRecallMessage" v-if="contextMenu.msg?.senderId === currentUserId && canRecall(contextMenu.msg)">
+          <el-icon><RefreshLeft /></el-icon>
+          <span>撤回</span>
+        </div>
+        <div class="context-menu-item" @click="contextMenu.visible = false">
+          <el-icon><Close /></el-icon>
+          <span>取消</span>
+        </div>
       </div>
 
       <!-- Real-time upload progress display -->
@@ -236,20 +259,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { 
   MoreFilled, Loading, Check, Select, 
   Picture, Paperclip, Document, ChatRound, 
-  Promotion, Download, Delete, ChatDotRound 
+  Promotion, Download, Delete, ChatDotRound,
+  Warning, Microphone, RefreshLeft, Close
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useMessageStore } from '@/stores/message'
 import { useUserStore } from '@/stores/user'
-import { uploadKnowledgeBaseCover } from '@/api/knowledgeBase'
-import type { FriendInfo, ChatMessage } from '@/api/message'
+import { messageApi, type FriendVO, type ChatMessage } from '@/api/message'
 
 const props = defineProps<{
-  friend: FriendInfo | null
+  friend: FriendVO | null
 }>()
 
 const emit = defineEmits<{
@@ -272,8 +295,13 @@ const uploadingFile = ref(false)
 const uploadingFileName = ref('')
 const uploadProgress = ref(0)
 
+// Context menu state
+const contextMenu = ref({ visible: false, x: 0, y: 0, msg: null as ChatMessage | null })
+
 const currentUserId = computed(() => userStore.userInfo?.id)
 const messages = computed(() => messageStore.currentMessages)
+
+const isOnline = computed(() => props.friend?.status === 1)
 
 const emojis = [
   '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
@@ -298,6 +326,14 @@ watch(messages, () => {
   nextTick(() => scrollToBottom())
 }, { deep: true })
 
+onMounted(() => {
+  document.addEventListener('click', hideContextMenu)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', hideContextMenu)
+})
+
 function scrollToBottom() {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
@@ -320,7 +356,7 @@ async function handleSend() {
 
   sending.value = true
   try {
-    await messageStore.sendMessage(props.friend.id, messageText.value.trim(), 'text')
+    await messageStore.sendMessage(props.friend.id, messageText.value.trim(), 'TEXT')
     messageText.value = ''
   } catch (error) {
     ElMessage.error('发送失败')
@@ -349,21 +385,16 @@ async function handleImageUpload(event: Event) {
 
   uploadingFile.value = true
   uploadingFileName.value = file.name
-  uploadProgress.value = 15
+  uploadProgress.value = 30
 
   try {
-    uploadProgress.value = 35
-    let imageUrl = ''
-    try {
-      imageUrl = await uploadKnowledgeBaseCover(file)
-      uploadProgress.value = 80
-    } catch (apiError) {
-      console.warn('后端图片上传接口调用失败，使用本地Blob URL作为展示:', apiError)
-      imageUrl = URL.createObjectURL(file)
-      uploadProgress.value = 90
-    }
+    // 1. 先上传文件获取URL
+    uploadProgress.value = 60
+    const imageUrl = await messageApi.uploadChatFile(file, 'IMAGE')
+    uploadProgress.value = 90
 
-    await messageStore.sendMessage(props.friend.id, imageUrl, 'image')
+    // 2. 通过WebSocket发送图片消息
+    await messageStore.sendMessage(props.friend.id, imageUrl, 'IMAGE')
     uploadProgress.value = 100
     ElMessage.success('图片发送成功')
   } catch (error) {
@@ -386,28 +417,17 @@ async function handleFileUpload(event: Event) {
 
   uploadingFile.value = true
   uploadingFileName.value = file.name
-  uploadProgress.value = 10
+  uploadProgress.value = 20
 
   try {
-    const progressInterval = setInterval(() => {
-      if (uploadProgress.value < 85) {
-        uploadProgress.value += 12
-      }
-    }, 150)
+    // 1. 先上传文件获取URL
+    uploadProgress.value = 50
+    const fileUrl = await messageApi.uploadChatFile(file, 'FILE')
+    uploadProgress.value = 80
 
-    let fileUrl = ''
-    try {
-      // Try calling cover upload API first
-      fileUrl = await uploadKnowledgeBaseCover(file)
-    } catch {
-      fileUrl = URL.createObjectURL(file)
-    }
-
-    clearInterval(progressInterval)
-    uploadProgress.value = 95
-
+    // 2. 通过WebSocket发送文件消息（content格式：fileName|fileSize|fileUrl）
     const content = `${file.name}|${file.size}|${fileUrl}`
-    await messageStore.sendMessage(props.friend.id, content, 'file')
+    await messageStore.sendMessage(props.friend.id, content, 'FILE')
     uploadProgress.value = 100
     ElMessage.success('文件发送成功')
   } catch (error) {
@@ -442,6 +462,42 @@ async function handleDeleteFriend() {
   } catch {
     // cancelled
   }
+}
+
+// Context menu functions
+function showContextMenu(event: MouseEvent, msg: ChatMessage) {
+  contextMenu.value = {
+    visible: true,
+    x: event.clientX,
+    y: event.clientY,
+    msg
+  }
+}
+
+function hideContextMenu() {
+  contextMenu.value.visible = false
+}
+
+// 判断消息是否可以撤回（2分钟内）
+function canRecall(msg: ChatMessage | null): boolean {
+  if (!msg) return false
+  const now = new Date().getTime()
+  const msgTime = new Date(msg.createTime).getTime()
+  return now - msgTime < 2 * 60 * 1000 // 2分钟
+}
+
+async function handleRecallMessage() {
+  const msg = contextMenu.value.msg
+  if (!msg || !props.friend) return
+  
+  try {
+    await ElMessageBox.confirm('确定要撤回这条消息吗？', '撤回消息')
+    await messageStore.recallMessage(msg.id, props.friend.id)
+    ElMessage.success('消息已撤回')
+  } catch {
+    // cancelled
+  }
+  contextMenu.value.visible = false
 }
 
 // File message parser
@@ -489,12 +545,13 @@ function showTimeDivider(index: number): boolean {
   const curr = messages.value[index]
   if (!prev || !curr) return false
 
-  const prevTime = new Date(prev.createdAt).getTime()
-  const currTime = new Date(curr.createdAt).getTime()
+  const prevTime = new Date(prev.createTime).getTime()
+  const currTime = new Date(curr.createTime).getTime()
   return currTime - prevTime > 300000 // 5 minutes
 }
 
 function formatMessageTime(time: string): string {
+  if (!time) return ''
   const date = new Date(time)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
@@ -517,6 +574,7 @@ function formatMessageTime(time: string): string {
 }
 
 function formatTimeOnly(time: string): string {
+  if (!time) return ''
   const date = new Date(time)
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
@@ -599,22 +657,31 @@ function formatTimeOnly(time: string): string {
 .friend-status-text {
   font-size: 0.75rem;
   color: var(--text-muted);
-  margin-top: 1px;
+}
+
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
 }
 
 .action-btn {
-  font-size: 1.15rem;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
+  width: 32px;
+  height: 32px;
+  color: var(--text-secondary) !important;
 }
 
 .action-btn:hover {
   background: var(--bg-secondary) !important;
-  color: var(--text-dark);
+  color: var(--text-dark) !important;
 }
 
 .danger-item {
   color: var(--danger-color) !important;
+}
+
+.danger-item:hover {
+  background: rgba(239, 68, 68, 0.05) !important;
 }
 
 .chat-messages {
@@ -623,9 +690,7 @@ function formatTimeOnly(time: string): string {
   padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.02), transparent 400px), 
-              radial-gradient(circle at bottom left, rgba(16, 185, 129, 0.01), transparent 400px);
+  gap: var(--spacing-sm);
 }
 
 .loading-messages {
@@ -634,26 +699,31 @@ function formatTimeOnly(time: string): string {
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-2xl);
+  padding: var(--spacing-3xl);
   color: var(--text-muted);
 }
 
 .loading-spinner {
-  width: 28px;
-  height: 28px;
-  border: 3px solid var(--bg-secondary);
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--bg-secondary);
   border-top-color: var(--primary-color);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .empty-messages {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-2xl);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-3xl);
+  text-align: center;
 }
 
 .empty-animation {
@@ -661,25 +731,25 @@ function formatTimeOnly(time: string): string {
 }
 
 .chat-bubble-icon {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+  background: var(--bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .chat-bubble-icon .el-icon {
-  font-size: 32px;
+  font-size: 28px;
   color: var(--primary-color);
 }
 
 .empty-title {
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-dark);
-  margin: 0 0 var(--spacing-xs);
+  margin: 0;
 }
 
 .empty-desc {
@@ -688,137 +758,144 @@ function formatTimeOnly(time: string): string {
   margin: 0;
 }
 
-.time-divider {
-  text-align: center;
-  margin: var(--spacing-md) 0;
-}
-
-.time-divider span {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  background: rgba(148, 163, 184, 0.1);
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
-  font-weight: 500;
-}
-
 .message-wrapper {
   display: flex;
   flex-direction: column;
+  max-width: 70%;
 }
 
 .message-wrapper.is-mine {
-  align-items: flex-end;
+  align-self: flex-end;
+}
+
+.time-divider {
+  text-align: center;
+  margin: var(--spacing-sm) 0;
+}
+
+.time-divider span {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
 }
 
 .message-bubble {
   display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
-  max-width: 75%;
+  align-items: flex-end;
+  gap: var(--spacing-xs);
 }
 
-.message-wrapper.is-mine .message-bubble {
+.is-mine .message-bubble {
   flex-direction: row-reverse;
 }
 
 .message-avatar {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
-  border: 1.5px solid var(--bg-secondary);
 }
 
 .message-content-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 3px;
 }
 
-.message-wrapper.is-mine .message-content-wrapper {
+.is-mine .message-content-wrapper {
   align-items: flex-end;
 }
 
 .message-content {
   background: var(--bg-card);
-  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 4px;
+  border-radius: var(--radius-lg);
   padding: var(--spacing-sm) var(--spacing-md);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-xs);
   border: 1px solid var(--border-soft);
-  color: var(--text-primary);
-  width: fit-content;
 }
 
-.message-wrapper.is-mine .message-content {
-  background: var(--gradient-primary);
-  color: white;
-  border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2);
-  border: none;
+.is-mine .message-content {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.message-content.recalled {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-soft) !important;
+  opacity: 0.7;
+}
+
+.message-recalled {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .message-text {
-  font-size: 0.88rem;
-  line-height: 1.6;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-dark);
   word-break: break-word;
-  white-space: pre-wrap;
 }
 
-/* Image styles */
+.is-mine .message-text {
+  color: white;
+}
+
 .message-image-container {
-  max-width: 260px;
-  overflow: hidden;
-  border-radius: var(--radius-md);
+  max-width: 240px;
 }
 
 .message-image {
   max-width: 100%;
-  max-height: 220px;
   border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: transform var(--transition-fast);
 }
 
-.message-image:hover {
-  transform: scale(1.02);
+.message-voice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-regular);
 }
 
-/* File Card styles */
+.is-mine .message-voice {
+  color: white;
+}
+
 .message-file-card {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
-  padding: 8px 12px;
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-soft);
-  min-width: 200px;
-  max-width: 320px;
-}
-
-.message-wrapper.is-mine .message-file-card {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: white;
+  gap: var(--spacing-sm);
+  min-width: 180px;
 }
 
 .file-icon-wrapper {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-md);
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--primary-color);
+  background: var(--bg-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.35rem;
   flex-shrink: 0;
 }
 
-.message-wrapper.is-mine .file-icon-wrapper {
+.is-mine .file-icon-wrapper {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.file-icon-wrapper .el-icon {
+  font-size: 18px;
+  color: var(--primary-color);
+}
+
+.is-mine .file-icon-wrapper .el-icon {
   color: white;
 }
 
@@ -828,276 +905,316 @@ function formatTimeOnly(time: string): string {
 }
 
 .file-name {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
+  color: var(--text-dark);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: inherit;
+}
+
+.is-mine .file-name {
+  color: white;
 }
 
 .file-size {
-  font-size: 0.72rem;
-  opacity: 0.8;
+  font-size: 0.7rem;
+  color: var(--text-muted);
   margin-top: 2px;
 }
 
-.file-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+.is-mine .file-size {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .file-actions .el-button {
-  color: var(--primary-color);
-  font-size: 1.15rem;
+  padding: 4px !important;
 }
 
-.message-wrapper.is-mine .file-actions .el-button {
-  color: white;
+.is-mine .file-actions .el-button {
+  color: white !important;
 }
 
 .message-status {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  margin-top: 2px;
+  margin-top: 4px;
+  padding: 0 4px;
 }
 
 .status-time {
-  opacity: 0.7;
+  font-size: 0.65rem;
+  color: var(--text-muted);
 }
 
 .status-icon {
-  font-size: 0.75rem;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .status-icon.read {
   color: var(--primary-color);
 }
 
-/* Upload Panel styling */
-.uploading-progress-panel {
+/* Context Menu */
+.context-menu {
+  position: fixed;
   background: var(--bg-card);
-  border-top: 1px solid var(--border-soft);
-  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-soft);
+  padding: 4px;
+  z-index: 1000;
+  min-width: 100px;
+}
+
+.context-menu-item {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  color: var(--text-regular);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.context-menu-item:hover {
+  background: var(--bg-secondary);
+  color: var(--text-dark);
+}
+
+.uploading-progress-panel {
+  position: absolute;
+  bottom: 140px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-soft);
+  z-index: 20;
+  min-width: 280px;
 }
 
 .progress-details {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.78rem;
-  color: var(--text-regular);
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
 }
 
 .uploading-text {
-  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-regular);
 }
 
-/* Chat Input styling */
 .chat-input-container {
+  padding: var(--spacing-sm) var(--spacing-lg);
   background: var(--bg-card);
   border-top: 1px solid var(--border-soft);
-  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg);
-  z-index: 10;
 }
 
 .chat-input-wrapper {
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   border-radius: var(--radius-xl);
-  border: 1px solid var(--border-soft);
-  padding: 6px var(--spacing-md) var(--spacing-md);
-  box-shadow: var(--shadow-inner);
-  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  overflow: hidden;
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
 }
 
 .chat-input-wrapper:focus-within {
   border-color: var(--primary-lighter);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
 .input-toolbar {
   display: flex;
-  gap: 6px;
-  margin-bottom: 4px;
+  align-items: center;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-sm);
 }
 
 .toolbar-btn {
-  font-size: 1.15rem;
-  color: var(--text-secondary);
-  width: 34px;
-  height: 34px;
-  transition: all var(--transition-fast);
+  width: 32px !important;
+  height: 32px !important;
+  color: var(--text-secondary) !important;
 }
 
 .toolbar-btn:hover {
-  background: var(--bg-secondary) !important;
-  color: var(--primary-color);
+  background: var(--bg-card) !important;
+  color: var(--primary-color) !important;
 }
 
 .input-area {
   display: flex;
-  gap: var(--spacing-md);
   align-items: flex-end;
+  gap: var(--spacing-xs);
+  padding: 0 var(--spacing-sm) var(--spacing-sm);
 }
 
-/* Customize element plus textarea */
 :deep(.message-textarea .el-textarea__inner) {
-  background-color: transparent !important;
+  background: transparent !important;
   box-shadow: none !important;
   border: none !important;
-  padding: 4px 0 !important;
-  font-size: 0.88rem;
-  color: var(--text-primary);
-  font-family: inherit;
+  padding: 8px 12px !important;
+  font-size: 0.9rem;
   line-height: 1.5;
+  resize: none;
 }
 
 .send-btn {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50% !important;
-  padding: 0 !important;
   background: var(--gradient-primary) !important;
   border: none !important;
-  box-shadow: var(--shadow-md);
-  transition: all var(--transition-base);
   flex-shrink: 0;
+  transition: all var(--transition-fast);
 }
 
-.send-btn:hover:not(:disabled) {
-  transform: scale(1.08);
-  box-shadow: var(--shadow-lg);
+.send-btn:hover {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md);
 }
 
 .send-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+  box-shadow: none;
 }
 
-.send-btn .el-icon {
-  font-size: 1.05rem;
-}
-
-/* Emoji Picker styling */
-.emoji-picker {
-  display: flex;
-  flex-direction: column;
-}
-
-.emoji-title {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-  text-transform: uppercase;
-}
-
-.emoji-list {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 6px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.emoji-item {
-  font-size: 1.25rem;
-  cursor: pointer;
-  transition: transform var(--transition-fast), background-color var(--transition-fast);
-  padding: 4px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.emoji-item:hover {
-  transform: scale(1.22);
-  background: var(--bg-secondary);
-}
-
-/* Welcome page styling */
+/* Empty Chat Center */
 .empty-chat {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-md);
-  background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  height: 100%;
+  background: var(--bg-primary);
+  padding: var(--spacing-3xl);
 }
 
 .empty-chat-animation {
   position: relative;
-  margin-bottom: var(--spacing-md);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  margin-bottom: var(--spacing-xl);
 }
 
 .chat-icon-wrapper {
-  width: 90px;
-  height: 90px;
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%);
+  background: linear-gradient(135deg, var(--primary-lighter) 0%, var(--primary-color) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 8px 32px rgba(59, 130, 246, 0.25);
 }
 
 .chat-icon-wrapper .el-icon {
-  font-size: 42px;
-  color: var(--primary-color);
+  font-size: 36px;
+  color: white;
 }
 
 .float-dots {
   display: flex;
   gap: 6px;
-  justify-content: center;
-  margin-top: 16px;
+  position: absolute;
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .float-dots span {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--primary-lighter);
-  animation: bounce 1.4s ease-in-out infinite;
+  animation: floatDot 1.5s ease-in-out infinite;
 }
 
 .float-dots span:nth-child(2) {
-  animation-delay: 0.2s;
+  animation-delay: 0.3s;
 }
 
 .float-dots span:nth-child(3) {
-  animation-delay: 0.4s;
+  animation-delay: 0.6s;
 }
 
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+@keyframes floatDot {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50% { transform: translateY(-8px); opacity: 1; }
 }
 
 .empty-chat-title {
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-dark);
-  margin: 0;
-  letter-spacing: 0.03em;
+  margin: 0 0 var(--spacing-xs);
 }
 
 .empty-chat-desc {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--text-muted);
   margin: 0;
+}
+
+/* Emoji Picker */
+.emoji-picker {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.emoji-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: var(--spacing-xs);
+}
+
+.emoji-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.emoji-item {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.emoji-item:hover {
+  background: var(--bg-secondary);
+  transform: scale(1.1);
+}
+
+/* Animation classes */
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 8px 32px rgba(59, 130, 246, 0.25); }
+  50% { transform: scale(1.05); box-shadow: 0 12px 40px rgba(59, 130, 246, 0.35); }
 }
 </style>

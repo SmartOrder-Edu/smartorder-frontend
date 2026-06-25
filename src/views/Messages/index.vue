@@ -39,17 +39,16 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import FriendList from './components/FriendList.vue'
 import FriendSearch from './components/FriendSearch.vue'
 import ChatWindow from './components/ChatWindow.vue'
-import type { FriendInfo } from '@/api/message'
+import type { FriendVO } from '@/api/message'
 
 const messageStore = useMessageStore()
 const userStore = useUserStore()
 
 const showSearch = ref(false)
 const showSidebar = ref(true)
-const currentFriend = ref<FriendInfo | null>(null)
+const currentFriend = ref<FriendVO | null>(null)
 
 onMounted(async () => {
-  // Catch errors in index so it fails silently and loads mock data
   try {
     await Promise.all([
       messageStore.fetchFriends(),
@@ -57,7 +56,7 @@ onMounted(async () => {
       messageStore.fetchUnreadCount()
     ])
   } catch (err) {
-    console.warn('初始化消息页面 API 失败，使用本地 Mock 数据:', err)
+    console.warn('初始化消息页面 API 失败:', err)
   }
 
   window.addEventListener('ws-message', handleWsMessage)
@@ -75,12 +74,12 @@ function handleWsMessage(event: Event) {
   if (type === 'CHAT_MESSAGE') {
     messageStore.receiveMessage(data)
   } else if (type === 'FRIEND_REQUEST') {
-    ElMessage.info(`${data.fromUsername} 请求添加你为好友`)
+    ElMessage.info('收到新的好友请求')
     messageStore.fetchFriendRequests()
   }
 }
 
-function handleSelectFriend(friend: FriendInfo) {
+function handleSelectFriend(friend: FriendVO) {
   currentFriend.value = friend
   messageStore.setCurrentChat(friend.id)
   showSearch.value = false

@@ -7,12 +7,10 @@ class ChatWebSocket {
     private baseUrl: string = 'ws://localhost:9015/ws/chat';
     private pingInterval: number | null = null;
     private reconnectTimeout: number | null = null;
-    private isRefreshing: boolean = false; // 是否正在刷新 token
+    private isRefreshing: boolean = false;
 
-    // 连接状态
     public isConnected: boolean = false;
 
-    // 连接方法
     public connect() {
         if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
             return;
@@ -28,7 +26,6 @@ class ChatWebSocket {
             return;
         }
 
-        // 使用路径参数方式传递 token（适配后端 @PathParam("token")）
         const wsUrl = `${this.baseUrl}/${accessToken}`;
 
         console.log('[WebSocket] Connecting to:', wsUrl.replace(accessToken, '***'));
@@ -48,8 +45,6 @@ class ChatWebSocket {
     private onOpen() {
         console.log('[WebSocket] Connection established');
         this.isConnected = true;
-
-        // 开启心跳
         this.startHeartbeat();
     }
 
@@ -57,8 +52,8 @@ class ChatWebSocket {
         try {
             const data = JSON.parse(event.data);
 
-            // 处理心跳响应（后端返回的是纯文本 "pong"）
-            if (data.type === 'pong' || data.msgType === 'PONG') {
+            // 处理心跳响应
+            if (data === 'pong' || data.type === 'pong' || data.msgType === 'PONG') {
                 return;
             }
 
@@ -70,13 +65,7 @@ class ChatWebSocket {
                 return;
             }
 
-            // 如果是系统错误提示
-            if (data.msgType === 'ERROR_TIP') {
-                ElMessage.error(data.content);
-                return;
-            }
-
-            // 分发消息类型给其他组件
+            // 分发消息
             this.dispatchMessage(data);
         } catch (error) {
             // 解析失败，可能是纯文本心跳响应
@@ -89,32 +78,54 @@ class ChatWebSocket {
 
     /**
      * 分发消息给其他组件
-     * 通过自定义事件实现组件间通信
+     * 后端直接发送 ChatMessageDTO，格式为：
+     * {
+     *   messageId: 123,
+     *   senderId: 1,
+     *   receiverId: 2,
+     *   msgType: "TEXT" | "IMAGE" | "VOICE" | "FILE" | "ERROR_TIP" | "FRIEND_REQUEST" | ...,
+     *   content: "...",
+     *   createTime: "2024-01-01T00:00:00"
+     * }
      */
     private dispatchMessage(data: any) {
-        const { msgType, type } = data;
-        const messageType = msgType || type;
+        const { msgType } = data;
 
-        // 聊天消息
-        if (messageType === 'CHAT_MESSAGE') {
+        // 错误提示（被拉黑、被删等）
+        if (msgType === 'ERROR_TIP') {
+            ElMessage.error(data.content);
+            return;
+        }
+
+        // 普通聊天消息 (TEXT, IMAGE, VOICE, FILE)
+        if (['TEXT', 'IMAGE', 'VOICE', 'FILE'].includes(msgType)) {
             window.dispatchEvent(new CustomEvent('ws-message', {
-                detail: { type: 'CHAT_MESSAGE', data: data.data || data }
+                detail: { type: 'CHAT_MESSAGE', data }
             }));
             return;
         }
 
-        // 好友请求
-        if (messageType === 'FRIEND_REQUEST') {
+        // 好友请求通知
+        if (msgType === 'FRIEND_REQUEST') {
             window.dispatchEvent(new CustomEvent('ws-message', {
-                detail: { type: 'FRIEND_REQUEST', data: data.data || data }
+                detail: { type: 'FRIEND_REQUEST', data }
             }));
             return;
         }
 
         // 消息已读回执
-        if (messageType === 'MESSAGE_READ') {
+        if (msgType === 'MESSAGE_READ') {
             window.dispatchEvent(new CustomEvent('ws-message', {
-                detail: { type: 'MESSAGE_READ', data: data.data || data }
+                detail: { type: 'MESSAGE_READ', data }
+            }));
+            return;
+        }
+
+        // 通话信令
+        if (['VIDEO_CALL_REQUEST', 'VOICE_CALL_REQUEST', 'CALL_ACCEPT', 
+             'CALL_REJECT', 'CALL_CANCEL', 'CALL_END'].includes(msgType)) {
+            window.dispatchEvent(new CustomEvent('ws-message', {
+                detail: { type: 'CALL_SIGNAL', data }
             }));
             return;
         }
@@ -122,7 +133,7 @@ class ChatWebSocket {
         // 其他系统消息
         if (data.content) {
             window.dispatchEvent(new CustomEvent('ws-message', {
-                detail: { type: 'SYSTEM', data: data }
+                detail: { type: 'SYSTEM', data }
             }));
         }
     }
@@ -138,7 +149,7 @@ class ChatWebSocket {
             return;
         }
 
-        // 断线重连(如果是正常关闭则不重连，这里先简单通过错误码判断)
+        // 断线重连
         if (event.code !== 1000) {
             this.reconnect();
         }
@@ -148,10 +159,6 @@ class ChatWebSocket {
         console.error('[WebSocket] Error:', error);
     }
 
-    /**
-     * 处理 Token 过期
-     * 尝试刷新 accessToken 并重新连接，失败则跳转登录页
-     */
     private async handleTokenExpired(msg: string) {
         if (this.isRefreshing) {
             console.log('[WebSocket] Token refresh already in progress, skipping...');
@@ -162,16 +169,13 @@ class ChatWebSocket {
         console.log('[WebSocket] Token expired, attempting to refresh...');
 
         try {
-            // 调用 accessToken 刷新函数
             const newAccessToken = await refreshAccessToken();
 
-            // 更新 store 中的 accessToken
             const userStore = useUserStore();
             userStore.setToken(newAccessToken);
 
             ElMessage.success('Token 已刷新，正在重新连接...');
 
-            // 延迟一下再重连，确保后端已处理
             setTimeout(() => {
                 this.connect();
             }, 500);
@@ -179,7 +183,6 @@ class ChatWebSocket {
             console.error('[WebSocket] Failed to refresh token:', error);
             ElMessage.error(msg || '登录已过期，请重新登录');
 
-            // 清理本地状态并跳转登录页
             const userStore = useUserStore();
             userStore.logout();
 
@@ -189,13 +192,10 @@ class ChatWebSocket {
         }
     }
 
-    // 心跳机制
     private startHeartbeat() {
         this.stopHeartbeat();
-        // 每 30 秒发送一次心跳
         this.pingInterval = window.setInterval(() => {
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                // 后端期望纯文本 "ping"
                 this.ws.send('ping');
             }
         }, 30000);
@@ -208,21 +208,22 @@ class ChatWebSocket {
         }
     }
 
-    // 重连逻辑
     private reconnect() {
         if (this.reconnectTimeout !== null) {
             clearTimeout(this.reconnectTimeout);
         }
 
-        // 5秒后重连
         this.reconnectTimeout = window.setTimeout(() => {
             console.log('[WebSocket] Attempting to reconnect...');
             this.connect();
         }, 5000);
     }
 
-    // 发送消息
-    public sendMessage(data: any) {
+    /**
+     * 发送消息
+     * 后端期望的格式：{ receiverId, msgType, content }
+     */
+    public sendMessage(data: { receiverId: number; msgType: string; content: string }) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(data));
         } else {
@@ -231,7 +232,6 @@ class ChatWebSocket {
         }
     }
 
-    // 断开连接（用户登出时）
     public disconnect() {
         if (this.ws) {
             this.ws.close(1000, 'User logout');

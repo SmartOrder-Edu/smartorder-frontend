@@ -12,14 +12,9 @@
     <div class="search-content">
       <!-- Search Input controls -->
       <div class="search-input-area">
-        <el-radio-group v-model="searchType" size="small" class="type-selector">
-          <el-radio-button label="username">用户名</el-radio-button>
-          <el-radio-button label="phone">手机号</el-radio-button>
-        </el-radio-group>
-        
         <el-input
           v-model="keyword"
-          :placeholder="searchType === 'username' ? '输入用户名称 (支持模糊搜索)...' : '输入手机号码...'"
+          placeholder="输入用户名称或手机号 (支持模糊搜索)..."
           clearable
           class="search-bar"
         >
@@ -36,7 +31,7 @@
         <div v-if="searchResults.length > 0" class="result-list stagger-children">
           <div v-for="user in searchResults" :key="user.id" class="result-item hover-lift">
             <div class="user-avatar">
-              <img :src="user.avatarUrl || '/default-avatar.png'" :alt="user.username" />
+              <img :src="user.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" :alt="user.username" />
             </div>
             <div class="user-info">
               <div class="user-name">{{ user.username }}</div>
@@ -74,16 +69,15 @@
         <div v-if="pendingRequests.length > 0" class="request-list">
           <div v-for="request in pendingRequests" :key="request.id" class="request-item hover-lift animate-fade-in-up">
             <div class="request-avatar">
-              <img :src="request.fromAvatarUrl || '/default-avatar.png'" :alt="request.fromUsername" />
+              <img :src="getSenderAvatar(request.senderId) || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" :alt="getSenderName(request.senderId)" />
             </div>
             <div class="request-info">
-              <div class="request-name">{{ request.fromUsername }}</div>
-              <div class="request-message">{{ request.message || '请求添加你为好友' }}</div>
-              <div class="request-time">{{ formatTime(request.createdAt) }}</div>
+              <div class="request-name">{{ getSenderName(request.senderId) }}</div>
+              <div class="request-message">{{ request.requestMsg || '请求添加你为好友' }}</div>
+              <div class="request-time">{{ formatTime(request.createTime) }}</div>
             </div>
             <div class="request-actions">
               <el-button type="success" size="small" class="accept-btn" @click="handleAccept(request.id)">接受</el-button>
-              <el-button size="small" class="reject-btn" @click="handleReject(request.id)">拒绝</el-button>
             </div>
           </div>
         </div>
@@ -122,7 +116,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { ArrowLeft, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useMessageStore } from '@/stores/message'
-import type { FriendInfo } from '@/api/message'
+import type { UserVO } from '@/api/message'
 
 defineEmits<{
   (e: 'close'): void
@@ -130,15 +124,14 @@ defineEmits<{
 
 const messageStore = useMessageStore()
 
-const searchType = ref<'username' | 'phone'>('username')
 const keyword = ref('')
 const searching = ref(false)
 const hasSearched = ref(false)
-const searchResults = ref<FriendInfo[]>([])
+const searchResults = ref<UserVO[]>([])
 const addingUsers = ref(new Set<number>())
 
 const showAddDialog = ref(false)
-const selectedUser = ref<FriendInfo | null>(null)
+const selectedUser = ref<UserVO | null>(null)
 const requestMessage = ref('')
 const sendingRequest = ref(false)
 
@@ -148,7 +141,7 @@ onMounted(() => {
   messageStore.fetchFriendRequests()
 })
 
-// Watch for keyword and searchType changes to trigger fuzzy search immediately
+// Watch for keyword changes to trigger fuzzy search immediately
 watch(keyword, async (newVal) => {
   const val = newVal.trim()
   if (!val) {
@@ -160,7 +153,7 @@ watch(keyword, async (newVal) => {
   searching.value = true
   hasSearched.value = true
   try {
-    searchResults.value = await messageStore.searchUsers(val, searchType.value)
+    searchResults.value = await messageStore.searchUsers(val)
   } catch (error) {
     console.warn('即时搜索失败:', error)
   } finally {
@@ -168,21 +161,24 @@ watch(keyword, async (newVal) => {
   }
 })
 
-watch(searchType, async () => {
-  const val = keyword.value.trim()
-  if (!val) return
+function getSenderName(senderId: number): string {
+  // 从搜索结果或好友列表中查找用户名
+  const user = searchResults.value.find(u => u.id === senderId)
+  if (user) return user.username
+  const friend = messageStore.friends.find(f => f.id === senderId)
+  if (friend) return friend.username
+  return `用户${senderId}`
+}
 
-  searching.value = true
-  try {
-    searchResults.value = await messageStore.searchUsers(val, searchType.value)
-  } catch (error) {
-    console.warn('切换搜索类型失败:', error)
-  } finally {
-    searching.value = false
-  }
-})
+function getSenderAvatar(senderId: number): string {
+  const user = searchResults.value.find(u => u.id === senderId)
+  if (user) return user.avatarUrl || ''
+  const friend = messageStore.friends.find(f => f.id === senderId)
+  if (friend) return friend.avatarUrl || ''
+  return ''
+}
 
-function handleAddFriend(user: FriendInfo) {
+function handleAddFriend(user: UserVO) {
   selectedUser.value = user
   requestMessage.value = ''
   showAddDialog.value = true
@@ -208,15 +204,6 @@ async function handleAccept(requestId: number) {
   try {
     await messageStore.acceptRequest(requestId)
     ElMessage.success('已接受好友请求')
-  } catch (error) {
-    ElMessage.error('操作失败')
-  }
-}
-
-async function handleReject(requestId: number) {
-  try {
-    await messageStore.rejectRequest(requestId)
-    ElMessage.success('已拒绝好友请求')
   } catch (error) {
     ElMessage.error('操作失败')
   }
@@ -284,17 +271,6 @@ function formatTime(time: string): string {
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-lg);
   flex-shrink: 0;
-}
-
-.type-selector {
-  align-self: flex-start;
-}
-
-:deep(.type-selector .el-radio-button__inner) {
-  border-radius: var(--radius-md);
-  padding: 6px 14px;
-  font-size: 0.78rem;
-  font-weight: 600;
 }
 
 /* Customize element plus input append slot */
@@ -501,10 +477,6 @@ function formatTime(time: string): string {
   font-weight: 600 !important;
   background: var(--gradient-accent) !important;
   border: none !important;
-}
-
-.reject-btn {
-  font-weight: 600 !important;
 }
 
 .empty-requests {

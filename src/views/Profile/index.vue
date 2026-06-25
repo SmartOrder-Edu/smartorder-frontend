@@ -41,7 +41,7 @@
       <section class="section user-info-card">
         <div class="user-header">
           <div class="user-avatar-large">
-            <img :src="userInfo.avatar || '/default-avatar.png'" alt="头像" />
+            <img :src="userInfo.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="头像" />
             <label class="avatar-edit" :class="{ uploading }">
               <svg v-if="!uploading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
