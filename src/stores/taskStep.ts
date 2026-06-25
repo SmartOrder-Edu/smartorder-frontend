@@ -9,6 +9,7 @@ import type {
   CanvasContent,
   FeedbackType,
   LessonCue,
+  LessonSceneAction,
   LessonTimeline,
   MasteryJudge,
   QuizState,
@@ -55,6 +56,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   // ---- 教学流状态（v2 Agent 主动教学交互）----
   const teachingActive = ref(false)
   const quizState = ref<QuizState | null>(null)
+  const activeSceneActions = ref<LessonSceneAction[]>([])
+  const sceneActionTimers: ReturnType<typeof setTimeout>[] = []
 
   const timelinePlayer = useTimelinePlayer({
     applyCue: applyTimelineCue,
@@ -496,6 +499,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   }
 
   function reset() {
+    clearSceneActions()
     endTeaching()
     steps.value = []
     scriptSteps.value = []
@@ -548,10 +552,12 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   function buildTimelineFromTeachingFlow(sceneId: string, flow: TeachingFlow): LessonTimeline {
     let cursorMs = 0
-    const cues: LessonCue[] = flow.segments.map((segment, index) => {
+    const cues: LessonCue[] = []
+    flow.segments.forEach((segment, index) => {
       const startMs = cursorMs
       cursorMs += Math.max(segment.autoAdvanceMs, 800)
-      return {
+      const sceneAction = buildSceneActionFromSegment(segment, index, startMs)
+      cues.push({
         id: `${segment.id}-reveal`,
         type: 'segment_reveal',
         startMs,
@@ -561,8 +567,16 @@ export const useTaskStepStore = defineStore('taskStep', () => {
           segmentIndex: index,
           segmentType: segment.type,
           waitForUser: segment.autoAdvanceMs <= 0 || segment.type === 'quiz',
+          sceneAction,
         },
-      }
+      })
+      cues.push({
+        id: `${segment.id}-scene-action`,
+        type: 'scene_action',
+        startMs,
+        endMs: Math.min(cursorMs, startMs + sceneAction.durationMs),
+        payload: sceneAction,
+      })
     })
 
     return {
@@ -578,27 +592,22 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   }
 
   function applyTimelineCue(cue: LessonCue) {
+    reportTimelineCuePlayed(cue)
+
+    if (cue.type === 'scene_action') {
+      applySceneActionCue(cue)
+      return
+    }
+
     if (cue.type !== 'segment_reveal') return
     const index = Number(cue.payload.segmentIndex)
     if (!Number.isInteger(index)) return
-    void reportStudyEvent({
-      eventType: 'timeline_cue_played',
-      targetType: 'cue',
-      targetId: cue.id,
-      timelineTimeMs: Math.round(timelinePlayer.currentTimeMs.value),
-      payload: {
-        cueType: cue.type,
-        startMs: cue.startMs,
-        endMs: cue.endMs,
-        segmentIndex: index,
-        segmentType: cue.payload.segmentType,
-        waitForUser: cue.payload.waitForUser,
-      },
-    })
+    applySceneActionPayload(cue.payload.sceneAction, cue.startMs)
     processSegment(index, cue)
   }
 
   function resetTimelineScene() {
+    clearSceneActions()
     const flow = currentTeachingFlow.value
     if (flow) {
       flow.currentSegmentIndex = -1
@@ -616,6 +625,102 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     }
     quizState.value = null
     teachingActive.value = true
+  }
+
+  function buildSceneActionFromSegment(segment: TeachingSegment, index: number, startMs: number): LessonSceneAction {
+    const actionTypeBySegment: Record<string, string> = {
+      text: 'text_fade_in',
+      formula: 'formula_write',
+      diagram: 'diagram_trace',
+      quiz: 'quiz_mount',
+      pause: 'narration',
+    }
+    const instructionBySegment: Record<string, string> = {
+      text: '逐段淡入文字讲解',
+      formula: '按推导顺序书写公式',
+      diagram: '沿节点关系绘制图示',
+      quiz: '挂载互动题并等待学生作答',
+      pause: '展示过渡提示',
+    }
+
+    return {
+      actionId: `${segment.id}-action`,
+      actionType: actionTypeBySegment[segment.type] || 'text_fade_in',
+      targetType: segment.type === 'diagram' ? 'diagram' : segment.type === 'quiz' ? 'quiz' : 'segment',
+      targetId: segment.id,
+      layer: segment.type === 'quiz' ? 'overlay' : 'content',
+      startMs,
+      durationMs: Math.min(Math.max(segment.autoAdvanceMs || 1800, 1200), 5200),
+      instruction: instructionBySegment[segment.type] || '播放场景动作',
+      payload: {
+        segmentIndex: index,
+        segmentType: segment.type,
+        focusTarget: segment.focusTarget,
+      },
+    }
+  }
+
+  function applySceneActionCue(cue: LessonCue) {
+    applySceneActionPayload(cue.payload, cue.startMs)
+  }
+
+  function applySceneActionPayload(value: unknown, fallbackStartMs: number) {
+    if (!value || typeof value !== 'object') return
+    const payload = value as Record<string, unknown>
+    const actionId = String(payload.actionId || '')
+    const actionType = String(payload.actionType || '')
+    if (!actionId || !actionType) return
+
+    const action: LessonSceneAction = {
+      actionId,
+      actionType,
+      targetType: payload.targetType ? String(payload.targetType) : undefined,
+      targetId: payload.targetId ? String(payload.targetId) : undefined,
+      layer: payload.layer ? String(payload.layer) : undefined,
+      startMs: Number(payload.startMs ?? fallbackStartMs),
+      durationMs: Math.max(Number(payload.durationMs ?? 1800), 600),
+      instruction: payload.instruction ? String(payload.instruction) : undefined,
+      payload: typeof payload.payload === 'object' && payload.payload
+        ? payload.payload as Record<string, unknown>
+        : undefined,
+    }
+
+    activeSceneActions.value = [
+      action,
+      ...activeSceneActions.value.filter(item => item.actionId !== action.actionId),
+    ].slice(0, 4)
+
+    const timer = setTimeout(() => {
+      activeSceneActions.value = activeSceneActions.value.filter(item => item.actionId !== action.actionId)
+    }, action.durationMs)
+    sceneActionTimers.push(timer)
+  }
+
+  function clearSceneActions() {
+    while (sceneActionTimers.length) {
+      const timer = sceneActionTimers.pop()
+      if (timer) clearTimeout(timer)
+    }
+    activeSceneActions.value = []
+  }
+
+  function reportTimelineCuePlayed(cue: LessonCue) {
+    void reportStudyEvent({
+      eventType: 'timeline_cue_played',
+      targetType: 'cue',
+      targetId: cue.id,
+      timelineTimeMs: Math.round(timelinePlayer.currentTimeMs.value),
+      payload: {
+        cueType: cue.type,
+        startMs: cue.startMs,
+        endMs: cue.endMs,
+        segmentIndex: cue.payload.segmentIndex,
+        segmentType: cue.payload.segmentType,
+        waitForUser: cue.payload.waitForUser,
+        actionType: cue.payload.actionType,
+        targetId: cue.payload.targetId,
+      },
+    })
   }
 
   function pushSegmentCommentary(segment: TeachingSegment, cueId: string) {
@@ -736,6 +841,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     // 教学流
     teachingActive,
     quizState,
+    activeSceneActions,
     currentTeachingFlow,
     currentTimeline,
     currentSegment,

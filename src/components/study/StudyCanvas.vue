@@ -60,6 +60,18 @@
           <span>{{ stepStore.currentSegment.agentCommentary }}</span>
         </div>
 
+        <div class="scene-action-strip" v-if="stepStore.activeSceneActions.length">
+          <div
+            v-for="action in stepStore.activeSceneActions"
+            :key="action.actionId"
+            class="scene-action-pill"
+          >
+            <span class="scene-action-icon" :class="String(action.actionType)"></span>
+            <span>{{ sceneActionLabel(action.actionType) }}</span>
+            <small v-if="action.instruction">{{ action.instruction }}</small>
+          </div>
+        </div>
+
         <!-- 教学段列表（降序：所有已展示的段 + 当前段） -->
         <div class="teaching-segments">
           <template v-for="(seg, idx) in stepStore.canvasContent.teachingFlow.segments" :key="seg.id">
@@ -149,7 +161,7 @@ import PracticeStage from './PracticeStage.vue'
 import TeachingSegmentView from './TeachingSegmentView.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
 import { ElMessage } from 'element-plus'
-import type { ScriptPhaseType } from '@/types/study'
+import type { LessonSceneActionType, ScriptPhaseType } from '@/types/study'
 
 const stepStore = useTaskStepStore()
 
@@ -163,6 +175,19 @@ function phaseLabel(phase: ScriptPhaseType): string {
     summary: '本次总结',
   }
   return map[phase] || phase
+}
+
+function sceneActionLabel(actionType: LessonSceneActionType | string): string {
+  const map: Record<string, string> = {
+    narration: '旁白同步',
+    text_fade_in: '文字入场',
+    formula_write: '公式书写',
+    diagram_trace: '图示绘制',
+    focus_pulse: '重点聚焦',
+    quiz_mount: '互动题',
+    summary_pin: '总结固定',
+  }
+  return map[actionType] || String(actionType)
 }
 
 function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation: string }) {
@@ -306,6 +331,65 @@ function onQuizAnswer(quizId: string, answer: string) {
 }
 
 // ---- 教学段列表 ----
+.scene-action-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.scene-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.3;
+  animation: sceneActionIn 0.22s ease-out;
+
+  small {
+    color: #64748b;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.scene-action-icon {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #0bb7aa;
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+
+  &.formula_write {
+    background: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  }
+
+  &.diagram_trace {
+    background: #f59e0b;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
+  }
+
+  &.quiz_mount {
+    background: #a855f7;
+    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.12);
+  }
+
+  &.focus_pulse {
+    background: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+  }
+}
+
 .teaching-segments {
   display: flex;
   flex-direction: column;
@@ -389,5 +473,16 @@ function onQuizAnswer(quizId: string, answer: string) {
   .header-left { width: 100%; }
   .canvas-body { padding: 16px; }
   .markdown-stage { padding: 18px; }
+}
+
+@keyframes sceneActionIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

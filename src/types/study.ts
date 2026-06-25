@@ -167,6 +167,7 @@ export type LessonClockSource = 'internal' | 'audio'
 /** 教学时间轴 Cue 类型。保留通用动作，避免未来每加一种场景都改播放器核心。 */
 export type LessonCueType =
   | 'segment_reveal'
+  | 'scene_action'
   | 'speech'
   | 'subtitle'
   | 'text_reveal'
@@ -185,6 +186,29 @@ export interface LessonCue {
   startMs: number
   endMs?: number
   payload: Record<string, unknown>
+}
+
+/** 场景动作类型。它是动画生成协议的稳定层，不绑定具体渲染引擎。 */
+export type LessonSceneActionType =
+  | 'narration'
+  | 'text_fade_in'
+  | 'formula_write'
+  | 'diagram_trace'
+  | 'focus_pulse'
+  | 'quiz_mount'
+  | 'summary_pin'
+
+/** 时间轴驱动的场景动作。后续可映射到 Canvas、Manim、视频或字幕生成。 */
+export interface LessonSceneAction {
+  actionId: string
+  actionType: LessonSceneActionType | string
+  targetType?: 'segment' | 'formula' | 'diagram' | 'quiz' | 'canvas' | string
+  targetId?: string
+  layer?: 'content' | 'overlay' | 'agent' | string
+  startMs: number
+  durationMs: number
+  instruction?: string
+  payload?: Record<string, unknown>
 }
 
 /** 单个教学场景的播放时间轴 */
