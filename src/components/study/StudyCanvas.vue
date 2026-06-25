@@ -162,18 +162,23 @@ import PracticeStage from './PracticeStage.vue'
 import TeachingSegmentView from './TeachingSegmentView.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
 import { ElMessage } from 'element-plus'
-import type { LessonSceneActionType, ScriptPhaseType } from '@/types/study'
+import type { LessonSceneActionType } from '@/types/study'
 
 const stepStore = useTaskStepStore()
 
-function phaseLabel(phase: ScriptPhaseType): string {
-  const map: Record<ScriptPhaseType, string> = {
+function phaseLabel(phase: string): string {
+  const map: Record<string, string> = {
     review: '回顾前置',
     example: '动态例子',
     practice: '跟做例题',
     assessment: '掌握判断',
     advanced: '提高 / 补基础',
     summary: '本次总结',
+    diagnostic: '诊断',
+    targeted_review: '定向补弱',
+    diagnose_gap: '定位卡点',
+    rebuild_foundation: '补基础',
+    guided_practice: '跟做练习',
   }
   return map[phase] || phase
 }

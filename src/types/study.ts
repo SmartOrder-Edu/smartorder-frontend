@@ -41,25 +41,23 @@ export interface StartStudySessionRequest {
   stepId?: string
 }
 
-/** 学习脚本阶段类型（对应方案 6 阶段） */
-export type ScriptPhaseType =
-  | 'review'       // 1.回顾前置概念
-  | 'example'      // 2.动态例子
-  | 'practice'     // 3.跟做例题
-  | 'assessment'   // 4.掌握判断
-  | 'advanced'     // 5.提高或补基础
-  | 'summary'      // 6.总结与画像更新
+/** 学习脚本阶段。阶段由模板决定，不再固定为 6 段。 */
+export type ScriptPhaseType = string
 
 /** 学习脚本步骤（比 TaskStep 更细粒度的教学脚本） */
 export interface ScriptStep {
   id: string
   phase: ScriptPhaseType
+  /** 开放节点类型：diagnostic_quiz / concept_review / guided_practice / summary 等 */
+  nodeType?: string
   title: string
   subtitle: string
   estimatedMinutes: number
   status: 'pending' | 'in_progress' | 'completed' | 'skipped'
   /** 该步骤在画布上的渲染提示，驱动 CanvasContent 模板 */
   canvasType: CanvasType
+  sortOrder?: number
+  metadata?: Record<string, unknown>
 }
 
 /** 画布渲染类型 */

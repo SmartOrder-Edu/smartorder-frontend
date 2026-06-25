@@ -61,20 +61,24 @@
 
 <script setup lang="ts">
 import { useTaskStepStore } from '@/stores/taskStep'
-import type { ScriptPhaseType } from '@/types/study'
 
 defineEmits<{ (e: 'jump', index: number): void }>()
 
 const stepStore = useTaskStepStore()
 
-function phaseLabel(phase: ScriptPhaseType): string {
-  const map: Record<ScriptPhaseType, string> = {
+function phaseLabel(phase: string): string {
+  const map: Record<string, string> = {
     review: '回顾',
     example: '例子',
     practice: '练习',
     assessment: '测评',
     advanced: '提高',
     summary: '总结',
+    diagnostic: '诊断',
+    targeted_review: '补弱',
+    diagnose_gap: '定位',
+    rebuild_foundation: '补基础',
+    guided_practice: '跟做',
   }
   return map[phase] || phase
 }
