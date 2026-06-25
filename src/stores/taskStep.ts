@@ -57,7 +57,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const teachingActive = ref(false)
   const quizState = ref<QuizState | null>(null)
   const activeSceneActions = ref<LessonSceneAction[]>([])
-  const sceneActionTimers: ReturnType<typeof setTimeout>[] = []
+  const sceneActionTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   const timelinePlayer = useTimelinePlayer({
     applyCue: applyTimelineCue,
@@ -690,18 +690,29 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       ...activeSceneActions.value.filter(item => item.actionId !== action.actionId),
     ].slice(0, 4)
 
+    const existedTimer = sceneActionTimers.get(action.actionId)
+    if (existedTimer) {
+      clearTimeout(existedTimer)
+    }
     const timer = setTimeout(() => {
       activeSceneActions.value = activeSceneActions.value.filter(item => item.actionId !== action.actionId)
+      sceneActionTimers.delete(action.actionId)
     }, action.durationMs)
-    sceneActionTimers.push(timer)
+    sceneActionTimers.set(action.actionId, timer)
   }
 
   function clearSceneActions() {
-    while (sceneActionTimers.length) {
-      const timer = sceneActionTimers.pop()
-      if (timer) clearTimeout(timer)
-    }
+    sceneActionTimers.forEach(timer => clearTimeout(timer))
+    sceneActionTimers.clear()
     activeSceneActions.value = []
+  }
+
+  function getActiveSceneAction(targetId?: string, segmentIndex?: number): LessonSceneAction | null {
+    return activeSceneActions.value.find(action => {
+      if (targetId && action.targetId === targetId) return true
+      if (!Number.isInteger(segmentIndex)) return false
+      return Number(action.payload?.segmentIndex) === segmentIndex
+    }) || null
   }
 
   function reportTimelineCuePlayed(cue: LessonCue) {
@@ -842,6 +853,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     teachingActive,
     quizState,
     activeSceneActions,
+    getActiveSceneAction,
     currentTeachingFlow,
     currentTimeline,
     currentSegment,

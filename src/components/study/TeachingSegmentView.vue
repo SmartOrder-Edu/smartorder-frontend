@@ -6,7 +6,10 @@
       'segment-past': !isCurrent,
       'segment-current': isCurrent,
       'segment-future': !visible,
+      'scene-action-active': !!sceneAction,
+      [`scene-action-${sceneAction?.actionType}`]: !!sceneAction,
     }"
+    :style="sceneActionStyle"
     :ref="(el) => { if (el && isCurrent && segment.focusTarget) applyFocus(el) }"
   >
     <!-- text / formula：markdown + stagger 子元素 -->
@@ -46,13 +49,14 @@
 import { ref, computed, watch } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import InlineQuizCard from './InlineQuizCard.vue'
-import type { TeachingSegment, QuizState } from '@/types/study'
+import type { LessonSceneAction, TeachingSegment, QuizState } from '@/types/study'
 
 const props = defineProps<{
   segment: TeachingSegment
   visible: boolean
   isCurrent: boolean
   quizState?: QuizState | null
+  sceneAction?: LessonSceneAction | null
 }>()
 
 defineEmits<{
@@ -80,6 +84,11 @@ const focusClass = computed(() => {
   if (fx === 'scale') return 'focus-scale'
   return ''
 })
+
+const sceneAction = computed(() => props.sceneAction || null)
+const sceneActionStyle = computed(() => ({
+  '--scene-action-duration': `${Math.max(sceneAction.value?.durationMs || 1200, 600)}ms`,
+}))
 
 function applyFocus(el: HTMLElement) {
   const target = props.segment.focusTarget
@@ -114,6 +123,57 @@ function applyFocus(el: HTMLElement) {
 
 .segment-enter {
   // keyframes in teaching-animations.scss
+}
+
+.scene-action-active {
+  --scene-action-duration: 1200ms;
+}
+
+.scene-action-text_fade_in {
+  .segment-markdown {
+    animation: sceneTextFade var(--scene-action-duration) ease-out;
+  }
+}
+
+.scene-action-formula_write {
+  .segment-markdown {
+    position: relative;
+    overflow: hidden;
+    animation: formulaCardLift var(--scene-action-duration) ease-out;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.14), transparent);
+      transform: translateX(-100%);
+      animation: formulaWriteSweep var(--scene-action-duration) ease-out;
+    }
+  }
+
+  :deep(.math-block),
+  :deep(.math-inline) {
+    color: #1d4ed8;
+    transition: color 0.24s ease;
+  }
+}
+
+.scene-action-diagram_trace {
+  .segment-diagram {
+    animation: diagramTrace var(--scene-action-duration) ease-out;
+  }
+}
+
+.scene-action-focus_pulse {
+  .segment-markdown,
+  .segment-diagram {
+    animation: focusPulse var(--scene-action-duration) ease-out;
+  }
+}
+
+.scene-action-quiz_mount {
+  animation: quizMount var(--scene-action-duration) ease-out;
 }
 
 .segment-markdown {
@@ -172,6 +232,76 @@ function applyFocus(el: HTMLElement) {
     border-radius: 50%;
     background: #94a3b8;
     animation: agentDotPulse 1s ease-in-out infinite;
+  }
+}
+
+@keyframes sceneTextFade {
+  from {
+    opacity: 0.28;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes formulaCardLift {
+  0% {
+    border-color: rgba(37, 99, 235, 0.1);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+  }
+  42% {
+    border-color: rgba(37, 99, 235, 0.38);
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.13);
+  }
+  100% {
+    border-color: rgba(15, 23, 42, 0.04);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+  }
+}
+
+@keyframes formulaWriteSweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes diagramTrace {
+  0% {
+    border-color: rgba(245, 158, 11, 0.18);
+    box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0), 0 6px 20px rgba(15, 23, 42, 0.04);
+  }
+  50% {
+    border-color: rgba(245, 158, 11, 0.55);
+    box-shadow: inset 0 0 0 2px rgba(245, 158, 11, 0.12), 0 12px 28px rgba(245, 158, 11, 0.12);
+  }
+  100% {
+    border-color: rgba(15, 23, 42, 0.06);
+    box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0), 0 6px 20px rgba(15, 23, 42, 0.04);
+  }
+}
+
+@keyframes focusPulse {
+  0%, 100% {
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+  }
+  45% {
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.08), 0 12px 28px rgba(239, 68, 68, 0.12);
+  }
+}
+
+@keyframes quizMount {
+  from {
+    opacity: 0.3;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 </style>

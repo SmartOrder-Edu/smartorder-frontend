@@ -81,6 +81,7 @@
               :visible="true"
               :is-current="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex"
               :quiz-state="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex ? stepStore.quizState : null"
+              :scene-action="stepStore.getActiveSceneAction(seg.id, idx)"
               @quiz-answer="onQuizAnswer"
             />
           </template>
