@@ -52,6 +52,23 @@
           </div>
         </aside>
 
+        <!-- 数字人展开按钮（收起状态时显示） -->
+        <div 
+          v-if="isAssistantCollapsed" 
+          class="expand-btn-avatar" 
+          @click="isAssistantCollapsed = false"
+          title="展开数字人"
+        >
+          <el-icon><ArrowRight /></el-icon>
+        </div>
+
+        <!-- 数字人面板 -->
+        <AssistantPanel 
+          v-show="!isAssistantCollapsed"
+          :latestAiMessage="latestAiMessageForAvatar"
+          @collapse="isAssistantCollapsed = true"
+        />
+
         <!-- 聊天区域 -->
         <main class="chat-area" :class="{ 'sidebar-open': historySidebarOpen }">
           <div class="chat-area-top-bar">
@@ -563,6 +580,8 @@ import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
 import type { RagReference } from '@/composables/useAgentChat'
+import AssistantPanel from '@/components/AssistantPanel.vue'
+import { ArrowRight } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
@@ -579,6 +598,10 @@ const attachments = ref<AttachmentStatus[]>([])
 const pollingTimers = new Map<number, number>()
 const { upload: uploadAttachment, uploadProgress, resetProgress } = useAgentAttachmentUpload()
 const selectedReferences = ref<RagReference[]>([])
+
+// 数字人面板状态
+const isAssistantCollapsed = ref(false)
+const latestAiMessageForAvatar = ref('')
 
 const { width: windowWidth } = useWindowSize()
 const isMobile = computed(() => windowWidth.value < 768)
@@ -621,6 +644,14 @@ const switchMode = (mode: 'REACT' | 'PLAN_AND_EXECUTE') => {
   currentMode.value = mode
   currentForceMode.value = mode
 }
+
+// 监听 AI 消息变化，将最新消息传递给数字人
+watch(() => messages.value, (newMessages) => {
+  const lastAiMessage = [...newMessages].reverse().find(m => m.role === 'ai')
+  if (lastAiMessage) {
+    latestAiMessageForAvatar.value = lastAiMessage.content
+  }
+}, { deep: true })
 
 const activeContext = ref('global')
 
@@ -1447,7 +1478,7 @@ watch(windowWidth, (newWidth) => {
 
 .tutor-container {
   display: grid;
-  grid-template-columns: auto 1fr 280px;
+  grid-template-columns: auto auto 1fr 280px;
   gap: 0;
   flex: 1;
   min-height: 0;
@@ -2618,5 +2649,28 @@ watch(windowWidth, (newWidth) => {
   .footer-hints {
     justify-content: flex-start;
   }
+}
+
+/* 数字人展开按钮 */
+.expand-btn-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 100%;
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-right: 8px;
+}
+
+.expand-btn-avatar:hover {
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.expand-btn-avatar .el-icon {
+  color: #6366f1;
+  font-size: 16px;
 }
 </style>
