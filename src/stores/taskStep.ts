@@ -14,9 +14,11 @@ import type {
   QuizState,
   ScriptStep,
   StudyEventRequest,
+  StudyEventReceipt,
   StudySessionVO,
   StudyChatMessage,
   StudyMode,
+  StudyTeachingAction,
   TeachingFlow,
   TeachingSegment,
 } from '@/types/study'
@@ -170,8 +172,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       answered: true,
       explanation: quiz.explanation || (correct ? '回答正确！' : '答案不太对，再看看。'),
     }
-    reportStudyEvent({
-      eventType: 'quiz_answered',
+      void reportStudyEvent({
+        eventType: 'quiz_answered',
       targetType: 'quiz',
       targetId: quiz.id,
       payload: {
@@ -190,7 +192,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     if (!flow) return
     flow.isPaused = false
     quizState.value = null
-    reportStudyEvent({
+    void reportStudyEvent({
       eventType: 'resume_clicked',
       targetType: 'timeline',
       targetId: currentTimeline.value?.id,
@@ -207,7 +209,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   /** 暂停 Timeline 播放 */
   function pauseTeaching() {
-    reportStudyEvent({
+    void reportStudyEvent({
       eventType: 'pause_clicked',
       targetType: 'timeline',
       targetId: currentTimeline.value?.id,
@@ -278,7 +280,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       canvasContent.value = prepareCanvasContent(scriptSteps.value[currentStepIndex.value])
       mastery.value = backendSession?.mastery || getMockMasteryJudge(mode.value)
       chatMessages.value = getInitialChatMessages()
-      reportStudyEvent({
+      void reportStudyEvent({
         eventType: 'session_started',
         targetType: 'task',
         targetId: taskId.value,
@@ -382,7 +384,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         markdown: false,
         createTime: Date.now(),
       })
-      reportStudyEvent({
+      const receipt = await reportStudyEvent({
         eventType: 'feedback_clicked',
         targetType: 'feedback',
         targetId: type,
@@ -391,22 +393,25 @@ export const useTaskStepStore = defineStore('taskStep', () => {
           label: labels[type],
         },
       })
+      const handledByBackend = !!receipt?.actions?.length
       // 模拟网络延迟
       await new Promise(r => setTimeout(r, 400))
-      const reply = getMockFeedbackReply(type)
-      chatMessages.value.push({
-        id: `a-${Date.now()}`,
-        role: 'agent',
-        text: reply,
-        markdown: true,
-        createTime: Date.now(),
-      })
-      // 部分反馈影响画布与脚本
-      if (type === 'already_mastered') {
-        appendAgentNote('Agent：已标记本步为掌握，可直接进入下一步。')
-      } else if (type === 'skip') {
-        const cur = scriptSteps.value[currentStepIndex.value]
-        if (cur) cur.status = 'skipped'
+      if (!handledByBackend) {
+        const reply = getMockFeedbackReply(type)
+        chatMessages.value.push({
+          id: `a-${Date.now()}`,
+          role: 'agent',
+          text: reply,
+          markdown: true,
+          createTime: Date.now(),
+        })
+        // 部分反馈影响画布与脚本
+        if (type === 'already_mastered') {
+          appendAgentNote('Agent：已标记本步为掌握，可直接进入下一步。')
+        } else if (type === 'skip') {
+          const cur = scriptSteps.value[currentStepIndex.value]
+          if (cur) cur.status = 'skipped'
+        }
       }
     } finally {
       sendingFeedback.value = false
@@ -425,7 +430,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         markdown: false,
         createTime: Date.now(),
       })
-      reportStudyEvent({
+      void reportStudyEvent({
         eventType: 'custom_message_submitted',
         targetType: 'chat',
         payload: {
@@ -471,7 +476,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         if (s.status !== 'skipped') s.status = 'completed'
       })
       const minutes = actualMinutes ?? totalEstimatedMinutes.value
-      reportStudyEvent({
+      void reportStudyEvent({
         eventType: 'session_completed',
         targetType: 'session',
         targetId: sessionId.value,
@@ -576,7 +581,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     if (cue.type !== 'segment_reveal') return
     const index = Number(cue.payload.segmentIndex)
     if (!Number.isInteger(index)) return
-    reportStudyEvent({
+    void reportStudyEvent({
       eventType: 'timeline_cue_played',
       targetType: 'cue',
       targetId: cue.id,
@@ -626,7 +631,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   function reportStepEntered(step: ScriptStep | undefined, reason: string) {
     if (!step) return
-    reportStudyEvent({
+    void reportStudyEvent({
       eventType: 'step_entered',
       targetType: 'script_step',
       targetId: step.id,
@@ -640,7 +645,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   }
 
   function reportStepCompleted(step: ScriptStep, reason: string) {
-    reportStudyEvent({
+    void reportStudyEvent({
       eventType: 'step_completed',
       targetType: 'script_step',
       targetId: step.id,
@@ -653,8 +658,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     })
   }
 
-  function reportStudyEvent(event: StudyEventRequest) {
-    if (!sessionId.value) return
+  async function reportStudyEvent(event: StudyEventRequest): Promise<StudyEventReceipt | null> {
+    if (!sessionId.value) return null
 
     const payload: StudyEventRequest = {
       ...event,
@@ -670,8 +675,39 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       },
     }
 
-    void studySessionApi.reportEvent(sessionId.value, payload).catch(error => {
+    try {
+      const receipt = await studySessionApi.reportEvent(sessionId.value, payload)
+      applyTeachingActions(receipt.actions || [])
+      return receipt
+    } catch (error) {
       console.warn('[StudyEvent] 上报失败，已忽略。', error)
+      return null
+    }
+  }
+
+  function applyTeachingActions(actions: StudyTeachingAction[]) {
+    actions.forEach(action => {
+      switch (action.actionType) {
+        case 'agent_reply':
+          chatMessages.value.push({
+            id: `action-${action.actionId}`,
+            role: 'agent',
+            text: String(action.payload.text || ''),
+            markdown: action.payload.markdown !== false,
+            createTime: Date.now(),
+          })
+          break
+
+        case 'append_agent_note':
+          appendAgentNote(String(action.payload.note || ''))
+          break
+
+        case 'mark_current_step_skipped': {
+          const cur = scriptSteps.value[currentStepIndex.value]
+          if (cur) cur.status = 'skipped'
+          break
+        }
+      }
     })
   }
 

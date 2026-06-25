@@ -262,6 +262,21 @@ export interface StudyEventReceipt {
   eventType: StudyEventType | string
   status: 'accepted' | string
   acceptedAtMs: number
+  actions?: StudyTeachingAction[]
+}
+
+export type StudyTeachingActionType =
+  | 'agent_reply'
+  | 'append_agent_note'
+  | 'mark_current_step_skipped'
+  | 'insert_timeline_patch'
+
+export interface StudyTeachingAction {
+  actionId: string
+  actionType: StudyTeachingActionType | string
+  sceneType?: string
+  reason?: string
+  payload: Record<string, unknown>
 }
 
 /** 弹题回答状态 */
