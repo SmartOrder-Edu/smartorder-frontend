@@ -1,14 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { taskStepApi } from '@/api/spaceDashboard'
+import { studySessionApi } from '@/api/studySession'
 import { ElMessage } from 'element-plus'
+import { useTimelinePlayer } from '@/composables/useTimelinePlayer'
 import type { TaskStepVO, StepStatus } from '@/types/learningSpace'
 import type {
   CanvasContent,
   FeedbackType,
+  LessonCue,
+  LessonTimeline,
   MasteryJudge,
   QuizState,
   ScriptStep,
+  StudyEventRequest,
+  StudySessionVO,
   StudyChatMessage,
   StudyMode,
   TeachingFlow,
@@ -36,6 +42,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const mode = ref<StudyMode>('learn')
   const scriptSteps = ref<ScriptStep[]>([])
   const canvasContent = ref<CanvasContent | null>(null)
+  const sessionId = ref<string>('')
+  const lessonBundleId = ref<string>('')
+  const sessionTimelines = ref<Record<string, LessonTimeline>>({})
   const mastery = ref<MasteryJudge | null>(null)
   const chatMessages = ref<StudyChatMessage[]>([])
   const sendingFeedback = ref(false)
@@ -44,7 +53,12 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   // ---- 教学流状态（v2 Agent 主动教学交互）----
   const teachingActive = ref(false)
   const quizState = ref<QuizState | null>(null)
-  const autoAdvanceTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+
+  const timelinePlayer = useTimelinePlayer({
+    applyCue: applyTimelineCue,
+    resetScene: resetTimelineScene,
+    onEnded: handleTimelineEnded,
+  })
 
   const currentScriptStep = computed<ScriptStep | null>(
     () => scriptSteps.value[currentStepIndex.value] || null,
@@ -64,6 +78,10 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const currentTeachingFlow = computed<TeachingFlow | null>(
     () => canvasContent.value?.teachingFlow || null,
   )
+  /** 当前时间轴 */
+  const currentTimeline = computed<LessonTimeline | null>(
+    () => canvasContent.value?.timeline || null,
+  )
   /** 当前教学段 */
   const currentSegment = computed<TeachingSegment | null>(() => {
     const flow = currentTeachingFlow.value
@@ -79,46 +97,35 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   // 教学流控制方法
   // =============================================================
 
-  function clearAutoAdvance() {
-    if (autoAdvanceTimer.value) {
-      clearTimeout(autoAdvanceTimer.value)
-      autoAdvanceTimer.value = null
-    }
-  }
-
   /** 启动 Agent 教学流 */
   function startTeaching() {
-    const flow = currentTeachingFlow.value
-    if (!flow || !flow.segments.length) return
-    endTeaching() // 清理上次遗留
+    const timeline = currentTimeline.value
+    if (!timeline) return
+
+    timelinePlayer.stop()
+    resetTimelineScene()
     teachingActive.value = true
-    flow.currentSegmentIndex = 0
-    flow.isActive = true
-    flow.isPaused = false
-    quizState.value = null
-    processSegment(0)
+    timelinePlayer.load(timeline)
+    void timelinePlayer.play()
   }
 
   /** 推进到下一段 */
   function advanceSegment() {
-    const flow = currentTeachingFlow.value
-    if (!flow || !teachingActive.value) return
-    clearAutoAdvance()
-    const next = flow.currentSegmentIndex + 1
-    if (next >= flow.segments.length) {
-      endTeaching()
-      return
-    }
-    flow.currentSegmentIndex = next
-    processSegment(next)
+    void timelinePlayer.continueFromWait()
   }
 
-  /** 处理指定段：弹题暂停 / 聚焦 / 自动推进 / 手动暂停 */
-  function processSegment(index: number) {
+  /** 处理时间轴触发的教学段：弹题暂停 / 自动推进 / 手动暂停 */
+  function processSegment(index: number, cue: LessonCue) {
     const flow = currentTeachingFlow.value
     if (!flow) return
     const seg = flow.segments[index]
     if (!seg) return
+
+    flow.currentSegmentIndex = index
+    flow.isActive = true
+    flow.isPaused = false
+    teachingActive.value = true
+    quizState.value = null
 
     // 弹题：暂停教学流
     if (seg.type === 'quiz' && seg.quiz) {
@@ -129,6 +136,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         correct: false,
         answered: false,
       }
+      timelinePlayer.waitForUser()
+      pushSegmentCommentary(seg, cue.id)
       return
     }
 
@@ -137,24 +146,13 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       // 聚焦效果由 TeachingSegmentView 的 onMounted 处理
     }
 
-    // 自动推进或等待用户
-    if (seg.autoAdvanceMs > 0) {
-      flow.isPaused = false
-      autoAdvanceTimer.value = setTimeout(() => advanceSegment(), seg.autoAdvanceMs)
-    } else {
+    // 0 表示等待用户确认，>0 的自动推进由 TimelinePlayer 主时钟负责
+    if (seg.autoAdvanceMs <= 0) {
       flow.isPaused = true
+      timelinePlayer.waitForUser()
     }
 
-    // 同步 commentary 到聊天面板
-    if (seg.agentCommentary) {
-      chatMessages.value.push({
-        id: `agent-teach-${Date.now()}`,
-        role: 'agent',
-        text: seg.agentCommentary,
-        markdown: false,
-        createTime: Date.now(),
-      })
-    }
+    pushSegmentCommentary(seg, cue.id)
   }
 
   /** 提交弹题答案 */
@@ -172,6 +170,17 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       answered: true,
       explanation: quiz.explanation || (correct ? '回答正确！' : '答案不太对，再看看。'),
     }
+    reportStudyEvent({
+      eventType: 'quiz_answered',
+      targetType: 'quiz',
+      targetId: quiz.id,
+      payload: {
+        answer,
+        correct,
+        answerType: quiz.answerType,
+        currentSegmentId: seg.id,
+      },
+    })
     return { correct, explanation: quizState.value.explanation }
   }
 
@@ -181,13 +190,44 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     if (!flow) return
     flow.isPaused = false
     quizState.value = null
-    advanceSegment()
+    reportStudyEvent({
+      eventType: 'resume_clicked',
+      targetType: 'timeline',
+      targetId: currentTimeline.value?.id,
+      payload: {
+        statusBeforeResume: timelinePlayer.status.value,
+      },
+    })
+    if (timelinePlayer.status.value === 'paused') {
+      void timelinePlayer.play()
+      return
+    }
+    void timelinePlayer.continueFromWait()
+  }
+
+  /** 暂停 Timeline 播放 */
+  function pauseTeaching() {
+    reportStudyEvent({
+      eventType: 'pause_clicked',
+      targetType: 'timeline',
+      targetId: currentTimeline.value?.id,
+    })
+    timelinePlayer.pause()
+    const flow = currentTeachingFlow.value
+    if (flow) {
+      flow.isPaused = true
+    }
+  }
+
+  /** 重放当前教学时间轴 */
+  function replayTeaching() {
+    startTeaching()
   }
 
   /** 结束教学流 */
   function endTeaching() {
+    timelinePlayer.stop()
     teachingActive.value = false
-    clearAutoAdvance()
     const flow = currentTeachingFlow.value
     if (flow) {
       flow.isActive = false
@@ -212,18 +252,44 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       steps.value = await taskStepApi.getSteps(id)
 
       // 学习会话脚本与画布
-      scriptSteps.value = getMockScriptSteps(id)
+      const backendSession = await startBackendStudySession(id, options)
+      scriptSteps.value = backendSession?.scriptSteps?.length
+        ? backendSession.scriptSteps
+        : getMockScriptSteps(id)
+      sessionId.value = backendSession?.sessionId || ''
+      lessonBundleId.value = backendSession?.lessonBundleId || ''
+      sessionTimelines.value = backendSession?.timelinesByStepId || {}
+
       // assessment 模式：直接跳到第 4 步（掌握判断）
       const startIndex = mode.value === 'assessment' ? 3 : 0
+      const backendCurrentIndex = backendSession?.currentStepId
+        ? scriptSteps.value.findIndex(s => s.id === backendSession.currentStepId)
+        : -1
       const firstIncomplete = scriptSteps.value.findIndex(s => s.status !== 'completed')
       currentStepIndex.value =
-        firstIncomplete >= 0 ? Math.max(startIndex, Math.min(firstIncomplete, scriptSteps.value.length - 1)) : 0
+        backendCurrentIndex >= 0
+          ? backendCurrentIndex
+          : firstIncomplete >= 0
+            ? Math.max(startIndex, Math.min(firstIncomplete, scriptSteps.value.length - 1))
+            : 0
       if (scriptSteps.value[currentStepIndex.value]?.status === 'pending') {
         scriptSteps.value[currentStepIndex.value].status = 'in_progress'
       }
-      canvasContent.value = getMockCanvasContent(scriptSteps.value[currentStepIndex.value], mode.value)
-      mastery.value = getMockMasteryJudge(mode.value)
+      canvasContent.value = prepareCanvasContent(scriptSteps.value[currentStepIndex.value])
+      mastery.value = backendSession?.mastery || getMockMasteryJudge(mode.value)
       chatMessages.value = getInitialChatMessages()
+      reportStudyEvent({
+        eventType: 'session_started',
+        targetType: 'task',
+        targetId: taskId.value,
+        payload: {
+          mode: mode.value,
+          spaceId: spaceId.value,
+          lessonBundleId: lessonBundleId.value,
+          source: backendSession ? 'backend_session' : 'local_mock',
+        },
+      })
+      reportStepEntered(scriptSteps.value[currentStepIndex.value], 'session_start')
     } finally {
       loading.value = false
     }
@@ -233,11 +299,15 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     if (index < 0 || index >= scriptSteps.value.length) return
     endTeaching()
     const cur = scriptSteps.value[currentStepIndex.value]
-    if (cur && cur.status === 'in_progress') cur.status = 'completed'
+    if (cur && cur.status === 'in_progress') {
+      cur.status = 'completed'
+      reportStepCompleted(cur, 'jump')
+    }
     currentStepIndex.value = index
     const next = scriptSteps.value[index]
     if (next && next.status === 'pending') next.status = 'in_progress'
     refreshCanvas()
+    reportStepEntered(next, 'jump')
     startTeaching()
   }
 
@@ -245,11 +315,15 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     if (currentStepIndex.value >= scriptSteps.value.length - 1) return
     endTeaching()
     const cur = scriptSteps.value[currentStepIndex.value]
-    if (cur && cur.status === 'in_progress') cur.status = 'completed'
+    if (cur && cur.status === 'in_progress') {
+      cur.status = 'completed'
+      reportStepCompleted(cur, 'next')
+    }
     currentStepIndex.value++
     const next = scriptSteps.value[currentStepIndex.value]
     if (next && next.status === 'pending') next.status = 'in_progress'
     refreshCanvas()
+    reportStepEntered(next, 'next')
     startTeaching()
   }
 
@@ -258,6 +332,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     endTeaching()
     currentStepIndex.value--
     refreshCanvas()
+    reportStepEntered(scriptSteps.value[currentStepIndex.value], 'prev')
     startTeaching()
   }
 
@@ -274,7 +349,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   function refreshCanvas() {
     const step = scriptSteps.value[currentStepIndex.value]
-    if (step) canvasContent.value = getMockCanvasContent(step, mode.value)
+    if (step) canvasContent.value = prepareCanvasContent(step)
   }
 
   /** 在当前画布追加 Agent 临时补充讲解（不改步骤） */
@@ -306,6 +381,15 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         text: labels[type],
         markdown: false,
         createTime: Date.now(),
+      })
+      reportStudyEvent({
+        eventType: 'feedback_clicked',
+        targetType: 'feedback',
+        targetId: type,
+        payload: {
+          feedbackType: type,
+          label: labels[type],
+        },
       })
       // 模拟网络延迟
       await new Promise(r => setTimeout(r, 400))
@@ -340,6 +424,13 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         text: text.trim(),
         markdown: false,
         createTime: Date.now(),
+      })
+      reportStudyEvent({
+        eventType: 'custom_message_submitted',
+        targetType: 'chat',
+        payload: {
+          text: text.trim(),
+        },
       })
       await new Promise(r => setTimeout(r, 400))
       chatMessages.value.push({
@@ -380,6 +471,16 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         if (s.status !== 'skipped') s.status = 'completed'
       })
       const minutes = actualMinutes ?? totalEstimatedMinutes.value
+      reportStudyEvent({
+        eventType: 'session_completed',
+        targetType: 'session',
+        targetId: sessionId.value,
+        payload: {
+          actualMinutes: minutes,
+          completedSteps: completedSteps.value,
+          totalSteps: scriptSteps.value.length,
+        },
+      })
       // 预留：后端就绪后接入
       // await spaceDashboardStore.completeTask(taskId.value, minutes)
       ElMessage.success(`本次学习已保存（${minutes} 分钟），画像已更新。`)
@@ -394,6 +495,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     steps.value = []
     scriptSteps.value = []
     canvasContent.value = null
+    sessionId.value = ''
+    lessonBundleId.value = ''
+    sessionTimelines.value = {}
     mastery.value = null
     chatMessages.value = []
     currentStepIndex.value = 0
@@ -402,6 +506,173 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     mode.value = 'learn'
     teachingActive.value = false
     quizState.value = null
+  }
+
+  function prepareCanvasContent(step: ScriptStep): CanvasContent {
+    const content = getMockCanvasContent(step, mode.value)
+    const backendTimeline = sessionTimelines.value[step.id]
+    if (backendTimeline) {
+      return {
+        ...content,
+        timeline: backendTimeline,
+      }
+    }
+    if (content.timeline || !content.teachingFlow) return content
+
+    return {
+      ...content,
+      timeline: buildTimelineFromTeachingFlow(step.id, content.teachingFlow),
+    }
+  }
+
+  async function startBackendStudySession(
+    id: string,
+    options: { mode?: StudyMode; spaceId?: string },
+  ): Promise<StudySessionVO | null> {
+    try {
+      return await studySessionApi.start({
+        taskId: id,
+        spaceId: options.spaceId,
+        mode: options.mode || 'learn',
+      })
+    } catch (error) {
+      console.warn('[StudySession] 后端学习会话接口暂不可用，回退本地 mock。', error)
+      return null
+    }
+  }
+
+  function buildTimelineFromTeachingFlow(sceneId: string, flow: TeachingFlow): LessonTimeline {
+    let cursorMs = 0
+    const cues: LessonCue[] = flow.segments.map((segment, index) => {
+      const startMs = cursorMs
+      cursorMs += Math.max(segment.autoAdvanceMs, 800)
+      return {
+        id: `${segment.id}-reveal`,
+        type: 'segment_reveal',
+        startMs,
+        endMs: cursorMs,
+        payload: {
+          segmentId: segment.id,
+          segmentIndex: index,
+          segmentType: segment.type,
+          waitForUser: segment.autoAdvanceMs <= 0 || segment.type === 'quiz',
+        },
+      }
+    })
+
+    return {
+      id: `timeline-${sceneId}`,
+      sceneId,
+      clockSource: 'internal',
+      durationMs: Math.max(cursorMs, 800),
+      cues,
+      metadata: {
+        source: 'teaching_flow_compat',
+      },
+    }
+  }
+
+  function applyTimelineCue(cue: LessonCue) {
+    if (cue.type !== 'segment_reveal') return
+    const index = Number(cue.payload.segmentIndex)
+    if (!Number.isInteger(index)) return
+    reportStudyEvent({
+      eventType: 'timeline_cue_played',
+      targetType: 'cue',
+      targetId: cue.id,
+      timelineTimeMs: Math.round(timelinePlayer.currentTimeMs.value),
+      payload: {
+        cueType: cue.type,
+        startMs: cue.startMs,
+        endMs: cue.endMs,
+        segmentIndex: index,
+        segmentType: cue.payload.segmentType,
+        waitForUser: cue.payload.waitForUser,
+      },
+    })
+    processSegment(index, cue)
+  }
+
+  function resetTimelineScene() {
+    const flow = currentTeachingFlow.value
+    if (flow) {
+      flow.currentSegmentIndex = -1
+      flow.isActive = false
+      flow.isPaused = false
+    }
+    quizState.value = null
+  }
+
+  function handleTimelineEnded() {
+    const flow = currentTeachingFlow.value
+    if (flow) {
+      flow.isActive = false
+      flow.isPaused = false
+    }
+    quizState.value = null
+    teachingActive.value = true
+  }
+
+  function pushSegmentCommentary(segment: TeachingSegment, cueId: string) {
+    if (!segment.agentCommentary) return
+    chatMessages.value.push({
+      id: `agent-teach-${cueId}`,
+      role: 'agent',
+      text: segment.agentCommentary,
+      markdown: false,
+      createTime: Date.now(),
+    })
+  }
+
+  function reportStepEntered(step: ScriptStep | undefined, reason: string) {
+    if (!step) return
+    reportStudyEvent({
+      eventType: 'step_entered',
+      targetType: 'script_step',
+      targetId: step.id,
+      payload: {
+        reason,
+        phase: step.phase,
+        canvasType: step.canvasType,
+        title: step.title,
+      },
+    })
+  }
+
+  function reportStepCompleted(step: ScriptStep, reason: string) {
+    reportStudyEvent({
+      eventType: 'step_completed',
+      targetType: 'script_step',
+      targetId: step.id,
+      payload: {
+        reason,
+        phase: step.phase,
+        canvasType: step.canvasType,
+        title: step.title,
+      },
+    })
+  }
+
+  function reportStudyEvent(event: StudyEventRequest) {
+    if (!sessionId.value) return
+
+    const payload: StudyEventRequest = {
+      ...event,
+      clientTimeMs: event.clientTimeMs ?? Date.now(),
+      timelineTimeMs: event.timelineTimeMs ?? Math.round(timelinePlayer.currentTimeMs.value),
+      currentStepId: event.currentStepId ?? currentScriptStep.value?.id,
+      currentTimelineId: event.currentTimelineId ?? currentTimeline.value?.id,
+      payload: {
+        ...(event.payload || {}),
+        taskId: taskId.value,
+        spaceId: spaceId.value,
+        mode: mode.value,
+      },
+    }
+
+    void studySessionApi.reportEvent(sessionId.value, payload).catch(error => {
+      console.warn('[StudyEvent] 上报失败，已忽略。', error)
+    })
   }
 
   return {
@@ -413,6 +684,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     // 新增
     taskId,
     spaceId,
+    sessionId,
+    lessonBundleId,
     mode,
     scriptSteps,
     currentScriptStep,
@@ -428,8 +701,12 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     teachingActive,
     quizState,
     currentTeachingFlow,
+    currentTimeline,
     currentSegment,
     isTeachingPaused,
+    timelineStatus: timelinePlayer.status,
+    timelineCurrentTimeMs: timelinePlayer.currentTimeMs,
+    timelinePlaybackRate: timelinePlayer.playbackRate,
     // 方法
     fetchSteps,
     goToStep,
@@ -445,6 +722,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     // 教学流方法
     startTeaching,
     advanceSegment,
+    pauseTeaching,
+    replayTeaching,
     submitQuizAnswer,
     resumeTeaching,
     endTeaching,

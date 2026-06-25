@@ -32,6 +32,15 @@ export interface EnterStudyOptions {
   source?: StudyEntrySource
 }
 
+/** 启动学习会话请求 */
+export interface StartStudySessionRequest {
+  taskId: string
+  spaceId?: string
+  mode?: StudyMode
+  entrySource?: StudyEntrySource
+  stepId?: string
+}
+
 /** 学习脚本阶段类型（对应方案 6 阶段） */
 export type ScriptPhaseType =
   | 'review'       // 1.回顾前置概念
@@ -96,6 +105,8 @@ export interface CanvasContent {
   agentNote?: string
   /** v2: 分段式教学流（存在时走 Agent 教学模式，否则回退静态渲染） */
   teachingFlow?: TeachingFlow
+  /** v3: 统一教学时间轴。后端就绪后可直接返回该结构，TeachingFlow 仅作为兼容输入。 */
+  timeline?: LessonTimeline
 }
 
 // ---- 分段式教学流（v2 Agent 主动教学交互）----
@@ -146,6 +157,111 @@ export interface TeachingFlow {
   currentSegmentIndex: number
   isActive: boolean
   isPaused: boolean
+}
+
+// ---- 教学时间轴（v3 Timeline Player）----
+
+/** 时间轴时钟来源。无语音时使用 internal；接入 TTS 后由 audio.currentTime 驱动。 */
+export type LessonClockSource = 'internal' | 'audio'
+
+/** 教学时间轴 Cue 类型。保留通用动作，避免未来每加一种场景都改播放器核心。 */
+export type LessonCueType =
+  | 'segment_reveal'
+  | 'speech'
+  | 'subtitle'
+  | 'text_reveal'
+  | 'focus'
+  | 'highlight'
+  | 'underline'
+  | 'draw'
+  | 'pause'
+  | 'quiz'
+  | 'scene_change'
+
+/** 时间轴中的最小可执行动作 */
+export interface LessonCue {
+  id: string
+  type: LessonCueType
+  startMs: number
+  endMs?: number
+  payload: Record<string, unknown>
+}
+
+/** 单个教学场景的播放时间轴 */
+export interface LessonTimeline {
+  id: string
+  sceneId: string
+  clockSource: LessonClockSource
+  audioUrl?: string
+  durationMs: number
+  cues: LessonCue[]
+  metadata?: Record<string, unknown>
+}
+
+/** Timeline 播放器状态 */
+export interface TimelinePlayerState {
+  status: 'idle' | 'ready' | 'playing' | 'paused' | 'waiting_user' | 'ended'
+  currentTimeMs: number
+  playbackRate: number
+  activeTimelineId: string | null
+  firedCueIds: Set<string>
+}
+
+/** 后端返回的当前教学场景。content 第一阶段仍可为空，由前端兼容 mock 渲染。 */
+export interface StudyScene {
+  sceneId: string
+  sceneType: CanvasType | string
+  stepId: string
+  content: Record<string, unknown>
+}
+
+/** 后端学习会话 VO */
+export interface StudySessionVO {
+  sessionId: string
+  lessonBundleId: string
+  userId?: string
+  taskId: string
+  spaceId?: string | null
+  mode: StudyMode
+  status: 'created' | 'active' | 'paused' | 'completed' | 'abandoned' | string
+  currentStepId: string
+  currentScene?: StudyScene
+  currentTimeline?: LessonTimeline
+  scriptSteps: ScriptStep[]
+  timelinesByStepId?: Record<string, LessonTimeline>
+  mastery?: MasteryJudge
+}
+
+/** 学习过程事件类型。后端第一版只接收和记录，后续 TeachingPolicy 基于这些事件做决策。 */
+export type StudyEventType =
+  | 'session_started'
+  | 'step_entered'
+  | 'step_completed'
+  | 'timeline_cue_played'
+  | 'pause_clicked'
+  | 'resume_clicked'
+  | 'feedback_clicked'
+  | 'quiz_answered'
+  | 'custom_message_submitted'
+  | 'session_completed'
+
+export interface StudyEventRequest {
+  eventType: StudyEventType
+  targetType?: string
+  targetId?: string
+  clientTimeMs?: number
+  timelineTimeMs?: number
+  currentStepId?: string
+  currentTimelineId?: string
+  payload?: Record<string, unknown>
+}
+
+export interface StudyEventReceipt {
+  eventId: string
+  sessionId: string
+  eventType: StudyEventType | string
+  status: 'accepted' | string
+  acceptedAtMs: number
 }
 
 /** 弹题回答状态 */

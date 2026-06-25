@@ -12,13 +12,27 @@
         </div>
         <!-- Agent 讲解中指示器 -->
         <span class="teaching-badge" v-if="stepStore.teachingActive">
-          <span class="teaching-dot"></span>
-          Agent 讲解中
+          <span class="teaching-dot" v-if="stepStore.timelineStatus === 'playing'"></span>
+          {{ stepStore.timelineStatus === 'ended' ? '讲解完成' : 'Agent 讲解中' }}
         </span>
       </div>
       <div class="header-right">
         <!-- 教学模式：隐藏导航，显示"跳过"按钮 -->
         <template v-if="stepStore.teachingActive">
+          <button
+            v-if="stepStore.timelineStatus === 'playing'"
+            class="nav-btn"
+            @click="stepStore.pauseTeaching()"
+          >
+            暂停
+          </button>
+          <button
+            v-else-if="stepStore.timelineStatus === 'paused'"
+            class="nav-btn primary"
+            @click="stepStore.resumeTeaching()"
+          >
+            继续
+          </button>
           <button class="nav-btn skip" @click="stepStore.endTeaching()">
             跳过教学
           </button>
@@ -81,8 +95,15 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9,18 15,12 9,6"/></svg>
           </button>
           <!-- 教学中 → 进度指示 -->
+          <button
+            v-else-if="stepStore.timelineStatus === 'ended'"
+            class="continue-btn"
+            @click="stepStore.replayTeaching()"
+          >
+            重放本段
+          </button>
           <div v-else class="teaching-progress-hint">
-            Agent 正在讲解…
+            {{ stepStore.timelineStatus === 'paused' ? '已暂停' : 'Agent 正在讲解…' }}
           </div>
         </div>
       </template>

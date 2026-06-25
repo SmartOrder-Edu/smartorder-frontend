@@ -118,8 +118,8 @@ onMounted(async () => {
   if (!id) return
   const mode = (route.query.mode as StudyMode) || 'learn'
   const spaceId = route.query.spaceId as string | undefined
-  // 若带 spaceId，先拉空间信息用于面包屑
-  if (spaceId) {
+  // 旧 dashboard 接口只支持数据库数字 ID；mock 空间如 math/se 不请求该接口。
+  if (spaceId && /^\d+$/.test(spaceId)) {
     dashStore.fetchDashboard(spaceId).catch(() => {})
   }
   await stepStore.fetchSteps(id, { mode, spaceId })
