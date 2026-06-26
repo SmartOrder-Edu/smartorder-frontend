@@ -1,8 +1,10 @@
 import request from './request'
 import type {
   StartStudySessionRequest,
+  CompleteStudySessionRequest,
   StudyEventReceipt,
   StudyEventRequest,
+  StudySessionCompleteVO,
   StudySessionVO,
 } from '@/types/study'
 
@@ -17,6 +19,10 @@ export const studySessionApi = {
 
   reportEvent(sessionId: string, data: StudyEventRequest): Promise<StudyEventReceipt> {
     return request.post(`/study-sessions/${sessionId}/events`, data, { showError: false })
+  },
+
+  complete(sessionId: string, data: CompleteStudySessionRequest): Promise<StudySessionCompleteVO> {
+    return request.post(`/study-sessions/${sessionId}/complete`, data)
   },
 }
 

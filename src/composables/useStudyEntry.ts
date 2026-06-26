@@ -7,7 +7,8 @@ import type { EnterStudyOptions, StudyEntrySource, StudyMode } from '@/types/stu
  * 统一学习入口 composable
  *
  * 设计依据：讨论方案要求所有学习入口最终汇入同一个地方 ——
- * /study/:taskId 的 Agent 教学画布。不同入口文案不同，但行为统一。
+ * /study/:taskId 的 Agent 教学画布。路径节点入口使用 pathNodeId 查询参数，
+ * 由后端自动创建或复用对应学习任务。
  *
  * 入口文案模型：
  *   - 首页 → 开始今日学习
@@ -31,9 +32,22 @@ export function useStudyEntry() {
     const query: Record<string, string> = {}
     if (options.mode && options.mode !== 'learn') query.mode = options.mode
     if (options.spaceId) query.spaceId = String(options.spaceId)
+    if (options.pathNodeId) query.pathNodeId = String(options.pathNodeId)
     if (options.stepId) query.stepId = String(options.stepId)
     if (options.source) query.source = options.source
     router.push({ path: `/study/${taskId}`, query })
+  }
+
+  function enterPathNodeStudy(pathNodeId: string | number | undefined | null, options: EnterStudyOptions = {}) {
+    if (pathNodeId === undefined || pathNodeId === null || pathNodeId === '') {
+      ElMessage.warning('Agent 暂未为该路径节点排好学习会话，请稍后再试')
+      return
+    }
+    enterStudy(`path-node-${pathNodeId}`, {
+      ...options,
+      pathNodeId: String(pathNodeId),
+      source: options.source || 'path_node',
+    })
   }
 
   /**
@@ -59,6 +73,7 @@ export function useStudyEntry() {
 
   return {
     enterStudy,
+    enterPathNodeStudy,
     enterTodayFirst,
   }
 }

@@ -283,7 +283,7 @@ import type { StudyMode } from '@/types/study'
 
 type MasteryStatus = 'unlearned' | 'weak' | 'mastered' | 'fragile' | 'locked'
 
-const { enterStudy } = useStudyEntry()
+const { enterPathNodeStudy } = useStudyEntry()
 
 /** 按掌握状态返回按钮文案 */
 function actionLabel(status: MasteryStatus): string {
@@ -318,7 +318,7 @@ function modeForStatus(status: MasteryStatus): StudyMode {
 }
 
 function enterNode(node: { id: number | string; masteryStatus: MasteryStatus }) {
-  enterStudy(node.id, { mode: modeForStatus(node.masteryStatus), source: 'path_node' })
+  enterPathNodeStudy(node.id, { mode: modeForStatus(node.masteryStatus), source: 'path_node' })
 }
 
 

@@ -42,6 +42,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   // ---- 学习会话状态（新增）----
   const taskId = ref<string>('')
   const spaceId = ref<string | null>(null)
+  const pathNodeId = ref<string | null>(null)
   const mode = ref<StudyMode>('learn')
   const scriptSteps = ref<ScriptStep[]>([])
   const canvasContent = ref<CanvasContent | null>(null)
@@ -246,12 +247,16 @@ export const useTaskStepStore = defineStore('taskStep', () => {
    * mock 阶段：复用现有 taskStepApi.getSteps（mock），并基于 taskId 生成 6 阶段脚本与画布内容
    * 后端就绪后：替换为 /study-sessions/:taskId 真实接口
    */
-  async function fetchSteps(id: string, options: { mode?: StudyMode; spaceId?: string } = {}) {
+  async function fetchSteps(
+    id: string,
+    options: { mode?: StudyMode; spaceId?: string; pathNodeId?: string; source?: string; stepId?: string } = {},
+  ) {
     loading.value = true
     try {
       taskId.value = id
       mode.value = options.mode || 'learn'
       spaceId.value = options.spaceId || null
+      pathNodeId.value = options.pathNodeId || null
 
       // 原有 task steps（保留以兼容）
       steps.value = await taskStepApi.getSteps(id)
@@ -290,6 +295,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         payload: {
           mode: mode.value,
           spaceId: spaceId.value,
+          pathNodeId: pathNodeId.value,
           lessonBundleId: lessonBundleId.value,
           source: backendSession ? 'backend_session' : 'local_mock',
         },
@@ -489,8 +495,27 @@ export const useTaskStepStore = defineStore('taskStep', () => {
           totalSteps: scriptSteps.value.length,
         },
       })
-      // 预留：后端就绪后接入
-      // await spaceDashboardStore.completeTask(taskId.value, minutes)
+      if (sessionId.value) {
+        const completion = await studySessionApi.complete(sessionId.value, {
+          actualMinutes: minutes,
+          payload: {
+            completedSteps: completedSteps.value,
+            totalSteps: scriptSteps.value.length,
+            taskId: taskId.value,
+            spaceId: spaceId.value,
+            pathNodeId: pathNodeId.value,
+            mode: mode.value,
+          },
+        })
+        if (completion?.summary) {
+          mastery.value = {
+            level: (completion.masteryLevel as any) || mastery.value?.level || 'unknown',
+            levelLabel: mastery.value?.levelLabel || '已完成',
+            hint: mastery.value?.hint || '本次学习会话已完成。',
+            nextSuggestion: completion.nextSuggestion || mastery.value?.nextSuggestion || '',
+          }
+        }
+      }
       ElMessage.success(`本次学习已保存（${minutes} 分钟），画像已更新。`)
       return true
     } finally {
@@ -512,6 +537,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     currentStepIndex.value = 0
     taskId.value = ''
     spaceId.value = null
+    pathNodeId.value = null
     mode.value = 'learn'
     teachingActive.value = false
     quizState.value = null
@@ -536,13 +562,16 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   async function startBackendStudySession(
     id: string,
-    options: { mode?: StudyMode; spaceId?: string },
+    options: { mode?: StudyMode; spaceId?: string; pathNodeId?: string; source?: string; stepId?: string },
   ): Promise<StudySessionVO | null> {
     try {
       return await studySessionApi.start({
         taskId: id,
+        pathNodeId: options.pathNodeId,
         spaceId: options.spaceId,
         mode: options.mode || 'learn',
+        entrySource: options.source as any,
+        stepId: options.stepId,
       })
     } catch (error) {
       console.warn('[StudySession] 后端学习会话接口暂不可用，回退本地 mock。', error)
@@ -787,6 +816,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         ...(event.payload || {}),
         taskId: taskId.value,
         spaceId: spaceId.value,
+        pathNodeId: pathNodeId.value,
         mode: mode.value,
       },
     }
@@ -836,6 +866,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     // 新增
     taskId,
     spaceId,
+    pathNodeId,
     sessionId,
     lessonBundleId,
     mode,

@@ -118,11 +118,14 @@ onMounted(async () => {
   if (!id) return
   const mode = (route.query.mode as StudyMode) || 'learn'
   const spaceId = route.query.spaceId as string | undefined
+  const pathNodeId = route.query.pathNodeId as string | undefined
+  const source = route.query.source as string | undefined
+  const stepId = route.query.stepId as string | undefined
   // 旧 dashboard 接口只支持数据库数字 ID；mock 空间如 math/se 不请求该接口。
   if (spaceId && /^\d+$/.test(spaceId)) {
     dashStore.fetchDashboard(spaceId).catch(() => {})
   }
-  await stepStore.fetchSteps(id, { mode, spaceId })
+  await stepStore.fetchSteps(id, { mode, spaceId, pathNodeId, source, stepId })
   // 启动 Agent 教学流
   stepStore.startTeaching()
 })

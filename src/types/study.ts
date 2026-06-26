@@ -28,13 +28,15 @@ export type StudyEntrySource =
 export interface EnterStudyOptions {
   mode?: StudyMode
   spaceId?: string
+  pathNodeId?: string
   stepId?: string
   source?: StudyEntrySource
 }
 
 /** 启动学习会话请求 */
 export interface StartStudySessionRequest {
-  taskId: string
+  taskId?: string
+  pathNodeId?: string
   spaceId?: string
   mode?: StudyMode
   entrySource?: StudyEntrySource
@@ -243,6 +245,7 @@ export interface StudySessionVO {
   lessonBundleId: string
   userId?: string
   taskId: string
+  pathNodeId?: string | null
   spaceId?: string | null
   mode: StudyMode
   status: 'created' | 'active' | 'paused' | 'completed' | 'abandoned' | string
@@ -252,6 +255,26 @@ export interface StudySessionVO {
   scriptSteps: ScriptStep[]
   timelinesByStepId?: Record<string, LessonTimeline>
   mastery?: MasteryJudge
+}
+
+export interface CompleteStudySessionRequest {
+  actualMinutes?: number
+  focusLevel?: number
+  mood?: number
+  selfRating?: number
+  notes?: string
+  payload?: Record<string, unknown>
+}
+
+export interface StudySessionCompleteVO {
+  sessionId: string
+  status: 'completed' | string
+  actualMinutes: number
+  completedSteps: number
+  totalSteps: number
+  masteryLevel?: MasteryLevel | string
+  nextSuggestion?: string
+  summary?: Record<string, unknown>
 }
 
 /** 学习过程事件类型。后端第一版只接收和记录，后续 TeachingPolicy 基于这些事件做决策。 */
