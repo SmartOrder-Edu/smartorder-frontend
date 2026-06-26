@@ -263,30 +263,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
       // 学习会话脚本与画布
       const backendSession = await startBackendStudySession(id, options)
-      scriptSteps.value = backendSession?.scriptSteps?.length
-        ? backendSession.scriptSteps
-        : getMockScriptSteps(id)
-      sessionId.value = backendSession?.sessionId || ''
-      lessonBundleId.value = backendSession?.lessonBundleId || ''
-      sessionTimelines.value = backendSession?.timelinesByStepId || {}
-
-      // assessment 模式：直接跳到第 4 步（掌握判断）
-      const startIndex = mode.value === 'assessment' ? 3 : 0
-      const backendCurrentIndex = backendSession?.currentStepId
-        ? scriptSteps.value.findIndex(s => s.id === backendSession.currentStepId)
-        : -1
-      const firstIncomplete = scriptSteps.value.findIndex(s => s.status !== 'completed')
-      currentStepIndex.value =
-        backendCurrentIndex >= 0
-          ? backendCurrentIndex
-          : firstIncomplete >= 0
-            ? Math.max(startIndex, Math.min(firstIncomplete, scriptSteps.value.length - 1))
-            : 0
-      if (scriptSteps.value[currentStepIndex.value]?.status === 'pending') {
-        scriptSteps.value[currentStepIndex.value].status = 'in_progress'
-      }
-      canvasContent.value = prepareCanvasContent(scriptSteps.value[currentStepIndex.value])
-      mastery.value = backendSession?.mastery || getMockMasteryJudge(mode.value)
+      applyBackendSession(backendSession, id)
       chatMessages.value = getInitialChatMessages()
       void reportStudyEvent({
         eventType: 'session_started',
@@ -301,6 +278,23 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         },
       })
       reportStepEntered(scriptSteps.value[currentStepIndex.value], 'session_start')
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function loadSession(id: string) {
+    loading.value = true
+    try {
+      const backendSession = await studySessionApi.get(id)
+      taskId.value = backendSession.taskId
+      mode.value = backendSession.mode || 'learn'
+      spaceId.value = backendSession.spaceId || null
+      pathNodeId.value = backendSession.pathNodeId || null
+      steps.value = await taskStepApi.getSteps(backendSession.taskId)
+      applyBackendSession(backendSession, backendSession.taskId)
+      chatMessages.value = getInitialChatMessages()
+      reportStepEntered(scriptSteps.value[currentStepIndex.value], 'session_restore')
     } finally {
       loading.value = false
     }
@@ -558,6 +552,32 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       ...content,
       timeline: buildTimelineFromTeachingFlow(step.id, content.teachingFlow),
     }
+  }
+
+  function applyBackendSession(backendSession: StudySessionVO | null, fallbackTaskId: string) {
+    scriptSteps.value = backendSession?.scriptSteps?.length
+      ? backendSession.scriptSteps
+      : getMockScriptSteps(fallbackTaskId)
+    sessionId.value = backendSession?.sessionId || ''
+    lessonBundleId.value = backendSession?.lessonBundleId || ''
+    sessionTimelines.value = backendSession?.timelinesByStepId || {}
+
+    const startIndex = mode.value === 'assessment' ? 3 : 0
+    const backendCurrentIndex = backendSession?.currentStepId
+      ? scriptSteps.value.findIndex(s => s.id === backendSession.currentStepId)
+      : -1
+    const firstIncomplete = scriptSteps.value.findIndex(s => s.status !== 'completed')
+    currentStepIndex.value =
+      backendCurrentIndex >= 0
+        ? backendCurrentIndex
+        : firstIncomplete >= 0
+          ? Math.max(startIndex, Math.min(firstIncomplete, scriptSteps.value.length - 1))
+          : 0
+    if (scriptSteps.value[currentStepIndex.value]?.status === 'pending') {
+      scriptSteps.value[currentStepIndex.value].status = 'in_progress'
+    }
+    canvasContent.value = prepareCanvasContent(scriptSteps.value[currentStepIndex.value])
+    mastery.value = backendSession?.mastery || getMockMasteryJudge(mode.value)
   }
 
   async function startBackendStudySession(
@@ -925,6 +945,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     timelinePlaybackRate: timelinePlayer.playbackRate,
     // 方法
     fetchSteps,
+    loadSession,
     goToStep,
     nextStep,
     prevStep,
