@@ -48,6 +48,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const canvasContent = ref<CanvasContent | null>(null)
   const sessionId = ref<string>('')
   const lessonBundleId = ref<string>('')
+  const sessionScenes = ref<Record<string, StudySessionVO['currentScene']>>({})
   const sessionTimelines = ref<Record<string, LessonTimeline>>({})
   const mastery = ref<MasteryJudge | null>(null)
   const chatMessages = ref<StudyChatMessage[]>([])
@@ -525,6 +526,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     canvasContent.value = null
     sessionId.value = ''
     lessonBundleId.value = ''
+    sessionScenes.value = {}
     sessionTimelines.value = {}
     mastery.value = null
     chatMessages.value = []
@@ -538,6 +540,15 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   }
 
   function prepareCanvasContent(step: ScriptStep): CanvasContent {
+    const backendScene = sessionScenes.value[step.id]
+    const backendContent = toCanvasContent(backendScene?.content)
+    if (backendContent) {
+      return {
+        ...backendContent,
+        timeline: sessionTimelines.value[step.id] || backendContent.timeline,
+      }
+    }
+
     const content = getMockCanvasContent(step, mode.value)
     const backendTimeline = sessionTimelines.value[step.id]
     if (backendTimeline) {
@@ -560,6 +571,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       : getMockScriptSteps(fallbackTaskId)
     sessionId.value = backendSession?.sessionId || ''
     lessonBundleId.value = backendSession?.lessonBundleId || ''
+    sessionScenes.value = backendSession?.scenesByStepId || buildSingleSceneMap(backendSession)
     sessionTimelines.value = backendSession?.timelinesByStepId || {}
 
     const startIndex = mode.value === 'assessment' ? 3 : 0
@@ -578,6 +590,39 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     }
     canvasContent.value = prepareCanvasContent(scriptSteps.value[currentStepIndex.value])
     mastery.value = backendSession?.mastery || getMockMasteryJudge(mode.value)
+  }
+
+  function buildSingleSceneMap(backendSession: StudySessionVO | null): Record<string, StudySessionVO['currentScene']> {
+    if (!backendSession?.currentScene?.stepId) return {}
+    return {
+      [backendSession.currentScene.stepId]: backendSession.currentScene,
+    }
+  }
+
+  function toCanvasContent(value: unknown): CanvasContent | null {
+    if (!value || typeof value !== 'object') return null
+    const raw = value as Record<string, unknown>
+    const type = raw.type
+    const markdown = raw.markdown
+    if (typeof type !== 'string' || typeof markdown !== 'string') {
+      return null
+    }
+    return {
+      type: type as CanvasContent['type'],
+      markdown,
+      mermaid: typeof raw.mermaid === 'string' ? raw.mermaid : undefined,
+      exampleSteps: Array.isArray(raw.exampleSteps) ? raw.exampleSteps as CanvasContent['exampleSteps'] : undefined,
+      question: raw.question && typeof raw.question === 'object'
+        ? raw.question as CanvasContent['question']
+        : undefined,
+      agentNote: typeof raw.agentNote === 'string' ? raw.agentNote : undefined,
+      teachingFlow: raw.teachingFlow && typeof raw.teachingFlow === 'object'
+        ? raw.teachingFlow as CanvasContent['teachingFlow']
+        : undefined,
+      timeline: raw.timeline && typeof raw.timeline === 'object'
+        ? raw.timeline as CanvasContent['timeline']
+        : undefined,
+    }
   }
 
   async function startBackendStudySession(

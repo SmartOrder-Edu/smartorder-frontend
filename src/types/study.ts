@@ -253,6 +253,7 @@ export interface StudySessionVO {
   currentScene?: StudyScene
   currentTimeline?: LessonTimeline
   scriptSteps: ScriptStep[]
+  scenesByStepId?: Record<string, StudyScene>
   timelinesByStepId?: Record<string, LessonTimeline>
   mastery?: MasteryJudge
 }
