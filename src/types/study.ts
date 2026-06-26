@@ -324,6 +324,12 @@ export interface StudyTeachingAction {
   payload: Record<string, unknown>
 }
 
+export interface StudyTeachingActionStatusRequest {
+  status: 'applied' | 'failed' | 'pending'
+  errorMessage?: string
+  payload?: Record<string, unknown>
+}
+
 /** 弹题回答状态 */
 export interface QuizState {
   quizId: string

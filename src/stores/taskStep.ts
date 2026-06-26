@@ -833,28 +833,59 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   function applyTeachingActions(actions: StudyTeachingAction[]) {
     actions.forEach(action => {
-      switch (action.actionType) {
-        case 'agent_reply':
-          chatMessages.value.push({
-            id: `action-${action.actionId}`,
-            role: 'agent',
-            text: String(action.payload.text || ''),
-            markdown: action.payload.markdown !== false,
-            createTime: Date.now(),
-          })
-          break
+      try {
+        switch (action.actionType) {
+          case 'agent_reply':
+            chatMessages.value.push({
+              id: `action-${action.actionId}`,
+              role: 'agent',
+              text: String(action.payload.text || ''),
+              markdown: action.payload.markdown !== false,
+              createTime: Date.now(),
+            })
+            break
 
-        case 'append_agent_note':
-          appendAgentNote(String(action.payload.note || ''))
-          break
+          case 'append_agent_note':
+            appendAgentNote(String(action.payload.note || ''))
+            break
 
-        case 'mark_current_step_skipped': {
-          const cur = scriptSteps.value[currentStepIndex.value]
-          if (cur) cur.status = 'skipped'
-          break
+          case 'mark_current_step_skipped': {
+            const cur = scriptSteps.value[currentStepIndex.value]
+            if (cur) cur.status = 'skipped'
+            break
+          }
         }
+        void reportTeachingActionStatus(action.actionId, 'applied', {
+          actionType: action.actionType,
+          appliedAt: Date.now(),
+        })
+      } catch (error) {
+        void reportTeachingActionStatus(
+          action.actionId,
+          'failed',
+          { actionType: action.actionType },
+          error instanceof Error ? error.message : String(error),
+        )
       }
     })
+  }
+
+  async function reportTeachingActionStatus(
+    actionId: string,
+    status: 'applied' | 'failed',
+    payload?: Record<string, unknown>,
+    errorMessage?: string,
+  ) {
+    if (!sessionId.value || !actionId) return
+    try {
+      await studySessionApi.updateActionStatus(sessionId.value, actionId, {
+        status,
+        errorMessage,
+        payload,
+      })
+    } catch (error) {
+      console.warn('[StudyAction] 状态回写失败，已忽略。', error)
+    }
   }
 
   return {
