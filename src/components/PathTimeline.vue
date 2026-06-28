@@ -79,6 +79,15 @@
             >
               {{ scriptStatusOf(kp.id) === 'ready' ? '重新生成' : '生成脚本' }}
             </el-button>
+            <el-button
+              class="kp-start-btn"
+              size="small"
+              type="primary"
+              :disabled="kp.status === 'locked'"
+              @click.stop="startNodeStudy(kp)"
+            >
+              开始学习
+            </el-button>
             <span class="kp-status-tag" :class="kp.status">{{ statusLabel(kp.status) }}</span>
           </div>
         </div>
@@ -111,6 +120,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { lessonBundleApi } from '@/api/lessonBundle'
+import { useStudyEntry } from '@/composables/useStudyEntry'
 import type { PathNodeVO, TaskVO, ResourceVO } from '@/types/learningSpace'
 import type { LessonBundleStatus, LessonBundleStatusVO } from '@/types/study'
 
@@ -120,6 +130,7 @@ const props = defineProps<{
   resources: ResourceVO[]
 }>()
 
+const { enterPathNodeStudy } = useStudyEntry()
 const expandedNodes = ref(new Set<string>())
 const scriptStates = ref<Record<string, {
   status: LessonBundleStatus
@@ -267,6 +278,13 @@ async function generateScript(node: PathNodeVO) {
       }
     }
   }
+}
+
+function startNodeStudy(node: PathNodeVO) {
+  enterPathNodeStudy(node.id, {
+    mode: 'learn',
+    source: 'path_node',
+  })
 }
 
 function miniStatusLabel(s: string) {
@@ -554,7 +572,8 @@ export default { name: 'PathTimeline' }
   &.empty { background: #f3f4f6; color: #6b7280; }
 }
 
-.kp-script-btn {
+.kp-script-btn,
+.kp-start-btn {
   flex-shrink: 0;
 }
 
