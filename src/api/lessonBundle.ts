@@ -1,9 +1,9 @@
-import request from './request'
+import request, { type RequestConfig } from './request'
 import type { LessonBundleGenerateRequest, LessonBundleStatusVO, StudyMode } from '@/types/study'
 
 export const lessonBundleApi = {
-  generate(data: LessonBundleGenerateRequest): Promise<LessonBundleStatusVO> {
-    return request.post('/lesson-bundles/generate', data)
+  generate(data: LessonBundleGenerateRequest, config?: RequestConfig): Promise<LessonBundleStatusVO> {
+    return request.post('/lesson-bundles/generate', data, config)
   },
 
   getByTarget(params: {

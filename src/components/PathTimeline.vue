@@ -74,9 +74,10 @@
               class="kp-script-btn"
               size="small"
               :loading="scriptLoadingOf(kp.id)"
+              :disabled="scriptStatusOf(kp.id) === 'generating'"
               @click.stop="generateScript(kp)"
             >
-              {{ scriptStatusOf(kp.id) === 'ready' ? '重新生成' : '生成脚本' }}
+              {{ scriptActionLabel(scriptStatusOf(kp.id)) }}
             </el-button>
             <el-button
               class="kp-start-btn"
@@ -115,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { lessonBundleApi } from '@/api/lessonBundle'
 import { useStudyEntry } from '@/composables/useStudyEntry'
@@ -135,6 +136,8 @@ const scriptStates = ref<Record<string, {
   loading: boolean
   bundleId?: string
 }>>({})
+const statusRefreshToken = ref(0)
+let refreshTimer: ReturnType<typeof window.setTimeout> | null = null
 
 // 顶层只展示 stage 节点（按 sortOrder 升序）
 const stageNodes = computed(() =>
@@ -152,10 +155,23 @@ function getChildKps(stageId: string): PathNodeVO[] {
 watch(
   () => props.nodes.map(n => `${n.id}:${n.status}`).join('|'),
   () => {
-    loadScriptStatuses()
+    scheduleScriptStatusRefresh()
   },
   { immediate: true }
 )
+
+onMounted(() => {
+  window.addEventListener('focus', handleWindowFocus)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', handleWindowFocus)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  if (refreshTimer) {
+    window.clearTimeout(refreshTimer)
+  }
+})
 
 function toggleNode(node: PathNodeVO) {
   const next = new Set(expandedNodes.value)
@@ -205,6 +221,18 @@ function scriptStatusClass(status: LessonBundleStatus): string {
   return 'empty'
 }
 
+function scriptActionLabel(status: LessonBundleStatus): string {
+  const m: Record<LessonBundleStatus, string> = {
+    not_generated: '生成脚本',
+    generating: '生成中',
+    ready: '重新生成',
+    failed: '重试生成',
+    expired: '更新脚本',
+    needs_refresh: '更新脚本',
+  }
+  return m[status] || '生成脚本'
+}
+
 function normalizeScriptStatus(status?: string): LessonBundleStatus {
   if (
     status === 'generating' ||
@@ -230,7 +258,41 @@ function applyScriptStatus(nodeId: string, status?: LessonBundleStatusVO) {
   }
 }
 
+function setScriptState(nodeId: string, patch: Partial<{ status: LessonBundleStatus; loading: boolean; bundleId?: string }>) {
+  scriptStates.value = {
+    ...scriptStates.value,
+    [nodeId]: {
+      status: scriptStatusOf(nodeId),
+      loading: scriptLoadingOf(nodeId),
+      bundleId: scriptStates.value[nodeId]?.bundleId,
+      ...patch,
+    }
+  }
+}
+
+function scheduleScriptStatusRefresh(delayMs = 120) {
+  if (refreshTimer) {
+    window.clearTimeout(refreshTimer)
+  }
+  refreshTimer = window.setTimeout(() => {
+    refreshTimer = null
+    loadScriptStatuses()
+  }, delayMs)
+}
+
+function handleWindowFocus() {
+  scheduleScriptStatusRefresh(0)
+}
+
+function handleVisibilityChange() {
+  if (!document.hidden) {
+    scheduleScriptStatusRefresh(0)
+  }
+}
+
 async function loadScriptStatuses() {
+  const token = statusRefreshToken.value + 1
+  statusRefreshToken.value = token
   const knowledgeNodes = props.nodes.filter(n => n.nodeType === 'knowledge_point')
   await Promise.all(knowledgeNodes.map(async (node) => {
     try {
@@ -238,8 +300,14 @@ async function loadScriptStatuses() {
         pathNodeId: node.id,
         mode: 'learn',
       })
+      if (token !== statusRefreshToken.value) {
+        return
+      }
       applyScriptStatus(node.id, status)
     } catch {
+      if (token !== statusRefreshToken.value) {
+        return
+      }
       applyScriptStatus(node.id)
     }
   }))
@@ -249,32 +317,24 @@ async function generateScript(node: PathNodeVO) {
   if (scriptLoadingOf(node.id)) {
     return
   }
-  scriptStates.value = {
-    ...scriptStates.value,
-    [node.id]: {
-      ...scriptStates.value[node.id],
-      status: scriptStatusOf(node.id),
-      loading: true,
-    }
-  }
+  const previousStatus = scriptStatusOf(node.id)
+  setScriptState(node.id, { status: 'generating', loading: true })
   try {
     const status = await lessonBundleApi.generate({
       pathNodeId: node.id,
       mode: 'learn',
-      forceRegenerate: scriptStatusOf(node.id) === 'ready',
+      forceRegenerate: previousStatus === 'ready',
       generationTrigger: 'manual',
       generationReason: '用户在学习空间路径中提前生成知识点学习脚本',
-    })
+    }, { showError: false })
     applyScriptStatus(node.id, status)
     ElMessage.success('学习脚本已准备好')
+    scheduleScriptStatusRefresh(300)
+  } catch (error) {
+    setScriptState(node.id, { status: 'failed', loading: false })
+    ElMessage.error('学习脚本生成失败，请稍后重试')
   } finally {
-    scriptStates.value = {
-      ...scriptStates.value,
-      [node.id]: {
-        ...scriptStates.value[node.id],
-        loading: false,
-      }
-    }
+    setScriptState(node.id, { loading: false })
   }
 }
 
