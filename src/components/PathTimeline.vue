@@ -74,7 +74,6 @@
               class="kp-script-btn"
               size="small"
               :loading="scriptLoadingOf(kp.id)"
-              :disabled="kp.status === 'locked'"
               @click.stop="generateScript(kp)"
             >
               {{ scriptStatusOf(kp.id) === 'ready' ? '重新生成' : '生成脚本' }}
@@ -83,7 +82,6 @@
               class="kp-start-btn"
               size="small"
               type="primary"
-              :disabled="kp.status === 'locked'"
               @click.stop="startNodeStudy(kp)"
             >
               开始学习
@@ -233,7 +231,7 @@ function applyScriptStatus(nodeId: string, status?: LessonBundleStatusVO) {
 }
 
 async function loadScriptStatuses() {
-  const knowledgeNodes = props.nodes.filter(n => n.nodeType === 'knowledge_point' && n.status !== 'locked')
+  const knowledgeNodes = props.nodes.filter(n => n.nodeType === 'knowledge_point')
   await Promise.all(knowledgeNodes.map(async (node) => {
     try {
       const status = await lessonBundleApi.getByTarget({
@@ -248,7 +246,7 @@ async function loadScriptStatuses() {
 }
 
 async function generateScript(node: PathNodeVO) {
-  if (node.status === 'locked' || scriptLoadingOf(node.id)) {
+  if (scriptLoadingOf(node.id)) {
     return
   }
   scriptStates.value = {
