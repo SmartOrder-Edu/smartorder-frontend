@@ -83,6 +83,7 @@ class Request {
     this.instance.interceptors.response.use(
       (response: AxiosResponse) => {
         const { data } = response
+        const requestConfig = response.config as RequestConfig
         
         // 兼容后端直接返回非标准结构数据（如上传图片直接返回 OSS URL 字符串）
         if (typeof data === 'string' || (data && data.code === undefined)) {
@@ -90,13 +91,16 @@ class Request {
         }
 
         if (data.code !== 200 && data.code !== 0) {
-          ElMessage.error(data.msg || data.message || '请求失败')
+          if (requestConfig.showError !== false) {
+            ElMessage.error(data.msg || data.message || '请求失败')
+          }
           return Promise.reject(new Error(data.msg || data.message || '请求失败'))
         }
         return data.data
       },
       async (error) => {
         const { response, config } = error
+        const requestConfig = config as RequestConfig | undefined
 
         if (response?.status === 401 && config && !config._retry) {
           // refreshToken请求本身失败，不再重试
@@ -137,23 +141,29 @@ class Request {
 
         // 其他错误处理
         if (response) {
-          switch (response.status) {
-            case 403:
-              ElMessage.error('拒绝访问')
-              break
-            case 404:
-              ElMessage.error('请求地址不存在')
-              break
-            case 500:
-              ElMessage.error('服务器内部错误')
-              break
-            default:
-              ElMessage.error(response.data?.msg || response.data?.message || '请求失败')
+          if (requestConfig?.showError !== false) {
+            switch (response.status) {
+              case 403:
+                ElMessage.error('拒绝访问')
+                break
+              case 404:
+                ElMessage.error('请求地址不存在')
+                break
+              case 500:
+                ElMessage.error('服务器内部错误')
+                break
+              default:
+                ElMessage.error(response.data?.msg || response.data?.message || '请求失败')
+            }
           }
         } else if (error.code === 'ECONNABORTED') {
-          ElMessage.error('请求超时')
+          if (requestConfig?.showError !== false) {
+            ElMessage.error('请求超时')
+          }
         } else {
-          ElMessage.error('网络异常，请检查网络连接')
+          if (requestConfig?.showError !== false) {
+            ElMessage.error('网络异常，请检查网络连接')
+          }
         }
         return Promise.reject(error)
       }

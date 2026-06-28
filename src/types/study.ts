@@ -43,6 +43,41 @@ export interface StartStudySessionRequest {
   stepId?: string
 }
 
+/** 学习脚本包生成状态 */
+export type LessonBundleStatus =
+  | 'not_generated'
+  | 'generating'
+  | 'ready'
+  | 'failed'
+  | 'expired'
+  | 'needs_refresh'
+
+export interface LessonBundleGenerateRequest {
+  taskId?: string
+  pathNodeId?: number | string
+  spaceId?: string
+  mode?: StudyMode
+  forceRegenerate?: boolean
+  generationTrigger?: 'manual' | 'after_complete' | 'system' | string
+  generationReason?: string
+}
+
+export interface LessonBundleStatusVO {
+  bundleId?: string
+  taskId?: string
+  pathNodeId?: number | string | null
+  spaceId?: string | null
+  mode?: StudyMode | string
+  status: LessonBundleStatus | string
+  version?: number
+  generationTrigger?: string
+  generationReason?: string
+  expiresAt?: string
+  createTime?: string
+  updateTime?: string
+  errorMessage?: string
+}
+
 /** 学习脚本阶段。阶段由模板决定，不再固定为 6 段。 */
 export type ScriptPhaseType = string
 
