@@ -1,5 +1,10 @@
 import request, { type RequestConfig } from './request'
-import type { LessonBundleGenerateRequest, LessonBundleStatusVO, StudyMode } from '@/types/study'
+import type {
+  LessonBundleGenerateRequest,
+  LessonBundleStatusBatchRequest,
+  LessonBundleStatusVO,
+  StudyMode,
+} from '@/types/study'
 
 export const lessonBundleApi = {
   generate(data: LessonBundleGenerateRequest, config?: RequestConfig): Promise<LessonBundleStatusVO> {
@@ -13,6 +18,10 @@ export const lessonBundleApi = {
     mode?: StudyMode
   }): Promise<LessonBundleStatusVO> {
     return request.get('/lesson-bundles/by-target', { params, showError: false })
+  },
+
+  getByTargets(data: LessonBundleStatusBatchRequest): Promise<LessonBundleStatusVO[]> {
+    return request.post('/lesson-bundles/by-targets', data, { showError: false })
   },
 }
 

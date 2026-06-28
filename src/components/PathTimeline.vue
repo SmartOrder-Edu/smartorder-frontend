@@ -294,23 +294,26 @@ async function loadScriptStatuses() {
   const token = statusRefreshToken.value + 1
   statusRefreshToken.value = token
   const knowledgeNodes = props.nodes.filter(n => n.nodeType === 'knowledge_point')
-  await Promise.all(knowledgeNodes.map(async (node) => {
-    try {
-      const status = await lessonBundleApi.getByTarget({
-        pathNodeId: node.id,
-        mode: 'learn',
-      })
-      if (token !== statusRefreshToken.value) {
-        return
-      }
-      applyScriptStatus(node.id, status)
-    } catch {
-      if (token !== statusRefreshToken.value) {
-        return
-      }
-      applyScriptStatus(node.id)
+  if (!knowledgeNodes.length) {
+    return
+  }
+  try {
+    const statuses = await lessonBundleApi.getByTargets({
+      pathNodeIds: knowledgeNodes.map(node => node.id),
+      mode: 'learn',
+    })
+    if (token !== statusRefreshToken.value) {
+      return
     }
-  }))
+    knowledgeNodes.forEach((node, index) => {
+      applyScriptStatus(node.id, statuses[index])
+    })
+  } catch {
+    if (token !== statusRefreshToken.value) {
+      return
+    }
+    knowledgeNodes.forEach(node => applyScriptStatus(node.id))
+  }
 }
 
 async function generateScript(node: PathNodeVO) {

@@ -62,6 +62,12 @@ export interface LessonBundleGenerateRequest {
   generationReason?: string
 }
 
+export interface LessonBundleStatusBatchRequest {
+  pathNodeIds: Array<number | string>
+  spaceId?: string
+  mode?: StudyMode
+}
+
 export interface LessonBundleStatusVO {
   bundleId?: string
   taskId?: string
