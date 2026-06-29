@@ -67,6 +67,26 @@
                 <span v-if="getNodeResources(kp.id).length">资源 {{ getNodeResources(kp.id).length }}</span>
               </div>
             </div>
+            <span class="kp-script-tag" :class="scriptStatusClass(scriptStatusOf(kp.id))">
+              {{ scriptStatusLabel(scriptStatusOf(kp.id)) }}
+            </span>
+            <el-button
+              class="kp-script-btn"
+              size="small"
+              :loading="scriptLoadingOf(kp.id)"
+              :disabled="scriptStatusOf(kp.id) === 'generating'"
+              @click.stop="generateScript(kp)"
+            >
+              {{ scriptActionLabel(scriptStatusOf(kp.id)) }}
+            </el-button>
+            <el-button
+              class="kp-start-btn"
+              size="small"
+              type="primary"
+              @click.stop="startNodeStudy(kp)"
+            >
+              开始学习
+            </el-button>
             <span class="kp-status-tag" :class="kp.status">{{ statusLabel(kp.status) }}</span>
           </div>
         </div>
@@ -96,8 +116,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ElMessage } from 'element-plus'
+import { lessonBundleApi } from '@/api/lessonBundle'
+import { useStudyEntry } from '@/composables/useStudyEntry'
 import type { PathNodeVO, TaskVO, ResourceVO } from '@/types/learningSpace'
+import type { LessonBundleStatus, LessonBundleStatusVO } from '@/types/study'
 
 const props = defineProps<{
   nodes: PathNodeVO[]
@@ -105,7 +129,15 @@ const props = defineProps<{
   resources: ResourceVO[]
 }>()
 
+const { enterPathNodeStudy } = useStudyEntry()
 const expandedNodes = ref(new Set<string>())
+const scriptStates = ref<Record<string, {
+  status: LessonBundleStatus
+  loading: boolean
+  bundleId?: string
+}>>({})
+const statusRefreshToken = ref(0)
+let refreshTimer: ReturnType<typeof window.setTimeout> | null = null
 
 // 顶层只展示 stage 节点（按 sortOrder 升序）
 const stageNodes = computed(() =>
@@ -119,6 +151,27 @@ function getChildKps(stageId: string): PathNodeVO[] {
     .filter(n => n.parentNodeId === stageId && n.nodeType === 'knowledge_point')
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 }
+
+watch(
+  () => props.nodes.map(n => `${n.id}:${n.status}`).join('|'),
+  () => {
+    scheduleScriptStatusRefresh()
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  window.addEventListener('focus', handleWindowFocus)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('focus', handleWindowFocus)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  if (refreshTimer) {
+    window.clearTimeout(refreshTimer)
+  }
+})
 
 function toggleNode(node: PathNodeVO) {
   const next = new Set(expandedNodes.value)
@@ -138,6 +191,161 @@ function nodeTypeLabel(t: string) {
 function statusLabel(s: string) {
   const m: Record<string, string> = { completed: '已完成', current: '学习中', locked: '未解锁' }
   return m[s] || s
+}
+
+function scriptStatusOf(nodeId: string): LessonBundleStatus {
+  return scriptStates.value[nodeId]?.status || 'not_generated'
+}
+
+function scriptLoadingOf(nodeId: string): boolean {
+  return scriptStates.value[nodeId]?.loading || false
+}
+
+function scriptStatusLabel(status: LessonBundleStatus): string {
+  const m: Record<LessonBundleStatus, string> = {
+    not_generated: '未备课',
+    generating: '生成中',
+    ready: '已备课',
+    failed: '生成失败',
+    expired: '已过期',
+    needs_refresh: '需更新',
+  }
+  return m[status] || '未备课'
+}
+
+function scriptStatusClass(status: LessonBundleStatus): string {
+  if (status === 'ready') return 'ready'
+  if (status === 'failed') return 'failed'
+  if (status === 'expired' || status === 'needs_refresh') return 'stale'
+  if (status === 'generating') return 'generating'
+  return 'empty'
+}
+
+function scriptActionLabel(status: LessonBundleStatus): string {
+  const m: Record<LessonBundleStatus, string> = {
+    not_generated: '生成脚本',
+    generating: '生成中',
+    ready: '重新生成',
+    failed: '重试生成',
+    expired: '更新脚本',
+    needs_refresh: '更新脚本',
+  }
+  return m[status] || '生成脚本'
+}
+
+function normalizeScriptStatus(status?: string): LessonBundleStatus {
+  if (
+    status === 'generating' ||
+    status === 'ready' ||
+    status === 'failed' ||
+    status === 'expired' ||
+    status === 'needs_refresh'
+  ) {
+    return status
+  }
+  return 'not_generated'
+}
+
+function applyScriptStatus(nodeId: string, status?: LessonBundleStatusVO) {
+  scriptStates.value = {
+    ...scriptStates.value,
+    [nodeId]: {
+      ...scriptStates.value[nodeId],
+      status: normalizeScriptStatus(status?.status),
+      loading: false,
+      bundleId: status?.bundleId,
+    }
+  }
+}
+
+function setScriptState(nodeId: string, patch: Partial<{ status: LessonBundleStatus; loading: boolean; bundleId?: string }>) {
+  scriptStates.value = {
+    ...scriptStates.value,
+    [nodeId]: {
+      status: scriptStatusOf(nodeId),
+      loading: scriptLoadingOf(nodeId),
+      bundleId: scriptStates.value[nodeId]?.bundleId,
+      ...patch,
+    }
+  }
+}
+
+function scheduleScriptStatusRefresh(delayMs = 120) {
+  if (refreshTimer) {
+    window.clearTimeout(refreshTimer)
+  }
+  refreshTimer = window.setTimeout(() => {
+    refreshTimer = null
+    loadScriptStatuses()
+  }, delayMs)
+}
+
+function handleWindowFocus() {
+  scheduleScriptStatusRefresh(0)
+}
+
+function handleVisibilityChange() {
+  if (!document.hidden) {
+    scheduleScriptStatusRefresh(0)
+  }
+}
+
+async function loadScriptStatuses() {
+  const token = statusRefreshToken.value + 1
+  statusRefreshToken.value = token
+  const knowledgeNodes = props.nodes.filter(n => n.nodeType === 'knowledge_point')
+  if (!knowledgeNodes.length) {
+    return
+  }
+  try {
+    const statuses = await lessonBundleApi.getByTargets({
+      pathNodeIds: knowledgeNodes.map(node => node.id),
+      mode: 'learn',
+    })
+    if (token !== statusRefreshToken.value) {
+      return
+    }
+    knowledgeNodes.forEach((node, index) => {
+      applyScriptStatus(node.id, statuses[index])
+    })
+  } catch {
+    if (token !== statusRefreshToken.value) {
+      return
+    }
+    knowledgeNodes.forEach(node => applyScriptStatus(node.id))
+  }
+}
+
+async function generateScript(node: PathNodeVO) {
+  if (scriptLoadingOf(node.id)) {
+    return
+  }
+  const previousStatus = scriptStatusOf(node.id)
+  setScriptState(node.id, { status: 'generating', loading: true })
+  try {
+    const status = await lessonBundleApi.generate({
+      pathNodeId: node.id,
+      mode: 'learn',
+      forceRegenerate: previousStatus === 'ready',
+      generationTrigger: 'manual',
+      generationReason: '用户在学习空间路径中提前生成知识点学习脚本',
+    }, { showError: false })
+    applyScriptStatus(node.id, status)
+    ElMessage.success('学习脚本已准备好')
+    scheduleScriptStatusRefresh(300)
+  } catch (error) {
+    setScriptState(node.id, { status: 'failed', loading: false })
+    ElMessage.error('学习脚本生成失败，请稍后重试')
+  } finally {
+    setScriptState(node.id, { loading: false })
+  }
+}
+
+function startNodeStudy(node: PathNodeVO) {
+  enterPathNodeStudy(node.id, {
+    mode: 'learn',
+    source: 'path_node',
+  })
 }
 
 function miniStatusLabel(s: string) {
@@ -404,10 +612,30 @@ export default { name: 'PathTimeline' }
   font-size: 0.6875rem;
   padding: 1px 8px;
   border-radius: 99px;
+  white-space: nowrap;
 
   &.completed { background: #ecfdf5; color: #10b981; }
   &.current { background: #eff6ff; color: #3b82f6; }
   &.locked { background: #f3f4f6; color: #9ca3af; }
+}
+
+.kp-script-tag {
+  font-size: 0.6875rem;
+  padding: 1px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+  font-weight: 600;
+
+  &.ready { background: #ecfdf5; color: #059669; }
+  &.generating { background: #eff6ff; color: #2563eb; }
+  &.failed { background: #fef2f2; color: #dc2626; }
+  &.stale { background: #fffbeb; color: #d97706; }
+  &.empty { background: #f3f4f6; color: #6b7280; }
+}
+
+.kp-script-btn,
+.kp-start-btn {
+  flex-shrink: 0;
 }
 
 .node-task-item, .node-resource-item {

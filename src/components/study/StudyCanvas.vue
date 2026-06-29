@@ -12,13 +12,27 @@
         </div>
         <!-- Agent 讲解中指示器 -->
         <span class="teaching-badge" v-if="stepStore.teachingActive">
-          <span class="teaching-dot"></span>
-          Agent 讲解中
+          <span class="teaching-dot" v-if="stepStore.timelineStatus === 'playing'"></span>
+          {{ stepStore.timelineStatus === 'ended' ? '讲解完成' : 'Agent 讲解中' }}
         </span>
       </div>
       <div class="header-right">
         <!-- 教学模式：隐藏导航，显示"跳过"按钮 -->
         <template v-if="stepStore.teachingActive">
+          <button
+            v-if="stepStore.timelineStatus === 'playing'"
+            class="nav-btn"
+            @click="stepStore.pauseTeaching()"
+          >
+            暂停
+          </button>
+          <button
+            v-else-if="stepStore.timelineStatus === 'paused'"
+            class="nav-btn primary"
+            @click="stepStore.resumeTeaching()"
+          >
+            继续
+          </button>
           <button class="nav-btn skip" @click="stepStore.endTeaching()">
             跳过教学
           </button>
@@ -46,6 +60,18 @@
           <span>{{ stepStore.currentSegment.agentCommentary }}</span>
         </div>
 
+        <div class="scene-action-strip" v-if="stepStore.activeSceneActions.length">
+          <div
+            v-for="action in stepStore.activeSceneActions"
+            :key="action.actionId"
+            class="scene-action-pill"
+          >
+            <span class="scene-action-icon" :class="String(action.actionType)"></span>
+            <span>{{ sceneActionLabel(action.actionType) }}</span>
+            <small v-if="action.instruction">{{ action.instruction }}</small>
+          </div>
+        </div>
+
         <!-- 教学段列表（降序：所有已展示的段 + 当前段） -->
         <div class="teaching-segments">
           <template v-for="(seg, idx) in stepStore.canvasContent.teachingFlow.segments" :key="seg.id">
@@ -55,6 +81,7 @@
               :visible="true"
               :is-current="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex"
               :quiz-state="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex ? stepStore.quizState : null"
+              :scene-action="stepStore.getActiveSceneAction(seg.id, idx)"
               @quiz-answer="onQuizAnswer"
             />
           </template>
@@ -81,8 +108,15 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9,18 15,12 9,6"/></svg>
           </button>
           <!-- 教学中 → 进度指示 -->
+          <button
+            v-else-if="stepStore.timelineStatus === 'ended'"
+            class="continue-btn"
+            @click="stepStore.replayTeaching()"
+          >
+            重放本段
+          </button>
           <div v-else class="teaching-progress-hint">
-            Agent 正在讲解…
+            {{ stepStore.timelineStatus === 'paused' ? '已暂停' : 'Agent 正在讲解…' }}
           </div>
         </div>
       </template>
@@ -128,20 +162,38 @@ import PracticeStage from './PracticeStage.vue'
 import TeachingSegmentView from './TeachingSegmentView.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
 import { ElMessage } from 'element-plus'
-import type { ScriptPhaseType } from '@/types/study'
+import type { LessonSceneActionType } from '@/types/study'
 
 const stepStore = useTaskStepStore()
 
-function phaseLabel(phase: ScriptPhaseType): string {
-  const map: Record<ScriptPhaseType, string> = {
+function phaseLabel(phase: string): string {
+  const map: Record<string, string> = {
     review: '回顾前置',
     example: '动态例子',
     practice: '跟做例题',
     assessment: '掌握判断',
     advanced: '提高 / 补基础',
     summary: '本次总结',
+    diagnostic: '诊断',
+    targeted_review: '定向补弱',
+    diagnose_gap: '定位卡点',
+    rebuild_foundation: '补基础',
+    guided_practice: '跟做练习',
   }
   return map[phase] || phase
+}
+
+function sceneActionLabel(actionType: LessonSceneActionType | string): string {
+  const map: Record<string, string> = {
+    narration: '旁白同步',
+    text_fade_in: '文字入场',
+    formula_write: '公式书写',
+    diagram_trace: '图示绘制',
+    focus_pulse: '重点聚焦',
+    quiz_mount: '互动题',
+    summary_pin: '总结固定',
+  }
+  return map[actionType] || String(actionType)
 }
 
 function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation: string }) {
@@ -285,6 +337,65 @@ function onQuizAnswer(quizId: string, answer: string) {
 }
 
 // ---- 教学段列表 ----
+.scene-action-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.scene-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.3;
+  animation: sceneActionIn 0.22s ease-out;
+
+  small {
+    color: #64748b;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.scene-action-icon {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #0bb7aa;
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+
+  &.formula_write {
+    background: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  }
+
+  &.diagram_trace {
+    background: #f59e0b;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
+  }
+
+  &.quiz_mount {
+    background: #a855f7;
+    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.12);
+  }
+
+  &.focus_pulse {
+    background: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+  }
+}
+
 .teaching-segments {
   display: flex;
   flex-direction: column;
@@ -368,5 +479,16 @@ function onQuizAnswer(quizId: string, answer: string) {
   .header-left { width: 100%; }
   .canvas-body { padding: 16px; }
   .markdown-stage { padding: 18px; }
+}
+
+@keyframes sceneActionIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

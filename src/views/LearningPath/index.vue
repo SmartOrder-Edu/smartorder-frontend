@@ -109,9 +109,19 @@
                   </span>
                   {{ node.progress }}%
                 </span>
-                <span class="card-duration">{{ node.duration }}h</span>
+                <span class="script-status" :class="scriptStatusClass(node.scriptStatus)">
+                  {{ scriptStatusLabel(node.scriptStatus) }}
+                </span>
               </div>
               <div class="card-actions">
+                <el-button
+                  size="small"
+                  :loading="node.scriptLoading"
+                  :disabled="node.masteryStatus === 'locked'"
+                  @click.stop="generateScript(node)"
+                >
+                  {{ node.scriptStatus === 'ready' ? '重新生成' : '生成脚本' }}
+                </el-button>
                 <el-button
                   size="small"
                   :type="actionType(node.masteryStatus)"
@@ -276,14 +286,35 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { lessonBundleApi } from '@/api/lessonBundle'
 import { useStudyEntry } from '@/composables/useStudyEntry'
-import type { StudyMode } from '@/types/study'
+import type { LessonBundleStatus, LessonBundleStatusVO, StudyMode } from '@/types/study'
 
 type MasteryStatus = 'unlearned' | 'weak' | 'mastered' | 'fragile' | 'locked'
+type PathNodeStatus = 'completed' | 'learning' | 'pending'
 
-const { enterStudy } = useStudyEntry()
+interface PathNodeItem {
+  id: number
+  name: string
+  description: string
+  status: PathNodeStatus
+  statusText: string
+  isCurrent: boolean
+  progress: number
+  week: number
+  duration: number
+  tags: string[]
+  locked: boolean
+  masteryStatus: MasteryStatus
+  scriptStatus: LessonBundleStatus
+  scriptLoading: boolean
+  scriptBundleId?: string
+}
+
+const { enterPathNodeStudy } = useStudyEntry()
 
 /** 按掌握状态返回按钮文案 */
 function actionLabel(status: MasteryStatus): string {
@@ -318,7 +349,82 @@ function modeForStatus(status: MasteryStatus): StudyMode {
 }
 
 function enterNode(node: { id: number | string; masteryStatus: MasteryStatus }) {
-  enterStudy(node.id, { mode: modeForStatus(node.masteryStatus), source: 'path_node' })
+  enterPathNodeStudy(node.id, { mode: modeForStatus(node.masteryStatus), source: 'path_node' })
+}
+
+function scriptStatusLabel(status: LessonBundleStatus): string {
+  const map: Record<LessonBundleStatus, string> = {
+    not_generated: '未备课',
+    generating: '生成中',
+    ready: '已备课',
+    failed: '生成失败',
+    expired: '已过期',
+    needs_refresh: '需更新',
+  }
+  return map[status] || '未备课'
+}
+
+function scriptStatusClass(status: LessonBundleStatus): string {
+  if (status === 'ready') return 'ready'
+  if (status === 'failed') return 'failed'
+  if (status === 'expired' || status === 'needs_refresh') return 'stale'
+  if (status === 'generating') return 'generating'
+  return 'empty'
+}
+
+function applyScriptStatus(node: PathNodeItem, status?: LessonBundleStatusVO) {
+  node.scriptStatus = normalizeScriptStatus(status?.status)
+  node.scriptBundleId = status?.bundleId
+}
+
+function normalizeScriptStatus(status?: string): LessonBundleStatus {
+  if (
+    status === 'generating' ||
+    status === 'ready' ||
+    status === 'failed' ||
+    status === 'expired' ||
+    status === 'needs_refresh'
+  ) {
+    return status
+  }
+  return 'not_generated'
+}
+
+async function loadBundleStatuses() {
+  await Promise.all(pathNodes.value.map(async (node) => {
+    if (node.masteryStatus === 'locked') {
+      return
+    }
+    try {
+      const status = await lessonBundleApi.getByTarget({
+        pathNodeId: node.id,
+        mode: modeForStatus(node.masteryStatus),
+      })
+      applyScriptStatus(node, status)
+    } catch {
+      node.scriptStatus = 'not_generated'
+    }
+  }))
+}
+
+async function generateScript(node: PathNodeItem) {
+  if (node.masteryStatus === 'locked' || node.scriptLoading) {
+    return
+  }
+  node.scriptLoading = true
+  try {
+    const status = await lessonBundleApi.generate({
+      pathNodeId: node.id,
+      mode: modeForStatus(node.masteryStatus),
+      forceRegenerate: node.scriptStatus === 'ready',
+      generationTrigger: 'manual',
+      generationReason: '用户在学习路径中提前生成知识点学习脚本',
+    })
+    applyScriptStatus(node, status)
+    ElMessage.success(node.scriptStatus === 'ready' ? '学习脚本已准备好' : '学习脚本生成请求已提交')
+  } finally {
+    node.scriptLoading = false
+  }
 }
 
 
@@ -338,7 +444,7 @@ const pathProgress = computed(() => {
   return Math.round((completed / pathNodes.value.length) * 100)
 })
 
-const pathNodes = ref([
+const pathNodes = ref<PathNodeItem[]>([
   {
     id: 1,
     name: '操作系统基础',
@@ -352,6 +458,8 @@ const pathNodes = ref([
     tags: ['概念', '历史', '体系结构'],
     locked: false,
     masteryStatus: 'mastered' as MasteryStatus,
+    scriptStatus: 'not_generated',
+    scriptLoading: false,
   },
   {
     id: 2,
@@ -366,6 +474,8 @@ const pathNodes = ref([
     tags: ['进程', 'PCB', '状态转换'],
     locked: false,
     masteryStatus: 'mastered' as MasteryStatus,
+    scriptStatus: 'not_generated',
+    scriptLoading: false,
   },
   {
     id: 3,
@@ -380,6 +490,8 @@ const pathNodes = ref([
     tags: ['线程', 'PV操作', '同步互斥'],
     locked: false,
     masteryStatus: 'fragile' as MasteryStatus,
+    scriptStatus: 'not_generated',
+    scriptLoading: false,
   },
   {
     id: 4,
@@ -394,6 +506,8 @@ const pathNodes = ref([
     tags: ['虚拟内存', '分页', '页面置换'],
     locked: false,
     masteryStatus: 'unlearned' as MasteryStatus,
+    scriptStatus: 'not_generated',
+    scriptLoading: false,
   },
   {
     id: 5,
@@ -408,6 +522,8 @@ const pathNodes = ref([
     tags: ['inode', '目录', '磁盘管理'],
     locked: false,
     masteryStatus: 'weak' as MasteryStatus,
+    scriptStatus: 'not_generated',
+    scriptLoading: false,
   },
   {
     id: 6,
@@ -422,12 +538,18 @@ const pathNodes = ref([
     tags: ['项目', '综合', '实践'],
     locked: true,
     masteryStatus: 'locked' as MasteryStatus,
+    scriptStatus: 'not_generated',
+    scriptLoading: false,
   }
 ])
 
 const submitAdjust = () => {
   showAdjustDialog.value = false
 }
+
+onMounted(() => {
+  loadBundleStatuses()
+})
 </script>
 
 <style scoped>
@@ -750,6 +872,7 @@ const submitAdjust = () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-sm);
+  gap: var(--spacing-sm);
 }
 
 .card-progress-label {
@@ -775,14 +898,45 @@ const submitAdjust = () => {
   transition: width 0.5s ease;
 }
 
-.card-duration {
+.script-status {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.script-status.ready {
+  background: rgba(18, 184, 134, 0.1);
+  color: var(--accent-color);
+}
+
+.script-status.generating {
+  background: rgba(59, 91, 219, 0.1);
+  color: #3b5bdb;
+}
+
+.script-status.failed {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.script-status.stale {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.script-status.empty {
+  background: rgba(148, 163, 184, 0.1);
   color: var(--text-muted);
 }
 
 .card-actions {
   display: flex;
   justify-content: center;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
 }
 
 /* 知识树 */

@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="study-page">
+    <div class="study-page" ref="studyPageRef" :class="{ 'is-fullscreen': isFullscreen }">
       <!-- 顶栏 -->
       <header class="study-topbar">
         <div class="topbar-left">
@@ -20,6 +20,14 @@
           </div>
         </div>
         <div class="topbar-right">
+          <button class="fullscreen-btn" @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏学习'">
+            <svg v-if="!isFullscreen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+            </svg>
+          </button>
           <div class="task-title" v-if="stepStore.taskId">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
               <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
@@ -54,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LearningScript from '@/components/study/LearningScript.vue'
@@ -68,6 +76,23 @@ import type { StudyMode } from '@/types/study'
 const route = useRoute()
 const stepStore = useTaskStepStore()
 const dashStore = useSpaceDashboardStore()
+
+// 全屏
+const studyPageRef = ref<HTMLElement | null>(null)
+const isFullscreen = ref(false)
+
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement
+  document.body.classList.toggle('study-fullscreen', isFullscreen.value)
+}
+
+async function toggleFullscreen() {
+  if (isFullscreen.value) {
+    await document.exitFullscreen()
+  } else {
+    await studyPageRef.value?.requestFullscreen()
+  }
+}
 
 const spaceName = computed(() => dashStore.dashboard?.space?.name || '')
 
@@ -88,20 +113,34 @@ function onJump(index: number) {
 }
 
 onMounted(async () => {
+  document.addEventListener('fullscreenchange', onFullscreenChange)
   const id = String(route.params.taskId || '')
   if (!id) return
   const mode = (route.query.mode as StudyMode) || 'learn'
   const spaceId = route.query.spaceId as string | undefined
-  // 若带 spaceId，先拉空间信息用于面包屑
-  if (spaceId) {
+  const pathNodeId = route.query.pathNodeId as string | undefined
+  const source = route.query.source as string | undefined
+  const stepId = route.query.stepId as string | undefined
+  const sessionId = route.query.sessionId as string | undefined
+  // 旧 dashboard 接口只支持数据库数字 ID；mock 空间如 math/se 不请求该接口。
+  if (spaceId && /^\d+$/.test(spaceId)) {
     dashStore.fetchDashboard(spaceId).catch(() => {})
   }
-  await stepStore.fetchSteps(id, { mode, spaceId })
+  if (sessionId) {
+    await stepStore.loadSession(sessionId)
+    if (stepStore.spaceId && /^\d+$/.test(stepStore.spaceId)) {
+      dashStore.fetchDashboard(stepStore.spaceId).catch(() => {})
+    }
+  } else {
+    await stepStore.fetchSteps(id, { mode, spaceId, pathNodeId, source, stepId })
+  }
   // 启动 Agent 教学流
   stepStore.startTeaching()
 })
 
 onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+  document.body.classList.remove('study-fullscreen')
   stepStore.reset()
 })
 </script>
@@ -173,6 +212,28 @@ onUnmounted(() => {
 }
 
 .topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  .fullscreen-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+    &:hover {
+      border-color: #0bb7aa;
+      color: #0bb7aa;
+    }
+  }
+
   .task-title {
     display: inline-flex;
     align-items: center;
@@ -213,5 +274,28 @@ onUnmounted(() => {
   }
   .region-script { max-height: 240px; }
   .region-agent { max-height: 380px; }
+}
+
+/* 全屏状态 */
+.study-page.is-fullscreen {
+  background: linear-gradient(180deg, #f8fafc, #eef2f7);
+}
+</style>
+
+<style lang="scss">
+/* 学习页面去掉 page-container 的 padding，避免顶部空白和滚动条 */
+.page-container:has(.study-page) {
+  padding: 0;
+}
+
+/* 全屏学习时隐藏侧边栏、通知悬浮按钮 */
+body.study-fullscreen .app-layout .sidebar {
+  display: none;
+}
+body.study-fullscreen .app-layout .main-content {
+  margin-left: 0 !important;
+}
+body.study-fullscreen .app-layout .notif-fab {
+  display: none;
 }
 </style>

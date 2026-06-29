@@ -28,29 +28,79 @@ export type StudyEntrySource =
 export interface EnterStudyOptions {
   mode?: StudyMode
   spaceId?: string
+  pathNodeId?: string
   stepId?: string
   source?: StudyEntrySource
 }
 
-/** 学习脚本阶段类型（对应方案 6 阶段） */
-export type ScriptPhaseType =
-  | 'review'       // 1.回顾前置概念
-  | 'example'      // 2.动态例子
-  | 'practice'     // 3.跟做例题
-  | 'assessment'   // 4.掌握判断
-  | 'advanced'     // 5.提高或补基础
-  | 'summary'      // 6.总结与画像更新
+/** 启动学习会话请求 */
+export interface StartStudySessionRequest {
+  taskId?: string
+  pathNodeId?: string
+  spaceId?: string
+  mode?: StudyMode
+  entrySource?: StudyEntrySource
+  stepId?: string
+}
+
+/** 学习脚本包生成状态 */
+export type LessonBundleStatus =
+  | 'not_generated'
+  | 'generating'
+  | 'ready'
+  | 'failed'
+  | 'expired'
+  | 'needs_refresh'
+
+export interface LessonBundleGenerateRequest {
+  taskId?: string
+  pathNodeId?: number | string
+  spaceId?: string
+  mode?: StudyMode
+  forceRegenerate?: boolean
+  generationTrigger?: 'manual' | 'after_complete' | 'system' | string
+  generationReason?: string
+}
+
+export interface LessonBundleStatusBatchRequest {
+  pathNodeIds: Array<number | string>
+  spaceId?: string
+  mode?: StudyMode
+}
+
+export interface LessonBundleStatusVO {
+  bundleId?: string
+  taskId?: string
+  pathNodeId?: number | string | null
+  spaceId?: string | null
+  mode?: StudyMode | string
+  status: LessonBundleStatus | string
+  version?: number
+  generationTrigger?: string
+  generationReason?: string
+  expiresAt?: string
+  createTime?: string
+  updateTime?: string
+  errorMessage?: string
+}
+
+/** 学习脚本阶段。阶段由模板决定，不再固定为 6 段。 */
+export type ScriptPhaseType = string
 
 /** 学习脚本步骤（比 TaskStep 更细粒度的教学脚本） */
 export interface ScriptStep {
   id: string
   phase: ScriptPhaseType
+  /** 开放节点类型：diagnostic_quiz / concept_review / guided_practice / summary 等 */
+  nodeType?: string
   title: string
   subtitle: string
   estimatedMinutes: number
   status: 'pending' | 'in_progress' | 'completed' | 'skipped'
   /** 该步骤在画布上的渲染提示，驱动 CanvasContent 模板 */
   canvasType: CanvasType
+  sortOrder?: number
+  metadata?: Record<string, unknown>
 }
 
 /** 画布渲染类型 */
@@ -96,6 +146,8 @@ export interface CanvasContent {
   agentNote?: string
   /** v2: 分段式教学流（存在时走 Agent 教学模式，否则回退静态渲染） */
   teachingFlow?: TeachingFlow
+  /** v3: 统一教学时间轴。后端就绪后可直接返回该结构，TeachingFlow 仅作为兼容输入。 */
+  timeline?: LessonTimeline
 }
 
 // ---- 分段式教学流（v2 Agent 主动教学交互）----
@@ -146,6 +198,178 @@ export interface TeachingFlow {
   currentSegmentIndex: number
   isActive: boolean
   isPaused: boolean
+}
+
+// ---- 教学时间轴（v3 Timeline Player）----
+
+/** 时间轴时钟来源。无语音时使用 internal；接入 TTS 后由 audio.currentTime 驱动。 */
+export type LessonClockSource = 'internal' | 'audio'
+
+/** 教学时间轴 Cue 类型。保留通用动作，避免未来每加一种场景都改播放器核心。 */
+export type LessonCueType =
+  | 'segment_reveal'
+  | 'scene_action'
+  | 'speech'
+  | 'subtitle'
+  | 'text_reveal'
+  | 'focus'
+  | 'highlight'
+  | 'underline'
+  | 'draw'
+  | 'pause'
+  | 'quiz'
+  | 'scene_change'
+
+/** 时间轴中的最小可执行动作 */
+export interface LessonCue {
+  id: string
+  type: LessonCueType
+  startMs: number
+  endMs?: number
+  payload: Record<string, unknown>
+}
+
+/** 场景动作类型。它是动画生成协议的稳定层，不绑定具体渲染引擎。 */
+export type LessonSceneActionType =
+  | 'narration'
+  | 'text_fade_in'
+  | 'formula_write'
+  | 'diagram_trace'
+  | 'focus_pulse'
+  | 'quiz_mount'
+  | 'summary_pin'
+
+/** 时间轴驱动的场景动作。后续可映射到 Canvas、Manim、视频或字幕生成。 */
+export interface LessonSceneAction {
+  actionId: string
+  actionType: LessonSceneActionType | string
+  targetType?: 'segment' | 'formula' | 'diagram' | 'quiz' | 'canvas' | string
+  targetId?: string
+  layer?: 'content' | 'overlay' | 'agent' | string
+  startMs: number
+  durationMs: number
+  instruction?: string
+  payload?: Record<string, unknown>
+}
+
+/** 单个教学场景的播放时间轴 */
+export interface LessonTimeline {
+  id: string
+  sceneId: string
+  clockSource: LessonClockSource
+  audioUrl?: string
+  durationMs: number
+  cues: LessonCue[]
+  metadata?: Record<string, unknown>
+}
+
+/** Timeline 播放器状态 */
+export interface TimelinePlayerState {
+  status: 'idle' | 'ready' | 'playing' | 'paused' | 'waiting_user' | 'ended'
+  currentTimeMs: number
+  playbackRate: number
+  activeTimelineId: string | null
+  firedCueIds: Set<string>
+}
+
+/** 后端返回的当前教学场景。content 第一阶段仍可为空，由前端兼容 mock 渲染。 */
+export interface StudyScene {
+  sceneId: string
+  sceneType: CanvasType | string
+  stepId: string
+  content: Record<string, unknown>
+}
+
+/** 后端学习会话 VO */
+export interface StudySessionVO {
+  sessionId: string
+  lessonBundleId: string
+  userId?: string
+  taskId: string
+  pathNodeId?: string | null
+  spaceId?: string | null
+  mode: StudyMode
+  status: 'created' | 'active' | 'paused' | 'completed' | 'abandoned' | string
+  currentStepId: string
+  currentScene?: StudyScene
+  currentTimeline?: LessonTimeline
+  scriptSteps: ScriptStep[]
+  scenesByStepId?: Record<string, StudyScene>
+  timelinesByStepId?: Record<string, LessonTimeline>
+  mastery?: MasteryJudge
+}
+
+export interface CompleteStudySessionRequest {
+  actualMinutes?: number
+  focusLevel?: number
+  mood?: number
+  selfRating?: number
+  notes?: string
+  payload?: Record<string, unknown>
+}
+
+export interface StudySessionCompleteVO {
+  sessionId: string
+  status: 'completed' | string
+  actualMinutes: number
+  completedSteps: number
+  totalSteps: number
+  masteryLevel?: MasteryLevel | string
+  nextSuggestion?: string
+  summary?: Record<string, unknown>
+}
+
+/** 学习过程事件类型。后端第一版只接收和记录，后续 TeachingPolicy 基于这些事件做决策。 */
+export type StudyEventType =
+  | 'session_started'
+  | 'step_entered'
+  | 'step_completed'
+  | 'timeline_cue_played'
+  | 'pause_clicked'
+  | 'resume_clicked'
+  | 'feedback_clicked'
+  | 'quiz_answered'
+  | 'custom_message_submitted'
+  | 'session_completed'
+
+export interface StudyEventRequest {
+  eventType: StudyEventType
+  targetType?: string
+  targetId?: string
+  clientTimeMs?: number
+  timelineTimeMs?: number
+  currentStepId?: string
+  currentTimelineId?: string
+  payload?: Record<string, unknown>
+}
+
+export interface StudyEventReceipt {
+  eventId: string
+  sessionId: string
+  eventType: StudyEventType | string
+  status: 'accepted' | string
+  acceptedAtMs: number
+  actions?: StudyTeachingAction[]
+}
+
+export type StudyTeachingActionType =
+  | 'agent_reply'
+  | 'append_agent_note'
+  | 'mark_current_step_skipped'
+  | 'insert_timeline_patch'
+
+export interface StudyTeachingAction {
+  actionId: string
+  actionType: StudyTeachingActionType | string
+  sceneType?: string
+  reason?: string
+  payload: Record<string, unknown>
+}
+
+export interface StudyTeachingActionStatusRequest {
+  status: 'applied' | 'failed' | 'pending'
+  errorMessage?: string
+  payload?: Record<string, unknown>
 }
 
 /** 弹题回答状态 */
