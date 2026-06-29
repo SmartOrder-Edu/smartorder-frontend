@@ -1,5 +1,5 @@
 <template>
-  <div class="inline-quiz-card">
+  <div class="inline-quiz-card" :class="{ celebrating: celebrating && isCorrect }">
     <div v-if="celebrating && isCorrect" class="confetti-layer" aria-hidden="true">
       <span
         v-for="piece in confettiPieces"
@@ -8,6 +8,12 @@
         :class="`confetti-${piece.shape}`"
         :style="confettiStyle(piece)"
       ></span>
+      <div class="celebration-icon">
+        <svg viewBox="0 0 48 48" fill="none" width="48" height="48">
+          <circle cx="24" cy="24" r="22" fill="#10b981" stroke="#059669" stroke-width="2"/>
+          <path d="M14 24l7 7 13-13" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
     </div>
 
     <div class="quiz-head">
@@ -102,30 +108,41 @@ let celebrationTimer: ReturnType<typeof setTimeout> | null = null
 type QuizOption = { label: string; value: string }
 type ConfettiPiece = {
   id: number
-  x: number
-  sway: number
+  burstX: number
+  burstY: number
+  drift: number
   delay: number
   duration: number
   color: string
   rotate: number
   size: number
-  shape: 'rect' | 'circle'
+  shape: 'rect' | 'circle' | 'triangle'
 }
 
-const confettiPieces: ConfettiPiece[] = [
-  { id: 1, x: 10, sway: 12, delay: 0, duration: 1250, color: '#14b8a6', rotate: -16, size: 7, shape: 'rect' },
-  { id: 2, x: 18, sway: -10, delay: 70, duration: 1340, color: '#f59e0b', rotate: 18, size: 6, shape: 'circle' },
-  { id: 3, x: 26, sway: 14, delay: 25, duration: 1290, color: '#3b82f6', rotate: -22, size: 7, shape: 'rect' },
-  { id: 4, x: 34, sway: -12, delay: 115, duration: 1400, color: '#ef4444', rotate: 20, size: 6, shape: 'rect' },
-  { id: 5, x: 42, sway: 10, delay: 45, duration: 1320, color: '#a855f7', rotate: -18, size: 7, shape: 'circle' },
-  { id: 6, x: 50, sway: -14, delay: 145, duration: 1440, color: '#10b981', rotate: 16, size: 7, shape: 'rect' },
-  { id: 7, x: 58, sway: 12, delay: 90, duration: 1360, color: '#f97316', rotate: -14, size: 6, shape: 'circle' },
-  { id: 8, x: 66, sway: -10, delay: 35, duration: 1280, color: '#06b6d4', rotate: 22, size: 7, shape: 'rect' },
-  { id: 9, x: 74, sway: 13, delay: 130, duration: 1420, color: '#eab308', rotate: -20, size: 6, shape: 'rect' },
-  { id: 10, x: 82, sway: -12, delay: 80, duration: 1330, color: '#ec4899', rotate: 16, size: 7, shape: 'circle' },
-  { id: 11, x: 90, sway: 9, delay: 155, duration: 1460, color: '#22c55e', rotate: -12, size: 6, shape: 'rect' },
-  { id: 12, x: 95, sway: -9, delay: 20, duration: 1260, color: '#6366f1', rotate: 18, size: 6, shape: 'circle' },
-]
+const confettiPieces = ref<ConfettiPiece[]>([])
+
+function generateConfetti(): ConfettiPiece[] {
+  const colors = [
+    '#14b8a6', '#f59e0b', '#3b82f6', '#ef4444', '#a855f7',
+    '#10b981', '#f97316', '#06b6d4', '#eab308', '#ec4899',
+    '#22c55e', '#6366f1', '#84cc16', '#f43f5e', '#8b5cf6',
+    '#fb923c', '#2dd4bf', '#e879f9',
+  ]
+  const shapes: Array<'rect' | 'circle' | 'triangle'> = ['rect', 'circle', 'triangle']
+
+  return Array.from({ length: 50 }, (_, i) => ({
+    id: i,
+    burstX: (Math.random() - 0.5) * 420,
+    burstY: -(Math.random() * 80 + 40),
+    drift: (Math.random() - 0.5) * 160,
+    delay: Math.random() * 250,
+    duration: 1200 + Math.random() * 600,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    rotate: Math.random() * 720 - 360,
+    size: 5 + Math.random() * 7,
+    shape: shapes[Math.floor(Math.random() * shapes.length)],
+  }))
+}
 
 const inlineOptionPattern = /(^|\s)([A-Ha-h])\s*[.、．)]\s*([\s\S]*?)(?=(\s+[A-Ha-h]\s*[.、．)]\s*)|$)/g
 
@@ -189,12 +206,13 @@ function doSubmit() {
   isCorrect.value = value === normalizeCorrectAnswer(props.quiz.correctAnswer || '')
   submitted.value = true
   if (isCorrect.value && isChoiceQuestion.value) {
+    confettiPieces.value = generateConfetti()
     celebrating.value = true
     celebrationTimer = setTimeout(() => {
       celebrating.value = false
       showResult.value = true
       celebrationTimer = null
-    }, 1350)
+    }, 1600)
   } else {
     showResult.value = true
   }
@@ -223,16 +241,14 @@ function normalizeCorrectAnswer(value: string): string {
 
 function confettiStyle(piece: ConfettiPiece) {
   return {
-    '--confetti-x': `${piece.x}%`,
-    '--confetti-drift': `${piece.drift}px`,
+    '--burst-x': `${piece.burstX}px`,
+    '--burst-y': `${piece.burstY}px`,
+    '--drift': `${piece.drift}px`,
     '--confetti-delay': `${piece.delay}ms`,
     '--confetti-duration': `${piece.duration}ms`,
     '--confetti-color': piece.color,
     '--confetti-rotate': `${piece.rotate}deg`,
-    '--confetti-width': `${piece.size}px`,
-    '--confetti-height': `${Math.round(piece.size * 1.35)}px`,
-    '--confetti-sway': `${piece.sway}px`,
-    '--confetti-sway-half': `${Math.round(piece.sway * -0.45)}px`,
+    '--confetti-size': `${piece.size}px`,
   }
 }
 
@@ -278,17 +294,32 @@ function clearCelebrationTimer() {
 
 .confetti-piece {
   position: absolute;
-  top: -14px;
-  left: var(--confetti-x);
-  width: var(--confetti-width);
-  height: var(--confetti-height);
+  left: 50%;
+  top: 40%;
+  width: var(--confetti-size);
+  height: var(--confetti-size);
   border-radius: 2px;
   background: var(--confetti-color);
   opacity: 0;
-  transform: translate3d(0, -8px, 0) rotate(var(--confetti-rotate));
-  animation: confettiFall var(--confetti-duration) var(--confetti-delay) ease-in forwards;
+  transform: translate(-50%, -50%) scale(0);
+  animation: confettiBurst var(--confetti-duration) var(--confetti-delay) cubic-bezier(0.18, 0.89, 0.32, 1.05) forwards;
 
   &.confetti-circle { border-radius: 999px; }
+
+  &.confetti-triangle {
+    border-radius: 0;
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  }
+}
+
+.celebration-icon {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%) scale(0);
+  z-index: 4;
+  animation: iconPopIn 600ms 200ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  filter: drop-shadow(0 4px 12px rgba(16, 185, 129, 0.4));
 }
 
 .quiz-head {
@@ -387,8 +418,13 @@ function clearCelebrationTimer() {
   border-color: rgba(16, 185, 129, 0.7);
   background: rgba(16, 185, 129, 0.08);
   color: #047857;
-  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.13);
-  animation: correctOptionLift 520ms ease-out;
+  animation: correctOptionPop 700ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.inline-quiz-card.celebrating {
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .quiz-submit {
@@ -436,37 +472,58 @@ function clearCelebrationTimer() {
   :deep(.markdown-renderer) { background: transparent; padding: 0; p { margin: 4px 0; } }
 }
 
-@keyframes confettiFall {
+@keyframes confettiBurst {
   0% {
-    transform: translate3d(0, -10px, 0) rotate(var(--confetti-rotate));
+    transform: translate(-50%, -50%) scale(0);
     opacity: 0;
   }
-  12% {
-    opacity: 0.9;
+  8% {
+    opacity: 1;
   }
-  35% {
-    transform: translate3d(var(--confetti-sway), 68px, 0) rotate(calc(var(--confetti-rotate) + 80deg));
-    opacity: 0.9;
-  }
-  70% {
-    transform: translate3d(var(--confetti-sway-half), 138px, 0) rotate(calc(var(--confetti-rotate) + 170deg));
-    opacity: 0.72;
+  25% {
+    transform: translate(calc(var(--burst-x) - 50%), calc(var(--burst-y) - 50%)) scale(1);
+    opacity: 1;
   }
   100% {
-    transform: translate3d(var(--confetti-sway), 210px, 0) rotate(calc(var(--confetti-rotate) + 250deg));
+    transform: translate(calc(var(--burst-x) + var(--drift) - 50%), calc(200px - 50%)) scale(0.3) rotate(var(--confetti-rotate));
     opacity: 0;
   }
 }
 
-@keyframes correctOptionLift {
+@keyframes iconPopIn {
   0% {
-    transform: translateY(0);
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
   }
-  28% {
-    transform: translateY(-2px);
+  55% {
+    transform: translate(-50%, -50%) scale(1.3);
+    opacity: 1;
+  }
+  75% {
+    transform: translate(-50%, -50%) scale(0.88);
+    opacity: 1;
   }
   100% {
-    transform: translateY(0);
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes correctOptionPop {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  }
+  30% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+  55% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 8px 18px rgba(16, 185, 129, 0.13);
   }
 }
 </style>
