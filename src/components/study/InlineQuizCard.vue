@@ -11,13 +11,13 @@
 
     <!-- 作答区 -->
     <div v-if="!submitted" class="quiz-input-area">
-      <template v-if="quiz.answerType === 'text'">
+      <template v-if="normalizedAnswerType === 'text'">
         <textarea v-model="answer" class="quiz-textarea" placeholder="输入你的答案…" rows="2" :disabled="disabled"></textarea>
       </template>
-      <template v-else-if="quiz.answerType === 'number'">
+      <template v-else-if="normalizedAnswerType === 'number'">
         <input v-model="answer" class="quiz-textinput" placeholder="输入数字…" :disabled="disabled" />
       </template>
-      <template v-else-if="quiz.answerType === 'single_select'">
+      <template v-else-if="normalizedAnswerType === 'single_select'">
         <div class="quiz-options">
           <button
             v-for="opt in quiz.options" :key="opt.value"
@@ -28,7 +28,7 @@
           >{{ opt.label }}</button>
         </div>
       </template>
-      <template v-else-if="quiz.answerType === 'multi_select'">
+      <template v-else-if="normalizedAnswerType === 'multi_select'">
         <div class="quiz-options">
           <label v-for="opt in quiz.options" :key="opt.value" class="quiz-check-label">
             <input type="checkbox" :value="opt.value" v-model="checkedValues" :disabled="disabled" />
@@ -71,15 +71,24 @@ const checkedValues = ref<string[]>([])
 const submitted = ref(false)
 const isCorrect = ref(false)
 
+const normalizedAnswerType = computed(() => {
+  const type = String(props.quiz.answerType || 'text').replace('-', '_')
+  if (type === 'short_text' || type === 'short_answer' || type === 'free_text') return 'text'
+  if (type === 'single_choice' || type === 'choice') return 'single_select'
+  if (type === 'multi_choice' || type === 'multiple_choice') return 'multi_select'
+  if (type === 'text' || type === 'number' || type === 'single_select' || type === 'multi_select') return type
+  return 'text'
+})
+
 const canSubmit = computed(() => {
-  if (props.quiz.answerType === 'multi_select') return checkedValues.value.length > 0
+  if (normalizedAnswerType.value === 'multi_select') return checkedValues.value.length > 0
   return answer.value.trim().length > 0
 })
 
 function doSubmit() {
   if (!canSubmit.value || submitted.value) return
   const value =
-    props.quiz.answerType === 'multi_select'
+    normalizedAnswerType.value === 'multi_select'
       ? checkedValues.value.join(',')
       : answer.value.trim()
   isCorrect.value = value === props.quiz.correctAnswer
