@@ -7,7 +7,7 @@
       <span>Agent 提问</span>
     </div>
 
-    <p class="quiz-prompt">{{ quiz.prompt }}</p>
+    <p class="quiz-prompt">{{ displayPrompt }}</p>
 
     <!-- 作答区 -->
     <div v-if="!submitted" class="quiz-input-area">
@@ -20,7 +20,7 @@
       <template v-else-if="normalizedAnswerType === 'single_select'">
         <div class="quiz-options">
           <button
-            v-for="opt in quiz.options" :key="opt.value"
+            v-for="opt in quizOptions" :key="opt.value"
             class="quiz-option"
             :class="{ selected: answer === opt.value }"
             :disabled="disabled"
@@ -30,7 +30,7 @@
       </template>
       <template v-else-if="normalizedAnswerType === 'multi_select'">
         <div class="quiz-options">
-          <label v-for="opt in quiz.options" :key="opt.value" class="quiz-check-label">
+          <label v-for="opt in quizOptions" :key="opt.value" class="quiz-check-label">
             <input type="checkbox" :value="opt.value" v-model="checkedValues" :disabled="disabled" />
             {{ opt.label }}
           </label>
@@ -71,11 +71,48 @@ const checkedValues = ref<string[]>([])
 const submitted = ref(false)
 const isCorrect = ref(false)
 
+type QuizOption = { label: string; value: string }
+
+const inlineOptionPattern = /(^|\s)([A-Ha-h])\s*[.、．)]\s*([\s\S]*?)(?=(\s+[A-Ha-h]\s*[.、．)]\s*)|$)/g
+
+const parsedInlineOptions = computed<QuizOption[]>(() => {
+  if (props.quiz.options?.length) return []
+  const text = props.quiz.prompt || ''
+  const matches: QuizOption[] = []
+  inlineOptionPattern.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = inlineOptionPattern.exec(text))) {
+    const value = normalizeOptionValue(match[2])
+    const label = stripOptionPrefix(match[3].trim())
+    if (label) matches.push({ value, label })
+  }
+  return matches.length >= 2 ? matches : []
+})
+
+const quizOptions = computed<QuizOption[]>(() => {
+  if (props.quiz.options?.length) {
+    return props.quiz.options.map(opt => ({
+      value: normalizeOptionValue(String(opt.value)),
+      label: stripOptionPrefix(String(opt.label)),
+    }))
+  }
+  return parsedInlineOptions.value
+})
+
+const displayPrompt = computed(() => {
+  if (!parsedInlineOptions.value.length) return props.quiz.prompt
+  inlineOptionPattern.lastIndex = 0
+  const match = inlineOptionPattern.exec(props.quiz.prompt || '')
+  return match ? (props.quiz.prompt || '').slice(0, match.index).trim() : props.quiz.prompt
+})
+
 const normalizedAnswerType = computed(() => {
   const type = String(props.quiz.answerType || 'text').replace('-', '_')
   if (type === 'short_text' || type === 'short_answer' || type === 'free_text') return 'text'
   if (type === 'single_choice' || type === 'choice') return 'single_select'
   if (type === 'multi_choice' || type === 'multiple_choice') return 'multi_select'
+  if (type === 'text' && quizOptions.value.length) return 'single_select'
+  if ((type === 'single_select' || type === 'multi_select') && !quizOptions.value.length) return 'text'
   if (type === 'text' || type === 'number' || type === 'single_select' || type === 'multi_select') return type
   return 'text'
 })
@@ -91,9 +128,29 @@ function doSubmit() {
     normalizedAnswerType.value === 'multi_select'
       ? checkedValues.value.join(',')
       : answer.value.trim()
-  isCorrect.value = value === props.quiz.correctAnswer
+  isCorrect.value = value === normalizeCorrectAnswer(props.quiz.correctAnswer || '')
   submitted.value = true
   emit('answer', props.quiz.id, value)
+}
+
+function stripOptionPrefix(value: string): string {
+  return value.replace(/^[A-Ha-h]\s*[.、．)]\s*/, '').trim()
+}
+
+function normalizeOptionValue(value: string): string {
+  const trimmed = value.trim()
+  return /^[A-Za-z]$/.test(trimmed) ? trimmed.toLowerCase() : trimmed
+}
+
+function normalizeCorrectAnswer(value: string): string {
+  const stripped = stripOptionPrefix(value)
+  const normalized = normalizeOptionValue(stripped)
+  const option = quizOptions.value.find(opt =>
+    opt.value === normalized ||
+    opt.label === value.trim() ||
+    opt.label === stripped,
+  )
+  return option?.value || normalized
 }
 
 watch(() => props.quiz.id, () => {
