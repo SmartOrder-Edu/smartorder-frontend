@@ -58,6 +58,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   // ---- 教学流状态（v2 Agent 主动教学交互）----
   const teachingActive = ref(false)
   const quizState = ref<QuizState | null>(null)
+  const currentSubtitle = ref('')
   const activeSceneActions = ref<LessonSceneAction[]>([])
   const sceneActionTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
@@ -693,15 +694,26 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       return
     }
 
-    if (cue.type !== 'segment_reveal') return
-    const index = Number(cue.payload.segmentIndex)
-    if (!Number.isInteger(index)) return
-    applySceneActionPayload(cue.payload.sceneAction, cue.startMs)
-    processSegment(index, cue)
+    if (cue.type === 'subtitle' || cue.type === 'speech') {
+      currentSubtitle.value = String(cue.payload.text || cue.payload.subtitle || '')
+      return
+    }
+
+    if (cue.type === 'segment_reveal' || cue.type === 'text_reveal') {
+      const index = Number(cue.payload.segmentIndex)
+      if (Number.isInteger(index)) {
+        applySceneActionPayload(cue.payload.sceneAction, cue.startMs)
+        processSegment(index, cue)
+        return
+      }
+    }
+
+    applyGenericTimelineCue(cue)
   }
 
   function resetTimelineScene() {
     clearSceneActions()
+    currentSubtitle.value = ''
     const flow = currentTeachingFlow.value
     if (flow) {
       flow.currentSegmentIndex = -1
@@ -719,6 +731,10 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     }
     quizState.value = null
     teachingActive.value = true
+  }
+
+  function setTimelineAudioElement(element: HTMLAudioElement | null) {
+    timelinePlayer.audioRef.value = element
   }
 
   function buildSceneActionFromSegment(segment: TeachingSegment, index: number, startMs: number): LessonSceneAction {
@@ -756,6 +772,41 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   function applySceneActionCue(cue: LessonCue) {
     applySceneActionPayload(cue.payload, cue.startMs)
+  }
+
+  function applyGenericTimelineCue(cue: LessonCue) {
+    const actionTypeByCue: Record<string, string> = {
+      focus: 'focus_pulse',
+      highlight: 'highlight',
+      underline: 'underline',
+      draw: 'draw',
+      quiz: 'quiz_mount',
+      pause: 'narration',
+      text_reveal: 'text_fade_in',
+    }
+    const rawTarget = cue.payload.target || cue.payload.targetId || cue.payload.nodeId || cue.payload.segmentId
+    const durationMs = Number(cue.payload.durationMs ?? (cue.endMs ? cue.endMs - cue.startMs : 1200))
+
+    applySceneActionPayload({
+      actionId: `${cue.id}-action`,
+      actionType: actionTypeByCue[cue.type] || cue.type,
+      targetType: cue.type === 'draw' ? 'canvas' : cue.type === 'quiz' ? 'quiz' : 'segment',
+      targetId: rawTarget ? String(rawTarget) : undefined,
+      layer: cue.type === 'quiz' ? 'overlay' : 'content',
+      startMs: cue.startMs,
+      durationMs,
+      instruction: String(cue.payload.instruction || ''),
+      payload: {
+        ...cue.payload,
+        cueType: cue.type,
+      },
+    }, cue.startMs)
+
+    if (cue.type === 'pause' || cue.payload.waitForUser === true) {
+      const flow = currentTeachingFlow.value
+      if (flow) flow.isPaused = true
+      timelinePlayer.waitForUser()
+    }
   }
 
   function applySceneActionPayload(value: unknown, fallbackStartMs: number) {
@@ -979,6 +1030,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     // 教学流
     teachingActive,
     quizState,
+    currentSubtitle,
     activeSceneActions,
     getActiveSceneAction,
     currentTeachingFlow,
@@ -1009,5 +1061,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     submitQuizAnswer,
     resumeTeaching,
     endTeaching,
+    setTimelineAudioElement,
+    handleTimelineAudioEnded: timelinePlayer.handleAudioEnded,
   }
 })
