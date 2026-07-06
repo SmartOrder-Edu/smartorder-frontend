@@ -36,6 +36,10 @@ export default defineConfig({
         target: 'http://localhost:9015',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
+      },
+      '/study-assets': {
+        target: 'http://localhost:9015',
+        changeOrigin: true
       }
     }
   },

@@ -40,18 +40,27 @@ export function useTimelinePlayer(handlers: TimelinePlayerHandlers) {
     status.value = 'ready'
     handlers.resetScene()
 
-    if (audioRef.value && timeline.audioUrl) {
-      audioRef.value.src = timeline.audioUrl
-      audioRef.value.load()
+    if (audioRef.value) {
+      if (timeline.audioUrl) {
+        audioRef.value.src = timeline.audioUrl
+        audioRef.value.load()
+      } else {
+        audioRef.value.removeAttribute('src')
+        audioRef.value.load()
+      }
     }
   }
 
   async function play() {
     if (!timeline || status.value === 'playing') return
 
-    if (timeline.clockSource === 'audio' && audioRef.value) {
+    if (canUseAudioClock()) {
       audioRef.value.playbackRate = playbackRate.value
-      await audioRef.value.play()
+      try {
+        await audioRef.value.play()
+      } catch (error) {
+        fallbackToInternalClock(error)
+      }
     } else {
       startedAtMs = performance.now() - currentTimeMs.value / playbackRate.value
     }
@@ -93,7 +102,7 @@ export function useTimelinePlayer(handlers: TimelinePlayerHandlers) {
     const boundedMs = clamp(targetMs, 0, timeline.durationMs)
     currentTimeMs.value = boundedMs
 
-    if (audioRef.value && timeline.clockSource === 'audio') {
+    if (audioRef.value && canUseAudioClock()) {
       audioRef.value.currentTime = boundedMs / 1000
     }
 
@@ -161,7 +170,7 @@ export function useTimelinePlayer(handlers: TimelinePlayerHandlers) {
   function syncCurrentTime() {
     if (!timeline) return
 
-    if (timeline.clockSource === 'audio' && audioRef.value) {
+    if (canUseAudioClock()) {
       currentTimeMs.value = audioRef.value.currentTime * 1000
       return
     }
@@ -222,6 +231,27 @@ export function useTimelinePlayer(handlers: TimelinePlayerHandlers) {
     if (audioRef.value && !audioRef.value.paused) {
       audioRef.value.pause()
     }
+  }
+
+  function canUseAudioClock() {
+    return !!timeline?.audioUrl && timeline.clockSource === 'audio' && !!audioRef.value
+  }
+
+  function fallbackToInternalClock(error: unknown) {
+    if (!timeline) return
+    console.warn('[TimelinePlayer] 音频无法播放，已切换为内部时间轴。', {
+      audioUrl: timeline.audioUrl,
+      error,
+    })
+    timeline = {
+      ...timeline,
+      clockSource: 'internal',
+    }
+    if (audioRef.value) {
+      audioRef.value.removeAttribute('src')
+      audioRef.value.load()
+    }
+    startedAtMs = performance.now() - currentTimeMs.value / playbackRate.value
   }
 
   onScopeDispose(() => {

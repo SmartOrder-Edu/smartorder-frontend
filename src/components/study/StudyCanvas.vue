@@ -1,5 +1,12 @@
 <template>
   <section class="study-canvas">
+    <audio
+      class="timeline-audio"
+      preload="auto"
+      :ref="bindTimelineAudio"
+      @ended="stepStore.handleTimelineAudioEnded()"
+    />
+
     <!-- 步骤标题条 -->
     <header class="canvas-header" v-if="stepStore.currentScriptStep">
       <div class="header-left">
@@ -70,6 +77,10 @@
             <span>{{ sceneActionLabel(action.actionType) }}</span>
             <small v-if="action.instruction">{{ action.instruction }}</small>
           </div>
+        </div>
+
+        <div class="timeline-subtitle" v-if="stepStore.currentSubtitle">
+          {{ stepStore.currentSubtitle }}
         </div>
 
         <!-- 教学段列表（降序：所有已展示的段 + 当前段） -->
@@ -166,6 +177,10 @@ import type { LessonSceneActionType } from '@/types/study'
 
 const stepStore = useTaskStepStore()
 
+function bindTimelineAudio(el: Element | null) {
+  stepStore.setTimelineAudioElement(el instanceof HTMLAudioElement ? el : null)
+}
+
 function phaseLabel(phase: string): string {
   const map: Record<string, string> = {
     review: '回顾前置',
@@ -217,6 +232,10 @@ function onQuizAnswer(quizId: string, answer: string) {
   height: 100%;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.92));
   overflow: hidden;
+}
+
+.timeline-audio {
+  display: none;
 }
 
 .canvas-header {
@@ -342,6 +361,21 @@ function onQuizAnswer(quizId: string, answer: string) {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.timeline-subtitle {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.55;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
+  animation: subtitleIn 0.18s ease-out;
 }
 
 .scene-action-pill {
@@ -482,6 +516,17 @@ function onQuizAnswer(quizId: string, answer: string) {
 }
 
 @keyframes sceneActionIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes subtitleIn {
   from {
     opacity: 0;
     transform: translateY(-4px);
