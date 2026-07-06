@@ -152,8 +152,26 @@ export interface CanvasContent {
 
 // ---- 分段式教学流（v2 Agent 主动教学交互）----
 
-/** 教学段类型 */
-export type TeachingSegmentType = 'text' | 'formula' | 'diagram' | 'quiz' | 'pause'
+/** 教学段类型。兼容旧 text/formula/quiz，同时支持课堂化脚本段。 */
+export type TeachingSegmentType =
+  | 'text'
+  | 'formula'
+  | 'diagram'
+  | 'quiz'
+  | 'pause'
+  | 'hook'
+  | 'recall'
+  | 'explain'
+  | 'analogy'
+  | 'board_write'
+  | 'worked_example'
+  | 'teacher_question'
+  | 'student_try'
+  | 'diagnosis'
+  | 'mistake_warning'
+  | 'summary'
+  | 'transition'
+  | 'self_check'
 
 /** 画布元素聚焦目标 */
 export interface FocusTarget {
@@ -174,14 +192,39 @@ export interface InlineQuiz {
   correctAnswer?: string
   /** 提交后展示的讲解（答对/答错通用） */
   explanation?: string
+  feedbackWhenCorrect?: string
+  feedbackWhenWrong?: string
+}
+
+export interface TeachingVisualHint {
+  type: 'formula' | 'diagram' | 'code' | 'table' | 'timeline' | 'mindmap' | 'text' | string
+  content: string
+}
+
+export interface TeachingInteraction {
+  type: 'pause' | 'single_select' | 'multi_select' | 'text_answer' | 'predict' | 'self_check' | string
+  prompt: string
+  options?: { label: string; value: string }[]
+  correctAnswer?: string
+  feedbackWhenCorrect?: string
+  feedbackWhenWrong?: string
 }
 
 /** 单个教学段（Agent 讲解的最小原子单元） */
 export interface TeachingSegment {
   id: string
   type: TeachingSegmentType
+  /** 老师真实说出口的话。TTS 启用后应优先播报该字段。 */
+  teacherTalk?: string
+  /** 黑板/画布上出现的精炼内容。 */
+  boardContent?: string
   /** markdown 内容（quiz/pause 段可为空） */
   markdown: string
+  /** 本段教学设计意图，前端可作为弱提示展示。 */
+  teachingIntent?: string
+  emotionTone?: 'encourage' | 'serious' | 'curious' | 'warning' | 'summary' | string
+  visualHint?: TeachingVisualHint
+  interaction?: TeachingInteraction
   /** 需要聚焦/高亮的画布元素 */
   focusTarget?: FocusTarget
   /** type=quiz 时的题面 */
@@ -232,11 +275,18 @@ export interface LessonCue {
 /** 场景动作类型。它是动画生成协议的稳定层，不绑定具体渲染引擎。 */
 export type LessonSceneActionType =
   | 'narration'
+  | 'teacher_speak'
   | 'text_fade_in'
+  | 'board_write'
   | 'formula_write'
+  | 'formula_step_write'
   | 'diagram_trace'
   | 'focus_pulse'
   | 'quiz_mount'
+  | 'ask_question'
+  | 'wait_student'
+  | 'show_mistake'
+  | 'correct_mistake'
   | 'summary_pin'
 
 /** 时间轴驱动的场景动作。后续可映射到 Canvas、Manim、视频或字幕生成。 */

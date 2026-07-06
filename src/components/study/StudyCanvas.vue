@@ -201,11 +201,18 @@ function phaseLabel(phase: string): string {
 function sceneActionLabel(actionType: LessonSceneActionType | string): string {
   const map: Record<string, string> = {
     narration: '旁白同步',
+    teacher_speak: '老师讲解',
     text_fade_in: '文字入场',
+    board_write: '板书展开',
     formula_write: '公式书写',
+    formula_step_write: '公式书写',
     diagram_trace: '图示绘制',
     focus_pulse: '重点聚焦',
     quiz_mount: '互动题',
+    ask_question: '课堂提问',
+    wait_student: '等待思考',
+    show_mistake: '误区提示',
+    correct_mistake: '诊断纠正',
     summary_pin: '总结固定',
   }
   return map[actionType] || String(actionType)
@@ -414,6 +421,12 @@ function onQuizAnswer(quizId: string, answer: string) {
     box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
   }
 
+  &.formula_step_write,
+  &.board_write {
+    background: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  }
+
   &.diagram_trace {
     background: #f59e0b;
     box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
@@ -424,7 +437,19 @@ function onQuizAnswer(quizId: string, answer: string) {
     box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.12);
   }
 
+  &.ask_question,
+  &.wait_student {
+    background: #a855f7;
+    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.12);
+  }
+
   &.focus_pulse {
+    background: #ef4444;
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
+  }
+
+  &.show_mistake,
+  &.correct_mistake {
     background: #ef4444;
     box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
   }

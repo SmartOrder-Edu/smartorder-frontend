@@ -12,31 +12,36 @@
     :style="sceneActionStyle"
     :ref="(el) => { if (el && isCurrent && segment.focusTarget) applyFocus(el) }"
   >
-    <!-- text / formula：markdown + stagger 子元素 -->
-    <template v-if="segment.type === 'text' || segment.type === 'formula'">
-      <div class="segment-markdown" :class="{ 'teaching-stagger': visible }">
-        <MarkdownRenderer :content="segment.markdown" />
+    <div v-if="segment.type !== 'pause'" class="classroom-shell" :class="[`tone-${segment.emotionTone || 'serious'}`]">
+      <div class="teacher-talk" v-if="teacherLine">
+        <div class="teacher-text">
+          <MarkdownRenderer :content="teacherLine" />
+        </div>
       </div>
-    </template>
 
-    <!-- diagram：markdown（内嵌 mermaid）+ focus 效果容器 -->
-    <template v-else-if="segment.type === 'diagram'">
-      <div class="segment-diagram focus-target-container" :class="focusClass">
-        <MarkdownRenderer :content="segment.markdown" />
+      <div
+        v-if="displayBoardContent"
+        class="segment-board focus-target-container"
+        :class="[focusClass, boardClass, { 'teaching-stagger': visible }]"
+      >
+        <MarkdownRenderer :content="displayBoardContent" />
       </div>
-    </template>
 
-    <!-- quiz：内嵌弹题 -->
-    <template v-else-if="segment.type === 'quiz' && segment.quiz">
+      <div v-if="segment.visualHint?.content" class="visual-hint" :class="`visual-${segment.visualHint.type}`">
+        <MarkdownRenderer :content="segment.visualHint.content" />
+      </div>
+
       <InlineQuizCard
+        v-if="isInteractive && segment.quiz"
         :quiz="segment.quiz"
         :disabled="quizState?.answered ?? false"
         @answer="(qid, val) => $emit('quizAnswer', qid, val)"
       />
-    </template>
+
+    </div>
 
     <!-- pause：过渡指示器 -->
-    <template v-else-if="segment.type === 'pause'">
+    <template v-else>
       <div class="segment-pause">
         <span class="pause-dot"></span>
         <span>{{ segment.markdown || 'Agent 正在准备下一段讲解…' }}</span>
@@ -90,6 +95,24 @@ const sceneActionStyle = computed(() => ({
   '--scene-action-duration': `${Math.max(sceneAction.value?.durationMs || 1200, 600)}ms`,
 }))
 
+const teacherLine = computed(() => props.segment.teacherTalk || props.segment.agentCommentary || '')
+const displayBoardContent = computed(() =>
+  props.segment.boardContent || props.segment.markdown || props.segment.visualHint?.content || '',
+)
+const isInteractive = computed(() =>
+  props.segment.type === 'quiz'
+  || props.segment.type === 'teacher_question'
+  || props.segment.type === 'student_try'
+  || props.segment.type === 'self_check',
+)
+const boardClass = computed(() => ({
+  'segment-diagram': props.segment.type === 'diagram',
+  'segment-formula': props.segment.type === 'formula',
+  'segment-mistake': props.segment.type === 'mistake_warning',
+  'segment-diagnosis': props.segment.type === 'diagnosis',
+  'segment-question': isInteractive.value,
+}))
+
 function applyFocus(el: HTMLElement) {
   const target = props.segment.focusTarget
   if (!target || target.scroll === 'none') return
@@ -129,14 +152,22 @@ function applyFocus(el: HTMLElement) {
   --scene-action-duration: 1200ms;
 }
 
-.scene-action-text_fade_in {
+.scene-action-text_fade_in,
+.scene-action-teacher_speak {
   .segment-markdown {
+    animation: sceneTextFade var(--scene-action-duration) ease-out;
+  }
+
+  .classroom-shell {
     animation: sceneTextFade var(--scene-action-duration) ease-out;
   }
 }
 
-.scene-action-formula_write {
-  .segment-markdown {
+.scene-action-formula_write,
+.scene-action-formula_step_write,
+.scene-action-board_write {
+  .segment-markdown,
+  .segment-board {
     position: relative;
     overflow: hidden;
     animation: formulaCardLift var(--scene-action-duration) ease-out;
@@ -160,20 +191,279 @@ function applyFocus(el: HTMLElement) {
 }
 
 .scene-action-diagram_trace {
-  .segment-diagram {
+  .segment-diagram,
+  .segment-board.segment-diagram {
     animation: diagramTrace var(--scene-action-duration) ease-out;
   }
 }
 
-.scene-action-focus_pulse {
+.scene-action-focus_pulse,
+.scene-action-ask_question,
+.scene-action-wait_student {
   .segment-markdown,
-  .segment-diagram {
+  .segment-diagram,
+  .segment-board {
     animation: focusPulse var(--scene-action-duration) ease-out;
   }
 }
 
-.scene-action-quiz_mount {
+.scene-action-quiz_mount,
+.scene-action-show_mistake,
+.scene-action-correct_mistake,
+.scene-action-summary_pin {
   animation: quizMount var(--scene-action-duration) ease-out;
+}
+
+.scene-action-highlight,
+.scene-action-show_mistake {
+  :deep(strong),
+  :deep(.markdown-renderer h1),
+  :deep(.markdown-renderer h2),
+  :deep(.markdown-renderer h3) {
+    background-image: linear-gradient(transparent 58%, rgba(245, 158, 11, 0.26) 58%);
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+}
+
+.scene-action-underline,
+.scene-action-correct_mistake,
+.scene-action-summary_pin {
+  :deep(strong),
+  :deep(.markdown-renderer h2),
+  :deep(.markdown-renderer h3) {
+    text-decoration: underline;
+    text-decoration-color: rgba(11, 183, 170, 0.65);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 5px;
+  }
+}
+
+.classroom-shell {
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  padding: 14px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
+
+  &.tone-curious {
+    border-color: rgba(14, 165, 233, 0.18);
+    background: linear-gradient(180deg, #fff, #f0f9ff);
+  }
+
+  &.tone-warning {
+    border-color: rgba(239, 68, 68, 0.18);
+    background: linear-gradient(180deg, #fff, #fff7ed);
+  }
+
+  &.tone-summary {
+    border-color: rgba(16, 185, 129, 0.2);
+    background: linear-gradient(180deg, #fff, #f0fdf4);
+  }
+}
+
+.teacher-talk {
+  margin-bottom: 12px;
+}
+
+.teacher-text {
+  position: relative;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid rgba(11, 183, 170, 0.42);
+  color: #0f172a;
+  line-height: 1.82;
+  font-size: 15px;
+
+  :deep(.markdown-renderer) {
+    background: transparent;
+    padding: 0;
+    color: #0f172a;
+
+    p {
+      margin: 0;
+      letter-spacing: 0;
+    }
+
+    strong {
+      color: #0f766e;
+      font-weight: 700;
+      background-image: linear-gradient(transparent 62%, rgba(11, 183, 170, 0.18) 62%);
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+  }
+}
+
+.segment-board {
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px 22px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.055), 0 6px 18px rgba(15, 23, 42, 0.035);
+  line-height: 1.78;
+  font-size: 14px;
+  color: #334155;
+
+  :deep(.markdown-renderer) {
+    color: #334155;
+
+    h1,
+    h2 {
+      position: relative;
+      margin: 0 0 12px;
+      padding-bottom: 7px;
+      color: #0f172a;
+      font-size: 20px;
+      font-weight: 750;
+      line-height: 1.32;
+      letter-spacing: 0;
+
+      &::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 54px;
+        height: 3px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #0bb7aa, rgba(2, 132, 199, 0.2));
+      }
+    }
+
+    h3 {
+      margin: 14px 0 8px;
+      color: #1e293b;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    p {
+      margin: 8px 0;
+      color: #334155;
+      font-size: 14px;
+      line-height: 1.82;
+    }
+
+    ul,
+    ol {
+      display: grid;
+      gap: 8px;
+      margin: 10px 0;
+      padding-left: 0;
+      list-style: none;
+    }
+
+    li {
+      position: relative;
+      margin: 0;
+      padding: 8px 10px 8px 28px;
+      border-radius: 8px;
+      background: rgba(248, 250, 252, 0.9);
+      color: #334155;
+      line-height: 1.65;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 12px;
+        top: 18px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #0bb7aa;
+        box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
+      }
+    }
+
+    ol {
+      counter-reset: lesson-counter;
+
+      li {
+        counter-increment: lesson-counter;
+
+        &::before {
+          content: counter(lesson-counter);
+          top: 9px;
+          left: 8px;
+          width: 16px;
+          height: 16px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          background: #0bb7aa;
+          color: #fff;
+          font-size: 10px;
+          font-weight: 700;
+          box-shadow: none;
+        }
+      }
+    }
+
+    strong {
+      color: #0f766e;
+      font-weight: 750;
+      background-image: linear-gradient(transparent 58%, rgba(11, 183, 170, 0.2) 58%);
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
+    }
+
+    em {
+      color: #475569;
+      font-style: normal;
+      text-decoration: underline;
+      text-decoration-color: rgba(245, 158, 11, 0.55);
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+    }
+
+    blockquote {
+      border-left: 3px solid #0bb7aa;
+      padding: 9px 12px;
+      color: #0f766e;
+      background: rgba(11, 183, 170, 0.05);
+      border-radius: 0 8px 8px 0;
+      margin: 8px 0;
+    }
+    .math-block, .math-inline { font-style: italic; }
+  }
+}
+
+.segment-formula {
+  border-left: 3px solid #2563eb;
+}
+
+.segment-mistake {
+  border-left: 3px solid #ef4444;
+  background: #fff7ed;
+}
+
+.segment-diagnosis {
+  border-left: 3px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.segment-question {
+  border-left: 3px solid #a855f7;
+}
+
+.visual-hint {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(14, 165, 233, 0.06);
+  border: 1px solid rgba(14, 165, 233, 0.14);
+
+  :deep(.markdown-renderer) {
+    background: transparent;
+    padding: 0;
+
+    h1,
+    h2,
+    h3 {
+      margin-top: 0;
+      color: #075985;
+    }
+  }
 }
 
 .segment-markdown {
