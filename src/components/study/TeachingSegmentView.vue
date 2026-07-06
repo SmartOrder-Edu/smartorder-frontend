@@ -96,9 +96,10 @@ const sceneActionStyle = computed(() => ({
 }))
 
 const teacherLine = computed(() => props.segment.teacherTalk || props.segment.agentCommentary || '')
-const displayBoardContent = computed(() =>
-  props.segment.boardContent || props.segment.markdown || props.segment.visualHint?.content || '',
-)
+const displayBoardContent = computed(() => {
+  const content = props.segment.boardContent || props.segment.markdown || props.segment.visualHint?.content || ''
+  return normalizeBoardMarkdown(content)
+})
 const isInteractive = computed(() =>
   props.segment.type === 'quiz'
   || props.segment.type === 'teacher_question'
@@ -112,6 +113,45 @@ const boardClass = computed(() => ({
   'segment-diagnosis': props.segment.type === 'diagnosis',
   'segment-question': isInteractive.value,
 }))
+
+function normalizeBoardMarkdown(content: string): string {
+  const trimmed = content.trim()
+  if (!trimmed) return ''
+  if (containsMarkdownCodeFence(trimmed)) return content
+  if (!isLikelyStandaloneCode(trimmed)) return content
+
+  const language = inferCodeLanguage(trimmed)
+  return `\`\`\`${language}\n${trimmed}\n\`\`\``
+}
+
+function containsMarkdownCodeFence(content: string): boolean {
+  return /(^|\n)```/.test(content) || /(^|\n)~~~/.test(content)
+}
+
+function isLikelyStandaloneCode(content: string): boolean {
+  const lines = content.split('\n').filter((line) => line.trim())
+  if (lines.length < 2) return false
+
+  const codeLineCount = lines.filter((line) => {
+    const text = line.trim()
+    return /[;{}]$/.test(text)
+      || /^(#include|import|package|typedef|struct|class|interface|enum|public|private|protected|function|def|const|let|var)\b/.test(text)
+      || /^(if|else|for|while|switch|case|return|try|catch)\b/.test(text)
+      || /(\+\+|--|->|=>|==|!=|<=|>=|&&|\|\|)/.test(text)
+  }).length
+
+  return codeLineCount >= 3 || codeLineCount / lines.length >= 0.45
+}
+
+function inferCodeLanguage(content: string): string {
+  if (/#include\s*<|typedef\s+struct|->|int\*|char\*/.test(content)) return 'c'
+  if (/\bpublic\s+class\b|\bSystem\.out\.println\b/.test(content)) return 'java'
+  if (/\bdef\s+\w+\(|\bprint\(/.test(content)) return 'python'
+  if (/\bfunction\s+\w+\(|\bconst\s+\w+\s*=|\blet\s+\w+\s*=|=>/.test(content)) return 'javascript'
+  if (/\binterface\s+\w+\b|:\s*(string|number|boolean)\b/.test(content)) return 'typescript'
+  if (/\bSELECT\b|\bFROM\b|\bWHERE\b/i.test(content)) return 'sql'
+  return ''
+}
 
 function applyFocus(el: HTMLElement) {
   const target = props.segment.focusTarget
