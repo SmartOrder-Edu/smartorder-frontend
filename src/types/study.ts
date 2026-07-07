@@ -218,16 +218,69 @@ export type TeachingBoardBlockType =
   | 'quote'
   | 'diagram'
   | 'callout'
+  | 'structure'
+  | 'trace'
+  | 'complexity'
   | string
 
-export interface TeachingBoardBlock {
+export interface TeachingBaseBoardBlock {
   id?: string
   type: TeachingBoardBlockType
   title?: string
-  language?: string
-  content: string
+  content?: string
+  caption?: string
   tone?: 'info' | 'warning' | 'success' | 'error' | string
 }
+
+export interface TeachingCodeBoardBlock extends TeachingBaseBoardBlock {
+  type: 'code' | string
+  language?: string
+  content?: string
+  highlights?: number[]
+  focusLine?: number
+  errorLines?: number[]
+  noteLines?: number[]
+}
+
+export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
+  type: 'structure' | string
+  structureType?: 'array' | 'stack' | 'queue' | 'linked_list' | 'tree' | 'heap' | 'graph' | string
+  items?: unknown[]
+  nodes?: unknown[]
+  edges?: unknown[]
+  pointers?: Record<string, number | string>
+  activeIndices?: number[]
+  activeIds?: string[]
+}
+
+export interface TeachingTraceBoardBlock extends TeachingBaseBoardBlock {
+  type: 'trace' | string
+  algorithm?: string
+  items?: unknown[]
+  activeIndices?: number[]
+  processedRange?: [number, number]
+  action?: 'compare' | 'swap' | 'insert' | 'delete' | 'visit' | 'mark' | string
+  explanation?: string
+}
+
+export interface TeachingComplexityBoardBlock extends TeachingBaseBoardBlock {
+  type: 'complexity' | string
+  time?: string
+  space?: string
+  cases?: Array<{
+    label: string
+    value: string
+    description?: string
+  }>
+  reason?: string
+}
+
+export type TeachingBoardBlock =
+  | TeachingCodeBoardBlock
+  | TeachingStructureBoardBlock
+  | TeachingTraceBoardBlock
+  | TeachingComplexityBoardBlock
+  | TeachingBaseBoardBlock
 
 /** 单个教学段（Agent 讲解的最小原子单元） */
 export interface TeachingSegment {

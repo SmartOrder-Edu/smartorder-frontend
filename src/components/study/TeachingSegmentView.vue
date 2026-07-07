@@ -31,13 +31,7 @@
             class="board-block"
             :class="[`board-block-${normalizeBoardBlockType(block.type)}`, block.tone ? `board-tone-${block.tone}` : '']"
           >
-            <div v-if="block.title || isCodeBlock(block)" class="board-block-title-row">
-              <div v-if="block.title" class="board-block-title">{{ block.title }}</div>
-              <span v-if="isCodeBlock(block)" class="board-code-language">
-                {{ codeLanguageLabel(block.language) }}
-              </span>
-            </div>
-            <MarkdownRenderer :content="boardBlockMarkdown(block)" />
+            <BoardBlockRenderer :block="block" :scene-action="sceneAction" />
           </section>
         </template>
         <template v-else>
@@ -77,6 +71,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import BoardBlockRenderer from './board/BoardBlockRenderer.vue'
 import InlineQuizCard from './InlineQuizCard.vue'
 import type { LessonSceneAction, TeachingBoardBlock, TeachingSegment, QuizState } from '@/types/study'
 
@@ -120,9 +115,7 @@ const sceneActionStyle = computed(() => ({
 }))
 
 const teacherLine = computed(() => props.segment.teacherTalk || props.segment.agentCommentary || '')
-const displayBoardBlocks = computed(() =>
-  (props.segment.boardBlocks || []).filter((block) => !!block?.content?.trim()),
-)
+const displayBoardBlocks = computed(() => (props.segment.boardBlocks || []).filter(hasMeaningfulBoardBlock))
 const rawBoardContent = computed(() =>
   props.segment.boardContent || props.segment.markdown || props.segment.visualHint?.content || '',
 )
@@ -150,10 +143,6 @@ const boardClass = computed(() => ({
 
 function normalizeBoardBlockType(type: string): string {
   return (type || 'markdown').toLowerCase().replace(/[^a-z0-9_-]/g, '-')
-}
-
-function isCodeBlock(block: TeachingBoardBlock): boolean {
-  return normalizeBoardBlockType(block.type) === 'code'
 }
 
 function codeLanguageLabel(language?: string): string {
@@ -190,27 +179,6 @@ function detectBoardContentCodeLanguage(content: string): string {
   const fenced = trimmed.match(/^```([a-zA-Z0-9_+-]*)\s*[\r\n]/)
   if (fenced) return fenced[1] || 'unknown'
   return isLikelyStandaloneCode(trimmed) ? inferCodeLanguage(trimmed) || 'unknown' : ''
-}
-
-function boardBlockMarkdown(block: TeachingBoardBlock): string {
-  const type = normalizeBoardBlockType(block.type)
-  const content = block.content.trim()
-  if (!content) return ''
-  if (type === 'code') {
-    if (containsMarkdownCodeFence(content)) return content
-    return `\`\`\`${block.language || ''}\n${content}\n\`\`\``
-  }
-  if (type === 'diagram') {
-    if (containsMarkdownCodeFence(content)) return content
-    return `\`\`\`mermaid\n${content}\n\`\`\``
-  }
-  if (type === 'quote') {
-    return content
-      .split('\n')
-      .map((line) => `> ${line}`)
-      .join('\n')
-  }
-  return content
 }
 
 function normalizeBoardMarkdown(content: string): string {
@@ -250,6 +218,31 @@ function inferCodeLanguage(content: string): string {
   if (/\binterface\s+\w+\b|:\s*(string|number|boolean)\b/.test(content)) return 'typescript'
   if (/\bSELECT\b|\bFROM\b|\bWHERE\b/i.test(content)) return 'sql'
   return ''
+}
+
+function hasMeaningfulBoardBlock(block: TeachingBoardBlock): boolean {
+  if (!block) return false
+  if (block.content?.trim()) return true
+
+  const type = normalizeBoardBlockType(block.type)
+  const record = block as Record<string, unknown>
+  if (type === 'structure') {
+    return (Array.isArray(record.items) && record.items.length > 0)
+      || (Array.isArray(record.nodes) && record.nodes.length > 0)
+      || !!record.structureType
+  }
+  if (type === 'trace') {
+    return (Array.isArray(record.items) && record.items.length > 0)
+      || !!record.explanation
+      || !!record.action
+  }
+  if (type === 'complexity') {
+    return !!record.time
+      || !!record.space
+      || (Array.isArray(record.cases) && record.cases.length > 0)
+      || !!record.reason
+  }
+  return !!block.title || !!block.caption
 }
 
 function applyFocus(el: HTMLElement) {
