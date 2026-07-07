@@ -41,7 +41,7 @@
       <div class="study-body" v-loading="stepStore.loading">
         <!-- 左：学习脚本 -->
         <div class="region region-script">
-          <LearningScript @jump="onJump" />
+          <LearningScript v-model:collapsed="scriptCollapsed" @jump="onJump" />
         </div>
 
         <!-- 中：Agent 教学画布 -->
@@ -76,6 +76,9 @@ import type { StudyMode } from '@/types/study'
 const route = useRoute()
 const stepStore = useTaskStepStore()
 const dashStore = useSpaceDashboardStore()
+
+// 学习脚本收起状态
+const scriptCollapsed = ref(false)
 
 // 全屏
 const studyPageRef = ref<HTMLElement | null>(null)
@@ -247,7 +250,7 @@ onUnmounted(() => {
 .study-body {
   flex: 1;
   display: grid;
-  grid-template-columns: 260px 1fr 320px;
+  grid-template-columns: auto 1fr 320px;
   min-height: 0;
   overflow: hidden;
 }
@@ -257,13 +260,13 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
 
-  &.region-script { overflow: hidden; }
+  &.region-script { overflow: hidden; min-width: 0; }
   &.region-canvas { overflow: hidden; }
   &.region-agent { overflow: hidden; }
 }
 
 @media (max-width: 1280px) {
-  .study-body { grid-template-columns: 220px 1fr 290px; }
+  .study-body { grid-template-columns: auto 1fr 290px; }
 }
 
 @media (max-width: 1024px) {
