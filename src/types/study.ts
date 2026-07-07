@@ -251,6 +251,13 @@ export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
   pointers?: Record<string, number | string>
   activeIndices?: number[]
   activeIds?: string[]
+  visitedIds?: string[]
+  frontierIds?: string[]
+  pathIds?: string[]
+  compareIds?: string[]
+  rootId?: string
+  directed?: boolean
+  layout?: 'tree' | 'heap' | 'circle' | 'layered' | string
 }
 
 export interface TeachingTraceBoardBlock extends TeachingBaseBoardBlock {

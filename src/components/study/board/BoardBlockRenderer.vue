@@ -4,6 +4,21 @@
     :block="codeBlock"
     :scene-action="sceneAction"
   />
+  <TreeDiagramBlock
+    v-else-if="normalizedType === 'structure' && structureType === 'tree'"
+    :block="structureBlock"
+    :scene-action="sceneAction"
+  />
+  <HeapDiagramBlock
+    v-else-if="normalizedType === 'structure' && structureType === 'heap'"
+    :block="structureBlock"
+    :scene-action="sceneAction"
+  />
+  <GraphDiagramBlock
+    v-else-if="normalizedType === 'structure' && structureType === 'graph'"
+    :block="structureBlock"
+    :scene-action="sceneAction"
+  />
   <DataStructureDiagramBlock
     v-else-if="normalizedType === 'structure'"
     :block="structureBlock"
@@ -33,6 +48,9 @@ import AlgorithmTraceBlock from './AlgorithmTraceBlock.vue'
 import CodeLessonBlock from './CodeLessonBlock.vue'
 import ComplexityBlock from './ComplexityBlock.vue'
 import DataStructureDiagramBlock from './DataStructureDiagramBlock.vue'
+import GraphDiagramBlock from './GraphDiagramBlock.vue'
+import HeapDiagramBlock from './HeapDiagramBlock.vue'
+import TreeDiagramBlock from './TreeDiagramBlock.vue'
 import type {
   LessonSceneAction,
   TeachingBoardBlock,
@@ -52,6 +70,10 @@ const codeBlock = computed(() => props.block as TeachingCodeBoardBlock)
 const structureBlock = computed(() => props.block as TeachingStructureBoardBlock)
 const traceBlock = computed(() => props.block as TeachingTraceBoardBlock)
 const complexityBlock = computed(() => props.block as TeachingComplexityBoardBlock)
+const structureType = computed(() => {
+  const block = props.block as TeachingStructureBoardBlock
+  return (block.structureType || '').toLowerCase().replace(/[-\s]/g, '_')
+})
 const fallbackMarkdown = computed(() => boardBlockMarkdown(props.block, normalizedType.value))
 
 function normalizeBoardBlockType(type: string): string {
