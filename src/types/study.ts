@@ -258,6 +258,38 @@ export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
   rootId?: string
   directed?: boolean
   layout?: 'tree' | 'heap' | 'circle' | 'layered' | string
+  animation?: TeachingStructureAnimation
+}
+
+export interface TeachingStructureAnimation {
+  action?: 'enqueue' | 'dequeue' | 'push' | 'pop' | 'peek' | 'compare' | 'swap' | string
+  durationMs?: number
+  movingItem?: unknown
+  from?: string | number
+  to?: string | number
+  phases?: TeachingStructureAnimationPhase[]
+  previous?: {
+    items?: unknown[]
+    pointers?: Record<string, number | string>
+  }
+  next?: {
+    items?: unknown[]
+    pointers?: Record<string, number | string>
+  }
+  previousPointers?: Record<string, number | string>
+  nextPointers?: Record<string, number | string>
+}
+
+export interface TeachingStructureAnimationPhase {
+  name: 'before' | 'moving' | 'after' | 'done' | string
+  startRatio?: number
+  items?: unknown[]
+  pointers?: Record<string, number | string>
+  movingItem?: unknown
+  targetIndex?: number
+  sourceIndex?: number
+  highlightPointers?: string[]
+  narrationHint?: string
 }
 
 export interface TeachingTraceBoardBlock extends TeachingBaseBoardBlock {

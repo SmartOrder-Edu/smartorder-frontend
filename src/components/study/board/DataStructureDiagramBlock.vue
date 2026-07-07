@@ -61,7 +61,7 @@
           </span>
         </div>
       </div>
-      <div v-if="!items.length" class="empty-structure">{{ structureType === 'queue' ? '空队列' : '空数组' }}</div>
+      <div v-if="!items.length" class="empty-structure">空数组</div>
     </div>
 
     <div v-if="pointerEntries.length" class="pointer-summary">
@@ -112,7 +112,6 @@ const topIndex = computed(() => {
 })
 const queueRearAtTail = computed(() => structureType.value === 'queue' && Number(pointers.value.rear) === items.value.length)
 const processedRange = computed(() => normalizeRange(readScenePayloadArray('processedRange')))
-
 const structureLabel = computed(() => {
   const labels: Record<string, string> = {
     array: '数组',
@@ -193,6 +192,7 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
   return value as Record<string, number | string>
 }
+
 </script>
 
 <style scoped lang="scss">
@@ -315,6 +315,7 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
   background: #0f766e;
   color: #fff;
   white-space: nowrap;
+
 }
 
 .pointer-summary {
@@ -463,4 +464,5 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
   font-size: 12px;
   line-height: 1.65;
 }
+
 </style>

@@ -9,6 +9,11 @@
     :block="structureBlock"
     :scene-action="sceneAction"
   />
+  <QueueDiagramBlock
+    v-else-if="normalizedType === 'structure' && structureType === 'queue'"
+    :block="structureBlock"
+    :scene-action="sceneAction"
+  />
   <HeapDiagramBlock
     v-else-if="normalizedType === 'structure' && structureType === 'heap'"
     :block="structureBlock"
@@ -50,6 +55,7 @@ import ComplexityBlock from './ComplexityBlock.vue'
 import DataStructureDiagramBlock from './DataStructureDiagramBlock.vue'
 import GraphDiagramBlock from './GraphDiagramBlock.vue'
 import HeapDiagramBlock from './HeapDiagramBlock.vue'
+import QueueDiagramBlock from './QueueDiagramBlock.vue'
 import TreeDiagramBlock from './TreeDiagramBlock.vue'
 import type {
   LessonSceneAction,
