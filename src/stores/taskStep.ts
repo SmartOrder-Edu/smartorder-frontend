@@ -136,7 +136,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     quizState.value = null
 
     // 弹题：暂停教学流
-    if (seg.type === 'quiz' && seg.quiz) {
+    if (isInteractiveSegment(seg.type) && seg.quiz) {
       flow.isPaused = true
       quizState.value = {
         quizId: seg.quiz.id,
@@ -661,7 +661,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
           segmentId: segment.id,
           segmentIndex: index,
           segmentType: segment.type,
-          waitForUser: segment.autoAdvanceMs <= 0 || segment.type === 'quiz',
+          waitForUser: segment.autoAdvanceMs <= 0 || isInteractiveSegment(segment.type),
           sceneAction,
         },
       })
@@ -740,25 +740,57 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   function buildSceneActionFromSegment(segment: TeachingSegment, index: number, startMs: number): LessonSceneAction {
     const actionTypeBySegment: Record<string, string> = {
       text: 'text_fade_in',
+      hook: 'teacher_speak',
+      recall: 'text_fade_in',
+      explain: 'text_fade_in',
+      analogy: 'teacher_speak',
+      board_write: 'board_write',
+      worked_example: 'board_write',
       formula: 'formula_write',
       diagram: 'diagram_trace',
       quiz: 'quiz_mount',
+      teacher_question: 'ask_question',
+      student_try: 'ask_question',
+      self_check: 'ask_question',
+      diagnosis: 'correct_mistake',
+      mistake_warning: 'show_mistake',
+      summary: 'summary_pin',
+      transition: 'teacher_speak',
       pause: 'narration',
     }
     const instructionBySegment: Record<string, string> = {
       text: '逐段淡入文字讲解',
+      hook: '老师导入问题',
+      recall: '唤起前置知识',
+      explain: '老师展开讲解',
+      analogy: '用类比降低理解难度',
+      board_write: '像板书一样逐步写出关键内容',
+      worked_example: '分镜拆解例题',
       formula: '按推导顺序书写公式',
       diagram: '沿节点关系绘制图示',
       quiz: '挂载互动题并等待学生作答',
+      teacher_question: '课堂提问并等待学生思考',
+      student_try: '让学生先尝试作答',
+      self_check: '自我检查理解程度',
+      diagnosis: '诊断答案和错因',
+      mistake_warning: '展示并纠正常见误区',
+      summary: '固定本段结论',
+      transition: '过渡到下一段',
       pause: '展示过渡提示',
     }
 
     return {
       actionId: `${segment.id}-action`,
       actionType: actionTypeBySegment[segment.type] || 'text_fade_in',
-      targetType: segment.type === 'diagram' ? 'diagram' : segment.type === 'quiz' ? 'quiz' : 'segment',
+      targetType: segment.type === 'diagram'
+        ? 'diagram'
+        : isInteractiveSegment(segment.type)
+          ? 'quiz'
+          : segment.type === 'board_write' || segment.type === 'worked_example'
+            ? 'board'
+            : 'segment',
       targetId: segment.id,
-      layer: segment.type === 'quiz' ? 'overlay' : 'content',
+      layer: isInteractiveSegment(segment.type) ? 'overlay' : 'content',
       startMs,
       durationMs: Math.min(Math.max(segment.autoAdvanceMs || 1800, 1200), 5200),
       instruction: instructionBySegment[segment.type] || '播放场景动作',
@@ -768,6 +800,13 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         focusTarget: segment.focusTarget,
       },
     }
+  }
+
+  function isInteractiveSegment(type: string): boolean {
+    return type === 'quiz'
+      || type === 'teacher_question'
+      || type === 'student_try'
+      || type === 'self_check'
   }
 
   function applySceneActionCue(cue: LessonCue) {

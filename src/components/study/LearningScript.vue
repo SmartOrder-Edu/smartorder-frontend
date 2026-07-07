@@ -1,6 +1,28 @@
 <template>
-  <aside class="learning-script">
-    <!-- 顶部：本次学习脚本标题 + 进度 -->
+  <aside class="learning-script" :class="{ collapsed: collapsed }">
+    <!-- 收起态：竖条 -->
+    <div class="collapsed-strip">
+      <button class="collapse-toggle" @click="toggleCollapse" title="展开脚本" aria-label="展开学习脚本">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+          <polyline points="9,18 15,12 9,6" />
+        </svg>
+      </button>
+      <div class="mini-progress" :title="`进度 ${stepStore.progressPercent}%`">
+        <svg class="progress-ring" viewBox="0 0 36 36" width="36" height="36">
+          <circle class="progress-ring-track" cx="18" cy="18" r="14"
+            fill="none" stroke="rgba(15,23,42,0.08)" stroke-width="3" />
+          <circle class="progress-ring-fill" cx="18" cy="18" r="14"
+            fill="none" stroke="#0bb7aa" stroke-width="3"
+            :stroke-dasharray="`${stepStore.progressPercent * 0.88} 88`"
+            stroke-dashoffset="0"
+            stroke-linecap="round"
+            transform="rotate(-90 18 18)" />
+        </svg>
+        <span class="mini-progress-text">{{ stepStore.progressPercent }}%</span>
+      </div>
+    </div>
+
+    <!-- 展开态：完整侧边栏 -->
     <div class="script-header">
       <div class="script-title-row">
         <svg class="script-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -8,6 +30,11 @@
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
         </svg>
         <h3>本次学习脚本</h3>
+        <button class="collapse-toggle collapse-toggle--in-header" @click="toggleCollapse" title="收起脚本" aria-label="收起学习脚本">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+        </button>
       </div>
       <div class="script-progress">
         <div class="progress-bar">
@@ -64,7 +91,13 @@ import { useTaskStepStore } from '@/stores/taskStep'
 
 defineEmits<{ (e: 'jump', index: number): void }>()
 
+const collapsed = defineModel<boolean>('collapsed', { default: false })
+
 const stepStore = useTaskStepStore()
+
+function toggleCollapse() {
+  collapsed.value = !collapsed.value
+}
 
 function phaseLabel(phase: string): string {
   const map: Record<string, string> = {
@@ -89,9 +122,98 @@ function phaseLabel(phase: string): string {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 260px;
+  flex-shrink: 0;
+  position: relative;
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(12px);
   border-right: 1px solid rgba(15, 23, 42, 0.06);
+  transition: width 0.3s ease;
+  overflow: hidden;
+
+  &.collapsed {
+    width: 44px;
+  }
+}
+
+// ======= 收起态竖条（绝对定位，不占 flex 空间）=======
+.collapsed-strip {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 16px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.collapsed .collapsed-strip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.collapse-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    border-color: #0bb7aa;
+    color: #0bb7aa;
+    background: rgba(11, 183, 170, 0.08);
+  }
+}
+
+.collapse-toggle--in-header {
+  margin-left: auto;
+}
+
+// Mini 圆形进度
+.mini-progress {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .progress-ring { display: block; }
+
+  .progress-ring-fill {
+    transition: stroke-dasharray 0.4s ease;
+  }
+
+  .mini-progress-text {
+    position: absolute;
+    font-size: 9px;
+    font-weight: 600;
+    color: #0bb7aa;
+    line-height: 1;
+  }
+}
+
+// ======= 展开态内容淡入淡出 =======
+.script-header,
+.script-steps,
+.script-empty {
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.collapsed .script-header,
+.collapsed .script-steps,
+.collapsed .script-empty {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .script-header {
@@ -255,6 +377,18 @@ function phaseLabel(phase: string): string {
 }
 
 @media (max-width: 1024px) {
-  .learning-script { border-right: none; border-bottom: 1px solid rgba(15, 23, 42, 0.06); }
+  .learning-script {
+    width: 100% !important;
+    border-right: none;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+
+    &.collapsed {
+      width: 100% !important;
+    }
+  }
+  .collapse-toggle--in-header,
+  .collapsed-strip {
+    display: none;
+  }
 }
 </style>

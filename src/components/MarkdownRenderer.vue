@@ -8,41 +8,156 @@ import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 
-// 自定义代码渲染器：语法高亮 + 语言标签 + 复制按钮
+type CodeLineTone = 'normal' | 'highlight' | 'error' | 'note'
+type TeachingMarker =
+  | 'highlight-next-line'
+  | 'error-next-line'
+  | 'note-next-line'
+  | 'highlight-start'
+  | 'highlight-end'
+
+interface TeachingCodeLine {
+  content: string
+  tone: CodeLineTone
+}
+
+// 自定义代码渲染器：语法高亮 + 行号 + 教学标记 + 复制按钮
 const renderer = new marked.Renderer()
 
 renderer.code = function ({ text, lang }: { text: string; lang?: string }) {
+  const rawLanguage = (lang || '').trim()
+  const language = rawLanguage.split(/\s+/)[0] || ''
+
   // Mermaid 代码块：输出占位符，后续异步渲染
-  if (lang === 'mermaid') {
+  if (language === 'mermaid') {
     const encodedSource = btoa(unescape(encodeURIComponent(text)))
     return `<div class="mermaid-block" data-mermaid-source="${encodedSource}">
   <div class="mermaid-loading">正在渲染图表…</div>
 </div>`
   }
 
-  const language = lang || ''
-  let highlighted: string
+  const parsed = parseTeachingCode(text)
+  const encodedSource = btoa(unescape(encodeURIComponent(parsed.cleanText)))
+  const langLabel = language ? formatLanguageLabel(language) : '代码'
+  const codeLines = parsed.lines
+    .map((line, index) => renderTeachingCodeLine(line, index + 1, language))
+    .join('')
 
-  if (language && hljs.getLanguage(language)) {
-    highlighted = hljs.highlight(text, { language }).value
-  } else {
-    highlighted = hljs.highlightAuto(text).value
-  }
-
-  const langLabel = language
-    ? `<span class="code-lang">${escapeHtml(language)}</span>`
-    : ''
-
-  return `<div class="code-block-wrapper">
+  return `<div class="code-block-wrapper${parsed.hasTeachingMarkers ? ' has-teaching-markers' : ''}">
   <div class="code-block-header">
-    ${langLabel}
-    <button class="code-copy-btn" title="复制代码">
+    <div class="code-title-group">
+      <span class="code-lang">${escapeHtml(langLabel)}</span>
+      <span class="code-caption">示例代码</span>
+    </div>
+    <button class="code-copy-btn" title="复制代码" data-code-source="${encodedSource}">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       <span>复制</span>
     </button>
   </div>
-  <pre><code class="hljs${language ? ` language-${escapeHtml(language)}` : ''}">${highlighted}</code></pre>
+  <pre class="code-teaching-pre"><code class="hljs${language ? ` language-${escapeHtml(language)}` : ''}">${codeLines}</code></pre>
 </div>`
+}
+
+function parseTeachingCode(text: string): {
+  lines: TeachingCodeLine[]
+  cleanText: string
+  hasTeachingMarkers: boolean
+} {
+  const sourceLines = text.replace(/\r\n/g, '\n').split('\n')
+  const lines: TeachingCodeLine[] = []
+  let nextTone: CodeLineTone | null = null
+  let rangeTone: CodeLineTone | null = null
+  let hasTeachingMarkers = false
+
+  sourceLines.forEach((sourceLine) => {
+    const marker = readTeachingMarker(sourceLine)
+    if (marker) {
+      hasTeachingMarkers = true
+      if (marker === 'highlight-start') {
+        rangeTone = 'highlight'
+      } else if (marker === 'highlight-end') {
+        rangeTone = null
+      } else if (marker === 'highlight-next-line') {
+        nextTone = 'highlight'
+      } else if (marker === 'error-next-line') {
+        nextTone = 'error'
+      } else if (marker === 'note-next-line') {
+        nextTone = 'note'
+      }
+      return
+    }
+
+    lines.push({
+      content: sourceLine,
+      tone: nextTone || rangeTone || 'normal',
+    })
+    nextTone = null
+  })
+
+  return {
+    lines,
+    cleanText: lines.map((line) => line.content).join('\n'),
+    hasTeachingMarkers,
+  }
+}
+
+function readTeachingMarker(line: string): TeachingMarker | null {
+  const slashOrHash = line.match(
+    /^\s*(?:\/\/|#)\s*(highlight-next-line|error-next-line|note-next-line|highlight-start|highlight-end)\s*$/,
+  )
+  if (slashOrHash) return slashOrHash[1] as TeachingMarker
+
+  const html = line.match(
+    /^\s*<!--\s*(highlight-next-line|error-next-line|note-next-line|highlight-start|highlight-end)\s*-->\s*$/,
+  )
+  return html ? (html[1] as TeachingMarker) : null
+}
+
+function renderTeachingCodeLine(line: TeachingCodeLine, lineNumber: number, language: string): string {
+  const lineClass = line.tone === 'normal' ? '' : ` code-line-${line.tone}`
+  const highlighted = highlightCodeLine(line.content, language) || '&nbsp;'
+
+  return `<span class="code-line${lineClass}" data-line="${lineNumber}">
+  <span class="code-line-no">${lineNumber}</span>
+  <span class="code-line-content">${highlighted}</span>
+</span>`
+}
+
+function highlightCodeLine(line: string, language: string): string {
+  if (!line) return ''
+  if (language && hljs.getLanguage(language)) {
+    return hljs.highlight(line, { language, ignoreIllegals: true }).value
+  }
+  return escapeHtml(line)
+}
+
+function formatLanguageLabel(language: string): string {
+  const labels: Record<string, string> = {
+    js: 'JavaScript',
+    javascript: 'JavaScript',
+    ts: 'TypeScript',
+    typescript: 'TypeScript',
+    py: 'Python',
+    python: 'Python',
+    java: 'Java',
+    c: 'C',
+    cpp: 'C++',
+    csharp: 'C#',
+    cs: 'C#',
+    go: 'Go',
+    rust: 'Rust',
+    sql: 'SQL',
+    html: 'HTML',
+    css: 'CSS',
+    json: 'JSON',
+    shell: 'Shell',
+    bash: 'Bash',
+    sh: 'Shell',
+    xml: 'XML',
+    yaml: 'YAML',
+    yml: 'YAML',
+  }
+  return labels[language.toLowerCase()] || language
 }
 
 function escapeHtml(str: string): string {
@@ -469,12 +584,14 @@ function bindCopyButtons(el: HTMLElement) {
     ;(btn as HTMLElement)._copyBound = true
 
     btn.addEventListener('click', async () => {
-      const codeEl = btn
-        .closest('.code-block-wrapper')
-        ?.querySelector('code')
-      if (!codeEl) return
+      const button = btn as HTMLElement
+      const encodedSource = button.dataset.codeSource
+      const codeEl = button.closest('.code-block-wrapper')?.querySelector('code')
+      const text = encodedSource
+        ? decodeURIComponent(escape(atob(encodedSource)))
+        : codeEl?.textContent || ''
+      if (!text) return
 
-      const text = codeEl.textContent || ''
       try {
         await navigator.clipboard.writeText(text)
         const span = btn.querySelector('span')!
@@ -565,11 +682,21 @@ onUnmounted(() => {
 
 /* 代码块容器 */
 .markdown-renderer :deep(.code-block-wrapper) {
-  margin: 0.8em 0;
-  border-radius: 10px;
+  --code-bg: #fbfcfd;
+  --code-gutter-bg: #f4f7fa;
+  --code-border: #d7dfe8;
+  --code-muted: #64748b;
+  --code-text: #1e293b;
+  margin: 1em 0;
+  border-radius: 8px;
   overflow: hidden;
-  background: #f8f9fa;
-  border: 1px solid #e2e6ea;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.96)),
+    var(--code-bg);
+  border: 1px solid var(--code-border);
+  box-shadow:
+    0 12px 30px rgba(15, 23, 42, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
 }
 
 /* 代码块头部：语言标签 + 复制按钮 */
@@ -577,28 +704,47 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 14px;
-  background: #eef0f3;
-  border-bottom: 1px solid #e2e6ea;
-  font-size: 0.75rem;
-  color: #6a737d;
+  gap: 12px;
+  min-height: 38px;
+  padding: 8px 12px 8px 14px;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.96));
+  border-bottom: 1px solid var(--code-border);
+  font-size: 0.78rem;
+  color: var(--code-muted);
+}
+
+.markdown-renderer :deep(.code-title-group) {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 8px;
 }
 
 .markdown-renderer :deep(.code-lang) {
   font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
-  text-transform: lowercase;
-  font-weight: 500;
+  font-weight: 650;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+.markdown-renderer :deep(.code-caption) {
+  color: var(--code-muted);
+  font-size: 0.75rem;
+  line-height: 1.2;
 }
 
 .markdown-renderer :deep(.code-copy-btn) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border: none;
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: #6a737d;
+  color: var(--code-muted);
   font-size: 0.75rem;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -607,8 +753,10 @@ onUnmounted(() => {
 }
 
 .markdown-renderer :deep(.code-copy-btn:hover) {
-  background: rgba(0, 0, 0, 0.06);
-  color: #24292e;
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #1f2937;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
 }
 
 .markdown-renderer :deep(.code-copy-btn.copied) {
@@ -624,16 +772,185 @@ onUnmounted(() => {
   margin: 0;
   border-radius: 0;
   overflow-x: auto;
-  padding: 14px 16px;
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  background: #f8f9fa;
+  padding: 0;
+  font-size: 0.84rem;
+  line-height: 1.68;
+  background: var(--code-bg);
+  color: var(--code-text);
+  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-width: thin;
+}
+
+.markdown-renderer :deep(.code-block-wrapper pre::-webkit-scrollbar) {
+  height: 10px;
+}
+
+.markdown-renderer :deep(.code-block-wrapper pre::-webkit-scrollbar-track) {
+  background: #f1f5f9;
+}
+
+.markdown-renderer :deep(.code-block-wrapper pre::-webkit-scrollbar-thumb) {
+  border: 3px solid #f1f5f9;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.markdown-renderer :deep(.code-block-wrapper pre::-webkit-scrollbar-thumb:hover) {
+  background: #94a3b8;
 }
 
 .markdown-renderer :deep(.code-block-wrapper pre code) {
+  display: block;
+  min-width: max-content;
   font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+  font-variant-ligatures: none;
+  tab-size: 2;
   background: none;
   padding: 0;
+}
+
+.markdown-renderer :deep(.code-line) {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  min-height: 1.68em;
+  border-left: 3px solid transparent;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.markdown-renderer :deep(.code-line:first-child .code-line-no),
+.markdown-renderer :deep(.code-line:first-child .code-line-content) {
+  padding-top: 12px;
+}
+
+.markdown-renderer :deep(.code-line:last-child .code-line-no),
+.markdown-renderer :deep(.code-line:last-child .code-line-content) {
+  padding-bottom: 12px;
+}
+
+.markdown-renderer :deep(.code-line:hover) {
+  background: rgba(14, 116, 144, 0.045);
+}
+
+.markdown-renderer :deep(.code-line-no) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding: 0 12px 0 10px;
+  color: #94a3b8;
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid #e2e8f0;
+  background: var(--code-gutter-bg);
+  font-size: 0.74rem;
+}
+
+.markdown-renderer :deep(.code-line-content) {
+  min-width: 0;
+  padding: 0 18px;
+  white-space: pre;
+}
+
+.markdown-renderer :deep(.code-line-highlight) {
+  border-left-color: #0f9f8f;
+  background:
+    linear-gradient(90deg, rgba(20, 184, 166, 0.18), rgba(20, 184, 166, 0.06) 68%, transparent);
+  box-shadow: 0 1px 0 rgba(15, 159, 143, 0.08) inset;
+}
+
+.markdown-renderer :deep(.code-line-highlight .code-line-no) {
+  color: #0f766e;
+  background: #e6f7f5;
+}
+
+.markdown-renderer :deep(.code-line-note) {
+  border-left-color: #2563eb;
+  background:
+    linear-gradient(90deg, rgba(37, 99, 235, 0.13), rgba(37, 99, 235, 0.045) 68%, transparent);
+}
+
+.markdown-renderer :deep(.code-line-note .code-line-no) {
+  color: #2563eb;
+  background: #edf4ff;
+}
+
+.markdown-renderer :deep(.code-line-error) {
+  border-left-color: #dc2626;
+  background:
+    linear-gradient(90deg, rgba(220, 38, 38, 0.13), rgba(220, 38, 38, 0.045) 68%, transparent);
+}
+
+.markdown-renderer :deep(.code-line-error .code-line-no) {
+  color: #dc2626;
+  background: #fff1f1;
+}
+
+.markdown-renderer :deep(.has-teaching-markers .code-block-header) {
+  background:
+    linear-gradient(180deg, rgba(239, 253, 250, 0.98), rgba(236, 250, 248, 0.96));
+  border-bottom-color: rgba(15, 159, 143, 0.22);
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-comment),
+.markdown-renderer :deep(.code-block-wrapper .hljs-quote) {
+  color: #64748b;
+  font-style: italic;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-keyword),
+.markdown-renderer :deep(.code-block-wrapper .hljs-selector-tag),
+.markdown-renderer :deep(.code-block-wrapper .hljs-built_in) {
+  color: #0f5cb6;
+  font-weight: 650;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-string),
+.markdown-renderer :deep(.code-block-wrapper .hljs-regexp),
+.markdown-renderer :deep(.code-block-wrapper .hljs-template-variable) {
+  color: #0f766e;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-number),
+.markdown-renderer :deep(.code-block-wrapper .hljs-literal),
+.markdown-renderer :deep(.code-block-wrapper .hljs-variable) {
+  color: #b45309;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-title),
+.markdown-renderer :deep(.code-block-wrapper .hljs-title.function_),
+.markdown-renderer :deep(.code-block-wrapper .hljs-function .hljs-title) {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-attr),
+.markdown-renderer :deep(.code-block-wrapper .hljs-attribute),
+.markdown-renderer :deep(.code-block-wrapper .hljs-property) {
+  color: #0369a1;
+}
+
+@media (max-width: 640px) {
+  .markdown-renderer :deep(.code-block-header) {
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+
+  .markdown-renderer :deep(.code-caption) {
+    display: none;
+  }
+
+  .markdown-renderer :deep(.code-line) {
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+  }
+
+  .markdown-renderer :deep(.code-line-no) {
+    padding: 0 8px 0 6px;
+  }
+
+  .markdown-renderer :deep(.code-line-content) {
+    padding: 0 12px;
+  }
 }
 
 /* 兼容：没有经过 wrapper 的裸 pre */
