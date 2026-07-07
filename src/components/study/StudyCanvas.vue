@@ -61,18 +61,6 @@
     <div class="canvas-body" v-if="stepStore.canvasContent">
       <!-- Agent 教学模式：分段式讲解 -->
       <template v-if="stepStore.canvasContent.teachingFlow && stepStore.teachingActive">
-        <div class="scene-action-strip" v-if="stepStore.activeSceneActions.length">
-          <div
-            v-for="action in stepStore.activeSceneActions"
-            :key="action.actionId"
-            class="scene-action-pill"
-          >
-            <span class="scene-action-icon" :class="String(action.actionType)"></span>
-            <span>{{ sceneActionLabel(action.actionType) }}</span>
-            <small v-if="action.instruction">{{ action.instruction }}</small>
-          </div>
-        </div>
-
         <!-- 教学段列表（降序：所有已展示的段 + 当前段） -->
         <div class="teaching-segments">
           <template v-for="(seg, idx) in stepStore.canvasContent.teachingFlow.segments" :key="seg.id">
@@ -108,7 +96,6 @@
             继续
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9,18 15,12 9,6"/></svg>
           </button>
-          <!-- 教学中 → 进度指示 -->
           <button
             v-else-if="stepStore.timelineStatus === 'ended'"
             class="continue-btn"
@@ -116,9 +103,6 @@
           >
             重放本段
           </button>
-          <div v-else class="teaching-progress-hint">
-            {{ stepStore.timelineStatus === 'paused' ? '已暂停' : 'Agent 正在讲解…' }}
-          </div>
         </div>
       </template>
 
@@ -163,7 +147,6 @@ import PracticeStage from './PracticeStage.vue'
 import TeachingSegmentView from './TeachingSegmentView.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
 import { ElMessage } from 'element-plus'
-import type { LessonSceneActionType } from '@/types/study'
 
 const stepStore = useTaskStepStore()
 
@@ -186,26 +169,6 @@ function phaseLabel(phase: string): string {
     guided_practice: '跟做练习',
   }
   return map[phase] || phase
-}
-
-function sceneActionLabel(actionType: LessonSceneActionType | string): string {
-  const map: Record<string, string> = {
-    narration: '旁白同步',
-    teacher_speak: '老师讲解',
-    text_fade_in: '文字入场',
-    board_write: '板书展开',
-    formula_write: '公式书写',
-    formula_step_write: '公式书写',
-    diagram_trace: '图示绘制',
-    focus_pulse: '重点聚焦',
-    quiz_mount: '互动题',
-    ask_question: '课堂提问',
-    wait_student: '等待思考',
-    show_mistake: '误区提示',
-    correct_mistake: '诊断纠正',
-    summary_pin: '总结固定',
-  }
-  return map[actionType] || String(actionType)
 }
 
 function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation: string }) {
@@ -353,83 +316,6 @@ function onQuizAnswer(quizId: string, answer: string) {
 }
 
 // ---- 教学段列表 ----
-.scene-action-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.scene-action-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  max-width: 100%;
-  padding: 7px 10px;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.04);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  color: #334155;
-  font-size: 12px;
-  line-height: 1.3;
-  animation: sceneActionIn 0.22s ease-out;
-
-  small {
-    color: #64748b;
-    font-size: 11px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-.scene-action-icon {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: #0bb7aa;
-  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
-
-  &.formula_write {
-    background: #2563eb;
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-  }
-
-  &.formula_step_write,
-  &.board_write {
-    background: #2563eb;
-    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
-  }
-
-  &.diagram_trace {
-    background: #f59e0b;
-    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
-  }
-
-  &.quiz_mount {
-    background: #a855f7;
-    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.12);
-  }
-
-  &.ask_question,
-  &.wait_student {
-    background: #a855f7;
-    box-shadow: 0 0 0 4px rgba(168, 85, 247, 0.12);
-  }
-
-  &.focus_pulse {
-    background: #ef4444;
-    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
-  }
-
-  &.show_mistake,
-  &.correct_mistake {
-    background: #ef4444;
-    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.12);
-  }
-}
-
 .teaching-segments {
   display: flex;
   flex-direction: column;
@@ -457,22 +343,6 @@ function onQuizAnswer(quizId: string, answer: string) {
   box-shadow: 0 6px 16px rgba(11, 183, 170, 0.25);
   transition: all 0.2s ease;
   &:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(11, 183, 170, 0.35); }
-}
-
-.teaching-progress-hint {
-  font-size: 13px;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  &::before {
-    content: '';
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: #0bb7aa;
-    animation: agentDotPulse 1s ease-in-out infinite;
-  }
 }
 
 // ---- 静态模式 ----
@@ -513,17 +383,6 @@ function onQuizAnswer(quizId: string, answer: string) {
   .header-left { width: 100%; }
   .canvas-body { padding: 16px; }
   .markdown-stage { padding: 18px; }
-}
-
-@keyframes sceneActionIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 </style>
