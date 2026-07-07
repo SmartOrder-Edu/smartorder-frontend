@@ -100,29 +100,6 @@
   }
 }
 
-.agent-speaking-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #0bb7aa;
-  animation: agentDotPulse 1s ease-in-out infinite;
-}
-
-// ---- Agent 讲解横幅 ----
-.agent-speaking-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, rgba(11, 183, 170, 0.08), rgba(2, 132, 199, 0.05));
-  border-left: 3px solid #0bb7aa;
-  border-radius: 10px;
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: #0f766e;
-  line-height: 1.5;
-}
-
 // ---- 教学段已过（半透明）----
 .teaching-segment-past {
   opacity: 0.55;

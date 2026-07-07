@@ -61,12 +61,6 @@
     <div class="canvas-body" v-if="stepStore.canvasContent">
       <!-- Agent 教学模式：分段式讲解 -->
       <template v-if="stepStore.canvasContent.teachingFlow && stepStore.teachingActive">
-        <!-- Agent 讲解条 -->
-        <div class="agent-speaking-bar" v-if="stepStore.currentSegment?.agentCommentary">
-          <span class="agent-speaking-dot"></span>
-          <span>{{ stepStore.currentSegment.agentCommentary }}</span>
-        </div>
-
         <div class="scene-action-strip" v-if="stepStore.activeSceneActions.length">
           <div
             v-for="action in stepStore.activeSceneActions"
@@ -77,10 +71,6 @@
             <span>{{ sceneActionLabel(action.actionType) }}</span>
             <small v-if="action.instruction">{{ action.instruction }}</small>
           </div>
-        </div>
-
-        <div class="timeline-subtitle" v-if="stepStore.currentSubtitle">
-          {{ stepStore.currentSubtitle }}
         </div>
 
         <!-- 教学段列表（降序：所有已展示的段 + 当前段） -->
@@ -370,21 +360,6 @@ function onQuizAnswer(quizId: string, answer: string) {
   margin-bottom: 12px;
 }
 
-.timeline-subtitle {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  margin: 0 0 12px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.82);
-  color: #fff;
-  font-size: 14px;
-  line-height: 1.55;
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.14);
-  animation: subtitleIn 0.18s ease-out;
-}
-
 .scene-action-pill {
   display: inline-flex;
   align-items: center;
@@ -551,14 +526,4 @@ function onQuizAnswer(quizId: string, answer: string) {
   }
 }
 
-@keyframes subtitleIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 </style>
