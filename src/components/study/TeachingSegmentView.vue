@@ -20,11 +20,35 @@
       </div>
 
       <div
-        v-if="displayBoardContent"
+        v-if="hasBoardContent"
         class="segment-board focus-target-container"
-        :class="[focusClass, boardClass, { 'teaching-stagger': visible }]"
+        :class="[focusClass, boardClass, { 'teaching-stagger': visible, 'segment-board-code': !!boardContentCodeLanguage }]"
       >
-        <MarkdownRenderer :content="displayBoardContent" />
+        <template v-if="displayBoardBlocks.length">
+          <section
+            v-for="(block, index) in displayBoardBlocks"
+            :key="block.id || `${block.type}-${index}`"
+            class="board-block"
+            :class="[`board-block-${normalizeBoardBlockType(block.type)}`, block.tone ? `board-tone-${block.tone}` : '']"
+          >
+            <div v-if="block.title || isCodeBlock(block)" class="board-block-title-row">
+              <div v-if="block.title" class="board-block-title">{{ block.title }}</div>
+              <span v-if="isCodeBlock(block)" class="board-code-language">
+                {{ codeLanguageLabel(block.language) }}
+              </span>
+            </div>
+            <MarkdownRenderer :content="boardBlockMarkdown(block)" />
+          </section>
+        </template>
+        <template v-else>
+          <div v-if="boardContentCodeLanguage" class="board-block-title-row board-fallback-code-title">
+            <div class="board-block-title">示例代码</div>
+            <span class="board-code-language">
+              {{ codeLanguageLabel(boardContentCodeLanguage) }}
+            </span>
+          </div>
+          <MarkdownRenderer :content="displayBoardContent" />
+        </template>
       </div>
 
       <div v-if="segment.visualHint?.content" class="visual-hint" :class="`visual-${segment.visualHint.type}`">
@@ -54,7 +78,7 @@
 import { ref, computed, watch } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import InlineQuizCard from './InlineQuizCard.vue'
-import type { LessonSceneAction, TeachingSegment, QuizState } from '@/types/study'
+import type { LessonSceneAction, TeachingBoardBlock, TeachingSegment, QuizState } from '@/types/study'
 
 const props = defineProps<{
   segment: TeachingSegment
@@ -96,9 +120,19 @@ const sceneActionStyle = computed(() => ({
 }))
 
 const teacherLine = computed(() => props.segment.teacherTalk || props.segment.agentCommentary || '')
+const displayBoardBlocks = computed(() =>
+  (props.segment.boardBlocks || []).filter((block) => !!block?.content?.trim()),
+)
+const rawBoardContent = computed(() =>
+  props.segment.boardContent || props.segment.markdown || props.segment.visualHint?.content || '',
+)
 const displayBoardContent = computed(() => {
-  const content = props.segment.boardContent || props.segment.markdown || props.segment.visualHint?.content || ''
-  return normalizeBoardMarkdown(content)
+  return normalizeBoardMarkdown(rawBoardContent.value)
+})
+const hasBoardContent = computed(() => displayBoardBlocks.value.length > 0 || !!displayBoardContent.value)
+const boardContentCodeLanguage = computed(() => {
+  if (displayBoardBlocks.value.length > 0) return ''
+  return detectBoardContentCodeLanguage(rawBoardContent.value)
 })
 const isInteractive = computed(() =>
   props.segment.type === 'quiz'
@@ -113,6 +147,71 @@ const boardClass = computed(() => ({
   'segment-diagnosis': props.segment.type === 'diagnosis',
   'segment-question': isInteractive.value,
 }))
+
+function normalizeBoardBlockType(type: string): string {
+  return (type || 'markdown').toLowerCase().replace(/[^a-z0-9_-]/g, '-')
+}
+
+function isCodeBlock(block: TeachingBoardBlock): boolean {
+  return normalizeBoardBlockType(block.type) === 'code'
+}
+
+function codeLanguageLabel(language?: string): string {
+  const value = (language || '').trim().toLowerCase()
+  const labels: Record<string, string> = {
+    c: 'C',
+    cpp: 'C++',
+    cxx: 'C++',
+    cc: 'C++',
+    java: 'Java',
+    py: 'Python',
+    python: 'Python',
+    js: 'JavaScript',
+    javascript: 'JavaScript',
+    ts: 'TypeScript',
+    typescript: 'TypeScript',
+    go: 'Go',
+    rust: 'Rust',
+    sql: 'SQL',
+    html: 'HTML',
+    css: 'CSS',
+    json: 'JSON',
+    bash: 'Bash',
+    shell: 'Shell',
+    sh: 'Shell',
+    unknown: '未标明语言',
+  }
+  return labels[value] || (language ? language : '未标明语言')
+}
+
+function detectBoardContentCodeLanguage(content: string): string {
+  const trimmed = content.trim()
+  if (!trimmed) return ''
+  const fenced = trimmed.match(/^```([a-zA-Z0-9_+-]*)\s*[\r\n]/)
+  if (fenced) return fenced[1] || 'unknown'
+  return isLikelyStandaloneCode(trimmed) ? inferCodeLanguage(trimmed) || 'unknown' : ''
+}
+
+function boardBlockMarkdown(block: TeachingBoardBlock): string {
+  const type = normalizeBoardBlockType(block.type)
+  const content = block.content.trim()
+  if (!content) return ''
+  if (type === 'code') {
+    if (containsMarkdownCodeFence(content)) return content
+    return `\`\`\`${block.language || ''}\n${content}\n\`\`\``
+  }
+  if (type === 'diagram') {
+    if (containsMarkdownCodeFence(content)) return content
+    return `\`\`\`mermaid\n${content}\n\`\`\``
+  }
+  if (type === 'quote') {
+    return content
+      .split('\n')
+      .map((line) => `> ${line}`)
+      .join('\n')
+  }
+  return content
+}
 
 function normalizeBoardMarkdown(content: string): string {
   const trimmed = content.trim()
@@ -466,6 +565,74 @@ function applyFocus(el: HTMLElement) {
     }
     .math-block, .math-inline { font-style: italic; }
   }
+}
+
+.board-block {
+  margin: 0 0 14px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.board-block-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.board-block-title {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.board-code-language {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  background: rgba(20, 184, 166, 0.08);
+  color: #0f766e;
+  font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.board-block-code {
+  :deep(.code-block-wrapper) {
+    margin: 0;
+  }
+}
+
+.board-block-callout,
+.board-block-quote {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(14, 165, 233, 0.16);
+  background: rgba(14, 165, 233, 0.06);
+}
+
+.board-block-callout.board-tone-warning,
+.board-block-quote.board-tone-warning {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.board-block-callout.board-tone-error,
+.board-block-quote.board-tone-error {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: rgba(239, 68, 68, 0.07);
+}
+
+.board-block-callout.board-tone-success,
+.board-block-quote.board-tone-success {
+  border-color: rgba(16, 185, 129, 0.22);
+  background: rgba(16, 185, 129, 0.07);
 }
 
 .segment-formula {

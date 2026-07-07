@@ -210,6 +210,25 @@ export interface TeachingInteraction {
   feedbackWhenWrong?: string
 }
 
+export type TeachingBoardBlockType =
+  | 'markdown'
+  | 'code'
+  | 'formula'
+  | 'list'
+  | 'quote'
+  | 'diagram'
+  | 'callout'
+  | string
+
+export interface TeachingBoardBlock {
+  id?: string
+  type: TeachingBoardBlockType
+  title?: string
+  language?: string
+  content: string
+  tone?: 'info' | 'warning' | 'success' | 'error' | string
+}
+
 /** 单个教学段（Agent 讲解的最小原子单元） */
 export interface TeachingSegment {
   id: string
@@ -218,6 +237,8 @@ export interface TeachingSegment {
   teacherTalk?: string
   /** 黑板/画布上出现的精炼内容。 */
   boardContent?: string
+  /** 结构化板书块。存在时前端优先按块类型渲染，boardContent 仅作为兼容兜底。 */
+  boardBlocks?: TeachingBoardBlock[]
   /** markdown 内容（quiz/pause 段可为空） */
   markdown: string
   /** 本段教学设计意图，前端可作为弱提示展示。 */
