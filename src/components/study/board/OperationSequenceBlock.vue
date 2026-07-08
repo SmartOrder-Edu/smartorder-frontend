@@ -160,7 +160,7 @@ function readScenePayloadArray(key: string): unknown[] | null {
   }
 
   &.active {
-    background: linear-gradient(90deg, rgba(14, 165, 233, 0.08), transparent 72%);
+    background: transparent;
   }
 
   &:last-child {
@@ -189,6 +189,10 @@ function readScenePayloadArray(key: string): unknown[] | null {
 .operation-step.active .step-marker span {
   background: #0284c7;
   color: #fff;
+}
+
+.operation-step.active .step-action {
+  color: #0369a1;
 }
 
 .operation-step.done .step-marker span {

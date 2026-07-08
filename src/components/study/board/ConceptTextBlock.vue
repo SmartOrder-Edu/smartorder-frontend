@@ -10,14 +10,19 @@
 
     <div v-if="definition" class="definition-panel">
       <span class="panel-label">定义</span>
-      <p>{{ definition }}</p>
+      <p class="definition-equation">
+        <strong v-if="term">{{ term }}</strong>
+        <span v-if="term" class="equals-mark">=</span>
+        <span>{{ definition }}</span>
+      </p>
     </div>
 
-    <div v-if="intuition || formal" class="explain-grid">
+    <div v-if="intuition || formal" class="explain-grid" :class="{ 'has-relation': intuition && formal }">
       <article v-if="intuition" class="explain-card intuition-card">
         <span class="panel-label">直觉理解</span>
         <p>{{ intuition }}</p>
       </article>
+      <div v-if="intuition && formal" class="concept-arrow">→</div>
       <article v-if="formal" class="explain-card formal-card">
         <span class="panel-label">形式化表达</span>
         <p>{{ formal }}</p>
@@ -209,7 +214,7 @@ function readArray(key: string): unknown[] | null {
 }
 
 .concept-title {
-  color: #0f172a;
+  color: var(--board-heading, #0f172a);
   font-size: 15px;
   font-weight: 780;
   line-height: 1.4;
@@ -224,11 +229,29 @@ function readArray(key: string): unknown[] | null {
 
   p {
     margin: 0;
-    color: #0f172a;
+    color: var(--board-heading, #0f172a);
     font-size: 15px;
     font-weight: 700;
     line-height: 1.65;
   }
+}
+
+.definition-equation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+
+  strong {
+    color: var(--board-info, #0369a1);
+    font-weight: 800;
+  }
+}
+
+.equals-mark {
+  color: var(--board-muted, #64748b);
+  font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+  font-weight: 800;
 }
 
 .panel-label {
@@ -243,6 +266,19 @@ function readArray(key: string): unknown[] | null {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 18px;
+}
+
+.explain-grid.has-relation {
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.concept-arrow {
+  align-self: center;
+  color: var(--board-muted, #64748b);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .explain-card,
@@ -269,13 +305,13 @@ function readArray(key: string): unknown[] | null {
 .example-item span,
 .concept-caption {
   margin: 0;
-  color: #475569;
+  color: var(--board-muted, #475569);
   font-size: 12px;
   line-height: 1.7;
 }
 
 .section-title {
-  color: #334155;
+  color: var(--board-text, #334155);
   font-size: 12px;
   font-weight: 800;
   line-height: 1.45;
@@ -308,7 +344,7 @@ function readArray(key: string): unknown[] | null {
 
   p {
     margin: 0;
-    color: #334155;
+    color: var(--board-text, #334155);
     font-size: 12px;
     line-height: 1.65;
   }
@@ -400,6 +436,14 @@ function readArray(key: string): unknown[] | null {
 
   .term-chip {
     max-width: 100%;
+  }
+
+  .explain-grid.has-relation {
+    grid-template-columns: 1fr;
+  }
+
+  .concept-arrow {
+    display: none;
   }
 }
 </style>

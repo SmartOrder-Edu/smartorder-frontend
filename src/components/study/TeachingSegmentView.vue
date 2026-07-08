@@ -469,6 +469,16 @@ function applyFocus(el: HTMLElement) {
 }
 
 .segment-board {
+  --board-heading: #0f172a;
+  --board-text: #334155;
+  --board-muted: #64748b;
+  --board-line: rgba(226, 232, 240, 0.86);
+  --board-accent: #0f766e;
+  --board-info: #0369a1;
+  --board-warning: #b45309;
+  --board-danger: #dc2626;
+  --board-success: #0f766e;
+
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -531,22 +541,22 @@ function applyFocus(el: HTMLElement) {
     li {
       position: relative;
       margin: 0;
-      padding: 8px 10px 8px 28px;
-      border-radius: 8px;
-      background: rgba(248, 250, 252, 0.9);
+      padding: 2px 0 2px 24px;
+      border-radius: 0;
+      background: transparent;
       color: #334155;
       line-height: 1.65;
 
       &::before {
         content: '';
         position: absolute;
-        left: 12px;
-        top: 18px;
+        left: 6px;
+        top: 12px;
         width: 6px;
         height: 6px;
         border-radius: 50%;
         background: #0bb7aa;
-        box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
+        box-shadow: none;
       }
     }
 
@@ -558,8 +568,8 @@ function applyFocus(el: HTMLElement) {
 
         &::before {
           content: counter(lesson-counter);
-          top: 9px;
-          left: 8px;
+          top: 3px;
+          left: 0;
           width: 16px;
           height: 16px;
           display: inline-flex;
@@ -604,9 +614,11 @@ function applyFocus(el: HTMLElement) {
 }
 
 .board-block {
+  --block-divider-color: rgba(226, 232, 240, 0.9);
+
   margin: 0;
   padding: 0 0 16px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  border-bottom: 1px solid var(--block-divider-color);
 
   &:last-child {
     padding-bottom: 0;
@@ -616,6 +628,25 @@ function applyFocus(el: HTMLElement) {
   & + .board-block {
     padding-top: 16px;
   }
+}
+
+.board-block-concept-card,
+.board-block-definition-card,
+.board-block-principle-card,
+.board-block-key-takeaway {
+  --block-divider-color: rgba(20, 184, 166, 0.24);
+}
+
+.board-block-invariant,
+.board-block-operation-sequence {
+  --block-divider-color: rgba(14, 165, 233, 0.22);
+}
+
+.board-block-complexity,
+.board-block-comparison,
+.board-block-vs-compare,
+.board-block-vs_compare {
+  --block-divider-color: rgba(148, 163, 184, 0.34);
 }
 
 .board-block-title-row {
@@ -679,21 +710,19 @@ function applyFocus(el: HTMLElement) {
 }
 
 .segment-formula {
-  border-left: 3px solid #2563eb;
+  --board-accent: #2563eb;
 }
 
 .segment-mistake {
-  border-left: 3px solid #ef4444;
-  background: #fff7ed;
+  --board-accent: #ef4444;
 }
 
 .segment-diagnosis {
-  border-left: 3px solid #f59e0b;
-  background: #fffbeb;
+  --board-accent: #f59e0b;
 }
 
 .segment-question {
-  border-left: 3px solid #a855f7;
+  --board-accent: #a855f7;
 }
 
 .visual-hint {
