@@ -15,11 +15,23 @@
       </div>
     </div>
 
-    <div v-if="cases.length" class="complexity-cases">
-      <div v-for="item in cases" :key="item.label" class="case-row">
-        <span class="case-label">{{ item.label }}</span>
-        <strong class="case-value">{{ item.value }}</strong>
-        <span v-if="item.description" class="case-description">{{ item.description }}</span>
+    <div v-if="cases.length" class="complexity-cases" role="table" aria-label="复杂度分场景说明">
+      <div class="case-row case-head" role="row">
+        <span role="columnheader">{{ caseHeaders.label }}</span>
+        <span role="columnheader">{{ caseHeaders.value }}</span>
+        <span role="columnheader">{{ caseHeaders.description }}</span>
+      </div>
+      <div v-for="item in cases" :key="item.label" class="case-row" role="row">
+        <span class="case-label" role="cell">{{ item.label }}</span>
+        <strong class="case-value" :data-label="caseHeaders.value" role="cell">{{ item.value }}</strong>
+        <span
+          class="case-description"
+          :class="{ muted: !item.description }"
+          :data-label="caseHeaders.description"
+          role="cell"
+        >
+          {{ item.description || '暂无补充说明' }}
+        </span>
       </div>
     </div>
 
@@ -42,6 +54,10 @@ const props = defineProps<{
 const time = computed(() => readScenePayloadString('time') || props.block.time || '')
 const space = computed(() => readScenePayloadString('space') || props.block.space || '')
 const reason = computed(() => readScenePayloadString('reason') || props.block.reason || '')
+const caseHeaders = computed(() => {
+  const payloadHeaders = props.sceneAction?.payload?.caseHeaders
+  return normalizeCaseHeaders(payloadHeaders || props.block.caseHeaders)
+})
 const cases = computed(() => {
   const payloadCases = props.sceneAction?.payload?.cases
   if (Array.isArray(payloadCases)) return normalizeCases(payloadCases)
@@ -60,6 +76,17 @@ function normalizeCases(values: unknown[]) {
       return { label, value: caseValue, description }
     })
     .filter((value): value is { label: string; value: string; description: string } => !!value)
+}
+
+function normalizeCaseHeaders(value: unknown) {
+  const record = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+  return {
+    label: typeof record.label === 'string' && record.label.trim() ? record.label : '场景',
+    value: typeof record.value === 'string' && record.value.trim() ? record.value : '复杂度',
+    description: typeof record.description === 'string' && record.description.trim() ? record.description : '说明',
+  }
 }
 
 function readScenePayloadString(key: string): string {
@@ -124,38 +151,76 @@ function readScenePayloadString(key: string): string {
 
 .complexity-cases {
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
   border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.035);
 }
 
 .case-row {
+  --case-gutter-bg: #fbfdff;
   display: grid;
-  grid-template-columns: minmax(78px, 0.8fr) minmax(76px, 0.7fr) minmax(0, 2fr);
-  gap: 10px;
+  grid-template-columns: minmax(96px, 0.72fr) minmax(104px, 0.62fr) minmax(0, 2fr);
+  gap: 0;
   align-items: center;
-  padding: 9px 12px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
   background: #fff;
   font-size: 13px;
 
   &:last-child {
     border-bottom: 0;
   }
+
+  > span,
+  > strong {
+    min-width: 0;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-right: 1px solid rgba(226, 232, 240, 0.9);
+    overflow-wrap: anywhere;
+
+    &:last-child {
+      border-right: 0;
+    }
+  }
+}
+
+.case-head {
+  background: #f8fafc;
+
+  > span {
+    min-height: 34px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 760;
+    line-height: 1.35;
+  }
 }
 
 .case-label {
-  color: #475569;
-  font-weight: 650;
+  background: var(--case-gutter-bg);
+  color: #334155;
+  font-weight: 700;
 }
 
 .case-value {
+  justify-content: center;
   color: #0f766e;
   font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
 .case-description {
   color: #64748b;
-  line-height: 1.55;
+  line-height: 1.6;
+
+  &.muted {
+    color: #94a3b8;
+  }
 }
 
 .complexity-reason {
@@ -176,7 +241,49 @@ function readScenePayloadString(key: string): string {
 
   .case-row {
     grid-template-columns: 1fr;
-    gap: 4px;
+    align-items: stretch;
+    margin: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+
+    &:last-child {
+      margin-bottom: 8px;
+    }
+
+    > span,
+    > strong {
+      min-height: unset;
+      justify-content: flex-start;
+      border-right: 0;
+      border-bottom: 1px solid #e2e8f0;
+
+      &:last-child {
+        border-bottom: 0;
+      }
+    }
+  }
+
+  .case-head {
+    display: none;
+  }
+
+  .case-value::before,
+  .case-description::before {
+    flex: 0 0 48px;
+    margin-right: 8px;
+    color: #94a3b8;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 650;
+  }
+
+  .case-value::before {
+    content: attr(data-label);
+  }
+
+  .case-description::before {
+    content: attr(data-label);
   }
 }
 </style>

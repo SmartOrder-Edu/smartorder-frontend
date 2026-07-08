@@ -242,6 +242,12 @@ function hasMeaningfulBoardBlock(block: TeachingBoardBlock): boolean {
       || (Array.isArray(record.cases) && record.cases.length > 0)
       || !!record.reason
   }
+  if (type === 'comparison' || type === 'vs_compare' || type === 'vs-compare') {
+    return !!record.left
+      || !!record.right
+      || (Array.isArray(record.criteria) && record.criteria.length > 0)
+      || !!record.summary
+  }
   return !!block.title || !!block.caption
 }
 

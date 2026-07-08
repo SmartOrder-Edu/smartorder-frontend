@@ -39,6 +39,11 @@
     :block="complexityBlock"
     :scene-action="sceneAction"
   />
+  <ComparisonBlock
+    v-else-if="normalizedType === 'comparison' || normalizedType === 'vs_compare' || normalizedType === 'vs-compare'"
+    :block="comparisonBlock"
+    :scene-action="sceneAction"
+  />
   <section v-else class="fallback-board-block">
     <div v-if="block.title" class="fallback-title">{{ block.title }}</div>
     <MarkdownRenderer :content="fallbackMarkdown" />
@@ -52,6 +57,7 @@ import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import AlgorithmTraceBlock from './AlgorithmTraceBlock.vue'
 import CodeLessonBlock from './CodeLessonBlock.vue'
 import ComplexityBlock from './ComplexityBlock.vue'
+import ComparisonBlock from './ComparisonBlock.vue'
 import DataStructureDiagramBlock from './DataStructureDiagramBlock.vue'
 import GraphDiagramBlock from './GraphDiagramBlock.vue'
 import HeapDiagramBlock from './HeapDiagramBlock.vue'
@@ -61,6 +67,7 @@ import type {
   LessonSceneAction,
   TeachingBoardBlock,
   TeachingCodeBoardBlock,
+  TeachingComparisonBoardBlock,
   TeachingComplexityBoardBlock,
   TeachingStructureBoardBlock,
   TeachingTraceBoardBlock,
@@ -76,6 +83,7 @@ const codeBlock = computed(() => props.block as TeachingCodeBoardBlock)
 const structureBlock = computed(() => props.block as TeachingStructureBoardBlock)
 const traceBlock = computed(() => props.block as TeachingTraceBoardBlock)
 const complexityBlock = computed(() => props.block as TeachingComplexityBoardBlock)
+const comparisonBlock = computed(() => props.block as TeachingComparisonBoardBlock)
 const structureType = computed(() => {
   const block = props.block as TeachingStructureBoardBlock
   return (block.structureType || '').toLowerCase().replace(/[-\s]/g, '_')

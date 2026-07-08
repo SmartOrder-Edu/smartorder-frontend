@@ -218,6 +218,8 @@ export type TeachingBoardBlockType =
   | 'quote'
   | 'diagram'
   | 'callout'
+  | 'comparison'
+  | 'vs_compare'
   | 'structure'
   | 'trace'
   | 'complexity'
@@ -306,6 +308,11 @@ export interface TeachingComplexityBoardBlock extends TeachingBaseBoardBlock {
   type: 'complexity' | string
   time?: string
   space?: string
+  caseHeaders?: {
+    label?: string
+    value?: string
+    description?: string
+  }
   cases?: Array<{
     label: string
     value: string
@@ -314,11 +321,38 @@ export interface TeachingComplexityBoardBlock extends TeachingBaseBoardBlock {
   reason?: string
 }
 
+export interface TeachingComparisonSide {
+  title: string
+  subtitle?: string
+  badge?: string
+  content?: string
+  strengths?: string[]
+  weaknesses?: string[]
+}
+
+export interface TeachingComparisonCriterion {
+  label: string
+  left?: string
+  right?: string
+  winner?: 'left' | 'right' | 'tie' | string
+  explanation?: string
+}
+
+export interface TeachingComparisonBoardBlock extends TeachingBaseBoardBlock {
+  type: 'comparison' | 'vs_compare' | string
+  left?: TeachingComparisonSide
+  right?: TeachingComparisonSide
+  criteria?: TeachingComparisonCriterion[]
+  summary?: string
+  emphasis?: 'left' | 'right' | 'balanced' | string
+}
+
 export type TeachingBoardBlock =
   | TeachingCodeBoardBlock
   | TeachingStructureBoardBlock
   | TeachingTraceBoardBlock
   | TeachingComplexityBoardBlock
+  | TeachingComparisonBoardBlock
   | TeachingBaseBoardBlock
 
 /** 单个教学段（Agent 讲解的最小原子单元） */
