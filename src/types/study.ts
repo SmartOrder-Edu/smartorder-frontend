@@ -222,6 +222,8 @@ export type TeachingBoardBlockType =
   | 'vs_compare'
   | 'structure'
   | 'trace'
+  | 'operation_sequence'
+  | 'invariant'
   | 'complexity'
   | string
 
@@ -246,7 +248,7 @@ export interface TeachingCodeBoardBlock extends TeachingBaseBoardBlock {
 
 export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
   type: 'structure' | string
-  structureType?: 'array' | 'stack' | 'queue' | 'linked_list' | 'tree' | 'heap' | 'graph' | string
+  structureType?: 'array' | 'stack' | 'queue' | 'linked_list' | 'tree' | 'heap' | 'graph' | 'hash_table' | 'matrix' | string
   items?: unknown[]
   nodes?: unknown[]
   edges?: unknown[]
@@ -296,12 +298,45 @@ export interface TeachingStructureAnimationPhase {
 
 export interface TeachingTraceBoardBlock extends TeachingBaseBoardBlock {
   type: 'trace' | string
+  traceKind?: 'array_step' | 'pointer_walk' | 'sort_step' | 'tree_traversal' | 'graph_traversal' | 'heap_adjust' | string
   algorithm?: string
   items?: unknown[]
+  pointers?: Record<string, number | string>
   activeIndices?: number[]
   processedRange?: [number, number]
   action?: 'compare' | 'swap' | 'insert' | 'delete' | 'visit' | 'mark' | string
   explanation?: string
+}
+
+export interface TeachingOperationSequenceStep {
+  label?: string
+  action: string
+  description?: string
+  before?: string
+  after?: string
+  why?: string
+}
+
+export interface TeachingOperationSequenceBoardBlock extends TeachingBaseBoardBlock {
+  type: 'operation_sequence' | string
+  operation?: string
+  currentStep?: number
+  steps?: TeachingOperationSequenceStep[]
+  invariant?: string
+}
+
+export interface TeachingInvariantBoardBlock extends TeachingBaseBoardBlock {
+  type: 'invariant' | string
+  statement?: string
+  whyItMatters?: string
+  checkpoints?: string[]
+  commonMistake?: string
+  examples?: Array<{
+    label?: string
+    value: string
+    valid?: boolean
+    explanation?: string
+  }>
 }
 
 export interface TeachingComplexityBoardBlock extends TeachingBaseBoardBlock {
@@ -351,6 +386,8 @@ export type TeachingBoardBlock =
   | TeachingCodeBoardBlock
   | TeachingStructureBoardBlock
   | TeachingTraceBoardBlock
+  | TeachingOperationSequenceBoardBlock
+  | TeachingInvariantBoardBlock
   | TeachingComplexityBoardBlock
   | TeachingComparisonBoardBlock
   | TeachingBaseBoardBlock

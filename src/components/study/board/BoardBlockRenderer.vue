@@ -44,6 +44,16 @@
     :block="comparisonBlock"
     :scene-action="sceneAction"
   />
+  <OperationSequenceBlock
+    v-else-if="normalizedType === 'operation_sequence' || normalizedType === 'operation-sequence'"
+    :block="operationSequenceBlock"
+    :scene-action="sceneAction"
+  />
+  <InvariantBlock
+    v-else-if="normalizedType === 'invariant'"
+    :block="invariantBlock"
+    :scene-action="sceneAction"
+  />
   <section v-else class="fallback-board-block">
     <div v-if="block.title" class="fallback-title">{{ block.title }}</div>
     <MarkdownRenderer :content="fallbackMarkdown" />
@@ -61,6 +71,8 @@ import ComparisonBlock from './ComparisonBlock.vue'
 import DataStructureDiagramBlock from './DataStructureDiagramBlock.vue'
 import GraphDiagramBlock from './GraphDiagramBlock.vue'
 import HeapDiagramBlock from './HeapDiagramBlock.vue'
+import InvariantBlock from './InvariantBlock.vue'
+import OperationSequenceBlock from './OperationSequenceBlock.vue'
 import QueueDiagramBlock from './QueueDiagramBlock.vue'
 import TreeDiagramBlock from './TreeDiagramBlock.vue'
 import type {
@@ -69,6 +81,8 @@ import type {
   TeachingCodeBoardBlock,
   TeachingComparisonBoardBlock,
   TeachingComplexityBoardBlock,
+  TeachingInvariantBoardBlock,
+  TeachingOperationSequenceBoardBlock,
   TeachingStructureBoardBlock,
   TeachingTraceBoardBlock,
 } from '@/types/study'
@@ -84,6 +98,8 @@ const structureBlock = computed(() => props.block as TeachingStructureBoardBlock
 const traceBlock = computed(() => props.block as TeachingTraceBoardBlock)
 const complexityBlock = computed(() => props.block as TeachingComplexityBoardBlock)
 const comparisonBlock = computed(() => props.block as TeachingComparisonBoardBlock)
+const operationSequenceBlock = computed(() => props.block as TeachingOperationSequenceBoardBlock)
+const invariantBlock = computed(() => props.block as TeachingInvariantBoardBlock)
 const structureType = computed(() => {
   const block = props.block as TeachingStructureBoardBlock
   return (block.structureType || '').toLowerCase().replace(/[-\s]/g, '_')

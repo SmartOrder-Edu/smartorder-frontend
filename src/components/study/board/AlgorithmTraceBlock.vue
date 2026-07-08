@@ -2,7 +2,10 @@
   <section class="trace-block">
     <div class="lesson-block-header" v-if="block.title || actionLabel">
       <div class="lesson-block-title" v-if="block.title">{{ block.title }}</div>
-      <span class="trace-action">{{ actionLabel }}</span>
+      <div class="trace-badges">
+        <span v-if="traceKindLabel" class="trace-kind">{{ traceKindLabel }}</span>
+        <span class="trace-action">{{ actionLabel }}</span>
+      </div>
     </div>
 
     <div class="trace-array" v-if="items.length">
@@ -14,13 +17,19 @@
           active: activeIndices.includes(index),
           processed: isProcessed(index),
         }"
-      >
+        >
         <span class="trace-value">{{ item }}</span>
         <span class="trace-index">{{ index }}</span>
+        <span v-if="pointerNamesAt(index).length" class="trace-pointers">
+          <span v-for="name in pointerNamesAt(index)" :key="name" class="trace-pointer-chip">{{ name }}</span>
+        </span>
       </div>
     </div>
 
-    <div v-if="activeIndices.length" class="trace-focus">
+    <div v-if="pointerEntries.length || activeIndices.length" class="trace-focus">
+      <span v-for="entry in pointerEntries" :key="entry.name" class="trace-focus-chip pointer">
+        {{ entry.name }} = {{ entry.value }}
+      </span>
       <span v-for="index in activeIndices" :key="index" class="trace-focus-chip">
         当前下标 {{ index }}
       </span>
@@ -43,10 +52,31 @@ const props = defineProps<{
 }>()
 
 const items = computed(() => normalizeItems(readScenePayloadArray('items') || props.block.items || []))
+const traceKind = computed(() => readScenePayloadString('traceKind') || props.block.traceKind || '')
 const activeIndices = computed(() => normalizeNumberArray(readScenePayloadArray('activeIndices') || props.block.activeIndices || []))
+const pointers = computed(() => ({
+  ...(props.block.pointers || {}),
+  ...readScenePayloadRecord('pointers'),
+}))
+const pointerEntries = computed(() =>
+  Object.entries(pointers.value)
+    .filter(([, value]) => value !== undefined && value !== null && `${value}` !== '')
+    .map(([name, value]) => ({ name, value })),
+)
 const processedRange = computed(() => normalizeRange(readScenePayloadArray('processedRange') || props.block.processedRange || null))
 const action = computed(() => readScenePayloadString('action') || props.block.action || 'mark')
 const explanation = computed(() => readScenePayloadString('explanation') || props.block.explanation || '')
+const traceKindLabel = computed(() => {
+  const labels: Record<string, string> = {
+    array_step: '数组过程',
+    pointer_walk: '指针移动',
+    sort_step: '排序过程',
+    tree_traversal: '树遍历',
+    graph_traversal: '图遍历',
+    heap_adjust: '堆调整',
+  }
+  return labels[normalizeKey(traceKind.value)] || traceKind.value
+})
 const actionLabel = computed(() => {
   const labels: Record<string, string> = {
     compare: '比较',
@@ -64,6 +94,12 @@ function isProcessed(index: number): boolean {
   return index >= processedRange.value[0] && index <= processedRange.value[1]
 }
 
+function pointerNamesAt(index: number): string[] {
+  return pointerEntries.value
+    .filter((entry) => Number(entry.value) === index)
+    .map((entry) => entry.name)
+}
+
 function normalizeItems(values: unknown[]): string[] {
   return values.map((value) => {
     if (value === null || value === undefined) return ''
@@ -74,6 +110,10 @@ function normalizeItems(values: unknown[]): string[] {
     }
     return String(value)
   })
+}
+
+function normalizeKey(value: string): string {
+  return value.trim().toLowerCase().replace(/[-\s]/g, '_')
 }
 
 function normalizeNumberArray(values: unknown[]): number[] {
@@ -99,6 +139,12 @@ function readScenePayloadArray(key: string): unknown[] | null {
   const value = props.sceneAction?.payload?.[key]
   return Array.isArray(value) ? value : null
 }
+
+function readScenePayloadRecord(key: string): Record<string, number | string> {
+  const value = props.sceneAction?.payload?.[key]
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return value as Record<string, number | string>
+}
 </script>
 
 <style scoped lang="scss">
@@ -122,8 +168,17 @@ function readScenePayloadArray(key: string): unknown[] | null {
   line-height: 1.4;
 }
 
+.trace-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .trace-action,
-.trace-focus-chip {
+.trace-kind,
+.trace-focus-chip,
+.trace-pointer-chip {
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -138,11 +193,19 @@ function readScenePayloadArray(key: string): unknown[] | null {
   color: #b45309;
 }
 
+.trace-kind {
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  background: rgba(14, 165, 233, 0.08);
+  color: #0369a1;
+}
+
 .trace-array {
   display: flex;
   align-items: flex-start;
   overflow-x: auto;
-  padding: 6px 2px 12px;
+  padding: 6px 2px 32px;
 }
 
 .trace-cell {
@@ -197,6 +260,15 @@ function readScenePayloadArray(key: string): unknown[] | null {
   text-align: center;
 }
 
+.trace-pointers {
+  position: absolute;
+  left: 50%;
+  bottom: -24px;
+  display: flex;
+  gap: 4px;
+  transform: translateX(-50%);
+}
+
 .trace-focus {
   display: flex;
   flex-wrap: wrap;
@@ -207,6 +279,18 @@ function readScenePayloadArray(key: string): unknown[] | null {
   padding: 3px 8px;
   background: #f1f5f9;
   color: #475569;
+
+  &.pointer {
+    background: #ecfdf5;
+    color: #0f766e;
+  }
+}
+
+.trace-pointer-chip {
+  padding: 2px 6px;
+  background: #0f766e;
+  color: #fff;
+  white-space: nowrap;
 }
 
 .trace-explanation {

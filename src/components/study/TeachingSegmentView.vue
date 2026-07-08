@@ -235,6 +235,18 @@ function hasMeaningfulBoardBlock(block: TeachingBoardBlock): boolean {
     return (Array.isArray(record.items) && record.items.length > 0)
       || !!record.explanation
       || !!record.action
+      || !!record.traceKind
+  }
+  if (type === 'operation_sequence' || type === 'operation-sequence') {
+    return (Array.isArray(record.steps) && record.steps.length > 0)
+      || !!record.operation
+      || !!record.invariant
+  }
+  if (type === 'invariant') {
+    return !!record.statement
+      || !!record.whyItMatters
+      || (Array.isArray(record.checkpoints) && record.checkpoints.length > 0)
+      || !!record.commonMistake
   }
   if (type === 'complexity') {
     return !!record.time
