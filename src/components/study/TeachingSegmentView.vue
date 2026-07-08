@@ -31,13 +31,7 @@
             class="board-block"
             :class="[`board-block-${normalizeBoardBlockType(block.type)}`, block.tone ? `board-tone-${block.tone}` : '']"
           >
-            <div v-if="block.title || isCodeBlock(block)" class="board-block-title-row">
-              <div v-if="block.title" class="board-block-title">{{ block.title }}</div>
-              <span v-if="isCodeBlock(block)" class="board-code-language">
-                {{ codeLanguageLabel(block.language) }}
-              </span>
-            </div>
-            <MarkdownRenderer :content="boardBlockMarkdown(block)" />
+            <BoardBlockRenderer :block="block" :scene-action="sceneAction" />
           </section>
         </template>
         <template v-else>
@@ -77,6 +71,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import BoardBlockRenderer from './board/BoardBlockRenderer.vue'
 import InlineQuizCard from './InlineQuizCard.vue'
 import type { LessonSceneAction, TeachingBoardBlock, TeachingSegment, QuizState } from '@/types/study'
 
@@ -120,9 +115,7 @@ const sceneActionStyle = computed(() => ({
 }))
 
 const teacherLine = computed(() => props.segment.teacherTalk || props.segment.agentCommentary || '')
-const displayBoardBlocks = computed(() =>
-  (props.segment.boardBlocks || []).filter((block) => !!block?.content?.trim()),
-)
+const displayBoardBlocks = computed(() => (props.segment.boardBlocks || []).filter(hasMeaningfulBoardBlock))
 const rawBoardContent = computed(() =>
   props.segment.boardContent || props.segment.markdown || props.segment.visualHint?.content || '',
 )
@@ -150,10 +143,6 @@ const boardClass = computed(() => ({
 
 function normalizeBoardBlockType(type: string): string {
   return (type || 'markdown').toLowerCase().replace(/[^a-z0-9_-]/g, '-')
-}
-
-function isCodeBlock(block: TeachingBoardBlock): boolean {
-  return normalizeBoardBlockType(block.type) === 'code'
 }
 
 function codeLanguageLabel(language?: string): string {
@@ -190,27 +179,6 @@ function detectBoardContentCodeLanguage(content: string): string {
   const fenced = trimmed.match(/^```([a-zA-Z0-9_+-]*)\s*[\r\n]/)
   if (fenced) return fenced[1] || 'unknown'
   return isLikelyStandaloneCode(trimmed) ? inferCodeLanguage(trimmed) || 'unknown' : ''
-}
-
-function boardBlockMarkdown(block: TeachingBoardBlock): string {
-  const type = normalizeBoardBlockType(block.type)
-  const content = block.content.trim()
-  if (!content) return ''
-  if (type === 'code') {
-    if (containsMarkdownCodeFence(content)) return content
-    return `\`\`\`${block.language || ''}\n${content}\n\`\`\``
-  }
-  if (type === 'diagram') {
-    if (containsMarkdownCodeFence(content)) return content
-    return `\`\`\`mermaid\n${content}\n\`\`\``
-  }
-  if (type === 'quote') {
-    return content
-      .split('\n')
-      .map((line) => `> ${line}`)
-      .join('\n')
-  }
-  return content
 }
 
 function normalizeBoardMarkdown(content: string): string {
@@ -250,6 +218,95 @@ function inferCodeLanguage(content: string): string {
   if (/\binterface\s+\w+\b|:\s*(string|number|boolean)\b/.test(content)) return 'typescript'
   if (/\bSELECT\b|\bFROM\b|\bWHERE\b/i.test(content)) return 'sql'
   return ''
+}
+
+function hasMeaningfulBoardBlock(block: TeachingBoardBlock): boolean {
+  if (!block) return false
+  if (block.content?.trim()) return true
+
+  const type = normalizeBoardBlockType(block.type)
+  const record = block as Record<string, unknown>
+  if (type === 'structure') {
+    return (Array.isArray(record.items) && record.items.length > 0)
+      || (Array.isArray(record.nodes) && record.nodes.length > 0)
+      || !!record.structureType
+  }
+  if (type === 'trace') {
+    return (Array.isArray(record.items) && record.items.length > 0)
+      || !!record.explanation
+      || !!record.action
+      || !!record.traceKind
+  }
+  if (isConceptTextBlockType(type)) {
+    return !!record.term
+      || !!record.definition
+      || !!record.intuition
+      || !!record.formal
+      || (Array.isArray(record.keyPoints) && record.keyPoints.length > 0)
+      || (Array.isArray(record.examples) && record.examples.length > 0)
+      || !!record.takeaway
+  }
+  if (isNumberedTeachingBlockType(type)) {
+    return !!record.lead
+      || !!record.question
+      || !!record.summary
+      || !!record.conclusion
+      || !!record.rule
+      || !!record.reminder
+      || (Array.isArray(record.items) && record.items.length > 0)
+      || (Array.isArray(record.points) && record.points.length > 0)
+      || (Array.isArray(record.steps) && record.steps.length > 0)
+  }
+  if (type === 'operation_sequence' || type === 'operation-sequence') {
+    return (Array.isArray(record.steps) && record.steps.length > 0)
+      || !!record.operation
+      || !!record.invariant
+  }
+  if (type === 'invariant') {
+    return !!record.statement
+      || !!record.whyItMatters
+      || (Array.isArray(record.checkpoints) && record.checkpoints.length > 0)
+      || !!record.commonMistake
+  }
+  if (type === 'complexity') {
+    return !!record.time
+      || !!record.space
+      || (Array.isArray(record.cases) && record.cases.length > 0)
+      || !!record.reason
+  }
+  if (type === 'comparison' || type === 'vs_compare' || type === 'vs-compare') {
+    return !!record.left
+      || !!record.right
+      || (Array.isArray(record.criteria) && record.criteria.length > 0)
+      || !!record.summary
+  }
+  return !!block.title || !!block.caption
+}
+
+function isConceptTextBlockType(type: string): boolean {
+  return [
+    'concept_card',
+    'concept-card',
+    'definition_card',
+    'definition-card',
+    'principle_card',
+    'principle-card',
+    'key_takeaway',
+    'key-takeaway',
+  ].includes(type)
+}
+
+function isNumberedTeachingBlockType(type: string): boolean {
+  return [
+    'numbered_points',
+    'numbered-points',
+    'reasoning_steps',
+    'reasoning-steps',
+    'concept_breakdown',
+    'concept-breakdown',
+    'ordered_checklist',
+    'ordered-checklist',
+  ].includes(type)
 }
 
 function applyFocus(el: HTMLElement) {
@@ -379,35 +436,37 @@ function applyFocus(el: HTMLElement) {
 }
 
 .classroom-shell {
-  border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
-  padding: 14px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
+  display: grid;
+  gap: 12px;
+  padding: 4px 0 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 
   &.tone-curious {
-    border-color: rgba(14, 165, 233, 0.18);
-    background: linear-gradient(180deg, #fff, #f0f9ff);
+    .teacher-text {
+      border-left-color: rgba(14, 165, 233, 0.46);
+    }
   }
 
   &.tone-warning {
-    border-color: rgba(239, 68, 68, 0.18);
-    background: linear-gradient(180deg, #fff, #fff7ed);
+    .teacher-text {
+      border-left-color: rgba(245, 158, 11, 0.58);
+    }
   }
 
   &.tone-summary {
-    border-color: rgba(16, 185, 129, 0.2);
-    background: linear-gradient(180deg, #fff, #f0fdf4);
+    .teacher-text {
+      border-left-color: rgba(16, 185, 129, 0.54);
+    }
   }
 }
 
 .teacher-talk {
-  margin-bottom: 12px;
+  margin: 0;
 }
 
 .teacher-text {
   position: relative;
-  padding: 2px 0 2px 14px;
+  padding: 1px 0 1px 14px;
   border-left: 3px solid rgba(11, 183, 170, 0.42);
   color: #0f172a;
   line-height: 1.82;
@@ -434,10 +493,21 @@ function applyFocus(el: HTMLElement) {
 }
 
 .segment-board {
-  background: #fff;
-  border-radius: 12px;
-  padding: 18px 22px;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.055), 0 6px 18px rgba(15, 23, 42, 0.035);
+  --board-heading: #0f172a;
+  --board-text: #334155;
+  --board-muted: #64748b;
+  --board-line: rgba(226, 232, 240, 0.86);
+  --board-accent: #0f766e;
+  --board-info: #0369a1;
+  --board-warning: #b45309;
+  --board-danger: #dc2626;
+  --board-success: #0f766e;
+
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 8px 0 10px;
+  box-shadow: none;
   line-height: 1.78;
   font-size: 14px;
   color: #334155;
@@ -495,22 +565,22 @@ function applyFocus(el: HTMLElement) {
     li {
       position: relative;
       margin: 0;
-      padding: 8px 10px 8px 28px;
-      border-radius: 8px;
-      background: rgba(248, 250, 252, 0.9);
+      padding: 2px 0 2px 24px;
+      border-radius: 0;
+      background: transparent;
       color: #334155;
       line-height: 1.65;
 
       &::before {
         content: '';
         position: absolute;
-        left: 12px;
-        top: 18px;
+        left: 6px;
+        top: 12px;
         width: 6px;
         height: 6px;
         border-radius: 50%;
         background: #0bb7aa;
-        box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
+        box-shadow: none;
       }
     }
 
@@ -522,8 +592,8 @@ function applyFocus(el: HTMLElement) {
 
         &::before {
           content: counter(lesson-counter);
-          top: 9px;
-          left: 8px;
+          top: 3px;
+          left: 0;
           width: 16px;
           height: 16px;
           display: inline-flex;
@@ -568,11 +638,48 @@ function applyFocus(el: HTMLElement) {
 }
 
 .board-block {
-  margin: 0 0 14px;
+  --block-divider-color: rgba(226, 232, 240, 0.9);
+
+  margin: 0;
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--block-divider-color);
 
   &:last-child {
-    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
   }
+
+  & + .board-block {
+    padding-top: 16px;
+  }
+}
+
+.board-block-concept-card,
+.board-block-definition-card,
+.board-block-principle-card,
+.board-block-key-takeaway,
+.board-block-concept-breakdown,
+.board-block-concept_breakdown {
+  --block-divider-color: rgba(20, 184, 166, 0.24);
+}
+
+.board-block-invariant,
+.board-block-operation-sequence,
+.board-block-operation_sequence,
+.board-block-reasoning-steps,
+.board-block-reasoning_steps {
+  --block-divider-color: rgba(14, 165, 233, 0.22);
+}
+
+.board-block-complexity,
+.board-block-comparison,
+.board-block-vs-compare,
+.board-block-vs_compare,
+.board-block-numbered-points,
+.board-block-numbered_points,
+.board-block-ordered-checklist,
+.board-block-ordered_checklist {
+  --block-divider-color: rgba(148, 163, 184, 0.34);
 }
 
 .board-block-title-row {
@@ -611,46 +718,44 @@ function applyFocus(el: HTMLElement) {
 
 .board-block-callout,
 .board-block-quote {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(14, 165, 233, 0.16);
-  background: rgba(14, 165, 233, 0.06);
+  padding: 8px 0 8px 12px;
+  border-left: 3px solid rgba(14, 165, 233, 0.42);
+  border-radius: 0;
+  background: transparent;
 }
 
 .board-block-callout.board-tone-warning,
 .board-block-quote.board-tone-warning {
-  border-color: rgba(245, 158, 11, 0.24);
-  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.58);
+  background: transparent;
 }
 
 .board-block-callout.board-tone-error,
 .board-block-quote.board-tone-error {
-  border-color: rgba(239, 68, 68, 0.22);
-  background: rgba(239, 68, 68, 0.07);
+  border-color: rgba(239, 68, 68, 0.5);
+  background: transparent;
 }
 
 .board-block-callout.board-tone-success,
 .board-block-quote.board-tone-success {
-  border-color: rgba(16, 185, 129, 0.22);
-  background: rgba(16, 185, 129, 0.07);
+  border-color: rgba(16, 185, 129, 0.5);
+  background: transparent;
 }
 
 .segment-formula {
-  border-left: 3px solid #2563eb;
+  --board-accent: #2563eb;
 }
 
 .segment-mistake {
-  border-left: 3px solid #ef4444;
-  background: #fff7ed;
+  --board-accent: #ef4444;
 }
 
 .segment-diagnosis {
-  border-left: 3px solid #f59e0b;
-  background: #fffbeb;
+  --board-accent: #f59e0b;
 }
 
 .segment-question {
-  border-left: 3px solid #a855f7;
+  --board-accent: #a855f7;
 }
 
 .visual-hint {

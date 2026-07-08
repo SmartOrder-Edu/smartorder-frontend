@@ -290,7 +290,36 @@ export function getMockTeachingFlow(step: ScriptStep, mode: StudyMode): { segmen
       ])
     case 'derivation':
       return makeFlow([
-        { id: `${id}-d1`, type: 'text', markdown: '## 洛必达 vs 泰勒展开\n\n当洛必达法则需要多次使用时，**泰勒展开往往更高效**。\n\n我们来对比一道需要 3 次洛必达的题：\n\n求 $\\lim_{x \\to 0} \\dfrac{x - \\sin x}{x^3}$', autoAdvanceMs: 5000, agentCommentary: '多次洛必达容易出错，泰勒展开是更好的替代。' },
+        { id: `${id}-d1`, type: 'text', markdown: '## 洛必达 vs 泰勒展开\n\n当洛必达法则需要多次使用时，**泰勒展开往往更高效**。\n\n我们来对比一道需要 3 次洛必达的题：\n\n求 $\\lim_{x \\to 0} \\dfrac{x - \\sin x}{x^3}$', boardBlocks: [
+          {
+            type: 'vs_compare',
+            title: '洛必达 vs 泰勒展开',
+            caption: '同一道极限题的两种求解路径',
+            left: {
+              title: '洛必达法则',
+              subtitle: '连续求导推进',
+              badge: '步骤型',
+              content: '$$\\frac{x - \\sin x}{x^3} \\xrightarrow{L} \\frac{1 - \\cos x}{3x^2} \\xrightarrow{L} \\frac{\\sin x}{6x} \\xrightarrow{L} \\frac{\\cos x}{6}$$',
+              strengths: ['每一步规则明确', '适合 0/0、∞/∞ 型的基础题'],
+              weaknesses: ['多次使用时步骤变长', '每次都要重新检查适用条件'],
+            },
+            right: {
+              title: '泰勒展开',
+              subtitle: '抓住主导项',
+              badge: '结构型',
+              content: '$$\\sin x = x - \\frac{x^3}{6} + o(x^3)$$\n\n代入后直接得到 $\\frac{1}{6}$。',
+              strengths: ['一步暴露主导项', '更适合高阶无穷小比较'],
+              weaknesses: ['需要熟悉常用展开式', '展开阶数选错会丢信息'],
+            },
+            criteria: [
+              { label: '计算步数', left: '3 次求导', right: '1 次展开代入', winner: 'right' },
+              { label: '易错点', left: '漏检条件、求导链较长', right: '展开阶数判断', winner: 'tie' },
+              { label: '适用场景', left: '基础不定式', right: '高阶无穷小与函数差值', winner: 'right' },
+            ],
+            summary: '这类题优先观察是否能用常用泰勒展开抓主导项；如果展开不熟，再回到洛必达法则逐步推进。',
+            emphasis: 'right',
+          },
+        ], autoAdvanceMs: 5000, agentCommentary: '多次洛必达容易出错，泰勒展开是更好的替代。' },
         { id: `${id}-d2`, type: 'formula', markdown: '### 方法一：洛必达（3 次）\n\n$$\\frac{1-\\cos x}{3x^2} \\xrightarrow{L} \\frac{\\sin x}{6x} \\xrightarrow{L} \\frac{\\cos x}{6} = \\frac{1}{6}$$\n\n三连洛必达，步骤多、容易漏条件。', autoAdvanceMs: 5000, agentCommentary: '洛必达三次，每一步都要重新验证条件——繁琐且容易出错。' },
         { id: `${id}-d3`, type: 'formula', markdown: '### 方法二：泰勒展开\n\n$\\sin x = x - \\dfrac{x^3}{6} + o(x^3)$\n\n代入：\n\n$$\\frac{x - (x - \\frac{x^3}{6} + o(x^3))}{x^3} = \\frac{\\frac{x^3}{6} + o(x^3)}{x^3} \\to \\frac{1}{6}$$\n\n**一步到位！**', autoAdvanceMs: 0, agentCommentary: '泰勒展开一步到位。我的建议是：能用泰勒就不用连用洛必达。' },
       ])

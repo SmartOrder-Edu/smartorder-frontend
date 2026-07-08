@@ -135,16 +135,20 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     teachingActive.value = true
     quizState.value = null
 
-    // 弹题：暂停教学流
+    const waitImmediately = cue.payload.waitForUserImmediate === true
+
+    // 弹题：先展示题面，是否暂停由时间轴 pause cue 控制
     if (isInteractiveSegment(seg.type) && seg.quiz) {
-      flow.isPaused = true
+      flow.isPaused = waitImmediately
       quizState.value = {
         quizId: seg.quiz.id,
         userAnswer: '',
         correct: false,
         answered: false,
       }
-      timelinePlayer.waitForUser()
+      if (waitImmediately) {
+        timelinePlayer.waitForUser()
+      }
       pushSegmentCommentary(seg, cue.id)
       return
     }
@@ -154,8 +158,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       // 聚焦效果由 TeachingSegmentView 的 onMounted 处理
     }
 
-    // 0 表示等待用户确认，>0 的自动推进由 TimelinePlayer 主时钟负责
-    if (seg.autoAdvanceMs <= 0) {
+    if (waitImmediately) {
       flow.isPaused = true
       timelinePlayer.waitForUser()
     }
@@ -650,18 +653,30 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     const cues: LessonCue[] = []
     flow.segments.forEach((segment, index) => {
       const startMs = cursorMs
-      cursorMs += Math.max(segment.autoAdvanceMs, 800)
+      const segmentDurationMs = resolveSegmentDurationMs(segment)
+      const endMs = startMs + segmentDurationMs
+      const waitForUser = segment.autoAdvanceMs <= 0 || isInteractiveSegment(segment.type)
       const sceneAction = buildSceneActionFromSegment(segment, index, startMs)
+      sceneAction.durationMs = Math.min(Math.max(segmentDurationMs, 1200), 5200)
+      sceneAction.payload = {
+        ...(sceneAction.payload || {}),
+        speechStartMs: startMs,
+        speechEndMs: endMs,
+      }
       cues.push({
         id: `${segment.id}-reveal`,
         type: 'segment_reveal',
         startMs,
-        endMs: cursorMs,
+        endMs,
         payload: {
           segmentId: segment.id,
           segmentIndex: index,
           segmentType: segment.type,
-          waitForUser: segment.autoAdvanceMs <= 0 || isInteractiveSegment(segment.type),
+          waitForUser: false,
+          waitForUserAtEnd: waitForUser,
+          speechText: segmentSpeechText(segment),
+          speechStartMs: startMs,
+          speechEndMs: endMs,
           sceneAction,
         },
       })
@@ -669,9 +684,25 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         id: `${segment.id}-scene-action`,
         type: 'scene_action',
         startMs,
-        endMs: Math.min(cursorMs, startMs + sceneAction.durationMs),
+        endMs: Math.min(endMs, startMs + sceneAction.durationMs),
         payload: sceneAction,
       })
+      if (waitForUser) {
+        cues.push({
+          id: `${segment.id}-wait`,
+          type: 'pause',
+          startMs: endMs,
+          endMs,
+          payload: {
+            segmentId: segment.id,
+            segmentIndex: index,
+            segmentType: segment.type,
+            waitForUser: true,
+            reason: isInteractiveSegment(segment.type) ? 'interaction' : 'manual_continue',
+          },
+        })
+      }
+      cursorMs = endMs
     })
 
     return {
@@ -684,6 +715,26 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         source: 'teaching_flow_compat',
       },
     }
+  }
+
+  function resolveSegmentDurationMs(segment: TeachingSegment): number {
+    const speechMs = estimateSpeechDurationMs(segmentSpeechText(segment))
+    const explicitMs = Number(segment.autoAdvanceMs || 0)
+    return Math.max(1200, Math.min(30000, Math.max(speechMs, explicitMs)))
+  }
+
+  function segmentSpeechText(segment: TeachingSegment): string {
+    return segment.teacherTalk
+      || segment.agentCommentary
+      || segment.markdown
+      || segment.boardContent
+      || ''
+  }
+
+  function estimateSpeechDurationMs(text: string): number {
+    const length = text.trim().length
+    if (length <= 0) return 1800
+    return Math.max(1800, Math.min(30000, length * 220))
   }
 
   function applyTimelineCue(cue: LessonCue) {

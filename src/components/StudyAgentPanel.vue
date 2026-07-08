@@ -1,5 +1,5 @@
 <template>
-  <aside class="study-agent-panel">
+  <aside class="study-agent-panel" :class="{ collapsed: collapsed }">
     <!-- Agent header -->
     <div class="panel-top">
       <div class="agent-mini-header">
@@ -11,6 +11,9 @@
         </div>
         <span class="agent-mini-name">学习伙伴</span>
         <span class="agent-mini-status">在线</span>
+        <button class="collapse-btn" @click="collapsed = !collapsed" title="收起面板" aria-label="收起学习伙伴面板">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="15,18 9,12 15,6"/></svg>
+        </button>
         <button class="trace-btn" @click="openTrace" title="查看 Agent 执行轨迹">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
@@ -92,6 +95,8 @@ import { useTaskStepStore } from '@/stores/taskStep'
 import { useAgentStore } from '@/stores/agent'
 import type { FeedbackType } from '@/types/study'
 
+const collapsed = defineModel<boolean>('collapsed', { default: false })
+
 const stepStore = useTaskStepStore()
 const agentStore = useAgentStore()
 
@@ -144,12 +149,21 @@ export default { name: 'StudyAgentPanel' }
   flex-direction: column;
   gap: 10px;
   height: 100%;
+  width: 320px;
+  flex-shrink: 0;
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(10px);
   border-left: 1px solid rgba(15, 23, 42, 0.06);
   overflow: hidden;
+  transition: width 0.3s ease;
+
+  &.collapsed {
+    width: 0;
+    border-left: none;
+  }
 
   @media (max-width: 1024px) {
+    width: 100% !important;
     border-left: none;
     border-top: 1px solid rgba(15, 23, 42, 0.06);
   }
@@ -188,8 +202,29 @@ export default { name: 'StudyAgentPanel' }
   align-items: center;
   gap: 6px;
 
-  .trace-btn {
+  .collapse-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
     margin-left: auto;
+
+    &:hover {
+      border-color: #0bb7aa;
+      color: #0bb7aa;
+      background: rgba(11, 183, 170, 0.08);
+    }
+  }
+
+  .trace-btn {
     display: inline-flex;
     align-items: center;
     gap: 3px;

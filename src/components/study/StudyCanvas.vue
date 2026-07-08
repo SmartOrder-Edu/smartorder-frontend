@@ -10,6 +10,15 @@
     <!-- 步骤标题条 -->
     <header class="canvas-header" v-if="stepStore.currentScriptStep">
       <div class="header-left">
+        <button
+          v-if="scriptCollapsed"
+          class="script-toggle-btn"
+          @click="$emit('toggleScript')"
+          title="展开脚本"
+          aria-label="展开学习脚本"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/><path d="M14 4h7"/><path d="M14 9h7"/><path d="M14 15h7"/><path d="M14 20h7"/></svg>
+        </button>
         <span class="phase-tag" :class="stepStore.currentScriptStep.phase">
           {{ phaseLabel(stepStore.currentScriptStep.phase) }}
         </span>
@@ -24,6 +33,15 @@
         </span>
       </div>
       <div class="header-right">
+        <button
+          v-if="agentCollapsed"
+          class="agent-toggle-btn"
+          @click="$emit('toggleAgent')"
+          title="展开学习伙伴"
+          aria-label="展开学习伙伴面板"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><path d="M10 4H3"/><path d="M10 9H3"/><path d="M10 15H3"/><path d="M10 20H3"/></svg>
+        </button>
         <!-- 教学模式：隐藏导航，显示"跳过"按钮 -->
         <template v-if="stepStore.teachingActive">
           <button
@@ -148,6 +166,9 @@ import TeachingSegmentView from './TeachingSegmentView.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
 import { ElMessage } from 'element-plus'
 
+defineProps<{ scriptCollapsed: boolean; agentCollapsed: boolean }>()
+defineEmits<{ (e: 'toggleScript'): void; (e: 'toggleAgent'): void }>()
+
 const stepStore = useTaskStepStore()
 
 function bindTimelineAudio(el: Element | null) {
@@ -216,6 +237,27 @@ function onQuizAnswer(quizId: string, answer: string) {
   gap: 14px;
   min-width: 0;
 
+  .script-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
+    &:hover {
+      border-color: #0bb7aa;
+      color: #0bb7aa;
+      background: rgba(11, 183, 170, 0.08);
+    }
+  }
+
   .phase-tag {
     flex-shrink: 0;
     padding: 4px 12px;
@@ -276,6 +318,27 @@ function onQuizAnswer(quizId: string, answer: string) {
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.agent-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    border-color: #0bb7aa;
+    color: #0bb7aa;
+    background: rgba(11, 183, 170, 0.08);
+  }
 }
 
 .nav-btn {
