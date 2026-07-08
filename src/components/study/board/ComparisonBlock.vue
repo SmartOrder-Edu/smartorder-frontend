@@ -211,9 +211,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 .comparison-title {
   color: #0f172a;
-  font-size: 14px;
-  font-weight: 760;
-  line-height: 1.4;
+  font-size: 17px;
+  font-weight: 820;
+  line-height: 1.34;
 }
 
 .comparison-caption {
@@ -285,8 +285,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   h3 {
     margin: 0;
     color: #0f172a;
-    font-size: 16px;
-    font-weight: 760;
+    font-size: 15px;
+    font-weight: 780;
     line-height: 1.35;
   }
 

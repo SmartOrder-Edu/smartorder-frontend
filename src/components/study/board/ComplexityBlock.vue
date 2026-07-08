@@ -111,9 +111,9 @@ function readScenePayloadString(key: string): string {
 .lesson-block-title {
   min-width: 0;
   color: #0f172a;
-  font-size: 14px;
-  font-weight: 760;
-  line-height: 1.4;
+  font-size: 17px;
+  font-weight: 820;
+  line-height: 1.34;
 }
 
 .complexity-main {
@@ -126,13 +126,13 @@ function readScenePayloadString(key: string): string {
   display: grid;
   gap: 6px;
   padding: 14px;
-  border: 1px solid rgba(37, 99, 235, 0.16);
+  border: 1px solid rgba(15, 118, 110, 0.18);
   border-radius: 8px;
-  background: #f8fafc;
+  background: linear-gradient(180deg, #ffffff, #f0fdfa);
 
   &.primary {
-    border-color: rgba(15, 118, 110, 0.2);
-    background: #ecfdf5;
+    border-color: rgba(15, 118, 110, 0.18);
+    background: linear-gradient(180deg, #ffffff, #f0fdfa);
   }
 }
 
@@ -160,7 +160,7 @@ function readScenePayloadString(key: string): string {
 .case-row {
   --case-gutter-bg: #fbfdff;
   display: grid;
-  grid-template-columns: minmax(96px, 0.72fr) minmax(104px, 0.62fr) minmax(0, 2fr);
+  grid-template-columns: minmax(90px, 0.68fr) minmax(82px, 0.42fr) minmax(0, 2.4fr);
   gap: 0;
   align-items: center;
   border-bottom: 1px solid rgba(226, 232, 240, 0.9);
@@ -192,7 +192,8 @@ function readScenePayloadString(key: string): string {
 
   > span {
     min-height: 34px;
-    color: #475569;
+    justify-content: center;
+    color: #334155;
     font-size: 12px;
     font-weight: 760;
     line-height: 1.35;
@@ -217,6 +218,7 @@ function readScenePayloadString(key: string): string {
 .case-description {
   color: #64748b;
   line-height: 1.6;
+  justify-content: flex-start;
 
   &.muted {
     color: #94a3b8;

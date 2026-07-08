@@ -125,9 +125,9 @@ function codeLanguageLabel(language?: string): string {
 .lesson-block-title {
   min-width: 0;
   color: #0f172a;
-  font-size: 14px;
-  font-weight: 760;
-  line-height: 1.4;
+  font-size: 17px;
+  font-weight: 820;
+  line-height: 1.34;
 }
 
 .lesson-language {

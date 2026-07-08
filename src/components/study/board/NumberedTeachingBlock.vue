@@ -199,7 +199,7 @@ function stringValue(value: unknown): string {
 <style scoped lang="scss">
 .numbered-teaching-block {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   color: var(--board-text, #334155);
 }
 
@@ -219,9 +219,9 @@ function stringValue(value: unknown): string {
 .numbered-title {
   margin-top: 2px;
   color: var(--board-heading, #0f172a);
-  font-size: 16px;
-  font-weight: 780;
-  line-height: 1.4;
+  font-size: 18px;
+  font-weight: 820;
+  line-height: 1.32;
 }
 
 .numbered-lead,
@@ -249,20 +249,20 @@ function stringValue(value: unknown): string {
 
 .numbered-list {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   margin: 0;
-  padding: 0;
+  padding: 2px 0 0 8px;
   list-style: none;
   counter-reset: none;
 }
 
 .numbered-item {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 14px;
   align-items: start;
   margin: 0;
-  padding: 0 0 12px;
+  padding: 0 0 16px;
   border-bottom: 1px solid rgba(226, 232, 240, 0.64);
 
   &:last-child {
@@ -272,23 +272,23 @@ function stringValue(value: unknown): string {
 }
 
 .number-marker {
-  width: 26px;
-  height: 26px;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 1px solid rgba(14, 165, 233, 0.24);
-  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.3);
+  background: rgba(14, 165, 233, 0.1);
   color: var(--board-info, #0369a1);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 860;
   line-height: 1;
 }
 
 .numbered-body {
   display: grid;
-  gap: 5px;
+  gap: 7px;
   min-width: 0;
 }
 
@@ -301,8 +301,8 @@ function stringValue(value: unknown): string {
   line-height: 1.45;
 
   strong {
-    font-size: 14px;
-    font-weight: 760;
+    font-size: 15px;
+    font-weight: 780;
   }
 }
 
@@ -316,8 +316,8 @@ function stringValue(value: unknown): string {
 .item-example {
   margin: 0;
   color: var(--board-text, #334155);
-  font-size: 13px;
-  line-height: 1.72;
+  font-size: 14px;
+  line-height: 1.78;
 }
 
 .item-example {
@@ -328,8 +328,8 @@ function stringValue(value: unknown): string {
   display: grid;
   gap: 4px;
   color: var(--board-text, #334155);
-  font-size: 13px;
-  line-height: 1.68;
+  font-size: 14px;
+  line-height: 1.72;
 
   b {
     color: var(--board-heading, #0f172a);
@@ -361,13 +361,14 @@ function stringValue(value: unknown): string {
 
 @media (max-width: 640px) {
   .numbered-item {
-    grid-template-columns: 26px minmax(0, 1fr);
-    gap: 8px;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 10px;
   }
 
   .number-marker {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
   }
 }
 </style>

@@ -215,9 +215,9 @@ function readArray(key: string): unknown[] | null {
 
 .concept-title {
   color: var(--board-heading, #0f172a);
-  font-size: 15px;
-  font-weight: 780;
-  line-height: 1.4;
+  font-size: 17px;
+  font-weight: 820;
+  line-height: 1.34;
 }
 
 .definition-panel {
@@ -312,7 +312,7 @@ function readArray(key: string): unknown[] | null {
 
 .section-title {
   color: var(--board-text, #334155);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 800;
   line-height: 1.45;
 }
