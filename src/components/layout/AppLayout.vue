@@ -1411,8 +1411,10 @@ const handleLogout = async () => {
 .page-container {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding: var(--spacing-xl) var(--spacing-2xl) var(--spacing-xl);
+  overflow-y: scroll;
+  overflow-x: hidden;
+  padding: var(--spacing-xl) var(--spacing-2xl) var(--spacing-xl) var(--spacing-2xl);
+  scrollbar-gutter: stable;
 }
 
 .layout-container.sidebar-collapsed .main-content {

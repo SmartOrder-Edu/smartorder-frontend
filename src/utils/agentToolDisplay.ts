@@ -305,8 +305,8 @@ export function formatResultText(toolName: string, result?: any): string | null 
     case 'assessment_tool': {
       const count = obj.questionCount ?? obj.questions?.length ?? 0
       return count > 0
-        ? `共 ${count} 道题，需要你确认后才会保存`
-        : '练习题已生成，需要你确认后才会保存'
+        ? `练习题已成功生成并保存（共 ${count} 道题），可直接前往测评中心或点击下方卡片立即挑战！`
+        : '练习题已成功生成并保存，快来挑战吧！'
     }
 
     case 'webSearch': {

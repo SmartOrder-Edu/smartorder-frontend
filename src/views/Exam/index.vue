@@ -7,8 +7,49 @@
           <h1 class="page-title">测评中心</h1>
           <p class="page-desc">阶段性测评、专项测试、错题复习，追踪你的学习效果</p>
         </div>
-        <div class="header-right">
-          <el-button @click="showGenerateDialog = true">
+        <div class="header-right" style="display: flex; align-items: center;">
+          <template v-if="learningSpaceStore.loading || learningSpaceStore.activeSpaces.length > 0">
+            <el-select
+              v-model="selectedSpaceId"
+              filterable
+              placeholder="切换学习空间"
+              style="width: 200px; margin-right: 16px;"
+              :loading="learningSpaceStore.loading"
+            >
+              <el-option
+                v-for="space in learningSpaceStore.activeSpaces"
+                :key="space.id"
+                :label="space.name"
+                :value="space.id"
+              />
+              <template #empty>
+                <div class="select-empty-tip">
+                  <el-icon class="select-empty-icon"><Warning /></el-icon>
+                  <span>暂无学习空间</span>
+                  <el-button
+                    type="primary"
+                    link
+                    size="small"
+                    @click="router.push('/spaces')"
+                  >去创建</el-button>
+                </div>
+              </template>
+            </el-select>
+          </template>
+          <template v-else>
+            <el-button
+              type="primary"
+              style="margin-right: 16px;"
+              @click="router.push('/spaces')"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 4px;">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              立即创建学习空间
+            </el-button>
+          </template>
+          <el-button class="btn-ai-generate" @click="showGenerateDialog = true">
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -23,6 +64,25 @@
           </el-button>
         </div>
       </div>
+
+      <!-- 无学习空间提示横幅 -->
+      <el-alert
+        v-if="!learningSpaceStore.loading && learningSpaceStore.activeSpaces.length === 0"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="no-space-alert"
+      >
+        <template #title>
+          您还没有任何学习空间，无法使用测评功能。
+          <el-button
+            type="primary"
+            size="small"
+            style="margin-left: 12px;"
+            @click="router.push('/spaces')"
+          >立即创建学习空间</el-button>
+        </template>
+      </el-alert>
 
       <!-- 测评总览 -->
       <section class="section overview-cards">
@@ -63,34 +123,51 @@
         </div>
 
         <div class="overview-details">
-          <div class="detail-item">
-            <div class="detail-header">
-              <span class="detail-label">本周测评次数</span>
-              <span class="detail-value primary">{{ weeklyCount }} 次</span>
+          <div class="details-left">
+            <div class="detail-item">
+              <div class="detail-header">
+                <span class="detail-label">本周测评次数</span>
+                <span class="detail-value primary">{{ weeklyCount }} 次</span>
+              </div>
+              <div class="detail-bar">
+                <div class="bar-fill" style="width: 70%"></div>
+              </div>
             </div>
-            <div class="detail-bar">
-              <div class="bar-fill" style="width: 70%"></div>
-            </div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-header">
-              <span class="detail-label">本周平均正确率</span>
-              <span class="detail-value accent">{{ weeklyAccuracy }}%</span>
-            </div>
-            <div class="detail-bar accent">
-              <div class="bar-fill" :style="{ width: weeklyAccuracy + '%' }"></div>
-            </div>
-          </div>
-          <div class="detail-item">
-            <div class="detail-header">
-              <span class="detail-label">薄弱知识点</span>
-              <span class="detail-value warning">{{ weakCount }} 个</span>
+            <div class="detail-item">
+              <div class="detail-header">
+                <span class="detail-label">本周平均正确率</span>
+                <span class="detail-value accent">{{ weeklyAccuracy }}%</span>
+              </div>
+              <div class="detail-bar accent">
+                <div class="bar-fill" :style="{ width: weeklyAccuracy + '%' }"></div>
+              </div>
             </div>
           </div>
-          <div class="detail-item">
-            <div class="detail-header">
-              <span class="detail-label">本周进步</span>
-              <span class="detail-value success">+{{ weeklyProgress }}%</span>
+          <div class="details-right">
+            <div class="stat-tile-card warning">
+              <div class="card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div class="card-info">
+                <span class="card-label">薄弱知识点</span>
+                <span class="card-value warning">{{ weakCount }} 个</span>
+              </div>
+            </div>
+            <div class="stat-tile-card success">
+              <div class="card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                  <polyline points="17 6 23 6 23 12"/>
+                </svg>
+              </div>
+              <div class="card-info">
+                <span class="card-label">本周进步</span>
+                <span class="card-value success">+{{ weeklyProgress }}%</span>
+              </div>
             </div>
           </div>
         </div>
@@ -121,77 +198,45 @@
           <el-button :loading="questionBankLoading" @click="fetchQuestionBank">刷新</el-button>
         </div>
 
-        <div v-if="questionBank.length" class="question-bank-list">
-          <article v-for="question in questionBank" :key="question.id" class="question-bank-card">
-            <div class="question-bank-meta">
-              <span>{{ question.questionTypeName || getQuestionTypeLabel(question.questionType) }}</span>
-              <span>难度 {{ question.difficulty || '-' }}</span>
-              <span>{{ question.score || 0 }} 分</span>
-            </div>
-            <h3>{{ question.stem }}</h3>
-            <p v-if="question.explanation">{{ question.explanation }}</p>
-            <div v-if="question.tagsJson?.length" class="question-tags">
-              <span v-for="tag in question.tagsJson" :key="tag">{{ tag }}</span>
-            </div>
-          </article>
-        </div>
-        <div v-else class="question-bank-empty">
-          {{ questionBankLoading ? '正在加载题库数据...' : '暂无后端题库数据，生成一次测评后再刷新试试。' }}
-        </div>
-
-        <div class="exam-list">
-          <!-- 进行中 -->
-          <div v-if="activeTab === 'ongoing' && ongoingExam" class="exam-card ongoing">
+        <div v-if="questionBank.length" class="exam-list" style="margin-bottom: 32px;">
+          <!-- 题库汇总卡片 -->
+          <div class="exam-card">
             <div class="exam-status-bar">
-              <span class="status-badge ongoing">进行中</span>
-              <span class="time-left">剩余 {{ ongoingExam.timeLeft }} 分钟</span>
+              <span class="status-badge available">可参与</span>
             </div>
             <div class="exam-info">
-              <h3 class="exam-title">{{ ongoingExam.title }}</h3>
-              <p class="exam-desc">{{ ongoingExam.description }}</p>
+              <h3 class="exam-title">{{ selectedSpaceName || '当前空间' }} 总题库</h3>
+              <p class="exam-desc">包含所有知识点的测评题目，点击“开始刷题”即可逐一练习。</p>
               <div class="exam-meta">
                 <span>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 11l3 3L22 4" />
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                   </svg>
-                  {{ ongoingExam.total }} 题
+                  {{ questionBank.length }} 题
                 </span>
                 <span>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10" />
                     <polyline points="12,6 12,12 16,14" />
                   </svg>
-                  {{ ongoingExam.duration }} 分钟
+                  无时间限制
                 </span>
-                <span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                  </svg>
-                  {{ ongoingExam.attempted }}/{{ ongoingExam.total }} 已答
-                </span>
-              </div>
-              <div class="exam-progress-bar">
-                <div
-                  class="bar-fill"
-                  :style="{ width: (ongoingExam.attempted / ongoingExam.total) * 100 + '%' }"
-                ></div>
               </div>
             </div>
             <div class="exam-actions">
-              <el-button type="primary" @click="$router.push('/study/exam-' + ongoingExam.id)">
-                继续测评
-              </el-button>
+              <el-button type="primary" @click="$router.push('/exam/questions?spaceId=' + (selectedSpaceId || ''))">开始刷题</el-button>
             </div>
           </div>
+        </div>
 
+        <div class="exam-list">
           <!-- 测评卡片 -->
           <div
             v-for="exam in filteredExams"
             :key="exam.id"
             class="exam-card"
-            :class="{ 'has-result': exam.hasResult }"
+            :class="[{ 'has-result': exam.hasResult }, exam.status]"
           >
             <div class="exam-status-bar">
               <span class="status-badge" :class="exam.status">{{ exam.statusText }}</span>
@@ -254,14 +299,14 @@
                 <el-button type="primary" @click="retakeExam(exam)">重新测评</el-button>
               </template>
               <template v-else>
-                <el-button type="primary" @click="startExam(exam)">开始测评</el-button>
+                <el-button type="primary" @click="startExam(exam)">{{ exam.status === 'ongoing' ? '继续测评' : '开始测评' }}</el-button>
               </template>
             </div>
           </div>
         </div>
 
         <!-- 空状态 -->
-        <div class="empty-state" v-if="filteredExams.length === 0">
+        <div class="empty-state" v-if="filteredExams.length === 0 && questionBank.length === 0">
           <div class="empty-icon">
             <svg
               viewBox="0 0 24 24"
@@ -288,7 +333,7 @@
       <el-dialog
         v-model="showGenerateDialog"
         title="生成题库"
-        width="720px"
+        width="760px"
         class="question-generate-dialog"
       >
         <div class="generate-layout">
@@ -313,77 +358,137 @@
               </div>
               <div class="form-item">
                 <label>课程名称</label>
-                <el-input v-model="generateCourseName" placeholder="例如：操作系统" />
+                <el-input v-model="generateCourseName" placeholder="例如：数据结构" />
               </div>
             </div>
 
             <div class="form-item">
               <label>出题主题</label>
-              <el-input v-model="generateTopic" placeholder="例如：PV 操作与信号量" />
+              <el-input v-model="generateTopic" placeholder="例如：排序" />
             </div>
 
             <div class="form-item">
               <div class="field-heading">
                 <label>题型与题量</label>
-                <span>{{ totalGenerateCount }} 题</span>
+                <span class="total-badge">{{ totalGenerateCount }} 题</span>
               </div>
               <div class="question-type-list">
                 <div
                   v-for="row in questionTypeRows"
                   :key="row.questionType"
                   class="question-type-row"
+                  :class="{ active: row.enabled }"
                 >
-                  <el-switch v-model="row.enabled" />
-                  <div class="type-copy">
-                    <strong>{{ row.label }}</strong>
-                    <span>{{ row.description }}</span>
+                  <div class="type-main">
+                    <el-switch v-model="row.enabled" size="small" />
+                    <div class="type-icon-wrapper" :class="{ enabled: row.enabled }">
+                      <svg v-if="row.questionType === 'single_choice'" viewBox="0 0 24 24" class="type-svg-icon">
+                        <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <circle cx="9" cy="9" r="2" fill="currentColor"/>
+                        <line x1="13" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="9" cy="15" r="2" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <line x1="13" y1="15" x2="17" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                      <svg v-else-if="row.questionType === 'multiple_choice'" viewBox="0 0 24 24" class="type-svg-icon">
+                        <rect x="3" y="3" width="18" height="18" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <rect x="7" y="7" width="4" height="4" rx="1" fill="currentColor"/>
+                        <line x1="14" y1="9" x2="17" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <rect x="7" y="13" width="4" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <line x1="14" y1="15" x2="17" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                      <svg v-else-if="row.questionType === 'fill_blank'" viewBox="0 0 24 24" class="type-svg-icon">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <line x1="6" y1="12" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="14" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2"/>
+                        <line x1="6" y1="16" x2="10" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="12" y1="16" x2="18" y2="16" stroke="currentColor" stroke-width="2" stroke-dasharray="2 2"/>
+                      </svg>
+                      <svg v-else-if="row.questionType === 'judge'" viewBox="0 0 24 24" class="type-svg-icon">
+                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <path d="M8 12l3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                      <svg v-else viewBox="0 0 24 24" class="type-svg-icon">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="2"/>
+                        <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        <line x1="8" y1="13" x2="14" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                    </div>
+                    <div class="type-copy">
+                      <strong>{{ row.label }}</strong>
+                      <span>{{ row.description }}</span>
+                    </div>
                   </div>
-                  <el-input-number
-                    v-model="row.count"
-                    :min="1"
-                    :max="10"
-                    :disabled="!row.enabled"
-                    controls-position="right"
-                  />
+                  <div class="type-control">
+                    <el-input-number
+                      v-model="row.count"
+                      :min="1"
+                      :max="10"
+                      :disabled="!row.enabled"
+                      controls-position="right"
+                      size="small"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="form-item">
-              <label>难度级别</label>
-              <el-slider v-model="generateDifficulty" :min="1" :max="10" />
-              <div class="difficulty-tip">
-                当前难度：<strong>{{ generateDifficulty }}</strong> - {{ generateDifficultyDesc }}
+            <div class="form-item difficulty-section">
+              <div class="field-heading" style="margin-bottom: 32px;">
+                <label>难度级别</label>
+                <span class="total-badge" style="background: var(--el-color-primary-light-9); color: var(--el-color-primary);">{{ generateDifficultyDesc }}</span>
+              </div>
+              <div class="difficulty-slider-wrapper" style="padding: 0 20px 24px;">
+                <el-slider v-model="generateDifficulty" :min="1" :max="5" :step="1" :marks="difficultyMarks" show-stops :show-tooltip="false" />
               </div>
             </div>
           </div>
 
           <aside class="generate-summary">
             <div class="summary-title">生成预览</div>
-            <div class="summary-line">
-              <span>空间</span>
-              <strong>{{ selectedSpaceName || '未选择' }}</strong>
+            <div class="summary-receipt">
+              <div class="summary-line">
+                <span>学习空间</span>
+                <strong>{{ selectedSpaceName || '未选择' }}</strong>
+              </div>
+              <div class="summary-line">
+                <span>生成数量</span>
+                <strong>{{ totalGenerateCount }} 题</strong>
+              </div>
+              <div class="summary-line">
+                <span>预计耗时</span>
+                <strong>{{ estimatedMinutes }} 分钟</strong>
+              </div>
             </div>
-            <div class="summary-line">
-              <span>题量</span>
-              <strong>{{ totalGenerateCount }} 题</strong>
+            
+            <div class="summary-mix-container">
+              <span class="mix-label">题型组合</span>
+              <div class="summary-mix-tags">
+                <template v-if="selectedQuestionRows.length">
+                  <span
+                    v-for="row in selectedQuestionRows"
+                    :key="row.questionType"
+                    class="mix-tag"
+                  >
+                    {{ row.label }} <strong class="tag-count">{{ row.count }}</strong>
+                  </span>
+                </template>
+                <span v-else class="mix-tag empty">请选择题型</span>
+              </div>
             </div>
-            <div class="summary-line">
-              <span>预计</span>
-              <strong>{{ estimatedMinutes }} 分钟</strong>
-            </div>
-            <div class="summary-mix">{{ generationMixText || '请选择题型' }}</div>
 
             <div
               v-if="generating || generationJobNo || generationError"
               class="generation-progress-card"
             >
               <div class="progress-head">
-                <span>{{ generationStep }}</span>
-                <strong>{{ generationProgress }}%</strong>
+                <span class="progress-step-text">
+                  <span class="pulse-dot"></span>
+                  {{ generationStep }}
+                </span>
+                <strong class="progress-percentage">{{ generationProgress }}%</strong>
               </div>
-              <el-progress :percentage="generationProgress" :stroke-width="8" :show-text="false" />
-              <div v-if="generationJobNo" class="job-no">{{ generationJobNo }}</div>
+              <el-progress :percentage="generationProgress" :stroke-width="6" :show-text="false" />
+              <div v-if="generationJobNo" class="job-no">任务号：{{ generationJobNo }}</div>
               <div v-if="generationPreviewItems.length" class="token-preview-list">
                 <div
                   v-for="item in generationPreviewItems"
@@ -391,10 +496,10 @@
                   class="token-preview-item"
                 >
                   <div class="token-preview-meta">
-                    <span>{{ item.label }}</span>
-                    <small>{{ item.tokenCount }} 段</small>
+                    <span class="token-preview-label">{{ item.label }}</span>
+                    <small class="token-preview-count">{{ item.tokenCount }} 段</small>
                   </div>
-                  <p>{{ item.text || '正在接收题目结构...' }}</p>
+                  <p class="token-preview-text">{{ item.text || '正在接收题目结构...' }}</p>
                 </div>
               </div>
               <p v-if="generationError" class="generation-error">{{ generationError }}</p>
@@ -402,15 +507,16 @@
           </aside>
         </div>
         <template #footer>
-          <el-button v-if="generating" @click="stopGenerate">停止接收</el-button>
-          <el-button v-else @click="showGenerateDialog = false">取消</el-button>
+          <el-button v-if="generating" class="btn-secondary" @click="stopGenerate">停止接收</el-button>
+          <el-button v-else class="btn-secondary" @click="showGenerateDialog = false">取消</el-button>
           <el-button
             type="primary"
+            class="btn-primary"
             :loading="generating"
             :disabled="!canGenerate"
             @click="generateExam"
           >
-            {{ generating ? '生成中...' : '开始生成' }}
+            {{ generating ? '正在生成...' : '开始生成' }}
           </el-button>
         </template>
       </el-dialog>
@@ -420,18 +526,22 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Warning } from '@element-plus/icons-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
 import {
   fetchEvaluationQuestions,
+  fetchEvaluationTasks,
   streamGenerateQuestions,
   type EvaluationQuestion,
+  type EvaluationSession,
   type GenerateQuestionPayload,
   type QuestionGenerationTokenEvent,
   type QuestionTypeCode
 } from '@/api/evaluationQuestion'
+import { startSession } from '@/api/evaluationSession'
 import { formatQuestionStreamPreview } from '@/utils/questionStreamPreview'
 
 interface QuestionTypeRow {
@@ -457,16 +567,19 @@ interface GenerationPreviewBuffer {
 
 const learningSpaceStore = useLearningSpaceStore()
 const router = useRouter()
+const route = useRoute()
 const activeTab = ref('available')
 const showGenerateDialog = ref(false)
 const generating = ref(false)
-const selectedSpaceId = ref<number | null>(null)
-const generateCourseName = ref('操作系统')
-const generateTopic = ref('线程同步与互斥')
-const generateDifficulty = ref(5)
+const selectedSpaceId = ref<string | null>(null)
+const generateCourseName = ref('数据结构')
+const generateTopic = ref('排序')
+const generateDifficulty = ref(3)
 const generationProgress = ref(0)
 const generationStep = ref('等待生成')
 const generationPreviewItems = ref<GenerationPreviewItem[]>([])
+const generatedSessionId = ref<string | null>(null)
+const generatedSessionTitle = ref('')
 const generationPreviewBuffers = ref<Partial<Record<QuestionTypeCode, GenerationPreviewBuffer>>>(
   {}
 )
@@ -478,15 +591,17 @@ const questionBankLoading = ref(false)
 let generationAbortController: AbortController | null = null
 const difficultyDescMap: Record<number, string> = {
   1: '识记 - 回忆基本知识点',
-  2: '简单识别 - 识别基础概念',
-  3: '概念理解 - 理解核心原理',
-  4: '基础应用 - 简单场景应用',
-  5: '综合应用 - 多知识点融合',
-  6: '典型分析 - 分析典型问题',
-  7: '进阶分析 - 深入分析推理',
-  8: '综合设计 - 设计解决方案',
-  9: '迁移推理 - 跨领域推理',
-  10: '深层综合 - 高阶思维综合'
+  2: '理解 - 理解核心原理',
+  3: '应用 - 场景应用与分析',
+  4: '综合 - 多知识点融合设计',
+  5: '进阶 - 复杂推理与高阶思维'
+}
+const difficultyMarks = {
+  1: '识记',
+  2: '理解',
+  3: '应用',
+  4: '综合',
+  5: '进阶'
 }
 const generateDifficultyDesc = computed(() => difficultyDescMap[generateDifficulty.value] || '')
 const questionTypeRows = ref<QuestionTypeRow[]>([
@@ -547,108 +662,26 @@ const canGenerate = computed(
 )
 const estimatedMinutes = computed(() => Math.max(1, Math.ceil(totalGenerateCount.value / 4)))
 
-const overallScore = ref(76)
-const weeklyCount = ref(4)
-const weeklyAccuracy = ref(72)
-const weakCount = ref(5)
-const weeklyProgress = ref(8)
+const overallScore = ref(0)
+const weeklyCount = ref(0)
+const weeklyAccuracy = ref(0)
+const weakCount = ref(0)
+const weeklyProgress = ref(0)
 
-const ongoingExam = ref({
-  id: 100,
-  title: '进程同步与互斥专项测评',
-  description: '测试你对 PV 操作、信号量、临界区的理解程度',
-  total: 15,
-  attempted: 8,
-  duration: 30,
-  timeLeft: 18,
-  status: 'ongoing'
-})
-
-const exams = ref([
-  {
-    id: 1,
-    title: '进程管理综合测试',
-    description: '涵盖进程概念、PCB、状态转换、进程创建与终止',
-    total: 20,
-    duration: 30,
-    accuracy: 75,
-    score: 75,
-    hasResult: true,
-    wrongCount: 5,
-    weakPoints: ['进程创建', '状态转换'],
-    status: 'completed',
-    statusText: '已完成'
-  },
-  {
-    id: 2,
-    title: '线程与同步专项测评',
-    description: '聚焦线程同步、互斥锁、信号量、条件变量',
-    total: 15,
-    duration: 25,
-    accuracy: 52,
-    score: 52,
-    hasResult: true,
-    wrongCount: 7,
-    weakPoints: ['PV操作', '死锁检测'],
-    status: 'completed',
-    statusText: '已完成'
-  },
-  {
-    id: 3,
-    title: '内存管理阶段测试',
-    description: '分页、分段、虚拟内存、页面置换算法',
-    total: 15,
-    duration: 30,
-    accuracy: 0,
-    score: 0,
-    hasResult: false,
-    wrongCount: 0,
-    weakPoints: [],
-    status: 'available',
-    statusText: '可参与'
-  },
-  {
-    id: 4,
-    title: '文件系统章节测验',
-    description: '文件组织、目录结构、文件系统实现',
-    total: 12,
-    duration: 20,
-    accuracy: 0,
-    score: 0,
-    hasResult: false,
-    wrongCount: 0,
-    weakPoints: [],
-    status: 'available',
-    statusText: '可参与'
-  },
-  {
-    id: 5,
-    title: '操作系统期末模拟',
-    description: '全章节综合测试，包含选择、填空、简答、计算',
-    total: 30,
-    duration: 60,
-    accuracy: 0,
-    score: 0,
-    hasResult: false,
-    wrongCount: 0,
-    weakPoints: [],
-    status: 'available',
-    statusText: '可参与'
-  }
-])
+const exams = ref<any[]>([])
 
 const examTabs = computed(() => [
   {
     value: 'ongoing',
     label: '进行中',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>',
-    count: ongoingExam.value ? 1 : 0
+    count: exams.value.filter(exam => exam.status === 'ongoing').length
   },
   {
     value: 'available',
     label: '可参与',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
-    count: exams.value.filter(exam => !exam.hasResult).length
+    count: exams.value.filter(exam => exam.status === 'available' || exam.status === 'error').length
   },
   {
     value: 'completed',
@@ -665,9 +698,9 @@ const examTabs = computed(() => [
 ])
 
 const filteredExams = computed(() => {
-  if (activeTab.value === 'ongoing') return []
   return exams.value.filter(e => {
-    if (activeTab.value === 'available') return !e.hasResult
+    if (activeTab.value === 'ongoing') return e.status === 'ongoing'
+    if (activeTab.value === 'available') return e.status === 'available' || e.status === 'error'
     if (activeTab.value === 'completed') return e.hasResult
     if (activeTab.value === 'wrong') return e.wrongCount > 0
     return true
@@ -680,16 +713,27 @@ const getScoreClass = (score: number) => {
   return 'poor'
 }
 
-const startExam = (exam: any) => {
+const startExam = async (exam: any) => {
   const spaceId = exam.learningSpaceId || selectedSpaceId.value
   if (!spaceId) {
     ElMessage.warning('请先选择学习空间，或先生成一套题库')
     return
   }
 
+  // 仅当后端 status 为 'todo'（尚未开始）时才通知后端开始答题
+  if (exam.rawStatus === 'todo') {
+    try {
+      await startSession(exam.id)
+    } catch {
+      // 忽略异常，不阻断跳转
+    }
+  }
+
   router.push({
     name: 'ExamSession',
     query: {
+      sessionId: exam.id,  // 携带 sessionId，走完整 session 流程
+      rawStatus: exam.rawStatus, // 传递后端原始状态，供答题页判断是否调用 start
       spaceId,
       title: exam.title
     }
@@ -797,6 +841,8 @@ const resetGenerationState = () => {
   generationJobNo.value = ''
   generationTokenCount.value = 0
   generationError.value = ''
+  generatedSessionId.value = null
+  generatedSessionTitle.value = ''
 }
 
 const stopGenerate = () => {
@@ -810,9 +856,34 @@ const stopGenerate = () => {
 const fetchQuestionBank = async () => {
   questionBankLoading.value = true
   try {
-    questionBank.value = await fetchEvaluationQuestions({
-      learningSpaceId: selectedSpaceId.value || undefined,
-      limit: 30
+    const sessions = await fetchEvaluationTasks({
+      learningSpaceId: selectedSpaceId.value || undefined
+    })
+    questionBank.value = [] // 默认关闭请求，所以这里置空
+    exams.value = sessions.map((session: EvaluationSession) => {
+      const isFinished = session.status === 'finished'
+      const isDoing = session.status === 'doing'
+      const isError = session.status === 'error'
+      // todo / 其余未知状态 → available（可参与）
+      const uiStatus = isFinished ? 'completed' : isDoing ? 'ongoing' : isError ? 'error' : 'available'
+      const statusText = isFinished ? '已完成' : isDoing ? '进行中' : isError ? '生成失败' : '可参与'
+      return {
+        id: session.id,
+        generationTaskId: session.taskId,  // 出题生成任务ID，用于按任务查题
+        title: session.topic || '专项测评',
+        description: session.description || '',
+        total: session.totalQuestionCount || 0,
+        duration: (session.totalQuestionCount || 0) * 2, // 预估每题2分钟
+        accuracy: session.accuracy ? Math.round(session.accuracy * 100) : 0,
+        score: session.actualScore || 0,
+        hasResult: isFinished,
+        wrongCount: isFinished ? (session.totalQuestionCount || 0) - (session.answeredCount || 0) : 0,
+        weakPoints: [],
+        learningSpaceId: session.learningSpaceId,
+        rawStatus: session.status,  // 后端原始状态，用于业务判断
+        status: uiStatus,
+        statusText
+      }
     })
   } catch (error: any) {
     ElMessage.error(error?.message || '题库数据加载失败')
@@ -859,6 +930,11 @@ const generateExam = async () => {
         )
         generationStep.value = `${getQuestionTypeLabel(data.questionType)}生成中`
         appendGenerationPreviewChunk(data)
+      },
+      onSessionCreated(data) {
+        // 保存 sessionId，供跳转答题页使用
+        generatedSessionId.value = data.sessionId
+        generatedSessionTitle.value = data.title
       }
     })
 
@@ -866,7 +942,21 @@ const generateExam = async () => {
     generationStep.value = '题库生成完成'
     addGeneratedExamCard(payload)
     await fetchQuestionBank()
-    activeTab.value = 'available'
+
+    // 如果有 sessionId，自动跳转到答题页
+    if (generatedSessionId.value) {
+      const targetSpaceId = selectedSpaceId.value || payload.learningSpaceId
+      router.push({
+        name: 'ExamSession',
+        query: {
+          sessionId: generatedSessionId.value,
+          spaceId: targetSpaceId,
+          title: generatedSessionTitle.value
+        }
+      })
+    } else {
+      activeTab.value = 'available'
+    }
     showGenerateDialog.value = false
     ElMessage.success('题库已生成并保存')
   } catch (error: any) {
@@ -882,14 +972,22 @@ const generateExam = async () => {
 
 onMounted(async () => {
   await learningSpaceStore.fetchSpaces('active')
-  if (!selectedSpaceId.value && learningSpaceStore.activeSpaces.length > 0) {
+  
+  const querySpaceId = route.query.spaceId ? String(route.query.spaceId) : null
+  if (querySpaceId) {
+    selectedSpaceId.value = querySpaceId
+  } else if (!selectedSpaceId.value && learningSpaceStore.activeSpaces.length > 0) {
     selectedSpaceId.value = learningSpaceStore.activeSpaces[0].id
   }
+  
   await fetchQuestionBank()
 })
 
 watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   if (spaceId === oldSpaceId) return
+  if (spaceId) {
+    router.replace({ query: { ...route.query, spaceId } })
+  }
   await fetchQuestionBank()
 })
 </script>
@@ -899,8 +997,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  height: 100%;
-  overflow-y: auto;
+  padding: 4px;
 }
 
 .page-header {
@@ -912,113 +1009,73 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 .page-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.625rem;
+  font-weight: 800;
   color: var(--text-dark);
   margin: 0 0 var(--spacing-xs);
+  letter-spacing: -0.025em;
 }
 
 .page-desc {
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   color: var(--text-secondary);
   margin: 0;
 }
 
-.header-right .el-button {
+/* AI生成按钮高级发光效果 */
+.btn-ai-generate {
+  background: var(--gradient-primary) !important;
+  border: none !important;
+  color: white !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  padding: 10px 18px !important;
+  height: auto !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: 0 4px 14px rgba(11, 183, 170, 0.3) !important;
+  transition: all var(--transition-base) !important;
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: 8px;
 }
 
-/* 总览 */
+.btn-ai-generate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(11, 183, 170, 0.45), 0 0 12px rgba(79, 110, 246, 0.3) !important;
+}
+
+.btn-ai-generate:active {
+  transform: translateY(0);
+}
+
+.btn-ai-generate svg {
+  stroke: currentColor;
+  transition: transform 0.3s ease;
+}
+
+.btn-ai-generate:hover svg {
+  transform: rotate(30deg);
+}
+
+/* 总览卡片 - 升级为精致磨砂玻璃质感 */
 .section {
   background: white;
   border-radius: var(--radius-xl);
   padding: var(--spacing-xl);
   margin-bottom: var(--spacing-xl);
   border: 1px solid var(--border-light);
-}
-
-.section-title-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
-}
-
-.section-title-row h2 {
-  margin: 0 0 4px;
-  font-size: 1rem;
-  color: var(--text-dark);
-}
-
-.section-title-row p {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-}
-
-.question-bank-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-xl);
-}
-
-.question-bank-card {
-  min-height: 132px;
-  padding: var(--spacing-lg);
-  border: 1px solid rgba(31, 41, 55, 0.08);
-  border-radius: var(--radius-lg);
-  background: #f8fafc;
-}
-
-.question-bank-meta,
-.question-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-xs);
-}
-
-.question-bank-meta span,
-.question-tags span {
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  background: white;
-  color: var(--text-secondary);
-  font-size: 0.6875rem;
-  font-weight: 600;
-}
-
-.question-bank-card h3 {
-  margin: var(--spacing-md) 0 var(--spacing-sm);
-  color: var(--text-dark);
-  font-size: 0.9375rem;
-  line-height: 1.5;
-}
-
-.question-bank-card p {
-  margin: 0 0 var(--spacing-sm);
-  color: var(--text-muted);
-  font-size: 0.8125rem;
-  line-height: 1.5;
-}
-
-.question-bank-empty {
-  margin-bottom: var(--spacing-xl);
-  padding: var(--spacing-xl);
-  border: 1px dashed var(--border-light);
-  border-radius: var(--radius-lg);
-  color: var(--text-muted);
-  text-align: center;
-  background: #f8fafc;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
 }
 
 .overview-cards {
   display: flex;
   gap: var(--spacing-2xl);
   align-items: center;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(236, 253, 251, 0.6) 100%);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(11, 183, 170, 0.12);
+  box-shadow: var(--shadow-md), 0 10px 30px rgba(11, 183, 170, 0.03);
 }
 
 .overview-stat {
@@ -1026,12 +1083,13 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 .stat-circle {
-  width: 160px;
-  height: 160px;
+  width: 150px;
+  height: 150px;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  filter: drop-shadow(0 4px 12px rgba(11, 183, 170, 0.22));
 }
 
 .stat-circle svg {
@@ -1047,41 +1105,61 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 .stat-score {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: var(--primary-color);
-  line-height: 1;
+  font-size: 2.75rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #2563eb 0%, #0bb7aa 70%, #10b981 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.1;
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.stat-score::after {
+  content: '';
+  display: none;
 }
 
 .stat-label {
   font-size: 0.75rem;
+  font-weight: 600;
   color: var(--text-muted);
+  margin-top: 2px;
 }
 
+/* 详情指标区 */
 .overview-details {
   flex: 1;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: var(--spacing-xl);
+}
+
+.details-left {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  justify-content: center;
+  gap: var(--spacing-md);
 }
 
 .detail-item {
+  width: 100%;
 }
 
 .detail-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
 }
 
 .detail-label {
   font-size: 0.8125rem;
+  font-weight: 600;
   color: var(--text-secondary);
 }
 
 .detail-value {
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
 }
 
@@ -1091,73 +1169,150 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 .detail-value.accent {
   color: var(--accent-color);
 }
-.detail-value.warning {
-  color: var(--warning-color);
-}
-.detail-value.success {
-  color: var(--accent-color);
-}
 
 .detail-bar {
-  height: 6px;
-  background: var(--border-light);
+  height: 8px;
+  background: rgba(148, 163, 184, 0.12);
   border-radius: var(--radius-full);
   overflow: hidden;
 }
 
 .bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3b5bdb, #5c7cfa);
+  background: linear-gradient(90deg, #3b5bdb, var(--primary-color));
   border-radius: var(--radius-full);
-  transition: width 0.5s ease;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .detail-bar.accent .bar-fill {
-  background: linear-gradient(90deg, #12b886, #38d9a9);
+  background: linear-gradient(90deg, var(--accent-color), var(--primary-color));
 }
 
-/* 标签页 */
+/* 磁贴指标小卡片 */
+.details-right {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+
+.stat-tile-card {
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.stat-tile-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), 0 4px 12px rgba(11, 183, 170, 0.05);
+  border-color: rgba(11, 183, 170, 0.15);
+}
+
+.card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-tile-card.warning .card-icon {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning-color);
+}
+
+.stat-tile-card.success .card-icon {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success-color);
+}
+
+.card-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.card-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.card-value {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.card-value.warning {
+  color: var(--warning-color);
+}
+
+.card-value.success {
+  color: var(--success-color);
+}
+
+/* 分类标签页 - 胶囊式 */
 .exam-tabs {
   display: flex;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
   margin-bottom: var(--spacing-xl);
-  padding: 4px;
-  background: white;
+  padding: 6px;
+  background: rgba(148, 163, 184, 0.08);
   border-radius: var(--radius-xl);
-  border: 1px solid var(--border-light);
+  border: none;
 }
 
 .tab-item {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-lg);
+  padding: 10px var(--spacing-lg);
   border-radius: var(--radius-lg);
   font-size: 0.875rem;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: var(--text-regular);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: all var(--transition-base);
   flex: 1;
   justify-content: center;
 }
 
 .tab-item:hover {
-  background: var(--background-color-base);
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text-dark);
 }
+
 .tab-item.active {
-  background: var(--primary-color);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
   color: white;
+  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.25);
 }
+
 .tab-icon {
   font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .tab-count {
-  padding: 0 6px;
-  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.25);
   border-radius: var(--radius-full);
-  font-size: 0.625rem;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  font-weight: 700;
 }
 
 .tab-item:not(.active) .tab-count {
@@ -1165,7 +1320,113 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   color: var(--primary-color);
 }
 
-/* 测评列表 */
+/* 列表容器 */
+.section-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.section-title-row h2 {
+  margin: 0 0 4px;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.section-title-row p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.exam-list-section {
+  background: white;
+}
+
+/* 题库数据卡片优化 */
+.question-bank-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.question-bank-card {
+  min-height: 132px;
+  padding: var(--spacing-lg);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  border-radius: var(--radius-lg);
+  background: #f8fafc;
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.question-bank-card:hover {
+  background: white;
+  transform: translateY(-3px);
+  border-color: rgba(11, 183, 170, 0.2);
+  box-shadow: var(--shadow-md), 0 4px 16px rgba(11, 183, 170, 0.04);
+}
+
+.question-bank-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+}
+
+.question-bank-meta span {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: white;
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  border: 1px solid rgba(15, 23, 42, 0.03);
+}
+
+.question-bank-card h3 {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--text-dark);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.6;
+  flex-grow: 1;
+}
+
+.question-bank-card p {
+  margin: 0 0 var(--spacing-md);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  background: rgba(15, 23, 42, 0.02);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.question-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.question-tags span {
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(11, 183, 170, 0.08);
+  color: var(--primary-color);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+/* 测评列表与卡片 */
 .exam-list {
   display: flex;
   flex-direction: column;
@@ -1173,68 +1434,110 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 .exam-card {
+  position: relative;
   display: flex;
   gap: var(--spacing-xl);
   padding: var(--spacing-xl);
-  background: var(--background-color-base);
+  padding-left: calc(var(--spacing-xl) + 6px);
+  background: white;
   border-radius: var(--radius-xl);
-  border-left: 4px solid var(--border-light);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+  overflow: hidden;
+}
+
+/* 状态彩带设计 */
+.exam-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: var(--border-light);
   transition: all var(--transition-base);
 }
 
 .exam-card.ongoing {
-  border-left-color: var(--warning-color);
-  background: rgba(245, 158, 11, 0.04);
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.02), white 100%);
+}
+.exam-card.ongoing::before {
+  background: linear-gradient(180deg, #f59e0b, #fbbf24);
+}
+
+.exam-card.available::before {
+  background: linear-gradient(180deg, var(--primary-color), var(--accent-color));
+}
+
+.exam-card.completed::before {
+  background: linear-gradient(180deg, #10b981, #34d399);
+}
+
+.exam-card.error::before {
+  background: linear-gradient(180deg, #ef4444, #f87171);
 }
 
 .exam-card:hover {
-  background: white;
-  box-shadow: var(--shadow-md);
+  transform: translateY(-4px);
+  border-color: rgba(11, 183, 170, 0.18);
+  box-shadow: var(--shadow-lg), 0 8px 24px rgba(11, 183, 170, 0.05);
 }
 
 .exam-status-bar {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
-  min-width: 80px;
+  min-width: 90px;
+  align-items: flex-start;
 }
 
 .status-badge {
-  padding: 2px 10px;
+  padding: 3px 10px;
   border-radius: var(--radius-full);
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 700;
   text-align: center;
   width: fit-content;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .status-badge.completed {
-  background: rgba(18, 184, 134, 0.1);
-  color: var(--accent-color);
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success-color);
 }
 .status-badge.available {
   background: rgba(11, 183, 170, 0.1);
   color: var(--primary-color);
 }
 .status-badge.ongoing {
-  background: rgba(245, 158, 11, 0.15);
+  background: rgba(245, 158, 11, 0.12);
   color: var(--warning-color);
   animation: pulse 2s infinite;
+}
+.status-badge.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
 }
 
 .time-left {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--warning-color);
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }
 
 .result-score {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.375rem;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  margin-top: 4px;
 }
 
 .result-score.good {
-  color: var(--accent-color);
+  color: var(--success-color);
 }
 .result-score.medium {
   color: var(--primary-color);
@@ -1245,44 +1548,51 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
 .exam-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .exam-title {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.0625rem;
+  font-weight: 700;
   color: var(--text-dark);
-  margin: 0 0 var(--spacing-sm);
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
 }
 
 .exam-desc {
   font-size: 0.8125rem;
   color: var(--text-secondary);
   margin: 0 0 var(--spacing-md);
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .exam-meta {
   display: flex;
   gap: var(--spacing-lg);
   margin-bottom: var(--spacing-md);
+  flex-wrap: wrap;
 }
 
 .exam-meta span {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   font-size: 0.75rem;
   color: var(--text-muted);
+  font-weight: 500;
 }
 
 .exam-meta svg {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
 }
 
 .exam-progress-bar {
-  height: 4px;
-  background: var(--border-light);
+  height: 6px;
+  background: rgba(148, 163, 184, 0.12);
   border-radius: var(--radius-full);
   overflow: hidden;
   margin-bottom: var(--spacing-sm);
@@ -1293,10 +1603,16 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   background: linear-gradient(90deg, #f59e0b, #fbbf24);
 }
 
+/* 结果详细 */
 .result-detail {
   display: flex;
   align-items: center;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-xl);
+  margin-top: var(--spacing-xs);
+  background: rgba(15, 23, 42, 0.015);
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(15, 23, 42, 0.02);
 }
 
 .result-chart {
@@ -1307,28 +1623,28 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
 .chart-bar-group {
   display: flex;
-  gap: 2px;
+  gap: 3px;
   align-items: flex-end;
-  height: 40px;
+  height: 36px;
 }
 
 .chart-bar {
-  width: 16px;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  transition: height 0.5s ease;
+  width: 12px;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .chart-bar.correct {
-  background: var(--accent-color);
+  background: var(--success-color);
 }
 .chart-bar.wrong {
   background: var(--danger-color);
-  opacity: 0.6;
+  opacity: 0.75;
 }
 
 .chart-label {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-secondary);
 }
 
@@ -1341,63 +1657,117 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 .wrong-tag {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: 2px 10px;
-  background: rgba(239, 68, 68, 0.08);
+  gap: var(--spacing-xs);
+  padding: 3px 10px;
+  background: rgba(239, 68, 68, 0.06);
   color: var(--danger-color);
   border-radius: var(--radius-full);
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 700;
+  border: 1px solid rgba(239, 68, 68, 0.1);
 }
 
 .review-link {
   color: var(--primary-color);
   cursor: pointer;
+  text-decoration: none;
+  font-weight: 700;
+  margin-left: 2px;
+  transition: opacity 0.2s;
+}
+
+.review-link:hover {
+  opacity: 0.8;
   text-decoration: underline;
 }
 
 .weak-tag {
-  padding: 2px 10px;
-  background: rgba(245, 158, 11, 0.08);
+  padding: 3px 10px;
+  background: rgba(245, 158, 11, 0.06);
   color: var(--warning-color);
   border-radius: var(--radius-full);
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 700;
+  border: 1px solid rgba(245, 158, 11, 0.1);
 }
 
 .exam-actions {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
   justify-content: center;
+  min-width: 100px;
+}
+
+.exam-actions .el-button {
+  width: 100%;
+  margin-left: 0 !important;
+  font-weight: 600;
 }
 
 /* 空状态 */
 .empty-state {
   text-align: center;
-  padding: var(--spacing-3xl);
+  padding: var(--spacing-3xl) var(--spacing-xl);
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.02);
+  border-radius: var(--radius-xl);
 }
 
 .empty-icon {
-  font-size: 3rem;
   margin-bottom: var(--spacing-md);
+  color: var(--text-muted);
 }
 .empty-state h3 {
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-dark);
-  margin: 0 0 var(--spacing-sm);
+  margin: 0 0 var(--spacing-xs);
 }
 .empty-state p {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
   margin: 0;
 }
 
-/* 生成表单 */
+/* 生成表单 & AI 对话框 */
+:deep(.el-overlay-dialog) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+:deep(.question-generate-dialog) {
+  margin: 0 !important;
+  border-radius: var(--radius-xl) !important;
+  overflow: hidden;
+}
+
+:deep(.question-generate-dialog .el-dialog__header) {
+  padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-md) !important;
+  margin-right: 0 !important;
+  border-bottom: none !important;
+}
+
+:deep(.question-generate-dialog .el-dialog__title) {
+  font-weight: 700 !important;
+  font-size: 1.1rem !important;
+  color: var(--text-dark) !important;
+}
+
+:deep(.question-generate-dialog .el-dialog__body) {
+  padding: var(--spacing-xl) !important;
+}
+
+:deep(.question-generate-dialog .el-dialog__footer) {
+  padding: var(--spacing-lg) var(--spacing-xl) var(--spacing-xl) !important;
+  border-top: none !important;
+}
+
+/* Form Layout */
 .generate-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-columns: minmax(0, 1fr) 260px;
   gap: var(--spacing-xl);
 }
 
@@ -1412,16 +1782,17 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 .generate-form .form-item {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: 16px;
 }
 
 .generate-form label,
 .field-heading label {
   display: block;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: var(--text-dark);
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+  letter-spacing: 0.02em;
 }
 
 .field-heading {
@@ -1435,79 +1806,163 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   margin-bottom: 0;
 }
 
-.field-heading span {
+.total-badge {
   font-size: 0.75rem;
   color: var(--primary-color);
-  font-weight: 700;
+  font-weight: 800;
+  background: rgba(11, 183, 170, 0.08);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
 }
 
+/* Question Type Cards */
 .question-type-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-sm);
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .question-type-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) 96px;
+  display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
-  background: var(--background-color-base);
+  background: #fff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.question-type-row:hover {
+  border-color: rgba(11, 183, 170, 0.3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.question-type-row.active {
+  border-color: var(--primary-color);
+  background: rgba(11, 183, 170, 0.02);
+}
+
+.type-main {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex: 1;
+  min-width: 0;
+}
+
+.type-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.type-icon-wrapper.enabled {
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--primary-color);
+}
+
+.type-svg-icon {
+  width: 16px;
+  height: 16px;
 }
 
 .type-copy {
   min-width: 0;
-}
-
-.type-copy strong,
-.type-copy span {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .type-copy strong {
-  font-size: 0.8125rem;
+  font-size: 0.8rem;
   color: var(--text-dark);
+  font-weight: 600;
 }
 
 .type-copy span {
-  font-size: 0.6875rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.difficulty-tip {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-top: var(--spacing-xs);
+.type-control {
+  flex-shrink: 0;
 }
 
+:deep(.question-type-row .el-input-number) {
+  width: 90px;
+}
+:deep(.question-type-row .el-input-number.el-input-number--small) {
+  width: 90px;
+  line-height: 28px;
+}
+:deep(.question-type-row .el-input-number .el-input__wrapper) {
+  padding: 0 8px;
+}
+
+.difficulty-section {
+  display: flex;
+  flex-direction: column;
+}
+
+:deep(.difficulty-slider-wrapper .el-slider__runway) {
+  height: 6px !important;
+  background-color: #e4e7ed !important;
+}
+
+:deep(.difficulty-slider-wrapper .el-slider__bar) {
+  height: 6px !important;
+  background: var(--primary-color) !important;
+}
+
+:deep(.difficulty-slider-wrapper .el-slider__button) {
+  width: 16px !important;
+  height: 16px !important;
+  border: 2px solid var(--primary-color) !important;
+  background-color: #fff !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+/* Summary Sidebar */
 .generate-summary {
   align-self: start;
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(11, 183, 170, 0.06), rgba(18, 184, 134, 0.05));
+  border-radius: var(--radius-xl);
+  background: rgba(0, 0, 0, 0.015);
   padding: var(--spacing-lg);
 }
 
 .summary-title {
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 700;
   color: var(--text-dark);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-xs);
+  border-bottom: 2px solid rgba(11, 183, 170, 0.15);
+}
+
+.summary-receipt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-bottom: var(--spacing-md);
 }
 
 .summary-line {
   display: flex;
   justify-content: space-between;
-  gap: var(--spacing-md);
-  padding: var(--spacing-sm) 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  font-size: 0.8125rem;
+  padding: var(--spacing-xs) 0;
+  font-size: 0.85rem;
 }
 
 .summary-line span {
@@ -1516,23 +1971,52 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
 .summary-line strong {
   color: var(--text-dark);
-  text-align: right;
+  font-weight: 600;
 }
 
-.summary-mix {
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.7);
-  color: var(--text-secondary);
+.summary-mix-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px dashed var(--border-light);
+}
+
+.mix-label {
   font-size: 0.75rem;
-  line-height: 1.5;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
+.summary-mix-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mix-tag {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  background: rgba(11, 183, 170, 0.08);
+  color: var(--primary-color);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mix-tag.empty {
+  color: var(--text-muted);
+  background: transparent;
+  padding: 0;
+}
+
+/* Generation Progress UI */
 .generation-progress-card {
-  margin-top: var(--spacing-md);
+  margin-top: var(--spacing-lg);
   padding-top: var(--spacing-md);
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px dashed var(--border-light);
 }
 
 .progress-head {
@@ -1540,65 +2024,100 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--spacing-sm);
-  font-size: 0.75rem;
+}
+
+.progress-step-text {
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.progress-head strong {
-  color: var(--primary-color);
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background-color: var(--primary-color);
+  box-shadow: 0 0 8px var(--primary-color);
+  animation: pulse 1.5s infinite;
 }
 
-.job-no {
-  margin-top: var(--spacing-sm);
-  font-size: 0.75rem;
+.progress-percentage {
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--primary-color);
 }
 
+.job-no {
+  margin-top: var(--spacing-xs);
+  font-size: 0.7rem;
+  font-family: monospace;
+  color: var(--text-muted);
+  text-align: right;
+}
+
 .token-preview-list {
   display: grid;
-  gap: var(--spacing-xs);
-  max-height: 150px;
+  gap: 6px;
+  max-height: 180px;
   overflow-y: auto;
-  margin-top: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  padding-right: 4px;
+}
+
+.token-preview-list::-webkit-scrollbar {
+  width: 4px;
+}
+.token-preview-list::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.1);
+  border-radius: var(--radius-full);
 }
 
 .token-preview-item {
   padding: var(--spacing-xs) var(--spacing-sm);
-  border-left: 2px solid rgba(11, 183, 170, 0.4);
-  background: rgba(255, 255, 255, 0.68);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--primary-color);
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .token-preview-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-sm);
-  margin-bottom: 2px;
-  font-size: 0.6875rem;
+  margin-bottom: 4px;
+}
+
+.token-preview-label {
+  font-size: 0.75rem;
   font-weight: 700;
-  color: var(--text-secondary);
+  color: var(--text-dark);
 }
 
-.token-preview-meta small {
-  flex: none;
+.token-preview-count {
   color: var(--text-muted);
-  font-size: 0.625rem;
-  font-weight: 600;
+  font-size: 0.7rem;
 }
 
-.token-preview-item p {
+.token-preview-text {
   margin: 0;
-  font-size: 0.6875rem;
-  line-height: 1.5;
-  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
   word-break: break-word;
+  font-family: monospace;
 }
 
 .generation-error {
   margin: var(--spacing-sm) 0 0;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
   color: var(--danger-color);
+  background: rgba(239, 68, 68, 0.05);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--danger-color);
 }
 
 @media (max-width: 900px) {
@@ -1608,6 +2127,15 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   .question-type-list {
     grid-template-columns: 1fr;
   }
+  .overview-cards {
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-lg);
+  }
+  .overview-details {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
 }
 
 @keyframes pulse {
@@ -1616,7 +2144,27 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
     opacity: 1;
   }
   50% {
-    opacity: 0.7;
+    opacity: 0.75;
   }
+}
+
+.no-space-alert {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.select-empty-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.select-empty-icon {
+  color: var(--el-color-warning);
+  font-size: 15px;
+  flex-shrink: 0;
 }
 </style>

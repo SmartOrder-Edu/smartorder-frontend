@@ -103,6 +103,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '测评中心 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/exam/questions',
+    name: 'ExamQuestions',
+    component: () => import('@/views/Exam/Questions.vue'),
+    meta: { title: '总题库专项刷题 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/exam/session',
     name: 'ExamSession',
     component: () => import('@/views/ExamSession/index.vue'),
@@ -139,16 +145,42 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '意见反馈 - 知序智学', requiresAuth: true }
   },
   {
-    path: '/admin/feedback',
-    name: 'FeedbackReviewList',
-    component: () => import('@/views/feedback/FeedbackReviewList.vue'),
-    meta: { title: '反馈智能管理台 - 知序智学', requiresAuth: true }
-  },
-  {
-    path: '/admin/prize',
-    name: 'PrizeManagement',
-    component: () => import('@/views/feedback/PrizeManagement.vue'),
-    meta: { title: '反馈奖品管理 - 知序智学', requiresAuth: true }
+    path: '/admin',
+    component: () => import('@/components/layout/AdminLayout.vue'),
+    redirect: '/admin/dashboard',
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: 'dashboard',
+        name: 'AdminDashboard',
+        component: () => import('@/views/admin/AdminDashboard.vue'),
+        meta: { title: '系统全局看板 - 知序智学', requiresAuth: true }
+      },
+      {
+        path: 'agent',
+        name: 'AgentObservability',
+        component: () => import('@/views/admin/AgentObservability.vue'),
+        meta: { title: '智能体观测中心 - 知序智学', requiresAuth: true }
+      },
+      {
+        path: 'rag',
+        name: 'RAGMonitor',
+        component: () => import('@/views/admin/RAGMonitor.vue'),
+        meta: { title: 'RAG 引擎监控 - 知序智学', requiresAuth: true }
+      },
+      {
+        path: 'feedback',
+        name: 'FeedbackReviewList',
+        component: () => import('@/views/feedback/FeedbackReviewList.vue'),
+        meta: { title: '用户反馈管理 - 知序智学', requiresAuth: true }
+      },
+      {
+        path: 'prize',
+        name: 'PrizeManagement',
+        component: () => import('@/views/feedback/PrizeManagement.vue'),
+        meta: { title: '反馈奖品管理 - 知序智学', requiresAuth: true }
+      }
+    ]
   },
   {
     path: '/:pathMatch(.*)*',
