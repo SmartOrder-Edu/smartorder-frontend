@@ -44,6 +44,11 @@
     :block="complexityBlock"
     :scene-action="sceneAction"
   />
+  <NumberedTeachingBlock
+    v-else-if="isNumberedTeachingBlock"
+    :block="numberedBlock"
+    :scene-action="sceneAction"
+  />
   <ComparisonBlock
     v-else-if="normalizedType === 'comparison' || normalizedType === 'vs_compare' || normalizedType === 'vs-compare'"
     :block="comparisonBlock"
@@ -78,6 +83,7 @@ import DataStructureDiagramBlock from './DataStructureDiagramBlock.vue'
 import GraphDiagramBlock from './GraphDiagramBlock.vue'
 import HeapDiagramBlock from './HeapDiagramBlock.vue'
 import InvariantBlock from './InvariantBlock.vue'
+import NumberedTeachingBlock from './NumberedTeachingBlock.vue'
 import OperationSequenceBlock from './OperationSequenceBlock.vue'
 import QueueDiagramBlock from './QueueDiagramBlock.vue'
 import TreeDiagramBlock from './TreeDiagramBlock.vue'
@@ -89,6 +95,7 @@ import type {
   TeachingComplexityBoardBlock,
   TeachingConceptTextBoardBlock,
   TeachingInvariantBoardBlock,
+  TeachingNumberedBoardBlock,
   TeachingOperationSequenceBoardBlock,
   TeachingStructureBoardBlock,
   TeachingTraceBoardBlock,
@@ -106,6 +113,7 @@ const structureBlock = computed(() => props.block as TeachingStructureBoardBlock
 const traceBlock = computed(() => props.block as TeachingTraceBoardBlock)
 const complexityBlock = computed(() => props.block as TeachingComplexityBoardBlock)
 const comparisonBlock = computed(() => props.block as TeachingComparisonBoardBlock)
+const numberedBlock = computed(() => props.block as TeachingNumberedBoardBlock)
 const operationSequenceBlock = computed(() => props.block as TeachingOperationSequenceBoardBlock)
 const invariantBlock = computed(() => props.block as TeachingInvariantBoardBlock)
 const structureType = computed(() => {
@@ -122,6 +130,16 @@ const isConceptTextBlock = computed(() => [
   'principle-card',
   'key_takeaway',
   'key-takeaway',
+].includes(normalizedType.value))
+const isNumberedTeachingBlock = computed(() => [
+  'numbered_points',
+  'numbered-points',
+  'reasoning_steps',
+  'reasoning-steps',
+  'concept_breakdown',
+  'concept-breakdown',
+  'ordered_checklist',
+  'ordered-checklist',
 ].includes(normalizedType.value))
 
 function normalizeBoardBlockType(type: string): string {

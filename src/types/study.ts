@@ -222,6 +222,10 @@ export type TeachingBoardBlockType =
   | 'definition_card'
   | 'principle_card'
   | 'key_takeaway'
+  | 'numbered_points'
+  | 'reasoning_steps'
+  | 'concept_breakdown'
+  | 'ordered_checklist'
   | 'comparison'
   | 'vs_compare'
   | 'structure'
@@ -269,6 +273,43 @@ export interface TeachingConceptTextBoardBlock extends TeachingBaseBoardBlock {
   examples?: TeachingConceptTextExample[]
   nonExamples?: TeachingConceptTextExample[]
   takeaway?: string
+}
+
+export interface TeachingNumberedPointItem {
+  label?: string
+  title?: string
+  name?: string
+  content?: string
+  text?: string
+  detail?: string
+  description?: string
+  why?: string
+  example?: string
+}
+
+export interface TeachingReasoningStepItem {
+  label?: string
+  title?: string
+  step?: string
+  content?: string
+  reason?: string
+  result?: string
+  check?: string
+}
+
+export interface TeachingNumberedBoardBlock extends TeachingBaseBoardBlock {
+  type: 'numbered_points' | 'reasoning_steps' | 'concept_breakdown' | 'ordered_checklist' | string
+  term?: string
+  lead?: string
+  question?: string
+  summary?: string
+  conclusion?: string
+  rule?: string
+  context?: string
+  reminder?: string
+  points?: TeachingNumberedPointItem[]
+  items?: Array<TeachingNumberedPointItem | string>
+  steps?: TeachingReasoningStepItem[]
 }
 
 export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
@@ -410,6 +451,7 @@ export interface TeachingComparisonBoardBlock extends TeachingBaseBoardBlock {
 export type TeachingBoardBlock =
   | TeachingCodeBoardBlock
   | TeachingConceptTextBoardBlock
+  | TeachingNumberedBoardBlock
   | TeachingStructureBoardBlock
   | TeachingTraceBoardBlock
   | TeachingOperationSequenceBoardBlock

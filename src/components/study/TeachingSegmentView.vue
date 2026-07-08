@@ -246,6 +246,17 @@ function hasMeaningfulBoardBlock(block: TeachingBoardBlock): boolean {
       || (Array.isArray(record.examples) && record.examples.length > 0)
       || !!record.takeaway
   }
+  if (isNumberedTeachingBlockType(type)) {
+    return !!record.lead
+      || !!record.question
+      || !!record.summary
+      || !!record.conclusion
+      || !!record.rule
+      || !!record.reminder
+      || (Array.isArray(record.items) && record.items.length > 0)
+      || (Array.isArray(record.points) && record.points.length > 0)
+      || (Array.isArray(record.steps) && record.steps.length > 0)
+  }
   if (type === 'operation_sequence' || type === 'operation-sequence') {
     return (Array.isArray(record.steps) && record.steps.length > 0)
       || !!record.operation
@@ -282,6 +293,19 @@ function isConceptTextBlockType(type: string): boolean {
     'principle-card',
     'key_takeaway',
     'key-takeaway',
+  ].includes(type)
+}
+
+function isNumberedTeachingBlockType(type: string): boolean {
+  return [
+    'numbered_points',
+    'numbered-points',
+    'reasoning_steps',
+    'reasoning-steps',
+    'concept_breakdown',
+    'concept-breakdown',
+    'ordered_checklist',
+    'ordered-checklist',
   ].includes(type)
 }
 
@@ -633,19 +657,28 @@ function applyFocus(el: HTMLElement) {
 .board-block-concept-card,
 .board-block-definition-card,
 .board-block-principle-card,
-.board-block-key-takeaway {
+.board-block-key-takeaway,
+.board-block-concept-breakdown,
+.board-block-concept_breakdown {
   --block-divider-color: rgba(20, 184, 166, 0.24);
 }
 
 .board-block-invariant,
-.board-block-operation-sequence {
+.board-block-operation-sequence,
+.board-block-operation_sequence,
+.board-block-reasoning-steps,
+.board-block-reasoning_steps {
   --block-divider-color: rgba(14, 165, 233, 0.22);
 }
 
 .board-block-complexity,
 .board-block-comparison,
 .board-block-vs-compare,
-.board-block-vs_compare {
+.board-block-vs_compare,
+.board-block-numbered-points,
+.board-block-numbered_points,
+.board-block-ordered-checklist,
+.board-block-ordered_checklist {
   --block-divider-color: rgba(148, 163, 184, 0.34);
 }
 
