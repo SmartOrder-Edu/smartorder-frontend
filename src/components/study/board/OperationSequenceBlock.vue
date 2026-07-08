@@ -131,10 +131,10 @@ function readScenePayloadArray(key: string): unknown[] | null {
 
 .operation-label {
   flex: 0 0 auto;
-  padding: 3px 9px;
+  padding: 2px 8px;
   border: 1px solid rgba(14, 165, 233, 0.18);
   border-radius: 999px;
-  background: rgba(14, 165, 233, 0.08);
+  background: rgba(14, 165, 233, 0.06);
   color: #0369a1;
   font-size: 11px;
   font-weight: 700;
@@ -143,27 +143,28 @@ function readScenePayloadArray(key: string): unknown[] | null {
 
 .operation-steps {
   display: grid;
-  gap: 8px;
+  gap: 0;
+  border-left: 2px solid #e2e8f0;
 }
 
 .operation-step {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
   gap: 10px;
-  padding: 10px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  padding: 0 0 14px 12px;
+  background: transparent;
+  transition: color 0.18s ease, background 0.18s ease;
 
   &.done {
-    background: #f8fafc;
+    color: #64748b;
   }
 
   &.active {
-    border-color: rgba(14, 165, 233, 0.45);
-    background: #f0f9ff;
-    box-shadow: 0 8px 18px rgba(14, 165, 233, 0.1);
+    background: linear-gradient(90deg, rgba(14, 165, 233, 0.08), transparent 72%);
+  }
+
+  &:last-child {
+    padding-bottom: 0;
   }
 }
 
@@ -229,7 +230,7 @@ function readScenePayloadArray(key: string): unknown[] | null {
   max-width: 100%;
   overflow-wrap: anywhere;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: 4px;
   font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
   font-size: 11px;
   font-weight: 700;
@@ -258,10 +259,10 @@ function readScenePayloadArray(key: string): unknown[] | null {
 
 .operation-invariant {
   margin: 0;
-  padding: 10px 12px;
+  padding: 9px 0 9px 12px;
   border-left: 3px solid #14b8a6;
-  border-radius: 0 8px 8px 0;
-  background: rgba(20, 184, 166, 0.07);
+  border-radius: 0;
+  background: transparent;
   color: #0f766e;
   font-size: 12px;
   line-height: 1.7;

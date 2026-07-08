@@ -164,7 +164,7 @@ function readArray(key: string): unknown[] | null {
 <style scoped lang="scss">
 .concept-text-block {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .concept-header {
@@ -192,9 +192,9 @@ function readArray(key: string): unknown[] | null {
 }
 
 .concept-mode {
-  padding: 3px 9px;
-  border: 1px solid rgba(14, 165, 233, 0.18);
-  background: rgba(14, 165, 233, 0.08);
+  padding: 2px 8px;
+  border: 1px solid rgba(14, 165, 233, 0.16);
+  background: rgba(14, 165, 233, 0.06);
   color: #0369a1;
 }
 
@@ -202,8 +202,9 @@ function readArray(key: string): unknown[] | null {
   flex: 0 0 auto;
   max-width: 42%;
   overflow-wrap: anywhere;
-  padding: 3px 9px;
-  background: #f1f5f9;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid #e2e8f0;
   color: #475569;
 }
 
@@ -216,11 +217,10 @@ function readArray(key: string): unknown[] | null {
 
 .definition-panel {
   display: grid;
-  gap: 7px;
-  padding: 12px 14px;
-  border: 1px solid rgba(14, 165, 233, 0.2);
-  border-radius: 8px;
-  background: #f0f9ff;
+  gap: 6px;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid rgba(14, 165, 233, 0.46);
+  background: transparent;
 
   p {
     margin: 0;
@@ -232,8 +232,8 @@ function readArray(key: string): unknown[] | null {
 }
 
 .panel-label {
-  padding: 2px 8px;
-  background: rgba(255, 255, 255, 0.7);
+  padding: 0;
+  background: transparent;
   color: #0369a1;
 }
 
@@ -242,7 +242,7 @@ function readArray(key: string): unknown[] | null {
 .example-contrast {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
+  gap: 18px;
 }
 
 .explain-card,
@@ -250,20 +250,17 @@ function readArray(key: string): unknown[] | null {
 .example-column {
   display: grid;
   gap: 8px;
-  padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
+  padding: 0 0 0 12px;
+  border-left: 2px solid #e2e8f0;
+  background: transparent;
 }
 
 .intuition-card {
-  border-color: rgba(20, 184, 166, 0.22);
-  background: #f0fdfa;
+  border-color: rgba(20, 184, 166, 0.42);
 }
 
 .formal-card {
-  border-color: rgba(99, 102, 241, 0.2);
-  background: #eef2ff;
+  border-color: rgba(99, 102, 241, 0.36);
 }
 
 .explain-card p,
@@ -286,7 +283,7 @@ function readArray(key: string): unknown[] | null {
 
 .point-list {
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
 .point-item {
@@ -294,9 +291,8 @@ function readArray(key: string): unknown[] | null {
   grid-template-columns: 24px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #f8fafc;
+  padding: 0;
+  background: transparent;
 
   span {
     display: inline-grid;
@@ -350,22 +346,19 @@ function readArray(key: string): unknown[] | null {
   align-content: start;
 
   &.positive {
-    border-color: rgba(20, 184, 166, 0.22);
-    background: #f0fdfa;
+    border-color: rgba(20, 184, 166, 0.42);
   }
 
   &.negative {
-    border-color: rgba(239, 68, 68, 0.18);
-    background: #fff7ed;
+    border-color: rgba(239, 68, 68, 0.36);
   }
 }
 
 .example-item {
   display: grid;
   gap: 4px;
-  padding: 8px;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.72);
+  padding: 7px 0 0;
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
 
   strong {
     color: #0f172a;
@@ -380,10 +373,10 @@ function readArray(key: string): unknown[] | null {
 
 .takeaway {
   margin: 0;
-  padding: 10px 12px;
+  padding: 9px 0 9px 12px;
   border-left: 3px solid #14b8a6;
-  border-radius: 0 8px 8px 0;
-  background: rgba(20, 184, 166, 0.07);
+  border-radius: 0;
+  background: transparent;
   color: #0f766e;
   font-size: 12px;
   line-height: 1.7;
@@ -396,8 +389,8 @@ function readArray(key: string): unknown[] | null {
 
 .mode-key_takeaway .definition-panel,
 .mode-principle_card .definition-panel {
-  border-color: rgba(20, 184, 166, 0.22);
-  background: #f0fdfa;
+  border-color: rgba(20, 184, 166, 0.46);
+  background: transparent;
 }
 
 @media (max-width: 640px) {

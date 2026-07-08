@@ -412,35 +412,37 @@ function applyFocus(el: HTMLElement) {
 }
 
 .classroom-shell {
-  border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
-  padding: 14px;
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.045);
+  display: grid;
+  gap: 12px;
+  padding: 4px 0 14px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 
   &.tone-curious {
-    border-color: rgba(14, 165, 233, 0.18);
-    background: linear-gradient(180deg, #fff, #f0f9ff);
+    .teacher-text {
+      border-left-color: rgba(14, 165, 233, 0.46);
+    }
   }
 
   &.tone-warning {
-    border-color: rgba(239, 68, 68, 0.18);
-    background: linear-gradient(180deg, #fff, #fff7ed);
+    .teacher-text {
+      border-left-color: rgba(245, 158, 11, 0.58);
+    }
   }
 
   &.tone-summary {
-    border-color: rgba(16, 185, 129, 0.2);
-    background: linear-gradient(180deg, #fff, #f0fdf4);
+    .teacher-text {
+      border-left-color: rgba(16, 185, 129, 0.54);
+    }
   }
 }
 
 .teacher-talk {
-  margin-bottom: 12px;
+  margin: 0;
 }
 
 .teacher-text {
   position: relative;
-  padding: 2px 0 2px 14px;
+  padding: 1px 0 1px 14px;
   border-left: 3px solid rgba(11, 183, 170, 0.42);
   color: #0f172a;
   line-height: 1.82;
@@ -467,10 +469,11 @@ function applyFocus(el: HTMLElement) {
 }
 
 .segment-board {
-  background: #fff;
-  border-radius: 12px;
-  padding: 18px 22px;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.055), 0 6px 18px rgba(15, 23, 42, 0.035);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 8px 0 10px;
+  box-shadow: none;
   line-height: 1.78;
   font-size: 14px;
   color: #334155;
@@ -601,10 +604,17 @@ function applyFocus(el: HTMLElement) {
 }
 
 .board-block {
-  margin: 0 0 14px;
+  margin: 0;
+  padding: 0 0 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
 
   &:last-child {
-    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  & + .board-block {
+    padding-top: 16px;
   }
 }
 
@@ -644,28 +654,28 @@ function applyFocus(el: HTMLElement) {
 
 .board-block-callout,
 .board-block-quote {
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(14, 165, 233, 0.16);
-  background: rgba(14, 165, 233, 0.06);
+  padding: 8px 0 8px 12px;
+  border-left: 3px solid rgba(14, 165, 233, 0.42);
+  border-radius: 0;
+  background: transparent;
 }
 
 .board-block-callout.board-tone-warning,
 .board-block-quote.board-tone-warning {
-  border-color: rgba(245, 158, 11, 0.24);
-  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.58);
+  background: transparent;
 }
 
 .board-block-callout.board-tone-error,
 .board-block-quote.board-tone-error {
-  border-color: rgba(239, 68, 68, 0.22);
-  background: rgba(239, 68, 68, 0.07);
+  border-color: rgba(239, 68, 68, 0.5);
+  background: transparent;
 }
 
 .board-block-callout.board-tone-success,
 .board-block-quote.board-tone-success {
-  border-color: rgba(16, 185, 129, 0.22);
-  background: rgba(16, 185, 129, 0.07);
+  border-color: rgba(16, 185, 129, 0.5);
+  background: transparent;
 }
 
 .segment-formula {

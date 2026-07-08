@@ -126,10 +126,10 @@ function readScenePayloadArray(key: string): unknown[] | null {
 
 .invariant-label {
   flex: 0 0 auto;
-  padding: 3px 9px;
+  padding: 2px 8px;
   border: 1px solid rgba(20, 184, 166, 0.2);
   border-radius: 999px;
-  background: rgba(20, 184, 166, 0.08);
+  background: rgba(20, 184, 166, 0.06);
   color: #0f766e;
   font-size: 11px;
   font-weight: 800;
@@ -139,10 +139,9 @@ function readScenePayloadArray(key: string): unknown[] | null {
 .statement-card {
   display: grid;
   gap: 6px;
-  padding: 12px;
-  border: 1px solid rgba(20, 184, 166, 0.22);
-  border-radius: 8px;
-  background: #f0fdfa;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid rgba(20, 184, 166, 0.5);
+  background: transparent;
 }
 
 .statement-prefix {
@@ -169,14 +168,14 @@ function readScenePayloadArray(key: string): unknown[] | null {
 }
 
 .why-card {
-  padding: 9px 11px;
-  border-radius: 8px;
-  background: #f8fafc;
+  padding: 0 0 0 12px;
+  border-left: 2px solid #e2e8f0;
+  background: transparent;
 }
 
 .checkpoint-list {
   display: grid;
-  gap: 7px;
+  gap: 8px;
 }
 
 .checkpoint-title {
@@ -190,10 +189,9 @@ function readScenePayloadArray(key: string): unknown[] | null {
   grid-template-columns: 22px minmax(0, 1fr);
   align-items: start;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: inset 0 0 0 1px #e2e8f0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
   color: #334155;
   font-size: 12px;
   line-height: 1.65;
@@ -215,25 +213,22 @@ function readScenePayloadArray(key: string): unknown[] | null {
 .example-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
+  gap: 18px;
 }
 
 .example-card {
   display: grid;
   gap: 6px;
-  padding: 10px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
+  padding: 0 0 0 12px;
+  border-left: 2px solid #e2e8f0;
+  background: transparent;
 
   &.valid {
-    border-color: rgba(20, 184, 166, 0.24);
-    background: #f0fdfa;
+    border-color: rgba(20, 184, 166, 0.42);
   }
 
   &.invalid {
-    border-color: rgba(239, 68, 68, 0.22);
-    background: #fff7ed;
+    border-color: rgba(239, 68, 68, 0.36);
   }
 
   p {
@@ -271,10 +266,10 @@ function readScenePayloadArray(key: string): unknown[] | null {
 }
 
 .mistake-card {
-  padding: 10px 12px;
+  padding: 9px 0 9px 12px;
   border-left: 3px solid #ef4444;
-  border-radius: 0 8px 8px 0;
-  background: #fff7ed;
+  border-radius: 0;
+  background: transparent;
   color: #9f1239;
 
   span {
