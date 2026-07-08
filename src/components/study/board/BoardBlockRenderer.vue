@@ -4,6 +4,11 @@
     :block="codeBlock"
     :scene-action="sceneAction"
   />
+  <ConceptTextBlock
+    v-else-if="isConceptTextBlock"
+    :block="conceptTextBlock"
+    :scene-action="sceneAction"
+  />
   <TreeDiagramBlock
     v-else-if="normalizedType === 'structure' && structureType === 'tree'"
     :block="structureBlock"
@@ -66,6 +71,7 @@ import { computed } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import AlgorithmTraceBlock from './AlgorithmTraceBlock.vue'
 import CodeLessonBlock from './CodeLessonBlock.vue'
+import ConceptTextBlock from './ConceptTextBlock.vue'
 import ComplexityBlock from './ComplexityBlock.vue'
 import ComparisonBlock from './ComparisonBlock.vue'
 import DataStructureDiagramBlock from './DataStructureDiagramBlock.vue'
@@ -81,6 +87,7 @@ import type {
   TeachingCodeBoardBlock,
   TeachingComparisonBoardBlock,
   TeachingComplexityBoardBlock,
+  TeachingConceptTextBoardBlock,
   TeachingInvariantBoardBlock,
   TeachingOperationSequenceBoardBlock,
   TeachingStructureBoardBlock,
@@ -94,6 +101,7 @@ const props = defineProps<{
 
 const normalizedType = computed(() => normalizeBoardBlockType(props.block.type))
 const codeBlock = computed(() => props.block as TeachingCodeBoardBlock)
+const conceptTextBlock = computed(() => props.block as TeachingConceptTextBoardBlock)
 const structureBlock = computed(() => props.block as TeachingStructureBoardBlock)
 const traceBlock = computed(() => props.block as TeachingTraceBoardBlock)
 const complexityBlock = computed(() => props.block as TeachingComplexityBoardBlock)
@@ -105,6 +113,16 @@ const structureType = computed(() => {
   return (block.structureType || '').toLowerCase().replace(/[-\s]/g, '_')
 })
 const fallbackMarkdown = computed(() => boardBlockMarkdown(props.block, normalizedType.value))
+const isConceptTextBlock = computed(() => [
+  'concept_card',
+  'concept-card',
+  'definition_card',
+  'definition-card',
+  'principle_card',
+  'principle-card',
+  'key_takeaway',
+  'key-takeaway',
+].includes(normalizedType.value))
 
 function normalizeBoardBlockType(type: string): string {
   return (type || 'markdown').toLowerCase().replace(/[^a-z0-9_-]/g, '-')

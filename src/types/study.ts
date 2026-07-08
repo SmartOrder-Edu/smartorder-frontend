@@ -218,6 +218,10 @@ export type TeachingBoardBlockType =
   | 'quote'
   | 'diagram'
   | 'callout'
+  | 'concept_card'
+  | 'definition_card'
+  | 'principle_card'
+  | 'key_takeaway'
   | 'comparison'
   | 'vs_compare'
   | 'structure'
@@ -244,6 +248,27 @@ export interface TeachingCodeBoardBlock extends TeachingBaseBoardBlock {
   focusLine?: number
   errorLines?: number[]
   noteLines?: number[]
+}
+
+export interface TeachingConceptTextExample {
+  label?: string
+  value: string
+  explanation?: string
+  tone?: 'positive' | 'negative' | 'neutral' | string
+}
+
+export interface TeachingConceptTextBoardBlock extends TeachingBaseBoardBlock {
+  type: 'concept_card' | 'definition_card' | 'principle_card' | 'key_takeaway' | string
+  term?: string
+  definition?: string
+  intuition?: string
+  formal?: string
+  keyPoints?: string[]
+  boundaries?: string[]
+  conditions?: string[]
+  examples?: TeachingConceptTextExample[]
+  nonExamples?: TeachingConceptTextExample[]
+  takeaway?: string
 }
 
 export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
@@ -384,6 +409,7 @@ export interface TeachingComparisonBoardBlock extends TeachingBaseBoardBlock {
 
 export type TeachingBoardBlock =
   | TeachingCodeBoardBlock
+  | TeachingConceptTextBoardBlock
   | TeachingStructureBoardBlock
   | TeachingTraceBoardBlock
   | TeachingOperationSequenceBoardBlock

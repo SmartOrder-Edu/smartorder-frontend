@@ -237,6 +237,15 @@ function hasMeaningfulBoardBlock(block: TeachingBoardBlock): boolean {
       || !!record.action
       || !!record.traceKind
   }
+  if (isConceptTextBlockType(type)) {
+    return !!record.term
+      || !!record.definition
+      || !!record.intuition
+      || !!record.formal
+      || (Array.isArray(record.keyPoints) && record.keyPoints.length > 0)
+      || (Array.isArray(record.examples) && record.examples.length > 0)
+      || !!record.takeaway
+  }
   if (type === 'operation_sequence' || type === 'operation-sequence') {
     return (Array.isArray(record.steps) && record.steps.length > 0)
       || !!record.operation
@@ -261,6 +270,19 @@ function hasMeaningfulBoardBlock(block: TeachingBoardBlock): boolean {
       || !!record.summary
   }
   return !!block.title || !!block.caption
+}
+
+function isConceptTextBlockType(type: string): boolean {
+  return [
+    'concept_card',
+    'concept-card',
+    'definition_card',
+    'definition-card',
+    'principle_card',
+    'principle-card',
+    'key_takeaway',
+    'key-takeaway',
+  ].includes(type)
 }
 
 function applyFocus(el: HTMLElement) {
