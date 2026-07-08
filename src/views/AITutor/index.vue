@@ -1,7 +1,7 @@
 <template>
   <AppLayout>
     <div class="ai-tutor-page">
-      <div class="tutor-container">
+      <div class="tutor-container" :class="{ 'assistant-collapsed': isAssistantCollapsed }">
         <!-- 左侧：历史会话侧边栏 -->
         <aside class="history-sidebar" :class="{ open: historySidebarOpen }">
           <div class="history-sidebar-header">
@@ -54,7 +54,7 @@
 
         <!-- 数字人展开按钮（收起状态时显示） -->
         <div 
-          v-if="isAssistantCollapsed" 
+          v-if="false && isAssistantCollapsed" 
           class="expand-btn-avatar" 
           @click="isAssistantCollapsed = false"
           title="展开数字人"
@@ -66,6 +66,8 @@
         <AssistantPanel 
           v-show="!isAssistantCollapsed"
           :latestAiMessage="latestAiMessageForAvatar"
+          :initial-auth-info="avatarAuthInfo"
+          :auth-info-loading="avatarAuthLoading"
           @collapse="isAssistantCollapsed = true"
         />
 
@@ -78,6 +80,15 @@
                 <line x1="3" y1="12" x2="21" y2="12"/>
                 <line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
+            </button>
+            <button
+              v-if="isAssistantCollapsed"
+              class="avatar-toggle-btn"
+              @click="isAssistantCollapsed = false"
+              title="展开数字人"
+            >
+              <el-icon><ArrowRight /></el-icon>
+              <span>数字人</span>
             </button>
             <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
           </div>
@@ -582,6 +593,7 @@ import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
 import type { RagReference } from '@/composables/useAgentChat'
 import AssistantPanel from '@/components/AssistantPanel.vue'
 import { ArrowRight } from '@element-plus/icons-vue'
+import { getAvatarAuthInfo, type AvatarAuthInfo } from '@/api/avatar'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
@@ -602,6 +614,8 @@ const selectedReferences = ref<RagReference[]>([])
 // 数字人面板状态
 const isAssistantCollapsed = ref(false)
 const latestAiMessageForAvatar = ref('')
+const avatarAuthInfo = ref<AvatarAuthInfo | null>(null)
+const avatarAuthLoading = ref(true)
 
 const { width: windowWidth } = useWindowSize()
 const isMobile = computed(() => windowWidth.value < 768)
@@ -652,6 +666,26 @@ watch(() => messages.value, (newMessages) => {
     latestAiMessageForAvatar.value = lastAiMessage.content
   }
 }, { deep: true })
+
+const preloadAvatarAuthInfo = async () => {
+  avatarAuthLoading.value = true
+  try {
+    const response: any = await getAvatarAuthInfo()
+    const result = response?.data || response || {}
+    const authInfo = result?.wssUrl ? result : (result?.data || {})
+    if (authInfo?.wssUrl) {
+      avatarAuthInfo.value = {
+        wssUrl: authInfo.wssUrl,
+        appId: authInfo.appId || '',
+        sceneId: authInfo.sceneId || ''
+      }
+    }
+  } catch (error) {
+    console.warn('[AITutor] preload avatar auth info failed:', error)
+  } finally {
+    avatarAuthLoading.value = false
+  }
+}
 
 const activeContext = ref('global')
 
@@ -1429,6 +1463,8 @@ watch(
 )
 
 onMounted(() => {
+  isAssistantCollapsed.value = false
+  preloadAvatarAuthInfo()
   agentStore.fetchConversations()
   if (window.innerWidth < 768) {
     historySidebarOpen.value = false
@@ -1483,6 +1519,10 @@ watch(windowWidth, (newWidth) => {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.tutor-container.assistant-collapsed {
+  grid-template-columns: auto minmax(0, 1fr) 280px;
 }
 
 /* 历史会话侧边栏 */
@@ -1560,6 +1600,7 @@ watch(windowWidth, (newWidth) => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -1640,6 +1681,33 @@ watch(windowWidth, (newWidth) => {
 }
 
 .history-toggle-btn svg { width: 16px; height: 16px; }
+
+.avatar-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.avatar-toggle-btn:hover {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.36);
+}
+
+.avatar-toggle-btn .el-icon {
+  font-size: 14px;
+}
 
 .current-conv-title {
   font-size: 0.8125rem;
@@ -2656,13 +2724,13 @@ watch(windowWidth, (newWidth) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
+  width: 40px;
+  min-width: 40px;
   height: 100%;
   background: rgba(99, 102, 241, 0.08);
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-right: 8px;
 }
 
 .expand-btn-avatar:hover {

@@ -1,6 +1,6 @@
 <template>
-  <aside class="learning-script">
-    <!-- 顶部：本次学习脚本标题 + 进度 -->
+  <aside class="learning-script" :class="{ collapsed: collapsed }">
+    <!-- 展开态：完整侧边栏 -->
     <div class="script-header">
       <div class="script-title-row">
         <svg class="script-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -8,6 +8,11 @@
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
         </svg>
         <h3>本次学习脚本</h3>
+        <button class="collapse-toggle collapse-toggle--in-header" @click="toggleCollapse" title="收起脚本" aria-label="收起学习脚本">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <polyline points="15,18 9,12 15,6" />
+          </svg>
+        </button>
       </div>
       <div class="script-progress">
         <div class="progress-bar">
@@ -64,7 +69,13 @@ import { useTaskStepStore } from '@/stores/taskStep'
 
 defineEmits<{ (e: 'jump', index: number): void }>()
 
+const collapsed = defineModel<boolean>('collapsed', { default: false })
+
 const stepStore = useTaskStepStore()
+
+function toggleCollapse() {
+  collapsed.value = !collapsed.value
+}
 
 function phaseLabel(phase: string): string {
   const map: Record<string, string> = {
@@ -89,9 +100,57 @@ function phaseLabel(phase: string): string {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 260px;
+  flex-shrink: 0;
+  position: relative;
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(12px);
   border-right: 1px solid rgba(15, 23, 42, 0.06);
+  transition: width 0.3s ease;
+  overflow: hidden;
+
+  &.collapsed {
+    width: 0;
+    border-right: none;
+  }
+}
+
+// ======= 展开态内容淡入淡出 =======
+.collapse-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    border-color: #0bb7aa;
+    color: #0bb7aa;
+    background: rgba(11, 183, 170, 0.08);
+  }
+}
+
+.collapse-toggle--in-header {
+  margin-left: auto;
+}
+.script-header,
+.script-steps,
+.script-empty {
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.collapsed .script-header,
+.collapsed .script-steps,
+.collapsed .script-empty {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .script-header {
@@ -255,6 +314,17 @@ function phaseLabel(phase: string): string {
 }
 
 @media (max-width: 1024px) {
-  .learning-script { border-right: none; border-bottom: 1px solid rgba(15, 23, 42, 0.06); }
+  .learning-script {
+    width: 100% !important;
+    border-right: none;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+
+    &.collapsed {
+      width: 100% !important;
+    }
+  }
+  .collapse-toggle--in-header {
+    display: none;
+  }
 }
 </style>

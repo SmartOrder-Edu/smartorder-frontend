@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { getAvatarAuthInfo } from '@/api/avatar'; 
+import { getAvatarAuthInfo, type AvatarAuthInfo } from '@/api/avatar'; 
 import { RTCPlayer } from '@/utils/player/rtcplayer.esm.js';
 import { MagicStick, Setting, Fold } from '@element-plus/icons-vue';
 
@@ -65,23 +65,22 @@ const applySettings = () => {
   isAvatarReady.value = false;
   isLoading.value = true;
   isPlaying.value = false;
-  if (playerInstance && typeof playerInstance.destroy === 'function') {
-    playerInstance.destroy();
-    playerInstance = null;
-  }
-  if (avatarSocket) {
-    avatarSocket.close();
-    avatarSocket = null;
-  }
+  resetAvatarRuntime();
   setTimeout(() => { initDigitalHuman(); }, 500);
 };
 
 const props = defineProps<{
   latestAiMessage?: string;
   isAiGenerating?: boolean;
+  initialAuthInfo?: AvatarAuthInfo | null;
+  authInfoLoading?: boolean;
 }>();
 
 const emit = defineEmits(['collapse']);
+
+const AVATAR_HEARTBEAT_INTERVAL = 25000;
+const AVATAR_RECONNECT_BASE_DELAY = 3000;
+const AVATAR_RECONNECT_MAX_DELAY = 30000;
 
 const playerContainer = ref<HTMLElement | null>(null);
 const isAvatarReady = ref(false);
@@ -90,8 +89,15 @@ const isMuted = ref(true);
 const isPlaying = ref(false);
 let avatarSocket: WebSocket | null = null;
 let playerInstance: any = null;
+let isInitializing = false;
+let isUnmounted = false;
+let isManualSocketClose = false;
+let reconnectAttempts = 0;
+let avatarHeartbeatTimer: number | null = null;
+let avatarReconnectTimer: number | null = null;
+let lastAvatarMessageAt = 0;
 
-const avatarAuth = ref({ appId: '', wssUrl: '', sceneId: '' });
+const avatarAuth = ref<AvatarAuthInfo>({ appId: '', wssUrl: '', sceneId: '' });
 const currentSpeechText = ref("您好，我是您的专属教研助理~");
 
 const currentAvatarName = computed(() => {
@@ -106,6 +112,95 @@ const dispatchAvatarAction = (commandType: string, payloadData: any = {}) => {
     ...payloadData
   };
   avatarSocket.send(JSON.stringify(requestObj));
+};
+
+const destroyAvatarPlayer = () => {
+  if (playerInstance && typeof playerInstance.destroy === 'function') {
+    playerInstance.destroy();
+  }
+  playerInstance = null;
+};
+
+const stopAvatarHeartbeat = () => {
+  if (avatarHeartbeatTimer !== null) {
+    clearInterval(avatarHeartbeatTimer);
+    avatarHeartbeatTimer = null;
+  }
+};
+
+const clearAvatarReconnect = () => {
+  if (avatarReconnectTimer !== null) {
+    clearTimeout(avatarReconnectTimer);
+    avatarReconnectTimer = null;
+  }
+};
+
+const closeAvatarSocket = () => {
+  if (!avatarSocket) return;
+  isManualSocketClose = true;
+  avatarSocket.close();
+  avatarSocket = null;
+  stopAvatarHeartbeat();
+};
+
+const resetAvatarRuntime = () => {
+  closeAvatarSocket();
+  destroyAvatarPlayer();
+  isAvatarReady.value = false;
+  isPlaying.value = false;
+};
+
+const scheduleAvatarReconnect = (reason = 'connection lost') => {
+  if (isUnmounted || isInitializing || avatarReconnectTimer !== null) return;
+  clearAvatarReconnect();
+  stopAvatarHeartbeat();
+
+  const delay = Math.min(
+    AVATAR_RECONNECT_BASE_DELAY * Math.max(1, reconnectAttempts + 1),
+    AVATAR_RECONNECT_MAX_DELAY
+  );
+  reconnectAttempts += 1;
+  console.warn(`[Avatar] reconnect scheduled: ${reason}, retry #${reconnectAttempts} in ${delay}ms`);
+  avatarReconnectTimer = window.setTimeout(() => {
+    avatarReconnectTimer = null;
+    initDigitalHuman();
+  }, delay);
+};
+
+const sendAvatarHeartbeat = () => {
+  if (!avatarSocket || avatarSocket.readyState !== WebSocket.OPEN) {
+    scheduleAvatarReconnect('heartbeat found socket closed');
+    return;
+  }
+
+  try {
+    avatarSocket.send('ping');
+  } catch (error) {
+    console.warn('[Avatar] heartbeat failed:', error);
+    scheduleAvatarReconnect('heartbeat send failed');
+  }
+};
+
+const startAvatarHeartbeat = () => {
+  stopAvatarHeartbeat();
+  lastAvatarMessageAt = Date.now();
+  avatarHeartbeatTimer = window.setInterval(sendAvatarHeartbeat, AVATAR_HEARTBEAT_INTERVAL);
+};
+
+const handleVisibilityChange = () => {
+  if (document.hidden) return;
+
+  const video = playerContainer.value?.querySelector('video');
+  const socketUnavailable = !avatarSocket || avatarSocket.readyState !== WebSocket.OPEN;
+
+  if (socketUnavailable) {
+    scheduleAvatarReconnect('page resumed with closed avatar socket');
+    return;
+  }
+
+  sendAvatarHeartbeat();
+  if (video) video.play?.().catch(() => undefined);
+  playerInstance?.resume?.();
 };
 
 const speakText = (text: string) => {
@@ -149,28 +244,59 @@ watch(() => props.latestAiMessage, (newVal) => {
   if (newVal && isAvatarReady.value && !isMuted.value) { speakText(newVal); }
 });
 
+watch(() => props.initialAuthInfo, (authInfo) => {
+  if (!authInfo?.wssUrl || isAvatarReady.value || isInitializing) return;
+  avatarAuth.value = authInfo;
+  connectXfWebSocket();
+}, { immediate: true });
+
+watch(() => props.authInfoLoading, (loading) => {
+  if (loading === false && !props.initialAuthInfo?.wssUrl && !isAvatarReady.value) {
+    initDigitalHuman();
+  }
+});
+
 const initDigitalHuman = async () => {
+  if (isInitializing || isUnmounted) return;
+  isInitializing = true;
+  clearAvatarReconnect();
   try {
     isLoading.value = true;
-    const authRes: any = await getAvatarAuthInfo();
-    const resultData = authRes.data !== undefined ? authRes.data : authRes;
-    if (resultData && (resultData.code === 0 || authRes.code === 0)) {
-      avatarAuth.value = (resultData.data || resultData);
+    const response: any = await getAvatarAuthInfo();
+    const result = response?.data || response || {};
+    const authData: Partial<AvatarAuthInfo> = result?.wssUrl ? result : (result?.data || {});
+    if (authData && authData.wssUrl) {
+      avatarAuth.value = {
+        appId: authData.appId || '',
+        wssUrl: authData.wssUrl || '',
+        sceneId: authData.sceneId || ''
+      };
       connectXfWebSocket();
     } else {
-      ElMessage.error('获取虚拟人鉴权失败: ' + (authRes.msg || ''));
+      ElMessage.error('获取虚拟人鉴权失败：返回数据为空');
       isLoading.value = false;
     }
   } catch (error: any) {
     ElMessage.error('无法连接视频渲染服务: ' + (error?.message || ''));
     isLoading.value = false;
+  } finally {
+    isInitializing = false;
   }
 };
 
 const connectXfWebSocket = () => {
+  if (isUnmounted) return;
+  if (!avatarAuth.value.wssUrl) {
+    isLoading.value = false;
+    return;
+  }
+  closeAvatarSocket();
   const requestId = crypto.randomUUID();
   avatarSocket = new WebSocket(avatarAuth.value.wssUrl);
+  isManualSocketClose = false;
   avatarSocket.onopen = () => {
+    reconnectAttempts = 0;
+    startAvatarHeartbeat();
     const startCmd = {
       header: { app_id: avatarAuth.value.appId, request_id: requestId, ctrl: "start", scene_id: avatarAuth.value.sceneId },
       parameter: {
@@ -182,18 +308,49 @@ const connectXfWebSocket = () => {
     avatarSocket?.send(JSON.stringify(startCmd));
   };
   avatarSocket.onmessage = (event) => {
-    const res = JSON.parse(event.data);
-    if (res.header && res.header.code !== 0) return;
+    lastAvatarMessageAt = Date.now();
+    let res: any;
+    try {
+      res = JSON.parse(event.data);
+    } catch (error) {
+      if (event.data === 'pong') return;
+      if (event.data === 'ping') {
+        avatarSocket?.send('pong');
+        return;
+      }
+      console.warn('[Avatar] failed to parse message:', event.data, error);
+      return;
+    }
+    if (res.header && res.header.code !== 0) {
+      if (res.header.ctrl === 'heartbeat') return;
+      console.warn('[Avatar] command failed:', res.header);
+      return;
+    }
     const payload = res.payload;
     if (payload && payload.avatar) {
       if (payload.avatar.event_type === 'stream_info') { startPlayVideo(payload.avatar.stream_url, res.header.sid); }
       if (payload.avatar.event_type === 'driver_status' && res.payload.avatar.vmr_status === 2) { isPlaying.value = false; currentSpeechText.value = "静候您的指令..."; }
     }
   };
+  avatarSocket.onerror = (event) => {
+    console.warn('[Avatar] WebSocket error:', event);
+  };
+  avatarSocket.onclose = (event) => {
+    stopAvatarHeartbeat();
+    if (avatarSocket && avatarSocket !== event.currentTarget) return;
+    avatarSocket = null;
+    if (isManualSocketClose || isUnmounted) {
+      isManualSocketClose = false;
+      return;
+    }
+    console.warn('[Avatar] WebSocket closed:', event.code, event.reason);
+    scheduleAvatarReconnect(`socket closed: ${event.code}`);
+  };
 };
 
 const startPlayVideo = (streamUrl: string, sid: string) => {
   if (!playerContainer.value) return;
+  destroyAvatarPlayer();
   playerInstance = new RTCPlayer();
   playerInstance.on("playing", () => { isLoading.value = false; isAvatarReady.value = true; });
   playerInstance.on("error", (e: any) => { console.warn("拉流错误拦截:", e); });
@@ -220,10 +377,18 @@ const toggleAudio = () => {
   }
 };
 
-onMounted(() => { initDigitalHuman(); });
+onMounted(() => {
+  isUnmounted = false;
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  if (props.initialAuthInfo?.wssUrl) return;
+  if (props.authInfoLoading) return;
+  initDigitalHuman();
+});
 onBeforeUnmount(() => {
-  if (playerInstance && typeof playerInstance.destroy === 'function') { playerInstance.destroy(); }
-  if (avatarSocket) { console.log('正在退出页面，关闭数字人 WebSocket 连接'); avatarSocket.close(); }
+  isUnmounted = true;
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  clearAvatarReconnect();
+  resetAvatarRuntime();
 });
 </script>
 
@@ -239,7 +404,7 @@ onBeforeUnmount(() => {
            </div>
            <div class="identity-title-info">
              <div class="title-row">
-               <h3>启慧 · {{ currentAvatarName }}</h3>
+               <h3>知序 · {{ currentAvatarName }}</h3>
                <span v-if="isPlaying" class="speaking-badge">正在讲解...</span>
              </div>
              <span class="p-type-tag">3D 教研智能大模型</span>

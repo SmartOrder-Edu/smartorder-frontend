@@ -152,8 +152,26 @@ export interface CanvasContent {
 
 // ---- 分段式教学流（v2 Agent 主动教学交互）----
 
-/** 教学段类型 */
-export type TeachingSegmentType = 'text' | 'formula' | 'diagram' | 'quiz' | 'pause'
+/** 教学段类型。兼容旧 text/formula/quiz，同时支持课堂化脚本段。 */
+export type TeachingSegmentType =
+  | 'text'
+  | 'formula'
+  | 'diagram'
+  | 'quiz'
+  | 'pause'
+  | 'hook'
+  | 'recall'
+  | 'explain'
+  | 'analogy'
+  | 'board_write'
+  | 'worked_example'
+  | 'teacher_question'
+  | 'student_try'
+  | 'diagnosis'
+  | 'mistake_warning'
+  | 'summary'
+  | 'transition'
+  | 'self_check'
 
 /** 画布元素聚焦目标 */
 export interface FocusTarget {
@@ -174,14 +192,291 @@ export interface InlineQuiz {
   correctAnswer?: string
   /** 提交后展示的讲解（答对/答错通用） */
   explanation?: string
+  feedbackWhenCorrect?: string
+  feedbackWhenWrong?: string
 }
+
+export interface TeachingVisualHint {
+  type: 'formula' | 'diagram' | 'code' | 'table' | 'timeline' | 'mindmap' | 'text' | string
+  content: string
+}
+
+export interface TeachingInteraction {
+  type: 'pause' | 'single_select' | 'multi_select' | 'text_answer' | 'predict' | 'self_check' | string
+  prompt: string
+  options?: { label: string; value: string }[]
+  correctAnswer?: string
+  feedbackWhenCorrect?: string
+  feedbackWhenWrong?: string
+}
+
+export type TeachingBoardBlockType =
+  | 'markdown'
+  | 'code'
+  | 'formula'
+  | 'list'
+  | 'quote'
+  | 'diagram'
+  | 'callout'
+  | 'concept_card'
+  | 'definition_card'
+  | 'principle_card'
+  | 'key_takeaway'
+  | 'numbered_points'
+  | 'reasoning_steps'
+  | 'concept_breakdown'
+  | 'ordered_checklist'
+  | 'comparison'
+  | 'vs_compare'
+  | 'structure'
+  | 'trace'
+  | 'operation_sequence'
+  | 'invariant'
+  | 'complexity'
+  | string
+
+export interface TeachingBaseBoardBlock {
+  id?: string
+  type: TeachingBoardBlockType
+  title?: string
+  content?: string
+  caption?: string
+  tone?: 'info' | 'warning' | 'success' | 'error' | string
+}
+
+export interface TeachingCodeBoardBlock extends TeachingBaseBoardBlock {
+  type: 'code' | string
+  language?: string
+  content?: string
+  highlights?: number[]
+  focusLine?: number
+  errorLines?: number[]
+  noteLines?: number[]
+}
+
+export interface TeachingConceptTextExample {
+  label?: string
+  value: string
+  explanation?: string
+  tone?: 'positive' | 'negative' | 'neutral' | string
+}
+
+export interface TeachingConceptTextBoardBlock extends TeachingBaseBoardBlock {
+  type: 'concept_card' | 'definition_card' | 'principle_card' | 'key_takeaway' | string
+  term?: string
+  definition?: string
+  intuition?: string
+  formal?: string
+  keyPoints?: string[]
+  boundaries?: string[]
+  conditions?: string[]
+  examples?: TeachingConceptTextExample[]
+  nonExamples?: TeachingConceptTextExample[]
+  takeaway?: string
+}
+
+export interface TeachingNumberedPointItem {
+  label?: string
+  title?: string
+  name?: string
+  content?: string
+  text?: string
+  detail?: string
+  description?: string
+  why?: string
+  example?: string
+}
+
+export interface TeachingReasoningStepItem {
+  label?: string
+  title?: string
+  step?: string
+  content?: string
+  reason?: string
+  result?: string
+  check?: string
+}
+
+export interface TeachingNumberedBoardBlock extends TeachingBaseBoardBlock {
+  type: 'numbered_points' | 'reasoning_steps' | 'concept_breakdown' | 'ordered_checklist' | string
+  term?: string
+  lead?: string
+  question?: string
+  summary?: string
+  conclusion?: string
+  rule?: string
+  context?: string
+  reminder?: string
+  points?: TeachingNumberedPointItem[]
+  items?: Array<TeachingNumberedPointItem | string>
+  steps?: TeachingReasoningStepItem[]
+}
+
+export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
+  type: 'structure' | string
+  structureType?: 'array' | 'stack' | 'queue' | 'linked_list' | 'tree' | 'heap' | 'graph' | 'hash_table' | 'matrix' | string
+  items?: unknown[]
+  nodes?: unknown[]
+  edges?: unknown[]
+  pointers?: Record<string, number | string>
+  activeIndices?: number[]
+  activeIds?: string[]
+  visitedIds?: string[]
+  frontierIds?: string[]
+  pathIds?: string[]
+  compareIds?: string[]
+  rootId?: string
+  directed?: boolean
+  layout?: 'tree' | 'heap' | 'circle' | 'layered' | string
+  animation?: TeachingStructureAnimation
+}
+
+export interface TeachingStructureAnimation {
+  action?: 'enqueue' | 'dequeue' | 'push' | 'pop' | 'peek' | 'compare' | 'swap' | string
+  durationMs?: number
+  movingItem?: unknown
+  from?: string | number
+  to?: string | number
+  phases?: TeachingStructureAnimationPhase[]
+  previous?: {
+    items?: unknown[]
+    pointers?: Record<string, number | string>
+  }
+  next?: {
+    items?: unknown[]
+    pointers?: Record<string, number | string>
+  }
+  previousPointers?: Record<string, number | string>
+  nextPointers?: Record<string, number | string>
+}
+
+export interface TeachingStructureAnimationPhase {
+  name: 'before' | 'moving' | 'after' | 'done' | string
+  startRatio?: number
+  items?: unknown[]
+  pointers?: Record<string, number | string>
+  movingItem?: unknown
+  targetIndex?: number
+  sourceIndex?: number
+  highlightPointers?: string[]
+  narrationHint?: string
+}
+
+export interface TeachingTraceBoardBlock extends TeachingBaseBoardBlock {
+  type: 'trace' | string
+  traceKind?: 'array_step' | 'pointer_walk' | 'sort_step' | 'tree_traversal' | 'graph_traversal' | 'heap_adjust' | string
+  algorithm?: string
+  items?: unknown[]
+  pointers?: Record<string, number | string>
+  activeIndices?: number[]
+  processedRange?: [number, number]
+  action?: 'compare' | 'swap' | 'insert' | 'delete' | 'visit' | 'mark' | string
+  explanation?: string
+}
+
+export interface TeachingOperationSequenceStep {
+  label?: string
+  action: string
+  description?: string
+  before?: string
+  after?: string
+  why?: string
+}
+
+export interface TeachingOperationSequenceBoardBlock extends TeachingBaseBoardBlock {
+  type: 'operation_sequence' | string
+  operation?: string
+  currentStep?: number
+  steps?: TeachingOperationSequenceStep[]
+  invariant?: string
+}
+
+export interface TeachingInvariantBoardBlock extends TeachingBaseBoardBlock {
+  type: 'invariant' | string
+  statement?: string
+  whyItMatters?: string
+  checkpoints?: string[]
+  commonMistake?: string
+  examples?: Array<{
+    label?: string
+    value: string
+    valid?: boolean
+    explanation?: string
+  }>
+}
+
+export interface TeachingComplexityBoardBlock extends TeachingBaseBoardBlock {
+  type: 'complexity' | string
+  time?: string
+  space?: string
+  caseHeaders?: {
+    label?: string
+    value?: string
+    description?: string
+  }
+  cases?: Array<{
+    label: string
+    value: string
+    description?: string
+  }>
+  reason?: string
+}
+
+export interface TeachingComparisonSide {
+  title: string
+  subtitle?: string
+  badge?: string
+  content?: string
+  strengths?: string[]
+  weaknesses?: string[]
+}
+
+export interface TeachingComparisonCriterion {
+  label: string
+  left?: string
+  right?: string
+  winner?: 'left' | 'right' | 'tie' | string
+  explanation?: string
+}
+
+export interface TeachingComparisonBoardBlock extends TeachingBaseBoardBlock {
+  type: 'comparison' | 'vs_compare' | string
+  left?: TeachingComparisonSide
+  right?: TeachingComparisonSide
+  criteria?: TeachingComparisonCriterion[]
+  summary?: string
+  emphasis?: 'left' | 'right' | 'balanced' | string
+}
+
+export type TeachingBoardBlock =
+  | TeachingCodeBoardBlock
+  | TeachingConceptTextBoardBlock
+  | TeachingNumberedBoardBlock
+  | TeachingStructureBoardBlock
+  | TeachingTraceBoardBlock
+  | TeachingOperationSequenceBoardBlock
+  | TeachingInvariantBoardBlock
+  | TeachingComplexityBoardBlock
+  | TeachingComparisonBoardBlock
+  | TeachingBaseBoardBlock
 
 /** 单个教学段（Agent 讲解的最小原子单元） */
 export interface TeachingSegment {
   id: string
   type: TeachingSegmentType
+  /** 老师真实说出口的话。TTS 启用后应优先播报该字段。 */
+  teacherTalk?: string
+  /** 黑板/画布上出现的精炼内容。 */
+  boardContent?: string
+  /** 结构化板书块。存在时前端优先按块类型渲染，boardContent 仅作为兼容兜底。 */
+  boardBlocks?: TeachingBoardBlock[]
   /** markdown 内容（quiz/pause 段可为空） */
   markdown: string
+  /** 本段教学设计意图，前端可作为弱提示展示。 */
+  teachingIntent?: string
+  emotionTone?: 'encourage' | 'serious' | 'curious' | 'warning' | 'summary' | string
+  visualHint?: TeachingVisualHint
+  interaction?: TeachingInteraction
   /** 需要聚焦/高亮的画布元素 */
   focusTarget?: FocusTarget
   /** type=quiz 时的题面 */
@@ -232,11 +527,18 @@ export interface LessonCue {
 /** 场景动作类型。它是动画生成协议的稳定层，不绑定具体渲染引擎。 */
 export type LessonSceneActionType =
   | 'narration'
+  | 'teacher_speak'
   | 'text_fade_in'
+  | 'board_write'
   | 'formula_write'
+  | 'formula_step_write'
   | 'diagram_trace'
   | 'focus_pulse'
   | 'quiz_mount'
+  | 'ask_question'
+  | 'wait_student'
+  | 'show_mistake'
+  | 'correct_mistake'
   | 'summary_pin'
 
 /** 时间轴驱动的场景动作。后续可映射到 Canvas、Manim、视频或字幕生成。 */

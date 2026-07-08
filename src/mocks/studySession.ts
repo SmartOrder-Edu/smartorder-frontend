@@ -255,9 +255,14 @@ export function getMockTeachingFlow(step: ScriptStep, mode: StudyMode): { segmen
     case 'concept':
       return makeFlow([
         { id: `${id}-c1`, type: 'text', markdown: '学习洛必达法则前，Agent 先带你回顾两个前置概念。', autoAdvanceMs: 3500, agentCommentary: '我们先回顾一下极限的定义，这是洛必达法则的基石。' },
-        { id: `${id}-c2`, type: 'formula', markdown: '## 1. 极限的严谨定义\n\n函数 $f(x)$ 在 $x \\to a$ 时的极限为 $L$，记作 $\\lim_{x \\to a} f(x) = L$。\n\n直观理解：当 $x$ 越来越接近 $a$ 时，$f(x)$ 越来越接近 $L$。\n\n> Agent 提示：极限关心的是**趋近过程**，不要求函数在 a 点本身有定义。', autoAdvanceMs: 5500, agentCommentary: '记住，极限关心的是"趋近过程"，不要求函数在 a 点本身有定义。' },
+        { id: `${id}-c2`, type: 'formula', markdown: '## 1. 极限的严谨定义\n\n函数 $f(x)$ 在 $x \\to a$ 时的极限为 $L$，记作 $\\lim_{x \\to a} f(x) = L$。\n\n直观理解：当 $x$ 越来越接近 $a$ 时，$f(x)$ 越来越接近 $L$。\n\n> Agent 提示：极限关心的是**趋近过程**，不要求函数在 a 点本身有定义。', boardBlocks: [
+          { type: 'formula', title: '极限记号', content: '$$\\lim_{x \\to a} f(x) = L$$', tone: 'info' },
+          { type: 'callout', title: '老师提醒', content: '极限关心的是**趋近过程**，不要求函数在 a 点本身有定义。', tone: 'info' },
+        ], autoAdvanceMs: 5500, agentCommentary: '记住，极限关心的是"趋近过程"，不要求函数在 a 点本身有定义。' },
         { id: `${id}-c3`, type: 'text', markdown: '## 2. 函数可导\n\n$f(x)$ 在点 $a$ 处可导，等价于极限 $\\lim_{x \\to a} \\frac{f(x)-f(a)}{x-a}$ 存在。\n\n可导本质上也是一个极限是否存在的问题——这就是洛必达法则为什么依赖于可导性。', autoAdvanceMs: 5000, agentCommentary: '可导本质上也是一个极限是否存在的问题。' },
-        { id: `${id}-c4`, type: 'diagram', markdown: '```mermaid\nflowchart LR\n  A[极限定义] --> B[连续性]\n  A --> C[可导性]\n  B --> D[洛必达法则<br/>适用条件]\n  C --> D\n```', focusTarget: { selector: '.mermaid-block', effect: 'glow-border', scroll: 'smooth' }, autoAdvanceMs: 0, agentCommentary: '看这张关系图——注意"去心邻域"那条线，这是很多同学踩坑的地方。' },
+        { id: `${id}-c4`, type: 'diagram', markdown: '```mermaid\nflowchart LR\n  A[极限定义] --> B[连续性]\n  A --> C[可导性]\n  B --> D[洛必达法则<br/>适用条件]\n  C --> D\n```', boardBlocks: [
+          { type: 'diagram', title: '前置知识关系', content: 'flowchart LR\n  A[极限定义] --> B[连续性]\n  A --> C[可导性]\n  B --> D[洛必达法则<br/>适用条件]\n  C --> D', tone: 'info' },
+        ], focusTarget: { selector: '.mermaid-block', effect: 'glow-border', scroll: 'smooth' }, autoAdvanceMs: 0, agentCommentary: '看这张关系图——注意"去心邻域"那条线，这是很多同学踩坑的地方。' },
         { id: `${id}-c5`, type: 'quiz', markdown: '', quiz: { id: 'inline-q1', prompt: '洛必达法则的适用前提之一是极限必须为哪种类型？', answerType: 'single_select', options: [{ label: '0/0 或 ∞/∞ 型不定式', value: 'a' }, { label: '只要是分数形式就行', value: 'b' }, { label: '只要分子或分母趋于 0', value: 'c' }], correctAnswer: 'a', explanation: '**正确！** 洛必达法则要求极限为 **0/0 或 ∞/∞** 不定式。其他类型需要先变形为这两种之一。\n\n这是洛必达法则最核心的前提条件。' }, autoAdvanceMs: 0, agentCommentary: '来个课前小测，看你记不记得洛必达的前提条件。' },
         { id: `${id}-c6`, type: 'text', markdown: '> Agent 判断：你在基本极限定义上掌握稳定，但对**"去心邻域"**的理解有偏差。\n>\n> 洛必达不要求函数在 a 点有定义——只需要在 a 的去心邻域内可导即可。本次后续步骤会重点澄清这一点。', autoAdvanceMs: 0, agentCommentary: '这一步回顾完成了。准备好了点击"继续"进入动态例子。' },
       ])
@@ -277,12 +282,44 @@ export function getMockTeachingFlow(step: ScriptStep, mode: StudyMode): { segmen
     case 'assessment':
       return makeFlow([
         { id: `${id}-a1`, type: 'text', markdown: '## 掌握判断：一道陷阱题\n\n下面这道题，有人用洛必达法则做了——但**做得对吗**？\n\n> 求 $\\lim_{x \\to 0} \\dfrac{x^2 \\sin \\frac{1}{x}}{x}$', autoAdvanceMs: 4500, agentCommentary: '这道题很多人会做错，注意它的陷阱在哪里。' },
-        { id: `${id}-a2`, type: 'formula', markdown: '有人这样写：\n\n$$\\lim_{x \\to 0} \\frac{x^2 \\sin \\frac{1}{x}}{x} = \\lim_{x \\to 0} \\frac{2x\\sin\\frac{1}{x} - \\cos\\frac{1}{x}}{1}$$\n\n你觉得——**这一步洛必达用得对吗**？', autoAdvanceMs: 2500, agentCommentary: '看看这个求导过程，你觉得有问题吗？' },
+        { id: `${id}-a2`, type: 'formula', markdown: '有人这样写：\n\n$$\\lim_{x \\to 0} \\frac{x^2 \\sin \\frac{1}{x}}{x} = \\lim_{x \\to 0} \\frac{2x\\sin\\frac{1}{x} - \\cos\\frac{1}{x}}{1}$$\n\n你觉得——**这一步洛必达用得对吗**？', boardBlocks: [
+          { type: 'formula', title: '错误示范', content: '$$\\lim_{x \\to 0} \\frac{x^2 \\sin \\frac{1}{x}}{x} = \\lim_{x \\to 0} \\frac{2x\\sin\\frac{1}{x} - \\cos\\frac{1}{x}}{1}$$', tone: 'warning' },
+          { type: 'callout', title: '判断点', content: '先不要看计算快不快，重点检查洛必达法则的**适用条件**是否真的满足。', tone: 'warning' },
+        ], autoAdvanceMs: 2500, agentCommentary: '看看这个求导过程，你觉得有问题吗？' },
         { id: `${id}-a3`, type: 'quiz', markdown: '', quiz: { id: 'inline-q3', prompt: '上一步的洛必达法则用得对吗？', answerType: 'single_select', options: [{ label: '对，可以用洛必达', value: 'a' }, { label: '不对，洛必达不适用于这道题', value: 'b' }], correctAnswer: 'b', explanation: '**答对了！这里不能用洛必达。**\n\n洛必达法则要求 $\\lim \\frac{f\'(x)}{g\'(x)}$ **存在或为 ∞**。\n\n但 $\\cos\\frac{1}{x}$ 在 $x \\to 0$ 时**疯狂振荡**，导数极限不存在。\n\n**正确做法**：直接约分 → $\\lim_{x \\to 0} x \\sin\\frac{1}{x} = 0$（无穷小 × 有界量）\n\n> Agent 已记录：你在洛必达适用条件判定上仍需巩固。' }, autoAdvanceMs: 0, agentCommentary: '这道题的关键是：洛必达不仅要求是 0/0 型，还要求导数极限必须存在。' },
       ])
     case 'derivation':
       return makeFlow([
-        { id: `${id}-d1`, type: 'text', markdown: '## 洛必达 vs 泰勒展开\n\n当洛必达法则需要多次使用时，**泰勒展开往往更高效**。\n\n我们来对比一道需要 3 次洛必达的题：\n\n求 $\\lim_{x \\to 0} \\dfrac{x - \\sin x}{x^3}$', autoAdvanceMs: 5000, agentCommentary: '多次洛必达容易出错，泰勒展开是更好的替代。' },
+        { id: `${id}-d1`, type: 'text', markdown: '## 洛必达 vs 泰勒展开\n\n当洛必达法则需要多次使用时，**泰勒展开往往更高效**。\n\n我们来对比一道需要 3 次洛必达的题：\n\n求 $\\lim_{x \\to 0} \\dfrac{x - \\sin x}{x^3}$', boardBlocks: [
+          {
+            type: 'vs_compare',
+            title: '洛必达 vs 泰勒展开',
+            caption: '同一道极限题的两种求解路径',
+            left: {
+              title: '洛必达法则',
+              subtitle: '连续求导推进',
+              badge: '步骤型',
+              content: '$$\\frac{x - \\sin x}{x^3} \\xrightarrow{L} \\frac{1 - \\cos x}{3x^2} \\xrightarrow{L} \\frac{\\sin x}{6x} \\xrightarrow{L} \\frac{\\cos x}{6}$$',
+              strengths: ['每一步规则明确', '适合 0/0、∞/∞ 型的基础题'],
+              weaknesses: ['多次使用时步骤变长', '每次都要重新检查适用条件'],
+            },
+            right: {
+              title: '泰勒展开',
+              subtitle: '抓住主导项',
+              badge: '结构型',
+              content: '$$\\sin x = x - \\frac{x^3}{6} + o(x^3)$$\n\n代入后直接得到 $\\frac{1}{6}$。',
+              strengths: ['一步暴露主导项', '更适合高阶无穷小比较'],
+              weaknesses: ['需要熟悉常用展开式', '展开阶数选错会丢信息'],
+            },
+            criteria: [
+              { label: '计算步数', left: '3 次求导', right: '1 次展开代入', winner: 'right' },
+              { label: '易错点', left: '漏检条件、求导链较长', right: '展开阶数判断', winner: 'tie' },
+              { label: '适用场景', left: '基础不定式', right: '高阶无穷小与函数差值', winner: 'right' },
+            ],
+            summary: '这类题优先观察是否能用常用泰勒展开抓主导项；如果展开不熟，再回到洛必达法则逐步推进。',
+            emphasis: 'right',
+          },
+        ], autoAdvanceMs: 5000, agentCommentary: '多次洛必达容易出错，泰勒展开是更好的替代。' },
         { id: `${id}-d2`, type: 'formula', markdown: '### 方法一：洛必达（3 次）\n\n$$\\frac{1-\\cos x}{3x^2} \\xrightarrow{L} \\frac{\\sin x}{6x} \\xrightarrow{L} \\frac{\\cos x}{6} = \\frac{1}{6}$$\n\n三连洛必达，步骤多、容易漏条件。', autoAdvanceMs: 5000, agentCommentary: '洛必达三次，每一步都要重新验证条件——繁琐且容易出错。' },
         { id: `${id}-d3`, type: 'formula', markdown: '### 方法二：泰勒展开\n\n$\\sin x = x - \\dfrac{x^3}{6} + o(x^3)$\n\n代入：\n\n$$\\frac{x - (x - \\frac{x^3}{6} + o(x^3))}{x^3} = \\frac{\\frac{x^3}{6} + o(x^3)}{x^3} \\to \\frac{1}{6}$$\n\n**一步到位！**', autoAdvanceMs: 0, agentCommentary: '泰勒展开一步到位。我的建议是：能用泰勒就不用连用洛必达。' },
       ])
