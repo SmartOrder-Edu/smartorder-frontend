@@ -1,18 +1,32 @@
 <template>
   <div
+    ref="segmentEl"
     class="teaching-segment"
     :class="{
       'segment-enter': visible && isNew,
-      'segment-past': !isCurrent,
+      'segment-past': isPast && !collapsed,
       'segment-current': isCurrent,
       'segment-future': !visible,
+      'segment-collapsed': isPast && collapsed,
       'scene-action-active': !!sceneAction,
       [`scene-action-${sceneAction?.actionType}`]: !!sceneAction,
     }"
     :style="sceneActionStyle"
-    :ref="(el) => { if (el && isCurrent && segment.focusTarget) applyFocus(el) }"
   >
-    <div v-if="segment.type !== 'pause'" class="classroom-shell" :class="[`tone-${segment.emotionTone || 'serious'}`]">
+    <!-- 过去段折叠态：标题条 -->
+    <button
+      v-if="isPast && collapsed"
+      class="segment-collapsed-bar"
+      @click="toggleCollapse"
+      aria-label="展开此段内容"
+    >
+      <span class="collapsed-type-badge">{{ typeLabel }}</span>
+      <span class="collapsed-preview">{{ collapsedPreview }}</span>
+      <span class="collapsed-status">已讲</span>
+      <svg class="collapsed-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+
+    <div v-if="segment.type !== 'pause'" v-show="!(isPast && collapsed)" class="classroom-shell" :class="[`tone-${segment.emotionTone || 'serious'}`]">
       <div class="teacher-talk" v-if="teacherLine">
         <div class="teacher-text">
           <MarkdownRenderer :content="teacherLine" />
@@ -60,7 +74,7 @@
 
     <!-- pause：过渡指示器 -->
     <template v-else>
-      <div class="segment-pause">
+      <div v-show="!(isPast && collapsed)" class="segment-pause">
         <span class="pause-dot"></span>
         <span>{{ segment.markdown || 'Agent 正在准备下一段讲解…' }}</span>
       </div>
@@ -69,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import BoardBlockRenderer from './board/BoardBlockRenderer.vue'
 import InlineQuizCard from './InlineQuizCard.vue'
@@ -87,18 +101,86 @@ defineEmits<{
   (e: 'quizAnswer', quizId: string, answer: string): void
 }>()
 
-// 刚变为可见时播放入场动画
+// 段根元素引用（用于自动滚动）
+const segmentEl = ref<HTMLElement | null>(null)
+
+// 过去段折叠状态：过去段默认折叠为标题条，当前段始终展开
+const collapsed = ref(false)
+const isPast = computed(() => props.visible && !props.isCurrent)
+
+// 刚变为可见时播放入场动画 + 自动滚动到视口
 const isNew = ref(false)
 watch(
   () => props.isCurrent,
   (cur) => {
     if (cur) {
+      // 成为当前段：展开 + 入场动画 + 自动滚动
+      collapsed.value = false
       isNew.value = true
+      nextTick(() => {
+        segmentEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        if (props.segment.focusTarget && segmentEl.value) {
+          applyFocus(segmentEl.value)
+        }
+      })
       setTimeout(() => (isNew.value = false), 450)
+    } else if (props.visible) {
+      // 变为过去段：自动折叠
+      collapsed.value = true
     }
   },
   { immediate: true },
 )
+
+// 折叠标题条上的类型标签
+const typeLabel = computed(() => segmentTypeLabel(props.segment.type))
+// 折叠标题条上的预览文本（取 teacherTalk，剥除 markdown 符号，截断 42 字）
+const collapsedPreview = computed(() => {
+  const raw = props.segment.teacherTalk || props.segment.agentCommentary || props.segment.markdown || ''
+  return stripMarkdown(raw).slice(0, 42)
+})
+
+function toggleCollapse() {
+  collapsed.value = !collapsed.value
+}
+
+function segmentTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    text: '讲解',
+    formula: '公式',
+    diagram: '图示',
+    quiz: '测验',
+    pause: '过渡',
+    hook: '引入',
+    recall: '回顾',
+    explain: '解析',
+    analogy: '类比',
+    board_write: '板书',
+    worked_example: '示例',
+    teacher_question: '提问',
+    student_try: '试做',
+    diagnosis: '诊断',
+    mistake_warning: '易错',
+    summary: '总结',
+    transition: '过渡',
+    self_check: '自检',
+  }
+  return labels[type] || '讲解'
+}
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, '（代码）')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/!\[.*?\]\(.*?\)/g, '（图）')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/[*_~]{1,3}([^*_~]+)[*_~]{1,3}/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\n+/g, ' ')
+    .trim()
+}
 
 const focusClass = computed(() => {
   if (!isNew.value || !props.segment.focusTarget) return ''
@@ -316,14 +398,74 @@ function applyFocus(el: HTMLElement) {
   if (inner) {
     inner.scrollIntoView({ behavior: target.scroll as ScrollBehavior, block: 'center' })
   }
-}
-</script>
+}</script>
 
 <style scoped lang="scss">
 .teaching-segment {
   margin-bottom: 0;
   border-radius: 14px;
+  scroll-margin-top: 12px;
   transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+}
+
+// ---- 过去段折叠态：标题条 ----
+.segment-collapsed {
+  .segment-collapsed-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 14px;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+    border-radius: 10px;
+    background: rgba(248, 250, 252, 0.6);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+
+    &:hover {
+      border-color: rgba(11, 183, 170, 0.35);
+      background: rgba(11, 183, 170, 0.04);
+    }
+  }
+
+  .collapsed-type-badge {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(11, 183, 170, 0.1);
+    color: #0bb7aa;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .collapsed-preview {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .collapsed-status {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .collapsed-chevron {
+    flex-shrink: 0;
+    color: #94a3b8;
+    transition: transform 0.2s ease;
+  }
 }
 
 .segment-past {
@@ -374,6 +516,19 @@ function applyFocus(el: HTMLElement) {
     box-shadow:
       0 10px 30px rgba(15, 23, 42, 0.06),
       inset 0 0 0 1px rgba(11, 183, 170, 0.1);
+  }
+
+  // teacher-talk 在当前段内 sticky：板书滚动时老师讲话始终可见
+  .teacher-talk {
+    position: sticky;
+    top: 8px;
+    z-index: 2;
+  }
+
+  .teacher-text {
+    background: linear-gradient(135deg, rgba(11, 183, 170, 0.08), rgba(248, 250, 252, 0.95));
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
   }
 }
 
@@ -482,7 +637,8 @@ function applyFocus(el: HTMLElement) {
 
 .classroom-shell {
   position: relative;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   padding: 6px 0 8px;
 
