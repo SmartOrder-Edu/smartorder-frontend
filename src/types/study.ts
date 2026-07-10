@@ -235,6 +235,29 @@ export type TeachingBoardBlockType =
   | 'complexity'
   | string
 
+export type TeachingBoardBlockLayoutSpan = 'auto' | 'full' | 'wide' | 'side' | 'half' | 'third' | string
+export type TeachingBoardBlockLayoutRole =
+  | 'visual'
+  | 'explanation'
+  | 'concept'
+  | 'example'
+  | 'code'
+  | 'note'
+  | 'summary'
+  | 'support'
+  | string
+
+export interface TeachingBoardBlockLayoutHint {
+  /** 同一个 groupId 的 block 在桌面端会被前端尽量排成同一组视觉关系。 */
+  groupId?: string
+  /** block 在教学版面中的角色，前端用来决定默认宽度和邻近关系。 */
+  role?: TeachingBoardBlockLayoutRole
+  /** 桌面端栅格跨度：full=整行，wide=主视觉区，side=侧栏，half=半宽，third=三分之一。 */
+  span?: TeachingBoardBlockLayoutSpan
+  /** 可选排序，仅作为同组布局提示；不改变 boardBlocks 原始教学顺序。 */
+  order?: number
+}
+
 export interface TeachingBaseBoardBlock {
   id?: string
   type: TeachingBoardBlockType
@@ -242,6 +265,8 @@ export interface TeachingBaseBoardBlock {
   content?: string
   caption?: string
   tone?: 'info' | 'warning' | 'success' | 'error' | string
+  /** 桌面端板书版面提示；旧字段 layout 保留给结构图内部布局等历史语义。 */
+  displayLayout?: TeachingBoardBlockLayoutHint
 }
 
 export interface TeachingCodeBoardBlock extends TeachingBaseBoardBlock {

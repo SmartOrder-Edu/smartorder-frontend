@@ -36,7 +36,7 @@
       <div
         v-if="hasBoardContent"
         class="segment-board focus-target-container"
-        :class="[focusClass, boardClass, { 'teaching-stagger': visible, 'segment-board-code': !!boardContentCodeLanguage }]"
+        :class="[focusClass, boardClass, boardLayoutClass, { 'teaching-stagger': visible, 'segment-board-code': !!boardContentCodeLanguage }]"
       >
         <template v-if="displayBoardBlocks.length">
           <TransitionGroup name="board-block-reveal" appear>
@@ -47,6 +47,7 @@
               :class="[
                 `board-block-${normalizeBoardBlockType(entry.block.type)}`,
                 entry.block.tone ? `board-tone-${entry.block.tone}` : '',
+                ...boardBlockLayoutClasses(entry, visibleBoardBlockEntries),
               ]"
             >
               <BoardBlockRenderer
@@ -245,9 +246,176 @@ const boardClass = computed(() => ({
   'segment-diagnosis': props.segment.type === 'diagnosis',
   'segment-question': isInteractive.value,
 }))
+const boardLayoutClass = computed(() => ({
+  'segment-board-paired': hasPairedBoardLayout(visibleBoardBlockEntries.value),
+  'segment-board-compact': visibleBoardBlockEntries.value.length >= 3,
+}))
 
 function normalizeBoardBlockType(type: string): string {
   return (type || 'markdown').toLowerCase().replace(/[^a-z0-9_-]/g, '-')
+}
+
+function boardBlockLayoutClasses(
+  entry: { block: TeachingBoardBlock; originalIndex: number },
+  entries: Array<{ block: TeachingBoardBlock; originalIndex: number }>,
+): string[] {
+  const span = resolveBoardBlockSpan(entry, entries)
+  const role = resolveBoardBlockRole(entry.block)
+  const classes = [`board-span-${span}`, `board-role-${role}`]
+  const layout = boardLayoutHint(entry.block)
+  if (layout?.groupId) classes.push('board-grouped')
+  if (hasAdjacentComplement(entry, entries)) classes.push('board-paired')
+  if (['wide', 'full'].includes(span) && ['visual', 'code'].includes(role)) classes.push('board-primary')
+  if (span === 'side' || (['explanation', 'note', 'summary'].includes(role) && hasAdjacentComplement(entry, entries))) {
+    classes.push('board-side-panel')
+  }
+  return classes
+}
+
+function resolveBoardBlockSpan(
+  entry: { block: TeachingBoardBlock; originalIndex: number },
+  entries: Array<{ block: TeachingBoardBlock; originalIndex: number }>,
+): string {
+  const explicitSpan = normalizeBoardLayoutSpan(boardLayoutHint(entry.block)?.span)
+  if (explicitSpan) return explicitSpan
+
+  const type = normalizeBoardBlockType(entry.block.type).replace(/-/g, '_')
+  const hasPair = hasAdjacentComplement(entry, entries)
+  const textSize = boardBlockTextSize(entry.block)
+
+  if (type === 'comparison' || type === 'vs_compare' || type === 'vs-compare') return 'full'
+  if (type === 'structure' || type === 'trace' || type === 'diagram') return hasPair ? 'wide' : 'full'
+  if (type === 'code') return textSize > 520 || !hasPair ? 'full' : 'wide'
+  if (type === 'operation_sequence' || type === 'operation-sequence') return hasPair ? 'side' : 'wide'
+  if (type === 'complexity') return hasPair ? 'side' : 'half'
+  if (type === 'numbered_points' || type === 'numbered-points' || type === 'ordered_checklist' || type === 'ordered-checklist') {
+    return hasPair ? 'side' : textSize > 420 ? 'half' : 'third'
+  }
+  if (type === 'reasoning_steps' || type === 'reasoning-steps' || type === 'invariant') return hasPair ? 'side' : 'half'
+  if (isConceptTextBlockType(type) || type === 'concept_breakdown' || type === 'concept-breakdown') {
+    return textSize > 520 ? 'half' : 'third'
+  }
+  if (type === 'callout' || type === 'quote' || type === 'markdown' || type === 'list') {
+    return textSize > 520 ? 'half' : 'third'
+  }
+  if (type === 'formula') return textSize > 420 ? 'full' : 'half'
+  return 'half'
+}
+
+function resolveBoardBlockRole(block: TeachingBoardBlock): string {
+  const explicitRole = boardLayoutHint(block)?.role
+  if (typeof explicitRole === 'string' && explicitRole.trim()) return normalizeLayoutToken(explicitRole)
+
+  const type = normalizeBoardBlockType(block.type).replace(/-/g, '_')
+  if (type === 'structure' || type === 'trace' || type === 'diagram') return 'visual'
+  if (type === 'code') return 'code'
+  if (isConceptTextBlockType(type) || type === 'concept_breakdown') return 'concept'
+  if (type === 'summary' || type === 'key_takeaway') return 'summary'
+  if (type === 'callout' || type === 'quote' || type === 'invariant') return 'note'
+  if (type === 'operation_sequence' || type === 'reasoning_steps' || type === 'numbered_points' || type === 'ordered_checklist') {
+    return 'explanation'
+  }
+  return 'support'
+}
+
+function hasAdjacentComplement(
+  entry: { block: TeachingBoardBlock; originalIndex: number },
+  entries: Array<{ block: TeachingBoardBlock; originalIndex: number }>,
+): boolean {
+  const layout = boardLayoutHint(entry.block)
+  if (layout?.groupId) {
+    return entries.some((item) => item.originalIndex !== entry.originalIndex && boardLayoutHint(item.block)?.groupId === layout.groupId)
+  }
+
+  const currentRole = resolveBoardBlockRole(entry.block)
+  const adjacent = entries.filter((item) => Math.abs(item.originalIndex - entry.originalIndex) === 1)
+  if (currentRole === 'visual' || currentRole === 'code') {
+    return adjacent.some((item) => ['explanation', 'concept', 'note', 'summary', 'support'].includes(resolveBoardBlockRole(item.block)))
+  }
+  if (['explanation', 'concept', 'note', 'summary', 'support'].includes(currentRole)) {
+    return adjacent.some((item) => ['visual', 'code'].includes(resolveBoardBlockRole(item.block)))
+  }
+  return false
+}
+
+function hasPairedBoardLayout(entries: Array<{ block: TeachingBoardBlock; originalIndex: number }>): boolean {
+  return entries.some((entry) => hasAdjacentComplement(entry, entries))
+}
+
+function boardLayoutHint(block: TeachingBoardBlock): Record<string, unknown> | null {
+  const record = block as unknown as Record<string, unknown>
+  const displayLayout = record.displayLayout
+  if (displayLayout && typeof displayLayout === 'object' && !Array.isArray(displayLayout)) {
+    return displayLayout as Record<string, unknown>
+  }
+
+  // 兼容早期实验数据：只有对象型 layout 才作为板书版面提示；字符串 layout 保留给结构图内部布局。
+  const legacyLayout = record.layout
+  return legacyLayout && typeof legacyLayout === 'object' && !Array.isArray(legacyLayout)
+    ? legacyLayout as Record<string, unknown>
+    : null
+}
+
+function normalizeBoardLayoutSpan(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const span = normalizeLayoutToken(value)
+  return ['full', 'wide', 'side', 'half', 'third'].includes(span) ? span : ''
+}
+
+function normalizeLayoutToken(value: string): string {
+  return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-')
+}
+
+function boardBlockTextSize(block: TeachingBoardBlock): number {
+  const record = block as unknown as Record<string, unknown>
+  const textParts: unknown[] = [
+    block.title,
+    block.content,
+    block.caption,
+    record.term,
+    record.definition,
+    record.intuition,
+    record.formal,
+    record.lead,
+    record.question,
+    record.summary,
+    record.conclusion,
+    record.rule,
+    record.context,
+    record.reminder,
+    record.explanation,
+    record.invariant,
+    record.statement,
+    record.whyItMatters,
+    record.time,
+    record.space,
+    record.reason,
+    compactText(record.items),
+    compactText(record.points),
+    compactText(record.steps),
+    compactText(record.keyPoints),
+    compactText(record.examples),
+    compactText(record.cases),
+    compactText(record.criteria),
+  ]
+  return textParts.reduce<number>((sum, value) => sum + stringValue(value).length, 0)
+}
+
+function compactText(value: unknown): string {
+  if (!Array.isArray(value)) return ''
+  return value
+    .map((item) => {
+      if (item === null || item === undefined) return ''
+      if (typeof item === 'string') return item
+      if (typeof item !== 'object') return String(item)
+      return Object.values(item as Record<string, unknown>).map(stringValue).join(' ')
+    })
+    .join(' ')
+}
+
+function stringValue(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  return typeof value === 'string' ? value : String(value)
 }
 
 function boardBlockRevealedItemIndex(block: TeachingBoardBlock, index: number): number | null {
@@ -892,25 +1060,148 @@ function applyFocus(el: HTMLElement) {
   }
 }
 
-// board 有多个 block 时用 2 列网格填充横向宽度，避免宽屏稀疏
+// 桌面端板书使用 12 栅格，按教学语义组织主视觉、侧栏说明和概念卡片
 .segment-board:has(> .board-block) {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 20px;
-  align-items: start;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-flow: row;
+  gap: 18px 20px;
+  align-items: stretch;
 }
 
-// 单个 block 时全宽，不强制 2 列
-.segment-board:has(> .board-block:only-child) {
-  grid-template-columns: 1fr;
+.segment-board:has(> .board-block:only-child) > .board-block {
+  grid-column: 1 / -1;
+}
+
+.segment-board-paired {
+  gap: 18px 22px;
+}
+
+.segment-board-compact {
+  gap: 16px 18px;
 }
 
 .board-block {
   --block-divider-color: rgba(226, 232, 240, 0.9);
+  --block-panel-bg: rgba(255, 255, 255, 0.62);
+  --block-panel-border: rgba(203, 213, 225, 0.72);
+  --block-panel-shadow: 0 4px 14px rgba(15, 23, 42, 0.035);
 
+  position: relative;
+  min-width: 0;
+  height: 100%;
   margin: 0;
   padding: 0 0 0 14px;
   border-left: 2px solid rgba(11, 183, 170, 0.25);
+}
+
+.board-span-full {
+  grid-column: span 12;
+}
+
+.board-span-wide {
+  grid-column: span 8;
+}
+
+.board-span-side,
+.board-span-third {
+  grid-column: span 4;
+}
+
+.board-span-half {
+  grid-column: span 6;
+}
+
+.board-role-visual,
+.board-role-code {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.board-role-explanation,
+.board-role-concept,
+.board-role-note,
+.board-role-summary,
+.board-role-support {
+  min-height: 100%;
+}
+
+.board-role-explanation,
+.board-role-concept,
+.board-role-note,
+.board-role-summary,
+.board-role-support,
+.board-side-panel {
+  padding: 12px 14px;
+  border: 1px solid var(--block-panel-border);
+  border-left: 3px solid var(--block-divider-color);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(248, 250, 252, 0.52)),
+    var(--block-panel-bg);
+  box-shadow: var(--block-panel-shadow);
+}
+
+.board-role-concept {
+  --block-panel-bg: rgba(240, 253, 250, 0.38);
+  --block-panel-border: rgba(153, 246, 228, 0.5);
+}
+
+.board-role-note {
+  --block-panel-bg: rgba(255, 251, 235, 0.42);
+  --block-panel-border: rgba(253, 230, 138, 0.58);
+}
+
+.board-role-summary {
+  --block-panel-bg: rgba(236, 253, 245, 0.42);
+  --block-panel-border: rgba(167, 243, 208, 0.55);
+}
+
+.board-primary {
+  align-self: stretch;
+}
+
+.board-side-panel {
+  align-self: stretch;
+}
+
+.board-side-panel :deep(.lesson-block-header),
+.board-side-panel :deep(.numbered-header),
+.board-side-panel :deep(.concept-header) {
+  margin-bottom: 8px;
+}
+
+.board-side-panel :deep(.lesson-block-title),
+.board-side-panel :deep(.numbered-title),
+.board-side-panel :deep(.concept-title) {
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.board-side-panel :deep(.numbered-list) {
+  gap: 10px;
+}
+
+.board-side-panel :deep(.numbered-item) {
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+.board-side-panel :deep(.number-marker) {
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
+}
+
+.board-side-panel :deep(.operation-step) {
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  padding-left: 8px;
+}
+
+.board-grouped {
+  align-self: stretch;
 }
 
 .board-block-reveal-enter-active,
@@ -924,7 +1215,7 @@ function applyFocus(el: HTMLElement) {
   transform: translateY(8px);
 }
 
-// 需要全宽的 block 类型：代码 / 数据结构图 / 算法追踪 / 对比 / 操作序列
+// 宽内容仍可通过 span class 控制是否全宽；这里只保留视觉边框处理
 .board-block-code,
 .board-block-structure,
 .board-block-trace,
@@ -933,7 +1224,6 @@ function applyFocus(el: HTMLElement) {
 .board-block-vs_compare,
 .board-block-operation-sequence,
 .board-block-operation_sequence {
-  grid-column: 1 / -1;
   border-left: 0;
   padding-left: 0;
 }
