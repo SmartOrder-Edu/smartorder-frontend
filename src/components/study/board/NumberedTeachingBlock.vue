@@ -13,9 +13,9 @@
       <span v-if="summaryText">{{ summaryText }}</span>
     </div>
 
-    <ol v-if="displayItems.length" class="numbered-list">
+    <ol v-if="visibleDisplayItems.length" class="numbered-list">
       <li
-        v-for="(item, index) in displayItems"
+        v-for="(item, index) in visibleDisplayItems"
         :key="`${item.title || item.content}-${index}`"
         class="numbered-item"
       >
@@ -62,6 +62,7 @@ interface DisplayItem {
 const props = defineProps<{
   block: TeachingNumberedBoardBlock
   sceneAction?: LessonSceneAction | null
+  revealedItemIndex?: number | null
 }>()
 
 const mode = computed(() => normalizeType(props.block.type))
@@ -98,6 +99,13 @@ const displayItems = computed<DisplayItem[]>(() => {
     return normalizePointItems(readArray('points') || props.block.points || props.block.items || [])
   }
   return normalizePointItems(readArray('items') || props.block.items || props.block.points || [])
+})
+const visibleDisplayItems = computed(() => {
+  if (props.revealedItemIndex === null || props.revealedItemIndex === undefined) {
+    return displayItems.value
+  }
+  const visibleCount = Math.max(0, props.revealedItemIndex + 1)
+  return displayItems.value.slice(0, visibleCount)
 })
 
 function normalizeType(type: string): string {
@@ -264,10 +272,22 @@ function stringValue(value: unknown): string {
   margin: 0;
   padding: 0 0 16px;
   border-bottom: 1px solid rgba(226, 232, 240, 0.64);
+  animation: numberedItemReveal 0.26s ease both;
 
   &:last-child {
     padding-bottom: 0;
     border-bottom: 0;
+  }
+}
+
+@keyframes numberedItemReveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

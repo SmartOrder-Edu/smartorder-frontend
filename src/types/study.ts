@@ -507,6 +507,8 @@ export type LessonCueType =
   | 'speech'
   | 'subtitle'
   | 'text_reveal'
+  | 'board_block_reveal'
+  | 'board_item_reveal'
   | 'focus'
   | 'highlight'
   | 'underline'

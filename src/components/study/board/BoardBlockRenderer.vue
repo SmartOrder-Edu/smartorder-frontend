@@ -48,6 +48,7 @@
     v-else-if="isNumberedTeachingBlock"
     :block="numberedBlock"
     :scene-action="sceneAction"
+    :revealed-item-index="revealedItemIndex"
   />
   <ComparisonBlock
     v-else-if="normalizedType === 'comparison' || normalizedType === 'vs_compare' || normalizedType === 'vs-compare'"
@@ -58,6 +59,7 @@
     v-else-if="normalizedType === 'operation_sequence' || normalizedType === 'operation-sequence'"
     :block="operationSequenceBlock"
     :scene-action="sceneAction"
+    :revealed-item-index="revealedItemIndex"
   />
   <InvariantBlock
     v-else-if="normalizedType === 'invariant'"
@@ -104,6 +106,7 @@ import type {
 const props = defineProps<{
   block: TeachingBoardBlock
   sceneAction?: LessonSceneAction | null
+  revealedItemIndex?: number | null
 }>()
 
 const normalizedType = computed(() => normalizeBoardBlockType(props.block.type))

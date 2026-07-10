@@ -39,14 +39,23 @@
         :class="[focusClass, boardClass, { 'teaching-stagger': visible, 'segment-board-code': !!boardContentCodeLanguage }]"
       >
         <template v-if="displayBoardBlocks.length">
-          <section
-            v-for="(block, index) in displayBoardBlocks"
-            :key="block.id || `${block.type}-${index}`"
-            class="board-block"
-            :class="[`board-block-${normalizeBoardBlockType(block.type)}`, block.tone ? `board-tone-${block.tone}` : '']"
-          >
-            <BoardBlockRenderer :block="block" :scene-action="sceneAction" />
-          </section>
+          <TransitionGroup name="board-block-reveal" appear>
+            <section
+              v-for="entry in visibleBoardBlockEntries"
+              :key="entry.block.id || `${entry.block.type}-${entry.originalIndex}`"
+              class="board-block"
+              :class="[
+                `board-block-${normalizeBoardBlockType(entry.block.type)}`,
+                entry.block.tone ? `board-tone-${entry.block.tone}` : '',
+              ]"
+            >
+              <BoardBlockRenderer
+                :block="entry.block"
+                :scene-action="sceneAction"
+                :revealed-item-index="boardBlockRevealedItemIndex(entry.block, entry.originalIndex)"
+              />
+            </section>
+          </TransitionGroup>
         </template>
         <template v-else>
           <div v-if="boardContentCodeLanguage" class="board-block-title-row board-fallback-code-title">
@@ -95,6 +104,8 @@ const props = defineProps<{
   isCurrent: boolean
   quizState?: QuizState | null
   sceneAction?: LessonSceneAction | null
+  revealedBoardBlockIndex?: number | null
+  revealedBoardItemIndexes?: Record<string, number>
 }>()
 
 defineEmits<{
@@ -197,7 +208,19 @@ const sceneActionStyle = computed(() => ({
 }))
 
 const teacherLine = computed(() => props.segment.teacherTalk || props.segment.agentCommentary || '')
-const displayBoardBlocks = computed(() => (props.segment.boardBlocks || []).filter(hasMeaningfulBoardBlock))
+const displayBoardBlockEntries = computed(() =>
+  (props.segment.boardBlocks || [])
+    .map((block, originalIndex) => ({ block, originalIndex }))
+    .filter((entry) => hasMeaningfulBoardBlock(entry.block)),
+)
+const displayBoardBlocks = computed(() => displayBoardBlockEntries.value.map((entry) => entry.block))
+const visibleBoardBlockEntries = computed(() => {
+  if (!props.isCurrent || props.revealedBoardBlockIndex === null || props.revealedBoardBlockIndex === undefined) {
+    return displayBoardBlockEntries.value
+  }
+  const revealedIndex = props.revealedBoardBlockIndex
+  return displayBoardBlockEntries.value.filter((entry) => entry.originalIndex <= revealedIndex)
+})
 const rawBoardContent = computed(() =>
   props.segment.boardContent || props.segment.markdown || props.segment.visualHint?.content || '',
 )
@@ -225,6 +248,15 @@ const boardClass = computed(() => ({
 
 function normalizeBoardBlockType(type: string): string {
   return (type || 'markdown').toLowerCase().replace(/[^a-z0-9_-]/g, '-')
+}
+
+function boardBlockRevealedItemIndex(block: TeachingBoardBlock, index: number): number | null {
+  if (!props.isCurrent) return null
+  const indexes = props.revealedBoardItemIndexes || {}
+  const blockId = block.id || ''
+  if (blockId && Number.isInteger(indexes[blockId])) return indexes[blockId]
+  const indexKey = `index:${index}`
+  return Number.isInteger(indexes[indexKey]) ? indexes[indexKey] : null
 }
 
 function codeLanguageLabel(language?: string): string {
@@ -307,7 +339,7 @@ function hasMeaningfulBoardBlock(block: TeachingBoardBlock): boolean {
   if (block.content?.trim()) return true
 
   const type = normalizeBoardBlockType(block.type)
-  const record = block as Record<string, unknown>
+  const record = block as unknown as Record<string, unknown>
   if (type === 'structure') {
     return (Array.isArray(record.items) && record.items.length > 0)
       || (Array.isArray(record.nodes) && record.nodes.length > 0)
@@ -879,6 +911,17 @@ function applyFocus(el: HTMLElement) {
   margin: 0;
   padding: 0 0 0 14px;
   border-left: 2px solid rgba(11, 183, 170, 0.25);
+}
+
+.board-block-reveal-enter-active,
+.board-block-reveal-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.board-block-reveal-enter-from,
+.board-block-reveal-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 // 需要全宽的 block 类型：代码 / 数据结构图 / 算法追踪 / 对比 / 操作序列

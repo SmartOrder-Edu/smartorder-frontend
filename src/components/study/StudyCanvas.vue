@@ -89,6 +89,8 @@
               :is-current="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex"
               :quiz-state="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex ? stepStore.quizState : null"
               :scene-action="stepStore.getActiveSceneAction(seg.id, idx)"
+              :revealed-board-block-index="stepStore.getRevealedBoardBlockIndex(seg.id)"
+              :revealed-board-item-indexes="stepStore.getRevealedBoardItemIndexes(seg.id)"
               @quiz-answer="onQuizAnswer"
             />
           </template>
@@ -159,6 +161,7 @@
 </template>
 
 <script setup lang="ts">
+import type { ComponentPublicInstance } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import ExampleStage from './ExampleStage.vue'
 import PracticeStage from './PracticeStage.vue'
@@ -171,7 +174,7 @@ defineEmits<{ (e: 'toggleScript'): void; (e: 'toggleAgent'): void }>()
 
 const stepStore = useTaskStepStore()
 
-function bindTimelineAudio(el: Element | null) {
+function bindTimelineAudio(el: Element | ComponentPublicInstance | null) {
   stepStore.setTimelineAudioElement(el instanceof HTMLAudioElement ? el : null)
 }
 
@@ -201,7 +204,7 @@ function onSubmitAnswer(payload: { answer: string; correct: boolean; explanation
 }
 
 /** 教学流弹题提交 → 转到 store 处理 */
-function onQuizAnswer(quizId: string, answer: string) {
+function onQuizAnswer(_quizId: string, answer: string) {
   stepStore.submitQuizAnswer(answer)
 }
 </script>
