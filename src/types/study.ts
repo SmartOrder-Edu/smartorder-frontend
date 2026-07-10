@@ -350,6 +350,7 @@ export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
   frontierIds?: string[]
   pathIds?: string[]
   compareIds?: string[]
+  indexBase?: 0 | 1 | number
   heapType?: 'max' | 'min' | string
   heapSize?: number
   parentIndex?: number

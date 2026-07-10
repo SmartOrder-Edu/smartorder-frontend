@@ -43,10 +43,10 @@
               class="heap-node"
               :class="nodeClass(node)"
               :style="{ left: `${node.x}px`, top: `${node.y}px` }"
-              :title="`index ${node.index}: ${node.label}`"
+              :title="`index ${node.displayIndex}: ${node.label}`"
             >
               <span class="node-value">{{ node.label }}</span>
-              <span class="node-index">{{ node.index }}</span>
+              <span class="node-index">{{ node.displayIndex }}</span>
             </div>
           </div>
         </div>
@@ -57,10 +57,10 @@
             :key="`heap-array-${item.index}`"
             class="array-cell"
             :class="indexClass(item.index)"
-            :title="`index ${item.index}: ${item.label}`"
+            :title="`index ${item.displayIndex}: ${item.label}`"
           >
             <span class="array-value">{{ item.label }}</span>
-            <span class="array-index">{{ item.index }}</span>
+            <span class="array-index">{{ item.displayIndex }}</span>
           </div>
         </div>
       </div>
@@ -72,9 +72,7 @@
         </div>
 
         <div class="heap-formulas">
-          <span>parent(i) = floor((i - 1) / 2)</span>
-          <span>left(i) = 2i + 1</span>
-          <span>right(i) = 2i + 2</span>
+          <span v-for="formula in heapFormulaRows" :key="formula">{{ formula }}</span>
         </div>
 
         <div class="heap-focus-list" v-if="focusRows.length">
@@ -106,6 +104,7 @@ const props = defineProps<{
 interface HeapItem {
   label: string
   index: number
+  displayIndex: number
 }
 
 interface HeapNode extends HeapItem {
@@ -156,9 +155,8 @@ const animation = computed<TeachingStructureAnimation>(() => {
     : props.block.animation) || {}
 })
 const rawItems = computed(() => readPayloadArray('items') || props.block.items || props.block.nodes || [])
-const items = computed<HeapItem[]>(() => rawItems.value
-  .map((value, index) => ({ label: itemLabel(value), index }))
-  .filter((item) => item.label !== ''))
+const indexBase = computed<0 | 1>(() => resolveIndexBase(rawItems.value))
+const items = computed<HeapItem[]>(() => normalizeHeapItems(rawItems.value, indexBase.value))
 const heapKind = computed(() => {
   const raw = stringValue(readPayloadValue('heapType') ?? blockRecord.value.heapType ?? '')
     .toLowerCase()
@@ -170,34 +168,39 @@ const heapKindLabel = computed(() => heapKind.value === 'min' ? '最小堆' : '�
 const heapRuleText = computed(() => heapKind.value === 'min'
   ? '父节点值不大于任一孩子节点值'
   : '父节点值不小于任一孩子节点值')
+const heapFormulaRows = computed(() => indexBase.value === 1
+  ? ['parent(i) = floor(i / 2)', 'left(i) = 2i', 'right(i) = 2i + 1']
+  : ['parent(i) = floor((i - 1) / 2)', 'left(i) = 2i + 1', 'right(i) = 2i + 2'])
 const effectiveHeapSize = computed(() => {
-  const raw = numberValue(readPayloadValue('heapSize') ?? blockRecord.value.heapSize, items.value.length)
-  return Math.max(0, Math.min(items.value.length, raw))
+  const rawValue = readPayloadValue('heapSize') ?? blockRecord.value.heapSize
+  const raw = numberValue(rawValue, items.value.length)
+  const normalized = indexBase.value === 1 && raw > items.value.length ? raw - 1 : raw
+  return Math.max(0, Math.min(items.value.length, normalized))
 })
-const activeIndices = computed(() => normalizeIndexArray(readPayloadArray('activeIndices') || props.block.activeIndices || []))
+const activeIndices = computed(() => normalizeHeapIndexArray(readPayloadArray('activeIndices') || props.block.activeIndices || []))
 const compareIds = computed(() => normalizeStringArray(readPayloadArray('compareIds') || props.block.compareIds || []))
-const compareIndices = computed(() => normalizeIndexArray(compareIds.value))
+const compareIndices = computed(() => normalizeHeapIndexArray(compareIds.value))
 const pathIds = computed(() => normalizeStringArray(readPayloadArray('pathIds') || props.block.pathIds || []))
-const pathIndices = computed(() => normalizeIndexArray(pathIds.value))
+const pathIndices = computed(() => normalizeHeapIndexArray(pathIds.value))
 const parentIndex = computed(() => {
-  const raw = numberValue(readPayloadValue('parentIndex') ?? blockRecord.value.parentIndex, Number.NaN)
+  const raw = normalizeHeapIndex(readPayloadValue('parentIndex') ?? blockRecord.value.parentIndex)
   if (Number.isFinite(raw)) return raw
   if (compareIndices.value.length >= 2) return Math.min(...compareIndices.value)
   return Number.NaN
 })
 const childIndices = computed(() => {
-  const explicit = normalizeIndexArray(readPayloadArray('childIndices') || blockRecord.value.childIndices || [])
+  const explicit = normalizeHeapIndexArray(readPayloadArray('childIndices') || blockRecord.value.childIndices || [])
   if (explicit.length) return explicit
   if (!Number.isFinite(parentIndex.value)) return []
   return [parentIndex.value * 2 + 1, parentIndex.value * 2 + 2].filter((index) => index < items.value.length)
 })
 const swapIndices = computed(() => {
-  const explicit = normalizeIndexArray(readPayloadArray('swapIndices') || blockRecord.value.swapIndices || [])
+  const explicit = normalizeHeapIndexArray(readPayloadArray('swapIndices') || blockRecord.value.swapIndices || [])
   if (explicit.length) return explicit
   if (String(animation.value.action || '').toLowerCase() !== 'swap') return []
-  return normalizeIndexArray([animation.value.from, animation.value.to])
+  return normalizeHeapIndexArray([animation.value.from, animation.value.to])
 })
-const violationIndices = computed(() => normalizeIndexArray(
+const violationIndices = computed(() => normalizeHeapIndexArray(
   readPayloadArray('violationIndices') || blockRecord.value.violationIndices || [],
 ))
 const sortedRange = computed(() => {
@@ -251,7 +254,11 @@ const focusRows = computed<FocusRow[]>(() => {
   if (compareIndices.value.length) rows.push({ key: 'compare', label: '比较节点', value: compareIndices.value.map(formatIndex).join(', ') })
   if (swapIndices.value.length) rows.push({ key: 'swap', label: '交换节点', value: swapIndices.value.map(formatIndex).join(', ') })
   if (violationIndices.value.length) rows.push({ key: 'violation', label: '待修复', value: violationIndices.value.map(formatIndex).join(', ') })
-  if (sortedRange.value) rows.push({ key: 'sorted', label: '有序区间', value: `[${sortedRange.value[0]}, ${sortedRange.value[1]}]` })
+  if (sortedRange.value) rows.push({
+    key: 'sorted',
+    label: '有序区间',
+    value: `[${displayIndex(sortedRange.value[0])}, ${displayIndex(sortedRange.value[1])}]`,
+  })
   if (effectiveHeapSize.value < items.value.length) rows.push({ key: 'heap-size', label: '有效堆区', value: `[0, ${Math.max(effectiveHeapSize.value - 1, 0)}]` })
   return rows
 })
@@ -259,8 +266,8 @@ const focusRows = computed<FocusRow[]>(() => {
 function nodeClass(node: HeapNode): Record<string, boolean> {
   return {
     active: isActiveIndex(node.index),
-    compare: isCompare(node.id, node.index),
-    path: isPath(node.id, node.index),
+    compare: isCompareIndex(node.index),
+    path: isPathIndex(node.index),
     parent: node.index === parentIndex.value,
     child: childIndices.value.includes(node.index),
     swap: swapIndices.value.includes(node.index),
@@ -273,8 +280,8 @@ function nodeClass(node: HeapNode): Record<string, boolean> {
 function indexClass(index: number): Record<string, boolean> {
   return {
     active: isActiveIndex(index),
-    compare: isCompare(String(index), index),
-    path: isPath(String(index), index),
+    compare: isCompareIndex(index),
+    path: isPathIndex(index),
     parent: index === parentIndex.value,
     child: childIndices.value.includes(index),
     swap: swapIndices.value.includes(index),
@@ -288,12 +295,12 @@ function isActiveIndex(index: number): boolean {
   return activeIndices.value.includes(index)
 }
 
-function isCompare(id: string, index: number): boolean {
-  return compareIds.value.includes(id) || compareIndices.value.includes(index)
+function isCompareIndex(index: number): boolean {
+  return compareIndices.value.includes(index)
 }
 
-function isPath(id: string, index: number): boolean {
-  return pathIds.value.includes(id) || pathIndices.value.includes(index)
+function isPathIndex(index: number): boolean {
+  return pathIndices.value.includes(index)
 }
 
 function isSortedIndex(index: number): boolean {
@@ -301,11 +308,11 @@ function isSortedIndex(index: number): boolean {
 }
 
 function isCompareEdge(from: string, to: string): boolean {
-  return isCompare(from, Number(from)) && isCompare(to, Number(to))
+  return isCompareIndex(Number(from)) && isCompareIndex(Number(to))
 }
 
 function isPathEdge(from: string, to: string): boolean {
-  return isPath(from, Number(from)) && isPath(to, Number(to))
+  return isPathIndex(Number(from)) && isPathIndex(Number(to))
 }
 
 function isSwapEdge(from: string, to: string): boolean {
@@ -318,7 +325,7 @@ function isViolationEdge(from: string, to: string): boolean {
 
 function formatIndex(index: number): string {
   const item = items.value[index]
-  return item ? `${index}:${item.label}` : String(index)
+  return item ? `${item.displayIndex}:${item.label}` : String(displayIndex(index))
 }
 
 function buildHeapTreeLayout(values: HeapItem[]): HeapTreeLayout {
@@ -394,11 +401,52 @@ function itemLabel(value: unknown): string {
   return String(value)
 }
 
-function normalizeIndexArray(values: unknown): number[] {
+function normalizeHeapItems(values: unknown[], base: 0 | 1): HeapItem[] {
+  const skipSentinel = base === 1 && hasLeadingHeapSentinel(values)
+  const source = skipSentinel ? values.slice(1) : values
+  return source
+    .map((value, index) => ({
+      label: itemLabel(value),
+      index,
+      displayIndex: base === 1 ? index + 1 : index,
+    }))
+    .filter((item) => item.label !== '')
+}
+
+function resolveIndexBase(values: unknown[]): 0 | 1 {
+  const raw = readPayloadValue('indexBase') ?? blockRecord.value.indexBase
+  const explicit = Number(raw)
+  if (explicit === 1) return 1
+  if (explicit === 0) return 0
+  return hasLeadingHeapSentinel(values) ? 1 : 0
+}
+
+function hasLeadingHeapSentinel(values: unknown[]): boolean {
+  if (values.length <= 1) return false
+  const first = values[0]
+  return first === null
+    || first === undefined
+    || first === ''
+    || first === '-'
+    || first === '_'
+}
+
+function normalizeHeapIndexArray(values: unknown): number[] {
   const list = Array.isArray(values) ? values : []
   return Array.from(new Set(list
-    .map((value) => Number(value))
+    .map((value) => normalizeHeapIndex(value))
     .filter((value) => Number.isInteger(value) && value >= 0)))
+}
+
+function normalizeHeapIndex(value: unknown): number {
+  const index = Number(value)
+  if (!Number.isFinite(index)) return Number.NaN
+  if (indexBase.value !== 1) return index
+  return index > 0 ? index - 1 : index
+}
+
+function displayIndex(index: number): number {
+  return indexBase.value === 1 ? index + 1 : index
 }
 
 function normalizeStringArray(values: unknown[]): string[] {
@@ -407,8 +455,8 @@ function normalizeStringArray(values: unknown[]): string[] {
 
 function normalizeRange(value: unknown): [number, number] | null {
   if (!Array.isArray(value) || value.length < 2) return null
-  const start = Number(value[0])
-  const end = Number(value[1])
+  const start = normalizeHeapIndex(value[0])
+  const end = normalizeHeapIndex(value[1])
   if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) return null
   return [start, Math.min(end, Math.max(items.value.length - 1, 0))]
 }
