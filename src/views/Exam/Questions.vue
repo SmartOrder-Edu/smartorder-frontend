@@ -33,9 +33,10 @@
         </div>
         <div v-else class="question-list-container">
           <InteractiveQuestionCard
-            v-for="question in questionBank"
+            v-for="(question, idx) in sortedQuestionBank"
             :key="question.id + '-' + resetKey"
             :question="question"
+            :display-index="idx + 1"
             :show-answer="isSubmitted"
           />
         </div>
@@ -45,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -62,6 +63,16 @@ const questionBank = ref<EvaluationQuestion[]>([])
 const spaceName = ref('')
 const isSubmitted = ref(false)
 const resetKey = ref(0)
+
+/** 按 sortOrder 排序后的题目列表（兜底按 id） */
+const sortedQuestionBank = computed(() => {
+  return [...questionBank.value].sort((a, b) => {
+    const sa = a.sortOrder ?? 0
+    const sb = b.sortOrder ?? 0
+    if (sa !== sb) return sa - sb
+    return String(a.id).localeCompare(String(b.id))
+  })
+})
 
 onMounted(async () => {
   let spaceIdParam = route.query.spaceId

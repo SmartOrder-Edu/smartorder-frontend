@@ -279,35 +279,48 @@ const totalScore = computed(() => {
 
 const groupedQuestions = computed(() => {
   const groups: Record<string, any[]> = {}
-  let globalIndex = 1
-  
+
+  // 先按题型分组
   questions.value.forEach(q => {
     if (!groups[q.questionType]) {
       groups[q.questionType] = []
     }
-    const qWithIndex = { ...q, globalIndex: globalIndex++ }
-    groups[q.questionType].push(qWithIndex)
+    groups[q.questionType].push(q)
   })
-  
+
+  // 每组内部按 sortOrder 排序（兜底按 id）
+  Object.values(groups).forEach(group => {
+    group.sort((a, b) => {
+      const sa = a.sortOrder ?? 0
+      const sb = b.sortOrder ?? 0
+      if (sa !== sb) return sa - sb
+      return String(a.id).localeCompare(String(b.id))
+    })
+  })
+
+  // 全局序号：按固定题型顺序依次编号
+  let globalIndex = 1
   const order = ['single_choice', 'multiple_choice', 'fill_blank', 'judge', 'short_answer', 'essay']
   const result: any[] = []
   
   order.forEach(type => {
     if (groups[type] && groups[type].length > 0) {
+      const numberedQuestions = groups[type].map(q => ({ ...q, globalIndex: globalIndex++ }))
       result.push({
         type,
         typeName: getQuestionTypeName({ questionType: type } as any),
-        questions: groups[type]
+        questions: numberedQuestions
       })
     }
   })
-  
+
   Object.keys(groups).forEach(type => {
     if (!order.includes(type)) {
+      const numberedQuestions = groups[type].map(q => ({ ...q, globalIndex: globalIndex++ }))
       result.push({
         type,
         typeName: getQuestionTypeName({ questionType: type } as any),
-        questions: groups[type]
+        questions: numberedQuestions
       })
     }
   })

@@ -6,7 +6,10 @@
       <span class="score-badge">{{ question.score || 0 }} 分</span>
     </div>
 
-    <h3 class="question-stem">{{ question.stem }}</h3>
+    <h3 class="question-stem">
+      <span v-if="displayIndex" class="q-display-index">{{ displayIndex }}.</span>
+      {{ question.stem }}
+    </h3>
 
     <!-- 交互式答题区 -->
     <div class="question-interaction">
@@ -144,6 +147,7 @@ import {
 
 const props = defineProps<{
   question: EvaluationQuestion
+  displayIndex?: number
   showAnswer: boolean
 }>()
 
@@ -247,6 +251,12 @@ function toggleOption(label: string) {
   line-height: 1.6;
   font-weight: 600;
   margin-bottom: 24px;
+}
+
+.q-display-index {
+  color: var(--primary-color);
+  font-weight: 700;
+  margin-right: 4px;
 }
 
 /* 交互区样式 - 复用高档感 */

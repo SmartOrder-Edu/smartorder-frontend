@@ -58,6 +58,7 @@ export interface EvaluationQuestion {
   knowledgePointId?: string
   questionType: QuestionTypeCode | string
   questionTypeName?: string
+  sortOrder?: number
   difficulty?: number
   score?: number
   abilityDimension?: string
