@@ -321,19 +321,60 @@ function applyFocus(el: HTMLElement) {
 
 <style scoped lang="scss">
 .teaching-segment {
-  margin-bottom: 10px;
-  border-radius: 12px;
-  transition: opacity 0.35s ease, transform 0.35s ease;
+  margin-bottom: 0;
+  border-radius: 14px;
+  transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
 }
 
 .segment-past {
-  opacity: 0.5;
+  opacity: 0.42;
   pointer-events: none;
-  transform: scale(0.98);
+  transform: scale(0.985);
+  filter: saturate(0.92);
+
+  .classroom-shell {
+    gap: 10px;
+    padding-bottom: 4px;
+  }
+
+  .teacher-text {
+    background: rgba(11, 183, 170, 0.03);
+  }
+
+  .segment-board {
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
+
+    &::before {
+      opacity: 0.3;
+    }
+  }
+
+  // 「已讲」标记 chip（纯 CSS，无模板变更）
+  .classroom-shell::after {
+    content: '已讲';
+    position: absolute;
+    top: 2px;
+    right: 0;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(100, 116, 139, 0.12);
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
 }
 
 .segment-current {
   opacity: 1;
+  filter: none;
+
+  // 当前段通过更明显的板书阴影区分，不加左竖条避免嵌套感
+  .segment-board {
+    box-shadow:
+      0 10px 30px rgba(15, 23, 42, 0.06),
+      inset 0 0 0 1px rgba(11, 183, 170, 0.1);
+  }
 }
 
 .segment-future {
@@ -341,7 +382,11 @@ function applyFocus(el: HTMLElement) {
 }
 
 .segment-enter {
-  // keyframes in teaching-animations.scss
+  animation: segmentReveal 0.4s ease both;
+
+  .segment-board {
+    animation: boardEnter 0.5s ease both;
+  }
 }
 
 .scene-action-active {
@@ -436,10 +481,10 @@ function applyFocus(el: HTMLElement) {
 }
 
 .classroom-shell {
+  position: relative;
   display: grid;
-  gap: 12px;
-  padding: 4px 0 14px;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  gap: 16px;
+  padding: 6px 0 8px;
 
   &.tone-curious {
     .teacher-text {
@@ -466,10 +511,12 @@ function applyFocus(el: HTMLElement) {
 
 .teacher-text {
   position: relative;
-  padding: 1px 0 1px 14px;
-  border-left: 3px solid rgba(11, 183, 170, 0.42);
+  padding: 12px 16px;
+  border-left: 3px solid var(--mint-primary, #0bb7aa);
+  background: rgba(11, 183, 170, 0.05);
+  border-radius: 4px 12px 12px 12px;
   color: #0f172a;
-  line-height: 1.82;
+  line-height: 1.8;
   font-size: 15px;
 
   :deep(.markdown-renderer) {
@@ -496,21 +543,41 @@ function applyFocus(el: HTMLElement) {
   --board-heading: #0f172a;
   --board-text: #334155;
   --board-muted: #64748b;
-  --board-line: rgba(226, 232, 240, 0.86);
+  --board-line: rgba(203, 213, 225, 0.7);
   --board-accent: #0f766e;
   --board-info: #0369a1;
   --board-warning: #b45309;
   --board-danger: #dc2626;
   --board-success: #0f766e;
+  // 板书表面令牌（scoped，不污染全局）
+  --board-surface: #fbfdfe;
+  --board-surface-tint: rgba(11, 183, 170, 0.045);
+  --board-frame: var(--board-accent);
 
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  padding: 8px 0 10px;
-  box-shadow: none;
+  position: relative;
+  background:
+    linear-gradient(180deg, var(--board-surface-tint), transparent 38%),
+    var(--board-surface);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 14px;
+  padding: 18px 22px;
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.045);
   line-height: 1.78;
   font-size: 14px;
   color: #334155;
+
+  // 顶部框架条 - 黑板框隐喻，颜色跟随变体强调色
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 16px;
+    right: 16px;
+    height: 3px;
+    border-radius: 0 0 999px 999px;
+    background: linear-gradient(90deg, var(--board-frame), rgba(2, 132, 199, 0.22));
+    pointer-events: none;
+  }
 
   :deep(.markdown-renderer) {
     color: #334155;
@@ -637,21 +704,39 @@ function applyFocus(el: HTMLElement) {
   }
 }
 
+// board 有多个 block 时用 2 列网格填充横向宽度，避免宽屏稀疏
+.segment-board:has(> .board-block) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 20px;
+  align-items: start;
+}
+
+// 单个 block 时全宽，不强制 2 列
+.segment-board:has(> .board-block:only-child) {
+  grid-template-columns: 1fr;
+}
+
 .board-block {
   --block-divider-color: rgba(226, 232, 240, 0.9);
 
   margin: 0;
-  padding: 0 0 16px;
-  border-bottom: 1px solid var(--block-divider-color);
+  padding: 0 0 0 14px;
+  border-left: 2px solid rgba(11, 183, 170, 0.25);
+}
 
-  &:last-child {
-    padding-bottom: 0;
-    border-bottom: 0;
-  }
-
-  & + .board-block {
-    padding-top: 16px;
-  }
+// 需要全宽的 block 类型：代码 / 数据结构图 / 算法追踪 / 对比 / 操作序列
+.board-block-code,
+.board-block-structure,
+.board-block-trace,
+.board-block-comparison,
+.board-block-vs-compare,
+.board-block-vs_compare,
+.board-block-operation-sequence,
+.board-block-operation_sequence {
+  grid-column: 1 / -1;
+  border-left: 0;
+  padding-left: 0;
 }
 
 .board-block-concept-card,
@@ -759,11 +844,12 @@ function applyFocus(el: HTMLElement) {
 }
 
 .visual-hint {
-  margin-top: 10px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgba(14, 165, 233, 0.06);
-  border: 1px solid rgba(14, 165, 233, 0.14);
+  margin-top: 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(14, 165, 233, 0.05);
+  border: 1px solid rgba(14, 165, 233, 0.16);
+  font-size: 13px;
 
   :deep(.markdown-renderer) {
     background: transparent;
@@ -813,6 +899,11 @@ function applyFocus(el: HTMLElement) {
   box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
   border: 2px solid rgba(15, 23, 42, 0.06);
   transition: border-color 0.4s ease, box-shadow 0.4s ease;
+
+  // diagram 有自己的 2px 边框卡片，关掉板书框架条避免冲突
+  &::before {
+    display: none;
+  }
 }
 
 .focus-target-container {
@@ -904,6 +995,18 @@ function applyFocus(el: HTMLElement) {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+// 板书落定（落墨感）
+@keyframes boardEnter {
+  from {
+    opacity: 0.55;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 </style>

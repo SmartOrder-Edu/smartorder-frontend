@@ -223,19 +223,20 @@ function onQuizAnswer(quizId: string, answer: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 14px 22px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(8px);
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 12px;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
+  flex: 1 1 auto;
 
   .script-toggle-btn {
     display: flex;
@@ -276,14 +277,18 @@ function onQuizAnswer(quizId: string, answer: string) {
 
   .header-titles {
     min-width: 0;
+    flex: 1 1 auto;
     h2 {
       margin: 0;
       font-size: 17px;
-      font-weight: 600;
+      font-weight: 650;
       color: #0f172a;
-      white-space: nowrap;
+      white-space: normal;
       overflow: hidden;
-      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      line-height: 1.3;
     }
     p {
       margin: 2px 0 0;
@@ -317,7 +322,8 @@ function onQuizAnswer(quizId: string, answer: string) {
 .header-right {
   display: flex;
   gap: 8px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .agent-toggle-btn {
@@ -375,20 +381,21 @@ function onQuizAnswer(quizId: string, answer: string) {
 .canvas-body {
   flex: 1;
   overflow-y: auto;
-  padding: 22px 28px 28px;
+  padding: 20px 24px 28px;
 }
 
 // ---- 教学段列表 ----
 .teaching-segments {
   display: flex;
   flex-direction: column;
+  gap: 14px;
 }
 
 // ---- 教学控制区 ----
 .teaching-controls {
   display: flex;
   justify-content: center;
-  padding: 16px 0 4px;
+  padding: 20px 0 8px;
 }
 
 .continue-btn {
@@ -442,8 +449,12 @@ function onQuizAnswer(quizId: string, answer: string) {
 }
 
 @media (max-width: 1024px) {
-  .canvas-header { padding: 12px 16px; }
-  .header-left { width: 100%; }
+  .canvas-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+  }
+  .header-left { width: 100%; flex: 1 1 100%; }
+  .header-right { width: 100%; justify-content: flex-end; margin-left: 0; }
   .canvas-body { padding: 16px; }
   .markdown-stage { padding: 18px; }
 }
