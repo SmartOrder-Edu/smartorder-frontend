@@ -10,12 +10,16 @@
         v-for="(item, index) in reversedItems"
         :key="`stack-${index}`"
         class="stack-cell"
-        :class="{ active: isActive(item.originalIndex), top: item.originalIndex === topIndex }"
+        :class="{
+          active: isActive(item.originalIndex),
+          top: item.originalIndex === topIndex,
+          processed: isProcessed(item.originalIndex),
+        }"
       >
         <span class="cell-value">{{ item.label }}</span>
         <span v-if="item.originalIndex === topIndex" class="cell-pointer">top</span>
       </div>
-      <div v-if="!items.length" class="empty-structure">空栈</div>
+      <div v-if="!items.length" class="empty-structure">空{{ structureLabel }}</div>
     </div>
 
     <div v-else-if="structureType === 'linked_list'" class="linked-list-view">
@@ -25,7 +29,7 @@
           :key="`node-${index}`"
           class="list-node-wrap"
         >
-          <div class="list-node" :class="{ active: isActive(index) }">
+          <div class="list-node" :class="{ active: isActive(index), processed: isProcessed(index) }">
             <span class="node-index">{{ index }}</span>
             <span class="node-value">{{ item.label }}</span>
           </div>
@@ -33,10 +37,13 @@
         </div>
         <div class="list-null">NULL</div>
       </template>
-      <div v-else class="empty-structure">空链表</div>
+      <div v-else class="empty-structure">空{{ structureLabel }}</div>
     </div>
 
     <div v-else class="linear-view">
+      <div v-if="isUnsupportedType && items.length" class="unsupported-notice">
+        {{ structureLabel }}可视化开发中，以下为数据平铺展示
+      </div>
       <div class="linear-cells">
         <div
           v-for="(item, index) in items"
@@ -49,8 +56,8 @@
         >
           <span class="cell-value">{{ item.label }}</span>
           <span class="cell-index">{{ index }}</span>
-          <span v-if="pointerNamesAt(index).length" class="pointer-stack">
-            <span v-for="name in pointerNamesAt(index)" :key="name" class="pointer-chip">{{ name }}</span>
+          <span v-if="pointerMap.has(index)" class="pointer-stack">
+            <span v-for="name in pointerMap.get(index)" :key="name" class="pointer-chip">{{ name }}</span>
           </span>
         </div>
         <div v-if="queueRearAtTail" class="linear-cell ghost-cell">
@@ -61,7 +68,7 @@
           </span>
         </div>
       </div>
-      <div v-if="!items.length" class="empty-structure">空数组</div>
+      <div v-if="!items.length" class="empty-structure">空{{ structureLabel }}</div>
     </div>
 
     <div v-if="pointerEntries.length" class="pointer-summary">
@@ -105,13 +112,31 @@ const pointerEntries = computed(() =>
     .filter(([, value]) => value !== undefined && value !== null && `${value}` !== '')
     .map(([name, value]) => ({ name, value })),
 )
+const pointerMap = computed(() => {
+  const map = new Map<number, string[]>()
+  for (const entry of pointerEntries.value) {
+    const idx = Number(entry.value)
+    if (Number.isFinite(idx)) {
+      const list = map.get(idx) || []
+      list.push(entry.name)
+      map.set(idx, list)
+    }
+  }
+  return map
+})
 const topIndex = computed(() => {
   const pointerTop = Number(pointers.value.top)
   if (Number.isFinite(pointerTop)) return pointerTop
   return items.value.length - 1
 })
 const queueRearAtTail = computed(() => structureType.value === 'queue' && Number(pointers.value.rear) === items.value.length)
-const processedRange = computed(() => normalizeRange(readScenePayloadArray('processedRange')))
+const processedRange = computed(() => {
+  const range = normalizeRange(readScenePayloadArray('processedRange'))
+  if (!range) return null
+  const [a, b] = range
+  return a <= b ? range : [b, a]
+})
+const isUnsupportedType = computed(() => ['tree', 'heap', 'graph'].includes(structureType.value))
 const structureLabel = computed(() => {
   const labels: Record<string, string> = {
     array: '数组',
@@ -122,7 +147,7 @@ const structureLabel = computed(() => {
     heap: '堆',
     graph: '图',
   }
-  return labels[structureType.value] || props.block.structureType || '数据结构'
+  return labels[structureType.value] || structureType.value || '数据结构'
 })
 
 function isActive(index: number): boolean {
@@ -132,12 +157,6 @@ function isActive(index: number): boolean {
 function isProcessed(index: number): boolean {
   if (!processedRange.value) return false
   return index >= processedRange.value[0] && index <= processedRange.value[1]
-}
-
-function pointerNamesAt(index: number): string[] {
-  return pointerEntries.value
-    .filter((entry) => Number(entry.value) === index)
-    .map((entry) => entry.name)
 }
 
 function normalizeItems(values: unknown[]): DisplayItem[] {
@@ -212,7 +231,7 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
   min-width: 0;
   color: #0f172a;
   font-size: 17px;
-  font-weight: 820;
+  font-weight: 800;
   line-height: 1.34;
 }
 
@@ -235,7 +254,7 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
 
 .linear-view {
   overflow-x: auto;
-  padding: 6px 2px 14px;
+  padding: 6px 2px 28px;
 }
 
 .linear-cells {
@@ -286,7 +305,7 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
 }
 
 .cell-value {
-  font-weight: 760;
+  font-weight: 700;
   font-size: 15px;
   line-height: 1.2;
 }
@@ -315,7 +334,6 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
   background: #0f766e;
   color: #fff;
   white-space: nowrap;
-
 }
 
 .pointer-summary {
@@ -348,6 +366,11 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
   border-bottom: 0;
   background: #fff;
 
+  &.processed {
+    background: #f8fafc;
+    color: #64748b;
+  }
+
   &.active,
   &.top {
     background: #ecfdf5;
@@ -357,10 +380,13 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
 
 .cell-pointer {
   position: absolute;
-  right: -48px;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
   color: #0f766e;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .linked-list-view {
@@ -386,6 +412,14 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
   border-radius: 8px;
   background: #fff;
 
+  &.processed {
+    background: #f8fafc;
+
+    .node-value {
+      color: #64748b;
+    }
+  }
+
   &.active {
     border-color: #0f766e;
     box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
@@ -408,7 +442,7 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
 .node-value {
   padding: 0 12px;
   color: #0f172a;
-  font-weight: 760;
+  font-weight: 700;
 }
 
 .list-arrow {
@@ -456,6 +490,16 @@ function readScenePayloadRecord(key: string): Record<string, number | string> {
   color: #94a3b8;
   text-align: center;
   font-size: 13px;
+}
+
+.unsupported-notice {
+  margin-bottom: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  text-align: center;
 }
 
 .lesson-block-caption {

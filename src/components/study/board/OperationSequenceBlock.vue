@@ -5,9 +5,9 @@
       <span class="operation-label">{{ operationLabel }}</span>
     </div>
 
-    <div v-if="steps.length" class="operation-steps">
+    <div v-if="visibleSteps.length" class="operation-steps">
       <article
-        v-for="(step, index) in steps"
+        v-for="(step, index) in visibleSteps"
         :key="`${step.label || index}-${step.action}`"
         class="operation-step"
         :class="{ active: index === activeIndex, done: index < activeIndex }"
@@ -30,9 +30,9 @@
 
     <div v-else-if="block.content" class="operation-fallback">{{ block.content }}</div>
 
-    <p v-if="invariant" class="operation-invariant">
+    <p v-if="visibleInvariant" class="operation-invariant">
       <span>保持规则</span>
-      {{ invariant }}
+      {{ visibleInvariant }}
     </p>
     <p v-if="block.caption && block.caption !== invariant" class="lesson-block-caption">{{ block.caption }}</p>
   </section>
@@ -49,17 +49,31 @@ import type {
 const props = defineProps<{
   block: TeachingOperationSequenceBoardBlock
   sceneAction?: LessonSceneAction | null
+  revealedItemIndex?: number | null
 }>()
 
 const steps = computed(() => normalizeSteps(readScenePayloadArray('steps') || props.block.steps || []))
+const visibleSteps = computed(() => {
+  if (props.revealedItemIndex === null || props.revealedItemIndex === undefined) {
+    return steps.value
+  }
+  const visibleCount = Math.max(0, props.revealedItemIndex + 1)
+  return steps.value.slice(0, visibleCount)
+})
 const activeIndex = computed(() => {
   const value = readScenePayloadNumber('currentStep')
     ?? (props.block.currentStep === undefined ? null : Number(props.block.currentStep))
+    ?? props.revealedItemIndex
     ?? 0
   return normalizeCurrentStep(value, steps.value.length)
 })
 const operationLabel = computed(() => readScenePayloadString('operation') || props.block.operation || '操作序列')
 const invariant = computed(() => readScenePayloadString('invariant') || props.block.invariant || '')
+const visibleInvariant = computed(() => {
+  if (!invariant.value) return ''
+  if (props.revealedItemIndex === null || props.revealedItemIndex === undefined) return invariant.value
+  return props.revealedItemIndex >= steps.value.length - 1 ? invariant.value : ''
+})
 
 function normalizeSteps(values: unknown[]): TeachingOperationSequenceStep[] {
   return values
@@ -154,6 +168,7 @@ function readScenePayloadArray(key: string): unknown[] | null {
   padding: 0 0 14px 12px;
   background: transparent;
   transition: color 0.18s ease, background 0.18s ease;
+  animation: operationStepReveal 0.24s ease both;
 
   &.done {
     color: #64748b;
@@ -165,6 +180,17 @@ function readScenePayloadArray(key: string): unknown[] | null {
 
   &:last-child {
     padding-bottom: 0;
+  }
+}
+
+@keyframes operationStepReveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
