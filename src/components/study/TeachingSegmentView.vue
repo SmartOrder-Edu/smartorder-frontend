@@ -640,7 +640,7 @@ function applyFocus(el: HTMLElement) {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 6px 0 8px;
+  padding: 8px 0;
 
   &.tone-curious {
     .teacher-text {
@@ -670,7 +670,7 @@ function applyFocus(el: HTMLElement) {
   padding: 12px 16px;
   border-left: 3px solid var(--mint-primary, #0bb7aa);
   background: rgba(11, 183, 170, 0.05);
-  border-radius: 4px 12px 12px 12px;
+  border-radius: 4px 12px 12px 4px;
   color: #0f172a;
   line-height: 1.8;
   font-size: 15px;
@@ -745,7 +745,7 @@ function applyFocus(el: HTMLElement) {
       padding-bottom: 7px;
       color: #0f172a;
       font-size: 20px;
-      font-weight: 750;
+      font-weight: 700;
       line-height: 1.32;
       letter-spacing: 0;
 
@@ -833,7 +833,7 @@ function applyFocus(el: HTMLElement) {
 
     strong {
       color: #0f766e;
-      font-weight: 750;
+      font-weight: 700;
       background-image: linear-gradient(transparent 58%, rgba(11, 183, 170, 0.2) 58%);
       box-decoration-break: clone;
       -webkit-box-decoration-break: clone;
@@ -934,7 +934,7 @@ function applyFocus(el: HTMLElement) {
 .board-block-title {
   color: #0f172a;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 700;
   line-height: 1.35;
 }
 
