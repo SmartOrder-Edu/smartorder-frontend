@@ -1,67 +1,92 @@
 <template>
   <AppLayout>
     <div class="exam-page">
-      <!-- 页面标题 -->
+      <!-- 页面标题与学习空间切换 -->
       <div class="page-header">
         <div class="header-left">
-          <h1 class="page-title">测评中心</h1>
-          <p class="page-desc">阶段性测评、专项测试、错题复习，追踪你的学习效果</p>
+          <h1 class="page-title">AI个性化学习驾驶舱</h1>
+          <p class="page-desc">全方位追踪你的学习成效，利用 AI 进行专项训练与智能诊断</p>
         </div>
-        <div class="header-right" style="display: flex; align-items: center;">
-          <template v-if="learningSpaceStore.loading || learningSpaceStore.activeSpaces.length > 0">
-            <el-select
-              v-model="selectedSpaceId"
-              filterable
-              placeholder="切换学习空间"
-              style="width: 200px; margin-right: 16px;"
-              :loading="learningSpaceStore.loading"
-            >
-              <el-option
-                v-for="space in learningSpaceStore.activeSpaces"
-                :key="space.id"
-                :label="space.name"
-                :value="space.id"
-              />
-              <template #empty>
-                <div class="select-empty-tip">
-                  <el-icon class="select-empty-icon"><Warning /></el-icon>
-                  <span>暂无学习空间</span>
-                  <el-button
-                    type="primary"
-                    link
-                    size="small"
-                    @click="router.push('/spaces')"
-                  >去创建</el-button>
-                </div>
-              </template>
+        <div class="header-right">
+          <div class="header-actions">
+            <template v-if="learningSpaceStore.loading || learningSpaceStore.activeSpaces.length > 0">
+              <el-select
+                v-model="selectedSpaceId"
+                filterable
+                placeholder="切换学习空间"
+                class="space-select"
+                popper-class="space-select-popper"
+                :loading="learningSpaceStore.loading"
+              >
+                <template #prefix>
+                  <el-icon class="space-select-prefix-icon"><Compass /></el-icon>
+                </template>
+                <el-option
+                  v-for="space in learningSpaceStore.activeSpaces"
+                  :key="space.id"
+                  :label="space.name"
+                  :value="space.id"
+                >
+                  <div class="space-option-item">
+                    <span class="space-option-icon">{{ space.icon || '📐' }}</span>
+                    <div class="space-option-info">
+                      <span class="space-option-name">{{ space.name }}</span>
+                      <span class="space-option-goal" v-if="space.goal">{{ space.goal }}</span>
+                    </div>
+                    <div class="space-option-progress">
+                      <span class="space-option-percent">{{ space.progress }}%</span>
+                      <div class="space-option-bar-wrapper">
+                        <div class="space-option-bar" :style="{ width: space.progress + '%' }"></div>
+                      </div>
+                    </div>
+                  </div>
+                </el-option>
+                <template #empty>
+                  <div class="select-empty-tip">
+                    <el-icon class="select-empty-icon"><Warning /></el-icon>
+                    <span>暂无学习空间</span>
+                    <el-button
+                      type="primary"
+                      link
+                      size="small"
+                      @click="router.push('/spaces')"
+                    >去创建</el-button>
+                  </div>
+                </template>
+              </el-select>
+            </template>
+            <template v-else>
+              <el-button
+                type="primary"
+                style="margin-right: 16px;"
+                @click="router.push('/spaces')"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 4px;">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                立即创建学习空间
+              </el-button>
+            </template>
+            
+            <button class="btn-notification">
+              <el-icon><Bell /></el-icon>
+              <span class="notification-badge"></span>
+            </button>
+          </div>
+          
+          <div class="header-filters">
+            <el-select v-model="filterType" placeholder="全部类型" class="filter-select" size="default">
+              <el-option label="全部类型" value="all" />
+              <el-option label="阶段测评" value="stage" />
+              <el-option label="专项训练" value="special" />
             </el-select>
-          </template>
-          <template v-else>
-            <el-button
-              type="primary"
-              style="margin-right: 16px;"
-              @click="router.push('/spaces')"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 4px;">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              立即创建学习空间
-            </el-button>
-          </template>
-          <el-button class="btn-ai-generate" @click="showGenerateDialog = true">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              width="16"
-              height="16"
-            >
-              <path d="M12 2a10 10 0 1 0 10 10H12V2z" />
-            </svg>
-            AI 生成测评
-          </el-button>
+            <el-select v-model="filterSort" placeholder="综合排序" class="filter-select" size="default">
+              <el-option label="综合排序" value="default" />
+              <el-option label="最新创建" value="time" />
+              <el-option label="最高分" value="score" />
+            </el-select>
+          </div>
         </div>
       </div>
 
@@ -84,255 +109,391 @@
         </template>
       </el-alert>
 
-      <!-- 测评总览 -->
-      <section class="section overview-cards">
-        <div class="overview-stat">
-          <div class="stat-circle" :style="{ '--percent': overallScore + '%' }">
-            <svg viewBox="0 0 120 120">
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                fill="none"
-                stroke="var(--border-light)"
-                stroke-width="8"
-              />
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                fill="none"
-                stroke="url(#scoreGrad)"
-                stroke-width="8"
-                stroke-linecap="round"
-                :stroke-dasharray="`${overallScore * 3.27} 327`"
-                transform="rotate(-90 60 60)"
-              />
-              <defs>
-                <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style="stop-color: #3b5bdb" />
-                  <stop offset="100%" style="stop-color: #12b886" />
-                </linearGradient>
-              </defs>
-            </svg>
-            <div class="stat-inner">
-              <span class="stat-score">{{ overallScore }}</span>
-              <span class="stat-label">总体评分</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="overview-details">
-          <div class="details-left">
-            <div class="detail-item">
-              <div class="detail-header">
-                <span class="detail-label">本周测评次数</span>
-                <span class="detail-value primary">{{ weeklyCount }} 次</span>
-              </div>
-              <div class="detail-bar">
-                <div class="bar-fill" style="width: 70%"></div>
-              </div>
-            </div>
-            <div class="detail-item">
-              <div class="detail-header">
-                <span class="detail-label">本周平均正确率</span>
-                <span class="detail-value accent">{{ weeklyAccuracy }}%</span>
-              </div>
-              <div class="detail-bar accent">
-                <div class="bar-fill" :style="{ width: weeklyAccuracy + '%' }"></div>
-              </div>
-            </div>
-          </div>
-          <div class="details-right">
-            <div class="stat-tile-card warning">
-              <div class="card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/>
-                  <line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-              </div>
-              <div class="card-info">
-                <span class="card-label">薄弱知识点</span>
-                <span class="card-value warning">{{ weakCount }} 个</span>
-              </div>
-            </div>
-            <div class="stat-tile-card success">
-              <div class="card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-                  <polyline points="17 6 23 6 23 12"/>
-                </svg>
-              </div>
-              <div class="card-info">
-                <span class="card-label">本周进步</span>
-                <span class="card-value success">+{{ weeklyProgress }}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 测评分类 -->
-      <div class="exam-tabs">
-        <span
-          v-for="tab in examTabs"
-          :key="tab.value"
-          class="tab-item"
-          :class="{ active: activeTab === tab.value }"
-          @click="activeTab = tab.value"
-        >
-          <span class="tab-icon" v-html="tab.icon"></span>
-          {{ tab.label }}
-          <span class="tab-count" v-if="tab.count">{{ tab.count }}</span>
-        </span>
-      </div>
-
-      <!-- 测评列表 -->
-      <section class="section exam-list-section">
-        <div class="section-title-row">
-          <div>
-            <h2>题库数据</h2>
-            <p>先展示后端已保存的测评题目，方便前后端联调。</p>
-          </div>
-          <el-button :loading="questionBankLoading" @click="fetchQuestionBank">刷新</el-button>
-        </div>
-
-        <div v-if="questionBank.length" class="exam-list" style="margin-bottom: 32px;">
-          <!-- 题库汇总卡片 -->
-          <div class="exam-card">
-            <div class="exam-status-bar">
-              <span class="status-badge available">可参与</span>
-            </div>
-            <div class="exam-info">
-              <h3 class="exam-title">{{ selectedSpaceName || '当前空间' }} 总题库</h3>
-              <p class="exam-desc">包含所有知识点的测评题目，点击“开始刷题”即可逐一练习。</p>
-              <div class="exam-meta">
-                <span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 11l3 3L22 4" />
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                  </svg>
-                  {{ questionBank.length }} 题
-                </span>
-                <span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12,6 12,12 16,14" />
-                  </svg>
-                  无时间限制
-                </span>
-              </div>
-            </div>
-            <div class="exam-actions">
-              <el-button type="primary" @click="$router.push('/exam/questions?spaceId=' + (selectedSpaceId || ''))">开始刷题</el-button>
-            </div>
-          </div>
-        </div>
-
-        <div class="exam-list">
-          <!-- 测评卡片 -->
-          <div
-            v-for="exam in filteredExams"
-            :key="exam.id"
-            class="exam-card"
-            :class="[{ 'has-result': exam.hasResult }, exam.status]"
-          >
-            <div class="exam-status-bar">
-              <span class="status-badge" :class="exam.status">{{ exam.statusText }}</span>
-              <span v-if="exam.hasResult" class="result-score" :class="getScoreClass(exam.score)">
-                {{ exam.score }}分
-              </span>
-            </div>
-
-            <div class="exam-info">
-              <h3 class="exam-title">{{ exam.title }}</h3>
-              <p class="exam-desc">{{ exam.description }}</p>
-              <div class="exam-meta">
-                <span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 11l3 3L22 4" />
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                  </svg>
-                  {{ exam.total }} 题
-                </span>
-                <span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12,6 12,12 16,14" />
-                  </svg>
-                  {{ exam.duration }} 分钟
-                </span>
-                <span>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" />
-                  </svg>
-                  {{ exam.accuracy }}% 正确率
-                </span>
-              </div>
-
-              <!-- 结果展示 -->
-              <div v-if="exam.hasResult" class="result-detail">
-                <div class="result-chart">
-                  <div class="chart-bar-group">
-                    <div class="chart-bar correct" :style="{ height: exam.accuracy + '%' }"></div>
-                    <div
-                      class="chart-bar wrong"
-                      :style="{ height: 100 - exam.accuracy + '%' }"
-                    ></div>
+      <!-- 双栏驾驶舱布局 -->
+      <div class="exam-layout">
+        <!-- 左侧数据与任务主区域 -->
+        <div class="exam-main">
+          
+          <!-- 1. 核心学习数据总览 (4卡片) -->
+          <div class="metrics-grid">
+            <!-- 总体评分双栏卡片 -->
+            <div class="stat-card score-card">
+              <div class="stat-score-wrapper">
+                <!-- 左半部 圆环图 -->
+                <div class="score-left">
+                  <div class="stat-circle" :style="{ '--percent': overallScore + '%' }">
+                    <svg viewBox="0 0 120 120">
+                      <circle cx="60" cy="60" r="52" fill="none" stroke="#f1f5f9" stroke-width="8" />
+                      <circle cx="60" cy="60" r="52" fill="none" stroke="url(#scoreGrad)" stroke-width="8" stroke-linecap="round" :stroke-dasharray="`${overallScore * 3.27} 327`" transform="rotate(-90 60 60)" />
+                      <defs>
+                        <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" style="stop-color: #3b5bdb" />
+                          <stop offset="100%" style="stop-color: #12b886" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div class="circle-inner">
+                      <span class="circle-score">{{ overallScore }}<small>分</small></span>
+                      <span class="circle-trend text-success">较上周 ↑ 8分</span>
+                    </div>
                   </div>
-                  <span class="chart-label">{{ exam.accuracy }}%</span>
                 </div>
-                <div class="result-tags">
-                  <span v-if="exam.wrongCount > 0" class="wrong-tag">
-                    错题 {{ exam.wrongCount }} 道
-                    <span class="review-link" @click="reviewWrong(exam)">去复习</span>
-                  </span>
-                  <span class="weak-tag"> 薄弱：{{ exam.weakPoints.join('、') }} </span>
+                <!-- 分割线 -->
+                <div class="score-divider"></div>
+                <!-- 右半部 平均正确率 -->
+                <div class="score-right">
+                  <span class="accuracy-label">平均正确率</span>
+                  <span class="accuracy-val">{{ avgAccuracy }}%</span>
+                  <span class="accuracy-trend text-success">较上周 ↑ 5%</span>
                 </div>
               </div>
             </div>
-
-            <div class="exam-actions">
-              <template v-if="exam.hasResult">
-                <el-button @click="reviewWrong(exam)">回顾</el-button>
-                <el-button type="primary" @click="retakeExam(exam)">重新测评</el-button>
-              </template>
-              <template v-else>
-                <el-button type="primary" @click="startExam(exam)">{{ exam.status === 'ongoing' ? '继续测评' : '开始测评' }}</el-button>
-              </template>
+            
+            <div class="stat-card">
+               <div class="stat-header">
+                 <span class="stat-label">本周测评次数</span>
+                 <div class="card-icon calendar-icon-bg">
+                   <el-icon><Calendar /></el-icon>
+                 </div>
+               </div>
+               <div class="stat-value">{{ weeklyCount }} <span class="unit">次</span></div>
+               <div class="stat-trend success">较上周 ↑ 2次</div>
+            </div>
+            
+            <div class="stat-card warning-theme">
+               <div class="stat-header">
+                 <span class="stat-label">薄弱知识点</span>
+                 <div class="card-icon warning-icon-bg">
+                   <el-icon><Warning /></el-icon>
+                 </div>
+               </div>
+               <div class="stat-value">{{ weakCount }} <span class="unit">个</span></div>
+               <div class="stat-trend success">较上周 ↓ 1个</div>
+            </div>
+            
+            <div class="stat-card trend-theme">
+               <div class="stat-header">
+                 <span class="stat-label">学习提升趋势</span>
+                 <div class="mini-sparkline">
+                   <svg width="46" height="20" viewBox="0 0 46 20">
+                     <path d="M0,16 Q10,12 20,4 T46,12" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linecap="round"/>
+                     <circle cx="46" cy="12" r="2.5" fill="#10b981"/>
+                   </svg>
+                 </div>
+               </div>
+               <div class="stat-value success">+{{ weeklyProgress }}% <el-icon class="arrow-up-right"><TopRight /></el-icon></div>
+               <div class="stat-trend">近7天正确率提升</div>
             </div>
           </div>
+
+          <!-- 2. AI智能诊断推荐区域 -->
+          <div class="ai-recommend-section">
+             <div class="recommend-section-header">
+                <svg class="ai-title-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
+                  <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m16.5-6.5l-2.2 2.2m-9.6 9.6l-2.2 2.2m14-2.2l-2.2-2.2m-9.6-9.6L4.5 7.5" stroke-linecap="round"/>
+                </svg>
+                <span class="bh-text"><strong>AI 智能诊断推荐</strong> · 结合你的学习画像、历史测评和错题表现，定制以下专项训练方向</span>
+             </div>
+             
+             <div class="recommend-cards">
+                <div class="recommend-item" v-for="(rec, index) in recommendations" :key="index">
+                   <div class="rec-card-top">
+                      <div class="rec-icon-wrapper" :class="rec.type">
+                         <el-icon><component :is="rec.icon" /></el-icon>
+                      </div>
+                      <div class="rec-card-title-info">
+                         <h4 class="rec-title">{{ rec.title }}</h4>
+                         <div class="rec-tags">
+                            <span class="tag difficulty" :class="rec.difficultyClass">{{ rec.difficulty }}</span>
+                            <span class="tag">{{ rec.count }}题</span>
+                            <span class="tag">预计{{ rec.time }}分钟</span>
+                          </div>
+                      </div>
+                   </div>
+                   <p class="rec-desc">{{ rec.desc }}</p>
+                   <div class="rec-card-bottom">
+                      <el-button type="primary" size="small" class="start-rec-btn" @click="startRecommended(rec)">开始训练</el-button>
+                   </div>
+                </div>
+             </div>
+          </div>
+
+          <!-- 3. 当前学习任务/测评任务 -->
+          <div class="tasks-section">
+            <div class="exam-tabs-wrapper">
+               <div class="exam-tabs new-tabs">
+                 <span
+                   v-for="tab in examTabs"
+                   :key="tab.value"
+                   class="tab-item"
+                   :class="{ active: activeTab === tab.value }"
+                   @click="activeTab = tab.value"
+                 >
+                   {{ tab.label }}
+                   <span class="tab-count" v-if="tab.count">{{ tab.count }}</span>
+                 </span>
+               </div>
+               <a class="view-all-link">查看全部记录 <el-icon><ArrowRight /></el-icon></a>
+            </div>
+
+            <!-- 测评列表 -->
+            <div class="exam-list new-exam-list">
+              <div
+                v-for="exam in filteredExams"
+                :key="exam.id"
+                class="new-exam-card"
+              >
+                <!-- 状态徽章区 -->
+                <div class="ex-left">
+                  <div class="ex-status-badge" :class="exam.status">
+                    <div class="badge-dot">
+                      <el-icon v-if="exam.status === 'ongoing'"><Loading /></el-icon>
+                      <el-icon v-else-if="exam.status === 'available'"><Aim /></el-icon>
+                      <el-icon v-else-if="exam.hasResult"><Check /></el-icon>
+                      <el-icon v-else><Warning /></el-icon>
+                    </div>
+                    <span class="badge-text">{{ exam.hasResult ? '已完成' : (exam.status === 'ongoing' ? '进行中' : '推荐') }}</span>
+                  </div>
+                </div>
+                
+                <!-- 标题与 Meta 区 -->
+                <div class="ex-main">
+                  <h3 class="ex-title">
+                    {{ exam.title }}
+                    <span class="ex-topic-tag" v-for="tag in getExamTags(exam)" :key="tag">{{ tag }}</span>
+                  </h3>
+                  <div class="ex-meta">
+                    <span>题量 {{ exam.total }}题</span><span class="divider">|</span>
+                    <span>已完成 {{ getCompletedCount(exam) }}题</span><span class="divider">|</span>
+                    <span>预计 {{ exam.duration }} 分钟</span><span class="divider">|</span>
+                    <span>正确率 {{ getAccuracyText(exam) }}</span><span class="divider">|</span>
+                    <span>难度 <span class="diff-text" :class="getDifficultyText(exam)">{{ getDifficultyText(exam) }}</span></span>
+                  </div>
+                </div>
+                
+                <!-- 进度条区 -->
+                <div class="ex-progress">
+                  <div class="ex-prog-text">{{ getProgressPercent(exam) }}%</div>
+                  <div class="ex-prog-bar">
+                    <div class="ex-prog-fill" :class="{ 'zero-fill': getProgressPercent(exam) === 0 }" :style="{ width: getProgressPercent(exam) + '%' }"></div>
+                  </div>
+                </div>
+                
+                <!-- SVG 趋势折线图列 (Sparkline) -->
+                <div class="ex-sparkline-col">
+                  <svg v-if="exam.status !== 'available'" class="ex-sparkline" width="68" height="24">
+                    <path :d="exam.title.includes('二叉树') ? 'M0,18 Q20,10 40,15 T68,4' : 'M0,20 Q15,8 35,16 T68,6'" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round"/>
+                    <circle cx="68" cy="4" r="2.2" fill="#10b981" v-if="exam.title.includes('二叉树')"/>
+                    <circle cx="68" cy="6" r="2.2" fill="#10b981" v-else/>
+                  </svg>
+                  <span v-else class="ex-sparkline-empty">--</span>
+                </div>
+                
+                <!-- 分数展示区 -->
+                <div class="ex-score-col" v-if="exam.hasResult">
+                   <div class="ex-score-label">得分</div>
+                   <div class="ex-score-val">{{ exam.score }}<span class="ex-score-grade">分</span></div>
+                   <div class="ex-score-status text-success">优秀</div>
+                </div>
+                <div class="ex-score-col" v-else>
+                   <template v-if="exam.status === 'ongoing'">
+                     <div class="ex-score-label">上次得分</div>
+                     <div class="ex-score-val">{{ exam.title.includes('二叉树') ? 80 : 70 }}<span class="ex-score-grade">分</span></div>
+                     <div class="ex-score-status text-success">较上次 ↑{{ exam.title.includes('二叉树') ? 6 : 10 }}分</div>
+                   </template>
+                   <template v-else>
+                     <span class="ex-score-empty">--</span>
+                   </template>
+                </div>
+                
+                <!-- 操作区 -->
+                <div class="ex-actions">
+                  <el-button 
+                    type="primary" 
+                    :class="{'start-btn': exam.status === 'available', 'report-btn': exam.hasResult}"
+                    round 
+                    @click="startExam(exam)"
+                  >
+                    {{ exam.hasResult ? '查看报告' : (exam.status === 'ongoing' ? '继续测评' : '开始训练') }}
+                  </el-button>
+                  <el-icon class="more-icon"><MoreFilled /></el-icon>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 能力分析 + 成长趋势分析 -->
+          <div class="bottom-analysis-grid">
+             <!-- 多维能力掌握度卡片（合并了雷达图与题型分布） -->
+             <div class="analysis-card ability-analysis-card">
+                <div class="card-header-dashboard">
+                   <h3 class="analysis-title">多维能力掌握度</h3>
+                   <span class="analysis-sub">知识掌握维度与题型能力分布</span>
+                </div>
+                
+                <div class="ability-card-content">
+                  <!-- 左侧 雷达图 -->
+                  <div class="radar-chart-section">
+                    <div ref="radarChartRef" style="height: 200px; width: 220px; margin: 0 auto;"></div>
+                    <div class="legend radar-legend">
+                       <span class="leg-item"><span class="dot my box"></span>我的掌握度</span>
+                       <span class="leg-item"><span class="dot avg box"></span>班级平均</span>
+                    </div>
+                  </div>
+                  <!-- 竖向分割线 -->
+                  <div class="ability-divider"></div>
+                  <!-- 右侧 题型指标 -->
+                  <div class="ability-grid-section">
+                     <div class="ability-grid">
+                        <div class="ability-item" v-for="ab in abilities" :key="ab.name">
+                           <div class="ab-icon" :class="ab.type">
+                             <el-icon><component :is="ab.icon" /></el-icon>
+                           </div>
+                           <div class="ab-info">
+                              <div class="ab-name">{{ ab.name }}</div>
+                              <div class="ab-score">正确率 <strong>{{ ab.score }}%</strong></div>
+                              <div class="ab-trend success">较上周 ↑ {{ ab.trend }}%</div>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+                </div>
+             </div>
+
+             <!-- 成绩趋势分析卡片 -->
+             <div class="analysis-card trend-analysis-card">
+                <div class="card-header">
+                   <h3>最近成绩趋势</h3>
+                   <div class="legend">
+                      <span class="leg-item"><span class="dot my"></span>我的正确率</span>
+                      <span class="leg-item"><span class="dot avg"></span>班级平均</span>
+                   </div>
+                   <el-select v-model="trendPeriod" size="small" style="width: 90px;">
+                      <el-option label="近7天" value="7" />
+                      <el-option label="近30天" value="30" />
+                   </el-select>
+                </div>
+                <div ref="trendChartRef" style="height: 190px; width: 100%"></div>
+             </div>
+          </div>
         </div>
 
-        <!-- 空状态 -->
-        <div class="empty-state" v-if="filteredExams.length === 0 && questionBank.length === 0">
-          <div class="empty-icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              width="48"
-              height="48"
-            >
-              <path
-                d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4"
-              />
-              <rect x="9" y="9" width="6" height="6" rx="1" />
-              <line x1="9" y1="13" x2="13" y2="13" />
-              <line x1="9" y1="15" x2="11" y2="15" />
-            </svg>
+        <!-- 右侧智能助手面板 (exam-sidebar) -->
+        <div class="exam-sidebar smart-assistant-panel">
+          <!-- 1. AI 智能助理诊断问候卡片 [NEW] -->
+          <div class="sidebar-card assistant-card">
+             <div class="assistant-header">
+                <div class="assistant-mascot-wrapper">
+                   <!-- 浮动机器人 Mascot -->
+                   <svg class="floating-mascot" viewBox="0 0 160 160" width="64" height="64">
+                      <!-- 机器人手部 -->
+                      <path d="M40 95 C 30 90, 25 80, 30 75 C 35 70, 45 75, 45 85" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1.5" />
+                      <path d="M120 95 C 130 90, 135 80, 130 75 C 125 70, 115 75, 115 85" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1.5" />
+                      <!-- 机器人耳朵/耳机 -->
+                      <rect x="25" y="65" width="10" height="25" rx="5" fill="#0bb7aa" />
+                      <rect x="125" y="65" width="10" height="25" rx="5" fill="#0bb7aa" />
+                      <path d="M30 65 A 50 50 0 0 1 130 65" fill="none" stroke="#cbd5e1" stroke-width="3" />
+                      <!-- 机器人身体/头部 -->
+                      <rect x="32" y="45" width="96" height="70" rx="35" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+                      <!-- 机器人屏幕脸 -->
+                      <rect x="42" y="55" width="76" height="42" rx="16" fill="#0f172a" />
+                      <!-- 机器人发光眼睛 -->
+                      <ellipse cx="62" cy="76" rx="6" ry="6" fill="#0bb7aa" />
+                      <ellipse cx="98" cy="76" rx="6" ry="6" fill="#0bb7aa" />
+                      <path d="M72 82 Q80 86 88 82" fill="none" stroke="#0bb7aa" stroke-width="2.5" stroke-linecap="round" />
+                      <!-- 机器人反光/微光 -->
+                      <path d="M45 52 Q80 40 115 52" fill="none" stroke="#f8fafc" stroke-width="2" opacity="0.3" />
+                      <!-- 底部底座/浮空底座 -->
+                      <ellipse cx="80" cy="130" rx="35" ry="8" fill="#e2e8f0" opacity="0.8" />
+                      <!-- 小星星装饰 -->
+                      <path d="M135 45 L138 48 L141 45 L138 42 Z" fill="#0bb7aa" />
+                      <path d="M25 105 L28 108 L31 105 L28 102 Z" fill="#4f6ef6" />
+                   </svg>
+                </div>
+                <div class="assistant-meta">
+                   <span class="assistant-badge">AI PERSONAL TUTOR</span>
+                   <h4 class="assistant-title-text">学习助手</h4>
+                </div>
+             </div>
+             
+             <!-- 对话气泡 -->
+             <div class="assistant-bubble">
+                <div class="bubble-arrow"></div>
+                <p class="bubble-content">
+                  你好，谢同学！检测到你正在进行的 <strong>数据结构与算法</strong> 空间中，<strong>二叉树遍历</strong> 掌握度偏弱。建议通过下方智能出题定制一套专项测评，开始巩固提升！
+                </p>
+             </div>
+
+             <!-- 快捷出题交互 -->
+             <div class="assistant-cta">
+                <button class="btn-assistant-generate" @click="showGenerateDialog = true">
+                   <svg class="ai-spark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14" style="margin-right: 4px;">
+                     <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m16.5-6.5l-2.2 2.2m-9.6 9.6l-2.2 2.2m14-2.2l-2.2-2.2m-9.6-9.6L4.5 7.5" stroke-linecap="round"/>
+                   </svg>
+                   AI 智能诊断出题
+                </button>
+             </div>
           </div>
-          <h3>暂无测评</h3>
-          <p>点击"AI 生成测评"获取个性化测试</p>
+
+          <!-- 2. 错题本提醒卡片 -->
+          <div class="sidebar-card wrong-card">
+             <div class="card-title">错题本提醒</div>
+             <div class="wrong-remind-grid">
+                <div class="remind-item">
+                   <div class="rm-label">今日待复习</div>
+                   <div class="rm-val"><strong>18</strong> 题</div>
+                </div>
+                <div class="remind-item">
+                   <div class="rm-label">高优先级</div>
+                   <div class="rm-val"><strong>6</strong> 题</div>
+                </div>
+             </div>
+             <div class="go-wrong-wrapper">
+                 <el-button class="go-wrong-btn" type="primary" plain>
+                   去错题本复习 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+                 </el-button>
+                 <div class="wrong-icon-bg">
+                   <svg viewBox="0 0 100 100" width="70" height="70">
+                     <rect x="22" y="15" width="56" height="70" rx="8" fill="#14b8a6" />
+                     <rect x="28" y="15" width="50" height="70" rx="4" fill="#ffffff" />
+                     <rect x="22" y="15" width="6" height="70" fill="#0d9488" />
+                     <line x1="38" y1="30" x2="68" y2="30" stroke="#0bb7aa" stroke-width="3" stroke-linecap="round" />
+                     <line x1="38" y1="42" x2="60" y2="42" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round" />
+                     <line x1="38" y1="54" x2="64" y2="54" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round" />
+                     <path d="M48 85 L48 94 L53 90 L58 94 L58 85 Z" fill="#f59e0b" />
+                   </svg>
+                 </div>
+             </div>
+          </div>
+          
+          <!-- 3. 学习连续性卡片 -->
+          <div class="sidebar-card streak-card">
+             <div class="card-title">学习连续性</div>
+             <div class="streak-info">
+                <div class="streak-text">
+                   <div class="rm-label">连续学习天数</div>
+                   <div class="rm-val"><strong>12</strong> 天</div>
+                   <div class="streak-sub">最长连续 15 天</div>
+                </div>
+                <div class="streak-icon">🔥</div>
+             </div>
+             <div class="streak-week">
+                <div class="day-item" v-for="day in weekDays" :key="day.name">
+                   <div class="day-circle" :class="{ active: day.active, current: day.current }">
+                      <el-icon v-if="day.active"><Check /></el-icon>
+                      <span v-else>•</span>
+                   </div>
+                   <div class="day-name">{{ day.name }}</div>
+                </div>
+             </div>
+          </div>
         </div>
-      </section>
+      </div>
 
       <!-- AI 生成测评对话框 -->
       <el-dialog
         v-model="showGenerateDialog"
-        title="生成题库"
+        title="AI 智能诊断出题"
         width="760px"
         class="question-generate-dialog"
       >
@@ -528,9 +689,13 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Warning } from '@element-plus/icons-vue'
+import { Warning, Calendar, TopRight, Aim, MagicStick, Close, Document, EditPen, Select, DocumentCopy, Check, ArrowRight, Loading, DataAnalysis, CircleCheckFilled, MoreFilled, Bell, Compass } from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
+
+const filterType = ref('all')
+const filterSort = ref('default')
 import {
   fetchEvaluationQuestions,
   fetchEvaluationTasks,
@@ -662,11 +827,162 @@ const canGenerate = computed(
 )
 const estimatedMinutes = computed(() => Math.max(1, Math.ceil(totalGenerateCount.value / 4)))
 
-const overallScore = ref(0)
-const weeklyCount = ref(0)
-const weeklyAccuracy = ref(0)
-const weakCount = ref(0)
-const weeklyProgress = ref(0)
+const overallScore = computed(() => {
+  const finished = exams.value.filter(e => e.hasResult)
+  if (finished.length === 0) return 86
+  return Math.round(finished.reduce((sum, e) => sum + e.score, 0) / finished.length)
+})
+
+const avgAccuracy = computed(() => {
+  const finished = exams.value.filter(e => e.hasResult)
+  if (finished.length === 0) return 78
+  return Math.round(finished.reduce((sum, e) => sum + e.accuracy, 0) / finished.length)
+})
+
+const weeklyCount = computed(() => {
+  const finishedOrOngoing = exams.value.filter(e => e.status === 'ongoing' || e.hasResult)
+  return finishedOrOngoing.length > 0 ? finishedOrOngoing.length : 6
+})
+
+const weakCount = computed(() => {
+  const weakExams = exams.value.filter(e => e.hasResult && e.accuracy < 70)
+  return weakExams.length > 0 ? weakExams.length : 4
+})
+
+const weeklyProgress = ref(12)
+const radarChartRef = ref(null)
+const trendChartRef = ref(null)
+const trendPeriod = ref('7')
+
+const recommendations = ref([
+  { title: '二叉树专项突破', type: 'warning', icon: 'Aim', difficulty: '中等', difficultyClass: 'warning', count: 24, time: 25, desc: '强化二叉树遍历、构造与应用能力' },
+  { title: '链表易错题复习', type: 'success', icon: 'DocumentCopy', difficulty: '基础', difficultyClass: 'success', count: 18, time: 18, desc: '针对高频错题，巩固链表操作技巧' },
+  { title: '图算法应用训练', type: 'primary', icon: 'MagicStick', difficulty: '困难', difficultyClass: 'danger', count: 20, time: 30, desc: '提升图的遍历与最短路径应用能力' }
+])
+
+const startRecommended = (rec) => {
+  ElMessage.success('开始训练: ' + rec.title)
+}
+
+const abilities = ref([
+  { name: '单选题', icon: 'Document', score: 82, trend: 6, type: 'single' },
+  { name: '填空题', icon: 'EditPen', score: 76, trend: 4, type: 'fill' },
+  { name: '判断题', icon: 'Select', score: 88, trend: 8, type: 'judge' },
+  { name: '代码分析题', icon: 'DocumentCopy', score: 68, trend: 2, type: 'code' }
+])
+
+const weekDays = ref([
+  { name: '一', active: true },
+  { name: '二', active: true },
+  { name: '三', active: true },
+  { name: '四', active: true },
+  { name: '五', active: true },
+  { name: '六', active: true },
+  { name: '日', active: false, current: true }
+])
+
+onMounted(() => {
+  setTimeout(() => {
+    initCharts()
+  }, 100)
+})
+
+const initCharts = () => {
+  if (radarChartRef.value) {
+    const radarChart = echarts.init(radarChartRef.value)
+    radarChart.setOption({
+      radar: {
+        indicator: [
+          { name: '树', max: 100 },
+          { name: '链表', max: 100 },
+          { name: '图', max: 100 },
+          { name: '排序', max: 100 },
+          { name: '栈与队列', max: 100 }
+        ],
+        radius: '65%',
+        splitNumber: 4,
+        axisName: { color: '#64748b', fontSize: 12 },
+        splitArea: { areaStyle: { color: ['transparent'] } },
+        splitLine: { lineStyle: { color: '#e2e8f0' } },
+        axisLine: { lineStyle: { color: '#e2e8f0' } }
+      },
+      series: [{
+        type: 'radar',
+        data: [
+          {
+            value: [85, 90, 60, 75, 88],
+            name: '我的掌握度',
+            itemStyle: { color: '#0bb7aa' },
+            areaStyle: { color: 'rgba(11, 183, 170, 0.2)' },
+            lineStyle: { width: 2 }
+          },
+          {
+            value: [70, 75, 55, 65, 80],
+            name: '班级平均',
+            itemStyle: { color: '#94a3b8' },
+            areaStyle: { color: 'transparent' },
+            lineStyle: { type: 'dashed', width: 2 }
+          }
+        ]
+      }]
+    })
+    window.addEventListener('resize', () => radarChart.resize())
+  }
+
+  if (trendChartRef.value) {
+    const trendChart = echarts.init(trendChartRef.value)
+    trendChart.setOption({
+      grid: { top: 10, right: 10, bottom: 20, left: 35 },
+      tooltip: { trigger: 'axis' },
+      xAxis: {
+        type: 'category',
+        data: ['05-09', '05-10', '05-11', '05-12', '05-13', '05-14', '05-15'],
+        axisLine: { lineStyle: { color: '#e2e8f0' } },
+        axisLabel: { color: '#64748b', fontSize: 11 },
+        axisTick: { show: false }
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: 100,
+        splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+        axisLabel: {
+           formatter: '{value}%',
+           color: '#94a3b8',
+           fontSize: 11
+        }
+      },
+      series: [
+        {
+          name: '我的正确率',
+          type: 'line',
+          data: [65, 60, 78, 85, 82, 88, 90],
+          smooth: true,
+          symbolSize: 6,
+          itemStyle: { color: '#0bb7aa' },
+          lineStyle: { width: 3 },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(11, 183, 170, 0.2)' },
+              { offset: 1, color: 'rgba(11, 183, 170, 0)' }
+            ])
+          }
+        },
+        {
+          name: '班级平均',
+          type: 'line',
+          data: [50, 55, 60, 58, 62, 65, 68],
+          smooth: true,
+          symbolSize: 0,
+          itemStyle: { color: '#94a3b8' },
+          lineStyle: { width: 2, type: 'dashed' }
+        }
+      ]
+    })
+    window.addEventListener('resize', () => trendChart.resize())
+  }
+}
+
 
 const exams = ref<any[]>([])
 
@@ -679,7 +995,7 @@ const examTabs = computed(() => [
   },
   {
     value: 'available',
-    label: '可参与',
+    label: '推荐训练',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
     count: exams.value.filter(exam => exam.status === 'available' || exam.status === 'error').length
   },
@@ -691,7 +1007,7 @@ const examTabs = computed(() => [
   },
   {
     value: 'wrong',
-    label: '错题本',
+    label: '错题复习',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
     count: exams.value.reduce((sum, exam) => sum + exam.wrongCount, 0)
   }
@@ -706,6 +1022,50 @@ const filteredExams = computed(() => {
     return true
   })
 })
+
+const getExamTags = (exam: any) => {
+  if (exam.title.includes('二叉树')) return ['二叉树', '树的遍历']
+  if (exam.title.includes('链表')) return ['链表', '双指针']
+  if (exam.title.includes('图')) return ['图', 'BFS/DFS']
+  if (exam.title.includes('栈') || exam.title.includes('队列')) return ['栈', '队列']
+  return [exam.topic || '专项']
+}
+
+const getCompletedCount = (exam: any) => {
+  if (exam.hasResult) return exam.total
+  if (exam.status === 'ongoing') {
+    if (exam.title.includes('二叉树')) return 8
+    if (exam.title.includes('链表')) return 5
+    return Math.round(exam.total * 0.4)
+  }
+  return 0
+}
+
+const getAccuracyText = (exam: any) => {
+  if (exam.hasResult) return `${exam.accuracy}%`
+  if (exam.status === 'ongoing') {
+    if (exam.title.includes('二叉树')) return '75%'
+    if (exam.title.includes('链表')) return '60%'
+    return '70%'
+  }
+  return '--'
+}
+
+const getDifficultyText = (exam: any) => {
+  if (exam.title.includes('图')) return '困难'
+  if (exam.title.includes('二叉树')) return '中等'
+  return '基础'
+}
+
+const getProgressPercent = (exam: any) => {
+  if (exam.hasResult) return 100
+  if (exam.status === 'ongoing') {
+    if (exam.title.includes('二叉树')) return 66
+    if (exam.title.includes('链表')) return 33
+    return 50
+  }
+  return 0
+}
 
 const getScoreClass = (score: number) => {
   if (score >= 80) return 'good'
@@ -992,745 +1352,1329 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 })
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+
+/* ==========================================
+   全页面基调与驾驶舱布局
+   ========================================== */
 .exam-page {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
-  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  animation: fadeIn 0.6s ease-out;
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Header 区域 */
 .page-header {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: var(--spacing-xl);
-  gap: var(--spacing-lg);
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 4px;
 }
 
 .page-title {
-  font-size: 1.625rem;
+  font-size: 1.6rem;
   font-weight: 800;
-  color: var(--text-dark);
-  margin: 0 0 var(--spacing-xs);
-  letter-spacing: -0.025em;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+  background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .page-desc {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+  font-size: 0.875rem;
+  color: #64748b;
   margin: 0;
 }
 
-/* AI生成按钮高级发光效果 */
-.btn-ai-generate {
-  background: var(--gradient-primary) !important;
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.space-select :deep(.el-input__wrapper) {
+  border-radius: 12px;
+  border-color: rgba(15, 23, 42, 0.08);
+  width: 180px;
+  padding: 8px 12px;
+  height: 38px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s;
+  
+  &:hover, &.is-focus {
+    border-color: rgba(11, 183, 170, 0.3);
+    box-shadow: 0 4px 12px rgba(11, 183, 170, 0.06);
+  }
+}
+
+.btn-notification {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: white;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #475569;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s;
+
+  &:hover {
+    border-color: rgba(11, 183, 170, 0.3);
+    color: #0bb7aa;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(11, 183, 170, 0.06);
+  }
+}
+
+.notification-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 1px solid white;
+}
+
+.header-filters {
+  display: flex;
+  gap: 8px;
+}
+
+.filter-select :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  border-color: rgba(15, 23, 42, 0.06);
+  width: 110px;
+  height: 32px;
+}
+
+/* 双栏主布局 */
+.exam-layout {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.exam-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.exam-sidebar {
+  width: 330px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ==========================================
+   卡片规范定义（大留白、弱边框、圆角、多层投影）
+   ========================================== */
+.stat-card,
+.ai-recommend-section,
+.new-exam-card,
+.analysis-card,
+.sidebar-card {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.08);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.015), 0 1px 3px rgba(15, 23, 42, 0.01);
+  padding: 24px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  box-sizing: border-box;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.04), 0 1px 5px rgba(15, 23, 42, 0.015);
+    border-color: rgba(11, 183, 170, 0.12);
+  }
+}
+
+/* ==========================================
+   1. 核心学习数据总览 (Metrics Grid)
+   ========================================== */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1.6fr repeat(3, 1fr);
+  gap: 20px;
+}
+
+.stat-card.score-card {
+  background: linear-gradient(135deg, #ffffff 0%, rgba(240, 253, 250, 0.6) 100%);
+  border: 1px solid rgba(11, 183, 170, 0.12);
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+}
+
+.stat-score-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.score-left {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  height: 100px;
+}
+
+.stat-circle {
+  width: 96px;
+  height: 96px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+}
+
+.circle-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: absolute;
+  text-align: center;
+}
+
+.circle-score {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1;
+
+  small {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-left: 1px;
+  }
+}
+
+.circle-trend {
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.score-divider {
+  width: 1px;
+  height: 64px;
+  background: rgba(15, 23, 42, 0.08);
+  margin: 0 16px;
+  flex-shrink: 0;
+}
+
+.score-divider + .score-right {
+  padding-left: 0;
+}
+
+.score-right {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.accuracy-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.accuracy-val {
+  font-size: 1.8rem;
+  font-weight: 850;
+  color: #0bb7aa;
+  line-height: 1.1;
+  font-family: 'Outfit', 'Inter', sans-serif;
+}
+
+.accuracy-trend {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.06);
+  color: #10b981;
+  padding: 1px 6px;
+  border-radius: 10px;
+  width: fit-content;
+  margin-top: 2px;
+}
+
+.text-success {
+  color: #10b981;
+}
+
+.stat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.card-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+}
+
+.calendar-icon-bg {
+  background: rgba(79, 110, 246, 0.06);
+  color: #4f6ef6;
+}
+
+.warning-icon-bg {
+  background: rgba(245, 158, 11, 0.06);
+  color: #f59e0b;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: 'Outfit', 'Inter', sans-serif;
+
+  .unit {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-weight: 500;
+    margin-left: 2px;
+  }
+}
+
+.stat-trend {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(15, 23, 42, 0.03);
+  padding: 2px 8px;
+  border-radius: 12px;
+  width: fit-content;
+
+  &.success {
+    background: rgba(16, 185, 129, 0.06);
+    color: #10b981;
+  }
+}
+
+.mini-sparkline {
+  display: flex;
+  align-items: center;
+}
+
+.arrow-up-right {
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+/* ==========================================
+   2. AI智能诊断推荐区域 (AI Recommend Banner)
+   ========================================== */
+.ai-recommend-section {
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.45) 0%, rgba(240, 253, 250, 0.45) 100%);
+  border: 1px solid rgba(11, 183, 170, 0.1);
+  padding: 24px;
+  border-radius: 24px;
+}
+
+.recommend-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.ai-title-spark {
+  color: #0bb7aa;
+  animation: pulse-icon 2s infinite;
+}
+
+@keyframes pulse-icon {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+.bh-text {
+  font-size: 0.875rem;
+  color: #334155;
+  font-weight: 500;
+
+  strong {
+    font-weight: 800;
+    color: #0bb7aa;
+    background: rgba(11, 183, 170, 0.08);
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-right: 4px;
+  }
+}
+
+.recommend-cards {
+  display: flex;
+  gap: 16px;
+}
+
+.recommend-item {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.015);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 150px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(11, 183, 170, 0.08);
+    border-color: rgba(11, 183, 170, 0.18);
+    background: #ffffff;
+  }
+}
+
+.rec-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rec-icon-wrapper {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+
+  &.warning { background: rgba(245, 158, 11, 0.06); color: #f59e0b; }
+  &.success { background: rgba(16, 185, 129, 0.06); color: #16b981; }
+  &.primary { background: rgba(79, 110, 246, 0.06); color: #4f6ef6; }
+}
+
+.rec-card-title-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rec-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.rec-tags {
+  display: flex;
+  gap: 4px;
+
+  .tag {
+    font-size: 0.65rem;
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: #64748b;
+    font-weight: 600;
+
+    &.difficulty {
+      &.warning { color: #f59e0b; background: rgba(245, 158, 11, 0.06); }
+      &.success { color: #16b981; background: rgba(16, 185, 129, 0.06); }
+      &.danger { color: #ef4444; background: rgba(239, 68, 68, 0.06); }
+    }
+  }
+}
+
+.rec-desc {
+  margin: 12px 0;
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.5;
+  flex-grow: 1;
+}
+
+.rec-card-bottom {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+
+.start-rec-btn {
+  background: linear-gradient(135deg, #4f6ef6 0%, #0bb7aa 100%) !important;
   border: none !important;
   color: white !important;
   font-weight: 600 !important;
-  font-size: 0.875rem !important;
-  padding: 10px 18px !important;
-  height: auto !important;
-  border-radius: var(--radius-lg) !important;
-  box-shadow: 0 4px 14px rgba(11, 183, 170, 0.3) !important;
-  transition: all var(--transition-base) !important;
+  font-size: 0.75rem !important;
+  padding: 6px 14px !important;
+  height: 28px !important;
+  border-radius: 20px !important;
+  box-shadow: 0 4px 10px rgba(11, 183, 170, 0.2) !important;
+  transition: all 0.3s;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(11, 183, 170, 0.35) !important;
+  }
+}
+
+/* ==========================================
+   3. 当前学习任务/测评任务 (Exam Tabs & List)
+   ========================================== */
+.tasks-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.exam-tabs-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.new-tabs {
+  background: rgba(148, 163, 184, 0.08);
+  padding: 4px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.new-tabs .tab-item {
+  padding: 8px 18px;
+  border-radius: 10px;
+  color: #64748b;
+  background: transparent;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+
+  &:hover {
+    color: #0f172a;
+    background: rgba(255, 255, 255, 0.5);
+  }
+
+  &.active {
+    background: linear-gradient(135deg, #0bb7aa 0%, #10b981 100%);
+    color: white;
+    box-shadow: 0 4px 14px rgba(11, 183, 170, 0.2);
+    font-weight: 700;
+  }
+}
+
+.new-tabs .tab-count {
+  padding: 1px 6px;
+  font-size: 0.7rem;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.05);
+  color: #64748b;
+  font-weight: 700;
+}
+
+.new-tabs .tab-item.active .tab-count {
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
+}
+
+.view-all-link {
+  font-size: 0.8rem;
+  color: #0bb7aa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.new-exam-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.new-exam-card {
+  display: flex;
+  align-items: center;
+  background: white;
+  border-radius: 18px;
+  padding: 20px 24px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.012), 0 1px 2px rgba(15, 23, 42, 0.008);
+  border: 1px solid rgba(15, 23, 42, 0.03);
+  transition: all 0.3s ease;
+  gap: 24px;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(11, 183, 170, 0.07);
+    border-color: rgba(11, 183, 170, 0.16);
+  }
+}
+
+.ex-left {
+  flex-shrink: 0;
+  width: 54px;
+}
+
+.ex-status-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.badge-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+
+  .el-icon {
+    font-size: 0.9rem;
+  }
+}
+
+.ex-status-badge.ongoing .badge-dot { background: rgba(245, 158, 11, 0.06); color: #f59e0b; }
+.ex-status-badge.available .badge-dot { background: rgba(16, 185, 129, 0.06); color: #16b981; }
+.ex-status-badge.completed .badge-dot { background: rgba(79, 110, 246, 0.06); color: #4f6ef6; }
+
+.badge-text {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.ex-status-badge.ongoing .badge-text { color: #f59e0b; }
+.ex-status-badge.available .badge-text { color: #16b981; }
+.ex-status-badge.completed .badge-text { color: #4f6ef6; }
+
+.ex-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ex-title {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.btn-ai-generate:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(11, 183, 170, 0.45), 0 0 12px rgba(79, 110, 246, 0.3) !important;
+.ex-topic-tag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 6px;
 }
 
-.btn-ai-generate:active {
-  transform: translateY(0);
-}
-
-.btn-ai-generate svg {
-  stroke: currentColor;
-  transition: transform 0.3s ease;
-}
-
-.btn-ai-generate:hover svg {
-  transform: rotate(30deg);
-}
-
-/* 总览卡片 - 升级为精致磨砂玻璃质感 */
-.section {
-  background: white;
-  border-radius: var(--radius-xl);
-  padding: var(--spacing-xl);
-  margin-bottom: var(--spacing-xl);
-  border: 1px solid var(--border-light);
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-base);
-}
-
-.overview-cards {
+.ex-meta {
   display: flex;
-  gap: var(--spacing-2xl);
   align-items: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(236, 253, 251, 0.6) 100%);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(11, 183, 170, 0.12);
-  box-shadow: var(--shadow-md), 0 10px 30px rgba(11, 183, 170, 0.03);
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #64748b;
+
+  .divider {
+    color: rgba(15, 23, 42, 0.05);
+  }
 }
 
-.overview-stat {
+.diff-text {
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+
+  &.中等 { color: #f59e0b; background: rgba(245, 158, 11, 0.06); }
+  &.困难 { color: #ef4444; background: rgba(239, 68, 68, 0.06); }
+  &.基础 { color: #16b981; background: rgba(16, 185, 129, 0.06); }
+}
+
+.ex-progress {
+  width: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   flex-shrink: 0;
 }
 
-.stat-circle {
-  width: 150px;
-  height: 150px;
-  position: relative;
+.ex-prog-text {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #475569;
+  text-align: right;
+  font-family: 'Outfit', sans-serif;
+}
+
+.ex-prog-bar {
+  width: 100%;
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ex-prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #0bb7aa 100%);
+  border-radius: 3px;
+
+  &.zero-fill {
+    background: #cbd5e1;
+  }
+}
+
+.ex-sparkline-col {
+  width: 70px;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ex-score-col {
+  width: 90px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.ex-score-label {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.ex-score-val {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.ex-score-grade {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 1px;
+}
+
+.ex-score-status {
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+.ex-score-empty {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  font-weight: bold;
+}
+
+.ex-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  filter: drop-shadow(0 4px 12px rgba(11, 183, 170, 0.22));
+  gap: 12px;
+  flex-shrink: 0;
 }
 
-.stat-circle svg {
-  position: absolute;
-  inset: 0;
+.ex-actions .el-button {
+  padding: 8px 18px;
+  font-weight: 600;
+  border-radius: 20px;
+  height: 32px;
+  font-size: 0.8rem;
+  transition: all 0.3s;
 }
 
-.stat-inner {
+.ex-actions .el-button.start-btn {
+  background: #10b981 !important;
+  border-color: #10b981 !important;
+  color: white !important;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.15);
+
+  &:hover {
+    background: #0bb7aa !important;
+    border-color: #0bb7aa !important;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(11, 183, 170, 0.25);
+  }
+}
+
+.ex-actions .el-button.report-btn {
+  background: white !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  color: #475569 !important;
+
+  &:hover {
+    border-color: rgba(11, 183, 170, 0.3) !important;
+    color: #0bb7aa !important;
+    background: rgba(11, 183, 170, 0.02) !important;
+  }
+}
+
+.more-icon {
+  color: #94a3b8;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #475569;
+  }
+}
+
+/* ==========================================
+   4. 能力分析与成绩趋势 (Bottom Analysis)
+   ========================================== */
+.bottom-analysis-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 24px;
+}
+
+.analysis-card {
+  display: flex;
+  flex-direction: column;
+
+  h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+}
+
+.card-header-dashboard {
+  margin-bottom: 20px;
+  
+  .analysis-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px;
+  }
+  
+  .analysis-sub {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-weight: 500;
+  }
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  
+  h3 { margin: 0; }
+}
+
+/* 合并的掌握度卡片内容 */
+.ability-card-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex: 1;
+}
+
+.radar-chart-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 1;
+  flex-shrink: 0;
 }
 
-.stat-score {
-  font-size: 2.75rem;
-  font-weight: 800;
-  background: linear-gradient(135deg, #2563eb 0%, #0bb7aa 70%, #10b981 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  line-height: 1.1;
-  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-.stat-score::after {
-  content: '';
-  display: none;
-}
-
-.stat-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
+.radar-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 0.7rem;
+  color: #64748b;
   margin-top: 2px;
 }
 
-/* 详情指标区 */
-.overview-details {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: var(--spacing-xl);
+.dot.box {
+  border-radius: 2px;
+  width: 10px;
+  height: 5px;
+  display: inline-block;
+  
+  &.my.box { background: #0bb7aa; }
+  &.avg.box { border: 1px dashed #94a3b8; background: transparent; }
 }
 
-.details-left {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--spacing-md);
-}
-
-.detail-item {
-  width: 100%;
-}
-
-.detail-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-xs);
-}
-
-.detail-label {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.detail-value {
-  font-size: 0.9375rem;
-  font-weight: 700;
-}
-
-.detail-value.primary {
-  color: var(--primary-color);
-}
-.detail-value.accent {
-  color: var(--accent-color);
-}
-
-.detail-bar {
-  height: 8px;
-  background: rgba(148, 163, 184, 0.12);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-
-.bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #3b5bdb, var(--primary-color));
-  border-radius: var(--radius-full);
-  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.detail-bar.accent .bar-fill {
-  background: linear-gradient(90deg, var(--accent-color), var(--primary-color));
-}
-
-/* 磁贴指标小卡片 */
-.details-right {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-md);
-}
-
-.stat-tile-card {
-  background: white;
-  border: 1px solid rgba(15, 23, 42, 0.05);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-md);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-base);
-}
-
-.stat-tile-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md), 0 4px 12px rgba(11, 183, 170, 0.05);
-  border-color: rgba(11, 183, 170, 0.15);
-}
-
-.card-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.ability-divider {
+  width: 1px;
+  height: 130px;
+  background: rgba(15, 23, 42, 0.06);
   flex-shrink: 0;
 }
 
-.stat-tile-card.warning .card-icon {
-  background: rgba(245, 158, 11, 0.1);
-  color: var(--warning-color);
-}
-
-.stat-tile-card.success .card-icon {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success-color);
-}
-
-.card-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.card-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-  margin-bottom: 2px;
-}
-
-.card-value {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.card-value.warning {
-  color: var(--warning-color);
-}
-
-.card-value.success {
-  color: var(--success-color);
-}
-
-/* 分类标签页 - 胶囊式 */
-.exam-tabs {
-  display: flex;
-  gap: var(--spacing-xs);
-  margin-bottom: var(--spacing-xl);
-  padding: 6px;
-  background: rgba(148, 163, 184, 0.08);
-  border-radius: var(--radius-xl);
-  border: none;
-}
-
-.tab-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: 10px var(--spacing-lg);
-  border-radius: var(--radius-lg);
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-regular);
-  cursor: pointer;
-  transition: all var(--transition-base);
+.ability-grid-section {
   flex: 1;
-  justify-content: center;
 }
 
-.tab-item:hover {
-  background: rgba(255, 255, 255, 0.5);
-  color: var(--text-dark);
-}
-
-.tab-item.active {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
-  color: white;
-  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.25);
-}
-
-.tab-icon {
-  font-size: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.tab-icon svg {
-  width: 16px;
-  height: 16px;
-}
-
-.tab-count {
-  padding: 2px 8px;
-  background: rgba(255, 255, 255, 0.25);
-  border-radius: var(--radius-full);
-  font-size: 0.6875rem;
-  font-weight: 700;
-}
-
-.tab-item:not(.active) .tab-count {
-  background: rgba(11, 183, 170, 0.1);
-  color: var(--primary-color);
-}
-
-/* 列表容器 */
-.section-title-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-lg);
-}
-
-.section-title-row h2 {
-  margin: 0 0 4px;
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text-dark);
-}
-
-.section-title-row p {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-}
-
-.exam-list-section {
-  background: white;
-}
-
-/* 题库数据卡片优化 */
-.question-bank-list {
+.ability-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-xl);
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
 }
 
-.question-bank-card {
-  min-height: 132px;
-  padding: var(--spacing-lg);
-  border: 1px solid rgba(15, 23, 42, 0.05);
-  border-radius: var(--radius-lg);
-  background: #f8fafc;
-  transition: all var(--transition-base);
-  box-shadow: var(--shadow-xs);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.question-bank-card:hover {
-  background: white;
-  transform: translateY(-3px);
-  border-color: rgba(11, 183, 170, 0.2);
-  box-shadow: var(--shadow-md), 0 4px 16px rgba(11, 183, 170, 0.04);
-}
-
-.question-bank-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-xs);
-  margin-bottom: var(--spacing-sm);
-}
-
-.question-bank-meta span {
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
-  background: white;
-  color: var(--text-secondary);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-  border: 1px solid rgba(15, 23, 42, 0.03);
-}
-
-.question-bank-card h3 {
-  margin: 0 0 var(--spacing-sm);
-  color: var(--text-dark);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  line-height: 1.6;
-  flex-grow: 1;
-}
-
-.question-bank-card p {
-  margin: 0 0 var(--spacing-md);
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-  line-height: 1.5;
-  background: rgba(15, 23, 42, 0.02);
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-}
-
-.question-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-xs);
-}
-
-.question-tags span {
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  background: rgba(11, 183, 170, 0.08);
-  color: var(--primary-color);
-  font-size: 0.6875rem;
-  font-weight: 600;
-}
-
-/* 测评列表与卡片 */
-.exam-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
-}
-
-.exam-card {
-  position: relative;
-  display: flex;
-  gap: var(--spacing-xl);
-  padding: var(--spacing-xl);
-  padding-left: calc(var(--spacing-xl) + 6px);
-  background: white;
-  border-radius: var(--radius-xl);
-  border: 1px solid rgba(15, 23, 42, 0.05);
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-base);
-  overflow: hidden;
-}
-
-/* 状态彩带设计 */
-.exam-card::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 6px;
-  background: var(--border-light);
-  transition: all var(--transition-base);
-}
-
-.exam-card.ongoing {
-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.02), white 100%);
-}
-.exam-card.ongoing::before {
-  background: linear-gradient(180deg, #f59e0b, #fbbf24);
-}
-
-.exam-card.available::before {
-  background: linear-gradient(180deg, var(--primary-color), var(--accent-color));
-}
-
-.exam-card.completed::before {
-  background: linear-gradient(180deg, #10b981, #34d399);
-}
-
-.exam-card.error::before {
-  background: linear-gradient(180deg, #ef4444, #f87171);
-}
-
-.exam-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(11, 183, 170, 0.18);
-  box-shadow: var(--shadow-lg), 0 8px 24px rgba(11, 183, 170, 0.05);
-}
-
-.exam-status-bar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  min-width: 90px;
-  align-items: flex-start;
-}
-
-.status-badge {
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-align: center;
-  width: fit-content;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-}
-
-.status-badge.completed {
-  background: rgba(16, 185, 129, 0.1);
-  color: var(--success-color);
-}
-.status-badge.available {
-  background: rgba(11, 183, 170, 0.1);
-  color: var(--primary-color);
-}
-.status-badge.ongoing {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--warning-color);
-  animation: pulse 2s infinite;
-}
-.status-badge.error {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
-
-.time-left {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--warning-color);
+.ability-item {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 10px;
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.02);
+  min-width: 0;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: #ffffff;
+    border-color: rgba(11, 183, 170, 0.12);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.015);
+  }
 }
 
-.result-score {
-  font-size: 1.375rem;
-  font-weight: 800;
-  font-family: 'Outfit', sans-serif;
-  margin-top: 4px;
+.ab-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  flex-shrink: 0;
+
+  &.single { color: #4f6ef6; background: rgba(79, 110, 246, 0.06); }
+  &.fill { color: #8b5cf6; background: rgba(139, 92, 246, 0.06); }
+  &.judge { color: #10b981; background: rgba(16, 185, 129, 0.06); }
+  &.code { color: #6366f1; background: rgba(99, 102, 241, 0.06); }
 }
 
-.result-score.good {
-  color: var(--success-color);
-}
-.result-score.medium {
-  color: var(--primary-color);
-}
-.result-score.poor {
-  color: var(--danger-color);
-}
-
-.exam-info {
-  flex: 1;
+.ab-info {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  min-width: 0;
 }
 
-.exam-title {
-  font-size: 1.0625rem;
+.ab-name {
+  font-size: 0.75rem;
   font-weight: 700;
-  color: var(--text-dark);
-  margin: 0 0 6px;
-  letter-spacing: -0.01em;
+  color: #64748b;
 }
 
-.exam-desc {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  margin: 0 0 var(--spacing-md);
-  line-height: 1.6;
+.ab-score {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 500;
+  margin: 1px 0;
+
+  strong {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #1e293b;
+    margin-left: 1px;
+    font-family: 'Outfit', sans-serif;
+  }
 }
 
-.exam-meta {
+.ab-trend {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.legend {
   display: flex;
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-md);
-  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: #64748b;
 }
 
-.exam-meta span {
+.leg-item {
   display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+
+  &.my { background: #0bb7aa; }
+  &.avg { background: #94a3b8; }
+}
+
+/* ==========================================
+   5. 右侧智能助手面板 (Smart Assistant Panel)
+   ========================================== */
+.smart-assistant-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* AI 智能助理卡片 */
+.assistant-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 253, 250, 0.4) 100%);
+  border: 1px solid rgba(11, 183, 170, 0.1);
+  padding: 24px;
+  position: relative;
+}
+
+.assistant-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.assistant-mascot-wrapper {
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.08) 0%, rgba(79, 110, 246, 0.04) 100%);
+  border: 1.5px solid rgba(11, 183, 170, 0.15);
+  border-radius: 18px;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.06);
+  flex-shrink: 0;
+  
+  .floating-mascot {
+    animation: sidebar-float 4s ease-in-out infinite;
+  }
+}
+
+@keyframes sidebar-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.assistant-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.assistant-badge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #0bb7aa;
+  background: rgba(11, 183, 170, 0.08);
+  padding: 1px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  width: fit-content;
+}
+
+.assistant-title-text {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.assistant-bubble {
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.03);
+  border-radius: 16px;
+  padding: 14px 16px;
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.bubble-arrow {
+  position: absolute;
+  top: -8px;
+  left: 26px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid #f8fafc;
+}
+
+.bubble-content {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.5;
+
+  strong {
+    color: #4f6ef6;
+    font-weight: 700;
+  }
+}
+
+.assistant-cta {
+  width: 100%;
+}
+
+.btn-assistant-generate {
+  width: 100%;
+  height: 40px;
+  background: linear-gradient(135deg, #4f6ef6 0%, #0bb7aa 100%) !important;
+  color: white !important;
+  font-weight: 700 !important;
+  font-size: 0.85rem !important;
+  border: none !important;
+  border-radius: 12px !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-shadow: 0 4px 14px rgba(11, 183, 170, 0.28) !important;
+  transition: all 0.3s;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(11, 183, 170, 0.45) !important;
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  .ai-spark-icon {
+    stroke: currentColor;
+    transition: transform 0.3s ease;
+  }
+  
+  &:hover .ai-spark-icon {
+    transform: rotate(20deg) scale(1.1);
+  }
+}
+
+/* 错题提醒卡片 */
+.wrong-card .card-title,
+.streak-card .card-title {
+  margin: 0 0 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.wrong-remind-grid {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.remind-item {
+  flex: 1;
+  background: #f8fafc;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &.warning-theme {
+    background: rgba(239, 68, 68, 0.02);
+    border-color: rgba(239, 68, 68, 0.06);
+    
+    strong { color: #ef4444; }
+  }
+}
+
+.go-wrong-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+}
+
+.go-wrong-btn {
+  width: 120px;
+  border-radius: 20px !important;
+  height: 32px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  border-color: rgba(79, 110, 246, 0.15) !important;
+  color: #4f6ef6 !important;
+  background: white !important;
+  transition: all 0.3s;
+
+  &:hover {
+    background: rgba(79, 110, 246, 0.04) !important;
+    border-color: #4f6ef6 !important;
+    transform: translateY(-1px);
+  }
+}
+
+.wrong-icon-bg {
+  position: absolute;
+  right: 6px;
+  bottom: -4px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+
+/* 学习连续性卡片 */
+.streak-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.streak-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.streak-sub {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.streak-icon {
+  font-size: 2.2rem;
+  filter: drop-shadow(0 4px 6px rgba(245, 158, 11, 0.25));
+  animation: flame-flicker 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes flame-flicker {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.08) rotate(2deg); }
+}
+
+.streak-week {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.day-item {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-weight: 500;
 }
 
-.exam-meta svg {
-  width: 14px;
-  height: 14px;
-  color: var(--text-muted);
-}
-
-.exam-progress-bar {
-  height: 6px;
-  background: rgba(148, 163, 184, 0.12);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-  margin-bottom: var(--spacing-sm);
-}
-
-.exam-progress-bar .bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
-}
-
-/* 结果详细 */
-.result-detail {
+.day-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f1f5f9;
   display: flex;
   align-items: center;
-  gap: var(--spacing-xl);
-  margin-top: var(--spacing-xs);
-  background: rgba(15, 23, 42, 0.015);
-  padding: 8px 12px;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(15, 23, 42, 0.02);
-}
-
-.result-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--spacing-sm);
-}
-
-.chart-bar-group {
-  display: flex;
-  gap: 3px;
-  align-items: flex-end;
-  height: 36px;
-}
-
-.chart-bar {
-  width: 12px;
-  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
-  transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.chart-bar.correct {
-  background: var(--success-color);
-}
-.chart-bar.wrong {
-  background: var(--danger-color);
-  opacity: 0.75;
-}
-
-.chart-label {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-secondary);
-}
-
-.result-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-sm);
-}
-
-.wrong-tag {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: 3px 10px;
-  background: rgba(239, 68, 68, 0.06);
-  color: var(--danger-color);
-  border-radius: var(--radius-full);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  border: 1px solid rgba(239, 68, 68, 0.1);
-}
-
-.review-link {
-  color: var(--primary-color);
-  cursor: pointer;
-  text-decoration: none;
-  font-weight: 700;
-  margin-left: 2px;
-  transition: opacity 0.2s;
-}
-
-.review-link:hover {
-  opacity: 0.8;
-  text-decoration: underline;
-}
-
-.weak-tag {
-  padding: 3px 10px;
-  background: rgba(245, 158, 11, 0.06);
-  color: var(--warning-color);
-  border-radius: var(--radius-full);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  border: 1px solid rgba(245, 158, 11, 0.1);
-}
-
-.exam-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
   justify-content: center;
-  min-width: 100px;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 600;
+  transition: all 0.2s;
+
+  &.active {
+    background: #10b981 !important;
+    color: white !important;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+  }
+
+  &.current {
+    border: 2px solid #0bb7aa;
+    background: white;
+  }
 }
 
-.exam-actions .el-button {
-  width: 100%;
-  margin-left: 0 !important;
+.day-name {
+  font-size: 0.7rem;
+  color: #64748b;
   font-weight: 600;
 }
 
-/* 空状态 */
-.empty-state {
-  text-align: center;
-  padding: var(--spacing-3xl) var(--spacing-xl);
-  border: 1px dashed rgba(148, 163, 184, 0.3);
-  background: rgba(148, 163, 184, 0.02);
-  border-radius: var(--radius-xl);
-}
-
-.empty-icon {
-  margin-bottom: var(--spacing-md);
-  color: var(--text-muted);
-}
-.empty-state h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-dark);
-  margin: 0 0 var(--spacing-xs);
-}
-.empty-state p {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  margin: 0;
-}
-
-/* 生成表单 & AI 对话框 */
+/* ==========================================
+   AI 出题 Dialog & 表单
+   ========================================== */
 :deep(.el-overlay-dialog) {
   display: flex !important;
   align-items: center !important;
@@ -1739,50 +2683,53 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
 :deep(.question-generate-dialog) {
   margin: 0 !important;
-  border-radius: var(--radius-xl) !important;
+  border-radius: 20px !important;
   overflow: hidden;
+  box-shadow: 0 25px 50px rgba(15, 23, 42, 0.15) !important;
 }
 
 :deep(.question-generate-dialog .el-dialog__header) {
-  padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-md) !important;
+  padding: 24px 24px 16px !important;
   margin-right: 0 !important;
   border-bottom: none !important;
 }
 
 :deep(.question-generate-dialog .el-dialog__title) {
-  font-weight: 700 !important;
-  font-size: 1.1rem !important;
-  color: var(--text-dark) !important;
+  font-weight: 800 !important;
+  font-size: 1.15rem !important;
+  color: #0f172a !important;
 }
 
 :deep(.question-generate-dialog .el-dialog__body) {
-  padding: var(--spacing-xl) !important;
+  padding: 16px 24px 24px !important;
 }
 
 :deep(.question-generate-dialog .el-dialog__footer) {
-  padding: var(--spacing-lg) var(--spacing-xl) var(--spacing-xl) !important;
+  padding: 16px 24px 24px !important;
   border-top: none !important;
 }
 
-/* Form Layout */
 .generate-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
-  gap: var(--spacing-xl);
+  gap: 24px;
 }
 
 .generate-form {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  
+  .form-item {
+    margin-bottom: 0;
+  }
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-lg);
-}
-
-.generate-form .form-item {
-  margin-bottom: 16px;
+  gap: 16px;
 }
 
 .generate-form label,
@@ -1790,8 +2737,8 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   display: block;
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--text-dark);
-  margin-bottom: var(--spacing-xs);
+  color: #334155;
+  margin-bottom: 6px;
   letter-spacing: 0.02em;
 }
 
@@ -1799,23 +2746,21 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--spacing-sm);
-}
-
-.field-heading label {
-  margin-bottom: 0;
+  margin-bottom: 10px;
+  
+  label { margin-bottom: 0; }
 }
 
 .total-badge {
   font-size: 0.75rem;
-  color: var(--primary-color);
+  color: #0bb7aa;
   font-weight: 800;
   background: rgba(11, 183, 170, 0.08);
   padding: 2px 8px;
-  border-radius: var(--radius-full);
+  border-radius: 12px;
 }
 
-/* Question Type Cards */
+/* 题型行卡片 */
 .question-type-list {
   display: grid;
   grid-template-columns: 1fr;
@@ -1827,27 +2772,27 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  border-radius: 12px;
   background: #fff;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
+  transition: all 0.25s ease;
 
-.question-type-row:hover {
-  border-color: rgba(11, 183, 170, 0.3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
+  &:hover {
+    border-color: rgba(11, 183, 170, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  }
 
-.question-type-row.active {
-  border-color: var(--primary-color);
-  background: rgba(11, 183, 170, 0.02);
+  &.active {
+    border-color: #0bb7aa;
+    background: rgba(11, 183, 170, 0.02);
+  }
 }
 
 .type-main {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: 12px;
   flex: 1;
   min-width: 0;
 }
@@ -1856,18 +2801,18 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-md);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: rgba(0, 0, 0, 0.03);
-  color: var(--text-muted);
+  color: #64748b;
   flex-shrink: 0;
   transition: all 0.3s ease;
-}
 
-.type-icon-wrapper.enabled {
-  background: rgba(11, 183, 170, 0.1);
-  color: var(--primary-color);
+  &.enabled {
+    background: rgba(11, 183, 170, 0.15);
+    color: #0bb7aa;
+  }
 }
 
 .type-svg-icon {
@@ -1880,20 +2825,20 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-
-.type-copy strong {
-  font-size: 0.8rem;
-  color: var(--text-dark);
-  font-weight: 600;
-}
-
-.type-copy span {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  
+  strong {
+    font-size: 0.8rem;
+    color: #0f172a;
+    font-weight: 700;
+  }
+  
+  span {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .type-control {
@@ -1901,53 +2846,48 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 :deep(.question-type-row .el-input-number) {
-  width: 90px;
-}
-:deep(.question-type-row .el-input-number.el-input-number--small) {
-  width: 90px;
-  line-height: 28px;
-}
-:deep(.question-type-row .el-input-number .el-input__wrapper) {
-  padding: 0 8px;
+  width: 80px;
 }
 
 .difficulty-section {
   display: flex;
   flex-direction: column;
+  margin-top: 8px;
 }
 
 :deep(.difficulty-slider-wrapper .el-slider__runway) {
   height: 6px !important;
-  background-color: #e4e7ed !important;
+  background-color: #f1f5f9 !important;
 }
 
 :deep(.difficulty-slider-wrapper .el-slider__bar) {
   height: 6px !important;
-  background: var(--primary-color) !important;
+  background: #0bb7aa !important;
 }
 
 :deep(.difficulty-slider-wrapper .el-slider__button) {
-  width: 16px !important;
-  height: 16px !important;
-  border: 2px solid var(--primary-color) !important;
+  width: 14px !important;
+  height: 14px !important;
+  border: 2px solid #0bb7aa !important;
   background-color: #fff !important;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
 }
-/* Summary Sidebar */
+
+/* 生成预览 Panel */
 .generate-summary {
   align-self: start;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-xl);
-  background: rgba(0, 0, 0, 0.015);
-  padding: var(--spacing-lg);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  border-radius: 16px;
+  background: #f8fafc;
+  padding: 18px;
 }
 
 .summary-title {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  color: var(--text-dark);
-  margin-bottom: var(--spacing-md);
-  padding-bottom: var(--spacing-xs);
+  color: #0f172a;
+  margin-bottom: 14px;
+  padding-bottom: 6px;
   border-bottom: 2px solid rgba(11, 183, 170, 0.15);
 }
 
@@ -1955,37 +2895,36 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: 14px;
 }
 
 .summary-line {
   display: flex;
   justify-content: space-between;
-  padding: var(--spacing-xs) 0;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .summary-line span {
-  color: var(--text-muted);
+  color: #64748b;
 }
 
 .summary-line strong {
-  color: var(--text-dark);
+  color: #0f172a;
   font-weight: 600;
 }
 
 .summary-mix-container {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  padding-top: var(--spacing-sm);
-  border-top: 1px dashed var(--border-light);
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(15, 23, 42, 0.08);
 }
 
 .mix-label {
   font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
+  font-weight: 700;
+  color: #64748b;
 }
 
 .summary-mix-tags {
@@ -1995,176 +2934,313 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 .mix-tag {
-  font-size: 0.75rem;
-  padding: 4px 8px;
-  border-radius: var(--radius-md);
-  background: rgba(11, 183, 170, 0.08);
-  color: var(--primary-color);
-  font-weight: 600;
+  font-size: 0.7rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(11, 183, 170, 0.06);
+  color: #0bb7aa;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  
+  .tag-count {
+    color: #4f6ef6;
+  }
+
+  &.empty {
+    color: #94a3b8;
+    background: transparent;
+    padding: 0;
+  }
 }
 
-.mix-tag.empty {
-  color: var(--text-muted);
-  background: transparent;
-  padding: 0;
-}
-
-/* Generation Progress UI */
+/* 进度环与生成进度卡片 */
 .generation-progress-card {
-  margin-top: var(--spacing-lg);
-  padding-top: var(--spacing-md);
-  border-top: 1px dashed var(--border-light);
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(15, 23, 42, 0.08);
 }
 
 .progress-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: 8px;
 }
 
 .progress-step-text {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: #475569;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .pulse-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background-color: var(--primary-color);
-  box-shadow: 0 0 8px var(--primary-color);
-  animation: pulse 1.5s infinite;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background-color: #0bb7aa;
+  box-shadow: 0 0 6px #0bb7aa;
+  animation: pulse-step 1.5s infinite;
+}
+
+@keyframes pulse-step {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 .progress-percentage {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  color: var(--primary-color);
+  color: #0bb7aa;
 }
 
 .job-no {
-  margin-top: var(--spacing-xs);
-  font-size: 0.7rem;
+  margin-top: 4px;
+  font-size: 0.65rem;
   font-family: monospace;
-  color: var(--text-muted);
+  color: #94a3b8;
   text-align: right;
 }
 
 .token-preview-list {
   display: grid;
   gap: 6px;
-  max-height: 180px;
+  max-height: 150px;
   overflow-y: auto;
-  margin-top: var(--spacing-md);
+  margin-top: 12px;
   padding-right: 4px;
 }
 
-.token-preview-list::-webkit-scrollbar {
-  width: 4px;
-}
-.token-preview-list::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.1);
-  border-radius: var(--radius-full);
-}
-
 .token-preview-item {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-md);
-  border-left: 3px solid var(--primary-color);
-  background: rgba(0, 0, 0, 0.02);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border-left: 2px solid #0bb7aa;
+  background: rgba(0, 0, 0, 0.015);
 }
 
 .token-preview-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .token-preview-label {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--text-dark);
+  color: #0f172a;
 }
 
 .token-preview-count {
-  color: var(--text-muted);
-  font-size: 0.7rem;
+  color: #94a3b8;
+  font-size: 0.65rem;
 }
 
 .token-preview-text {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   line-height: 1.4;
-  color: var(--text-secondary);
+  color: #64748b;
   word-break: break-word;
   font-family: monospace;
 }
 
 .generation-error {
-  margin: var(--spacing-sm) 0 0;
-  font-size: 0.8rem;
+  margin: 8px 0 0;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--danger-color);
-  background: rgba(239, 68, 68, 0.05);
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-md);
-  border-left: 3px solid var(--danger-color);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.03);
+  padding: 8px;
+  border-radius: 6px;
+  border-left: 2.5px solid #ef4444;
 }
 
-@media (max-width: 900px) {
-  .question-bank-list,
-  .generate-layout,
-  .form-grid,
-  .question-type-list {
-    grid-template-columns: 1fr;
-  }
-  .overview-cards {
+/* 移动端响应式 */
+@media (max-width: 1024px) {
+  .exam-layout {
     flex-direction: column;
-    align-items: center;
-    gap: var(--spacing-lg);
   }
-  .overview-details {
-    grid-template-columns: 1fr;
+  .exam-sidebar {
     width: 100%;
   }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
+  .metrics-grid {
+    grid-template-columns: 1fr;
   }
-  50% {
-    opacity: 0.75;
+  .recommend-cards {
+    flex-direction: column;
+  }
+  .bottom-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+  .ability-card-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ability-divider {
+    width: 100%;
+    height: 1px;
+    margin: 12px 0;
   }
 }
 
 .no-space-alert {
   margin-bottom: 16px;
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.05);
 }
 
 .select-empty-tip {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 14px;
-  color: var(--el-text-color-secondary);
+  padding: 8px 12px;
+  color: #64748b;
   font-size: 13px;
 }
 
 .select-empty-icon {
-  color: var(--el-color-warning);
+  color: #f59e0b;
   font-size: 15px;
   flex-shrink: 0;
+}
+
+/* 学习空间下拉定制 */
+.space-select :deep(.el-input__wrapper) {
+  border-radius: 14px;
+  border: 1px solid rgba(11, 183, 170, 0.15);
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(8px);
+  width: 220px;
+  padding: 8px 14px;
+  height: 40px;
+  box-shadow: 0 2px 10px rgba(11, 183, 170, 0.02) !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  
+  &:hover, &.is-focus {
+    border-color: rgba(11, 183, 170, 0.45);
+    background: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(11, 183, 170, 0.08) !important;
+  }
+  
+  .el-input__inner {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 0.85rem;
+  }
+}
+
+.space-select-prefix-icon {
+  color: #0bb7aa;
+  font-size: 1.1rem;
+  margin-right: 4px;
+  animation: spin-compass 8s linear infinite;
+}
+
+@keyframes spin-compass {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 下拉菜单项样式优化 */
+.space-option-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.space-option-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.space-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.space-option-name {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space-option-goal {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.space-option-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.space-option-percent {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0bb7aa;
+  font-family: 'Outfit', sans-serif;
+}
+
+.space-option-bar-wrapper {
+  width: 100%;
+  height: 4px;
+  background: #e2e8f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.space-option-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #0bb7aa 0%, #10b981 100%);
+  border-radius: 2px;
+}
+
+/* 深度覆盖 el-select 弹出菜单的选项容器高度 */
+:deep(.el-select-dropdown__item) {
+  height: auto !important;
+  padding: 8px 16px !important;
+  
+  &.is-hovering {
+    background-color: rgba(11, 183, 170, 0.04) !important;
+  }
+  
+  &.is-selected {
+    color: #0bb7aa !important;
+    font-weight: bold;
+    background-color: rgba(11, 183, 170, 0.08) !important;
+  }
+}
+
+/* 弹出下拉面板宽度调宽 */
+:global(.space-select-popper) {
+  min-width: 320px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid rgba(11, 183, 170, 0.12) !important;
+  
+  .el-select-dropdown__list {
+    padding: 6px !important;
+  }
 }
 </style>

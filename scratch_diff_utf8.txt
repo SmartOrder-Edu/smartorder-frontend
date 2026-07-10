@@ -1,0 +1,2716 @@
+﻿diff --git a/src/views/Exam/index.vue b/src/views/Exam/index.vue
+index 9a15698..05033fc 100644
+--- a/src/views/Exam/index.vue
++++ b/src/views/Exam/index.vue
+@@ -5,63 +5,75 @@
+       <div class="page-header">
+         <div class="header-left">
+           <h1 class="page-title">娴嬭瘎涓績</h1>
+-          <p class="page-desc">闃舵鎬ф祴璇勩€佷笓椤规祴璇曘€侀敊棰樺涔狅紝杩借釜浣犵殑瀛︿範鏁堟灉</p>
++          <p class="page-desc">闃舵娴嬭瘎銆佷笓椤硅缁冦€侀敊棰樺涔狅紝杩借釜浣犵殑瀛︿範鏁堟灉</p>
+         </div>
+-        <div class="header-right" style="display: flex; align-items: center;">
+-          <template v-if="learningSpaceStore.loading || learningSpaceStore.activeSpaces.length > 0">
+-            <el-select
+-              v-model="selectedSpaceId"
+-              filterable
+-              placeholder="鍒囨崲瀛︿範绌洪棿"
+-              style="width: 200px; margin-right: 16px;"
+-              :loading="learningSpaceStore.loading"
+-            >
+-              <el-option
+-                v-for="space in learningSpaceStore.activeSpaces"
+-                :key="space.id"
+-                :label="space.name"
+-                :value="space.id"
+-              />
+-              <template #empty>
+-                <div class="select-empty-tip">
+-                  <el-icon class="select-empty-icon"><Warning /></el-icon>
+-                  <span>鏆傛棤瀛︿範绌洪棿</span>
+-                  <el-button
+-                    type="primary"
+-                    link
+-                    size="small"
+-                    @click="router.push('/spaces')"
+-                  >鍘诲垱寤?/el-button>
+-                </div>
+-              </template>
+-            </el-select>
+-          </template>
+-          <template v-else>
+-            <el-button
+-              type="primary"
+-              style="margin-right: 16px;"
+-              @click="router.push('/spaces')"
+-            >
+-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 4px;">
+-                <line x1="12" y1="5" x2="12" y2="19"></line>
+-                <line x1="5" y1="12" x2="19" y2="12"></line>
++        <div class="header-right">
++          <div class="header-actions">
++            <template v-if="learningSpaceStore.loading || learningSpaceStore.activeSpaces.length > 0">
++              <el-select
++                v-model="selectedSpaceId"
++                filterable
++                placeholder="鍒囨崲瀛︿範绌洪棿"
++                class="space-select"
++                :loading="learningSpaceStore.loading"
++              >
++                <el-option
++                  v-for="space in learningSpaceStore.activeSpaces"
++                  :key="space.id"
++                  :label="space.name"
++                  :value="space.id"
++                />
++                <template #empty>
++                  <div class="select-empty-tip">
++                    <el-icon class="select-empty-icon"><Warning /></el-icon>
++                    <span>鏆傛棤瀛︿範绌洪棿</span>
++                    <el-button
++                      type="primary"
++                      link
++                      size="small"
++                      @click="router.push('/spaces')"
++                    >鍘诲垱寤?/el-button>
++                  </div>
++                </template>
++              </el-select>
++            </template>
++            <template v-else>
++              <el-button
++                type="primary"
++                style="margin-right: 16px;"
++                @click="router.push('/spaces')"
++              >
++                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 4px;">
++                  <line x1="12" y1="5" x2="12" y2="19"></line>
++                  <line x1="5" y1="12" x2="19" y2="12"></line>
++                </svg>
++                绔嬪嵆鍒涘缓瀛︿範绌洪棿
++              </el-button>
++            </template>
++            <el-button class="btn-ai-generate" @click="showGenerateDialog = true">
++              <svg class="ai-spark-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
++                <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m16.5-6.5l-2.2 2.2m-9.6 9.6l-2.2 2.2m14-2.2l-2.2-2.2m-9.6-9.6L4.5 7.5" stroke-linecap="round"/>
+               </svg>
+-              绔嬪嵆鍒涘缓瀛︿範绌洪棿
++              AI 鐢熸垚娴嬭瘎
+             </el-button>
+-          </template>
+-          <el-button class="btn-ai-generate" @click="showGenerateDialog = true">
+-            <svg
+-              viewBox="0 0 24 24"
+-              fill="none"
+-              stroke="currentColor"
+-              stroke-width="2"
+-              width="16"
+-              height="16"
+-            >
+-              <path d="M12 2a10 10 0 1 0 10 10H12V2z" />
+-            </svg>
+-            AI 鐢熸垚娴嬭瘎
+-          </el-button>
++            <button class="btn-notification">
++              <el-icon><Bell /></el-icon>
++              <span class="notification-badge"></span>
++            </button>
++          </div>
++          
++          <div class="header-filters">
++            <el-select v-model="filterType" placeholder="鍏ㄩ儴绫诲瀷" class="filter-select" size="default">
++              <el-option label="鍏ㄩ儴绫诲瀷" value="all" />
++              <el-option label="闃舵娴嬭瘎" value="stage" />
++              <el-option label="涓撻」璁粌" value="special" />
++            </el-select>
++            <el-select v-model="filterSort" placeholder="缁煎悎鎺掑簭" class="filter-select" size="default">
++              <el-option label="缁煎悎鎺掑簭" value="default" />
++              <el-option label="鏈€鏂板垱寤? value="time" />
++              <el-option label="鏈€楂樺垎" value="score" />
++            </el-select>
++          </div>
+         </div>
+       </div>
+ 
+@@ -84,251 +96,359 @@
+         </template>
+       </el-alert>
+ 
+-      <!-- 娴嬭瘎鎬昏 -->
+-      <section class="section overview-cards">
+-        <div class="overview-stat">
+-          <div class="stat-circle" :style="{ '--percent': overallScore + '%' }">
+-            <svg viewBox="0 0 120 120">
+-              <circle
+-                cx="60"
+-                cy="60"
+-                r="52"
+-                fill="none"
+-                stroke="var(--border-light)"
+-                stroke-width="8"
+-              />
+-              <circle
+-                cx="60"
+-                cy="60"
+-                r="52"
+-                fill="none"
+-                stroke="url(#scoreGrad)"
+-                stroke-width="8"
+-                stroke-linecap="round"
+-                :stroke-dasharray="`${overallScore * 3.27} 327`"
+-                transform="rotate(-90 60 60)"
+-              />
+-              <defs>
+-                <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+-                  <stop offset="0%" style="stop-color: #3b5bdb" />
+-                  <stop offset="100%" style="stop-color: #12b886" />
+-                </linearGradient>
+-              </defs>
+-            </svg>
+-            <div class="stat-inner">
+-              <span class="stat-score">{{ overallScore }}</span>
+-              <span class="stat-label">鎬讳綋璇勫垎</span>
++      <!-- 鏂扮増娴嬭瘎甯冨眬 -->
++      <div class="exam-layout">
++        <div class="exam-main">
++          <!-- 鏍稿績鎸囨爣 5鍗＄墖 -->
++          <div class="metrics-grid">
++            <!-- 鎬讳綋璇勫垎鍙屾爮鍗＄墖 -->
++            <div class="stat-card score-card">
++              <div class="stat-score-wrapper">
++                <!-- 宸﹀崐閮?鍦嗙幆鍥?-->
++                <div class="score-left">
++                  <div class="stat-circle" :style="{ '--percent': overallScore + '%' }">
++                    <svg viewBox="0 0 120 120">
++                      <circle cx="60" cy="60" r="52" fill="none" stroke="#f1f5f9" stroke-width="8" />
++                      <circle cx="60" cy="60" r="52" fill="none" stroke="url(#scoreGrad)" stroke-width="8" stroke-linecap="round" :stroke-dasharray="`${overallScore * 3.27} 327`" transform="rotate(-90 60 60)" />
++                      <defs>
++                        <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
++                          <stop offset="0%" style="stop-color: #3b5bdb" />
++                          <stop offset="100%" style="stop-color: #12b886" />
++                        </linearGradient>
++                      </defs>
++                    </svg>
++                    <div class="circle-inner">
++                      <span class="circle-score">{{ overallScore }}<small>鍒?/small></span>
++                      <span class="circle-trend text-success">杈冧笂鍛?鈫?8鍒?/span>
++                    </div>
++                  </div>
++                </div>
++                <!-- 鍒嗗壊绾?-->
++                <div class="score-divider"></div>
++                <!-- 鍙冲崐閮?骞冲潎姝ｇ‘鐜?-->
++                <div class="score-right">
++                  <span class="accuracy-label">骞冲潎姝ｇ‘鐜?/span>
++                  <span class="accuracy-val">{{ avgAccuracy }}%</span>
++                  <span class="accuracy-trend text-success">杈冧笂鍛?鈫?5%</span>
++                </div>
++              </div>
++            </div>
++            
++            <div class="stat-card">
++               <div class="stat-header">
++                 <span class="stat-label">鏈懆娴嬭瘎娆℃暟</span>
++                 <div class="card-icon calendar-icon-bg">
++                   <el-icon><Calendar /></el-icon>
++                 </div>
++               </div>
++               <div class="stat-value">{{ weeklyCount }} <span class="unit">娆?/span></div>
++               <div class="stat-trend success">杈冧笂鍛?鈫?2娆?/div>
++            </div>
++            
++            <div class="stat-card warning-theme">
++               <div class="stat-header">
++                 <span class="stat-label">钖勫急鐭ヨ瘑鐐规暟閲?/span>
++                 <div class="card-icon warning-icon-bg">
++                   <el-icon><Warning /></el-icon>
++                 </div>
++               </div>
++               <div class="stat-value">{{ weakCount }} <span class="unit">涓?/span></div>
++               <div class="stat-trend success">杈冧笂鍛?鈫?1涓?/div>
++            </div>
++            
++            <div class="stat-card trend-theme">
++               <div class="stat-header">
++                 <span class="stat-label">瀛︿範鎻愬崌瓒嬪娍</span>
++                 <div class="mini-sparkline">
++                   <svg width="46" height="20" viewBox="0 0 46 20">
++                     <path d="M0,16 Q10,12 20,4 T46,12" fill="none" stroke="#10b981" stroke-width="1.5" stroke-linecap="round"/>
++                     <circle cx="46" cy="12" r="2.5" fill="#10b981"/>
++                   </svg>
++                 </div>
++               </div>
++               <div class="stat-value success">+{{ weeklyProgress }}% <el-icon class="arrow-up-right"><TopRight /></el-icon></div>
++               <div class="stat-trend">杩?澶╂纭巼鎻愬崌</div>
++            </div>
++            
++            <div class="stat-card recommend-theme">
++               <div class="stat-header">
++                 <span class="stat-label">鎺ㄨ崘涓嬩竴姝ヨ缁?/span>
++                 <div class="card-icon recommend-icon-bg">
++                   <el-icon><Aim /></el-icon>
++                 </div>
++               </div>
++               <div class="stat-value text-primary font-medium">浜屽弶鏍戜笓椤圭獊鐮?/div>
++               <div class="stat-trend"><el-icon><Aim /></el-icon> 鍑讳腑浣犵殑钖勫急鐐?/div>
+             </div>
+           </div>
+-        </div>
+ 
+-        <div class="overview-details">
+-          <div class="details-left">
+-            <div class="detail-item">
+-              <div class="detail-header">
+-                <span class="detail-label">鏈懆娴嬭瘎娆℃暟</span>
+-                <span class="detail-value primary">{{ weeklyCount }} 娆?/span>
+-              </div>
+-              <div class="detail-bar">
+-                <div class="bar-fill" style="width: 70%"></div>
++          <!-- AI 鏍规嵁浣犵殑瀛︿範鐢诲儚涓轰綘鎺ㄨ崘浠ヤ笅璁粌鏂瑰悜 -->
++          <div class="ai-recommend-banner">
++             <el-icon class="close-icon"><Close /></el-icon>
++             
++             <div class="banner-layout">
++                <!-- 宸﹀崐閮?-->
++                <div class="banner-left">
++                   <div class="banner-title-row">
++                      <svg class="ai-title-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
++                        <path d="M12 3v3m0 12v3m9-9h-3M6 12H3m16.5-6.5l-2.2 2.2m-9.6 9.6l-2.2 2.2m14-2.2l-2.2-2.2m-9.6-9.6L4.5 7.5" stroke-linecap="round"/>
++                      </svg>
++                      <span class="bh-text"><strong>AI</strong> 鏍规嵁浣犵殑瀛︿範鐢诲儚銆佸巻鍙叉祴璇勫拰閿欓琛ㄧ幇锛屼负浣犳帹鑽愪互涓嬭缁冩柟鍚?/span>
++                   </div>
++                   
++                   <div class="recommend-cards">
++                      <div class="recommend-item" v-for="(rec, index) in recommendations" :key="index">
++                         <div class="rec-card-top">
++                            <div class="rec-icon-wrapper" :class="rec.type">
++                               <el-icon><component :is="rec.icon" /></el-icon>
++                            </div>
++                            <div class="rec-card-title-info">
++                               <h4 class="rec-title">{{ rec.title }}</h4>
++                               <div class="rec-tags">
++                                  <span class="tag difficulty" :class="rec.difficultyClass">{{ rec.difficulty }}</span>
++                                  <span class="tag">{{ rec.count }}棰?/span>
++                                  <span class="tag">棰勮{{ rec.time }}鍒嗛挓</span>
++                                </div>
++                            </div>
++                         </div>
++                         <p class="rec-desc">{{ rec.desc }}</p>
++                         <div class="rec-card-bottom">
++                            <el-button type="primary" size="small" class="start-rec-btn" @click="startRecommended(rec)">寮€濮嬭缁?/el-button>
++                         </div>
++                      </div>
++                   </div>
++                </div>
++                
++                <!-- 鍙冲崐閮?AI 鏈哄櫒浜?Mascot -->
++                <div class="banner-right">
++                   <div class="mascot-container">
++                      <!-- 娴姩鏈哄櫒浜?SVG -->
++                      <svg class="floating-mascot" viewBox="0 0 160 160" width="120" height="120">
++                         <!-- 鏈哄櫒浜烘墜閮?-->
++                         <path d="M40 95 C 30 90, 25 80, 30 75 C 35 70, 45 75, 45 85" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1.5" />
++                         <path d="M120 95 C 130 90, 135 80, 130 75 C 125 70, 115 75, 115 85" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1.5" />
++                         <!-- 鏈哄櫒浜鸿€虫湹/鑰虫満 -->
++                         <rect x="25" y="65" width="10" height="25" rx="5" fill="#0bb7aa" />
++                         <rect x="125" y="65" width="10" height="25" rx="5" fill="#0bb7aa" />
++                         <path d="M30 65 A 50 50 0 0 1 130 65" fill="none" stroke="#cbd5e1" stroke-width="3" />
++                         <!-- 鏈哄櫒浜鸿韩浣?澶撮儴 -->
++                         <rect x="32" y="45" width="96" height="70" rx="35" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
++                         <!-- 鏈哄櫒浜哄睆骞曡劯 -->
++                         <rect x="42" y="55" width="76" height="42" rx="16" fill="#0f172a" />
++                         <!-- 鏈哄櫒浜哄彂鍏夌溂鐫?-->
++                         <ellipse cx="62" cy="76" rx="6" ry="6" fill="#0bb7aa" />
++                         <ellipse cx="98" cy="76" rx="6" ry="6" fill="#0bb7aa" />
++                         <path d="M72 82 Q80 86 88 82" fill="none" stroke="#0bb7aa" stroke-width="2.5" stroke-linecap="round" />
++                         <!-- 鏈哄櫒浜哄弽鍏?寰厜 -->
++                         <path d="M45 52 Q80 40 115 52" fill="none" stroke="#f8fafc" stroke-width="2" opacity="0.3" />
++                         <!-- 搴曢儴搴曞骇/娴┖搴曞骇 -->
++                         <ellipse cx="80" cy="130" rx="35" ry="8" fill="#e2e8f0" opacity="0.8" />
++                         <!-- 灏忔槦鏄熻楗?-->
++                         <path d="M135 45 L138 48 L141 45 L138 42 Z" fill="#0bb7aa" />
++                         <path d="M25 105 L28 108 L31 105 L28 102 Z" fill="#4f6ef6" />
++                      </svg>
++                   </div>
++                </div>
++             </div>
++          </div>
++
++          <!-- 娴嬭瘎鍒嗙被 -->
++          <div class="exam-tabs-wrapper">
++             <div class="exam-tabs new-tabs">
++               <span
++                 v-for="tab in examTabs"
++                 :key="tab.value"
++                 class="tab-item"
++                 :class="{ active: activeTab === tab.value }"
++                 @click="activeTab = tab.value"
++               >
++                 {{ tab.label }}
++                 <span class="tab-count" v-if="tab.count">{{ tab.count }}</span>
++               </span>
++             </div>
++             <a class="view-all-link">鏌ョ湅鍏ㄩ儴璁板綍 <el-icon><ArrowRight /></el-icon></a>
++          </div>
++
++          <!-- 娴嬭瘎鍒楄〃 -->
++          <div class="exam-list new-exam-list" style="margin-bottom: var(--spacing-2xl);">
++            <div
++              v-for="exam in filteredExams"
++              :key="exam.id"
++              class="new-exam-card"
++            >
++              <!-- 鐘舵€佸窘绔犲尯 -->
++              <div class="ex-left">
++                <div class="ex-status-badge" :class="exam.status">
++                  <div class="badge-dot">
++                    <el-icon v-if="exam.status === 'ongoing'"><Loading /></el-icon>
++                    <el-icon v-else-if="exam.status === 'available'"><Aim /></el-icon>
++                    <el-icon v-else-if="exam.hasResult"><Check /></el-icon>
++                    <el-icon v-else><Warning /></el-icon>
++                  </div>
++                  <span class="badge-text">{{ exam.hasResult ? '宸插畬鎴? : (exam.status === 'ongoing' ? '杩涜涓? : '鎺ㄨ崘') }}</span>
++                </div>
+               </div>
+-            </div>
+-            <div class="detail-item">
+-              <div class="detail-header">
+-                <span class="detail-label">鏈懆骞冲潎姝ｇ‘鐜?/span>
+-                <span class="detail-value accent">{{ weeklyAccuracy }}%</span>
++              
++              <!-- 鏍囬涓?Meta 鍖?-->
++              <div class="ex-main">
++                <h3 class="ex-title">
++                  {{ exam.title }}
++                  <span class="ex-topic-tag" v-for="tag in getExamTags(exam)" :key="tag">{{ tag }}</span>
++                </h3>
++                <div class="ex-meta">
++                  <span>棰橀噺 {{ exam.total }}棰?/span><span class="divider">|</span>
++                  <span>宸插畬鎴?{{ getCompletedCount(exam) }}棰?/span><span class="divider">|</span>
++                  <span>棰勮 {{ exam.duration }} 鍒嗛挓</span><span class="divider">|</span>
++                  <span>姝ｇ‘鐜?{{ getAccuracyText(exam) }}</span><span class="divider">|</span>
++                  <span>闅惧害 <span class="diff-text" :class="getDifficultyText(exam)">{{ getDifficultyText(exam) }}</span></span>
++                </div>
+               </div>
+-              <div class="detail-bar accent">
+-                <div class="bar-fill" :style="{ width: weeklyAccuracy + '%' }"></div>
++              
++              <!-- 杩涘害鏉″尯 -->
++              <div class="ex-progress">
++                <div class="ex-prog-text">{{ getProgressPercent(exam) }}%</div>
++                <div class="ex-prog-bar">
++                  <div class="ex-prog-fill" :class="{ 'zero-fill': getProgressPercent(exam) === 0 }" :style="{ width: getProgressPercent(exam) + '%' }"></div>
++                </div>
+               </div>
+-            </div>
+-          </div>
+-          <div class="details-right">
+-            <div class="stat-tile-card warning">
+-              <div class="card-icon">
+-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+-                  <line x1="12" y1="9" x2="12" y2="13"/>
+-                  <line x1="12" y1="17" x2="12.01" y2="17"/>
++              
++              <!-- SVG 瓒嬪娍鎶樼嚎鍥惧垪 (Sparkline) -->
++              <div class="ex-sparkline-col">
++                <svg v-if="exam.status !== 'available'" class="ex-sparkline" width="68" height="24">
++                  <path :d="exam.title.includes('浜屽弶鏍?) ? 'M0,18 Q20,10 40,15 T68,4' : 'M0,20 Q15,8 35,16 T68,6'" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round"/>
++                  <circle cx="68" cy="4" r="2.2" fill="#10b981" v-if="exam.title.includes('浜屽弶鏍?)"/>
++                  <circle cx="68" cy="6" r="2.2" fill="#10b981" v-else/>
+                 </svg>
++                <span v-else class="ex-sparkline-empty">--</span>
+               </div>
+-              <div class="card-info">
+-                <span class="card-label">钖勫急鐭ヨ瘑鐐?/span>
+-                <span class="card-value warning">{{ weakCount }} 涓?/span>
++              
++              <!-- 鍒嗘暟灞曠ず鍖?-->
++              <div class="ex-score-col" v-if="exam.hasResult">
++                 <div class="ex-score-label">寰楀垎</div>
++                 <div class="ex-score-val">{{ exam.score }}<span class="ex-score-grade">鍒?/span></div>
++                 <div class="ex-score-status text-success">浼樼</div>
+               </div>
+-            </div>
+-            <div class="stat-tile-card success">
+-              <div class="card-icon">
+-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+-                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+-                  <polyline points="17 6 23 6 23 12"/>
+-                </svg>
++              <div class="ex-score-col" v-else>
++                 <template v-if="exam.status === 'ongoing'">
++                   <div class="ex-score-label">涓婃寰楀垎</div>
++                   <div class="ex-score-val">{{ exam.title.includes('浜屽弶鏍?) ? 80 : 70 }}<span class="ex-score-grade">鍒?/span></div>
++                   <div class="ex-score-status text-success">杈冧笂娆?鈫憑{ exam.title.includes('浜屽弶鏍?) ? 6 : 10 }}鍒?/div>
++                 </template>
++                 <template v-else>
++                   <span class="ex-score-empty">--</span>
++                 </template>
+               </div>
+-              <div class="card-info">
+-                <span class="card-label">鏈懆杩涙</span>
+-                <span class="card-value success">+{{ weeklyProgress }}%</span>
++              
++              <!-- 鎿嶄綔鍖?-->
++              <div class="ex-actions">
++                <el-button 
++                  type="primary" 
++                  :class="{'start-btn': exam.status === 'available', 'report-btn': exam.hasResult}"
++                  round 
++                  @click="startExam(exam)"
++                >
++                  {{ exam.hasResult ? '鏌ョ湅鎶ュ憡' : (exam.status === 'ongoing' ? '缁х画娴嬭瘎' : '寮€濮嬭缁?) }}
++                </el-button>
++                <el-icon class="more-icon"><MoreFilled /></el-icon>
+               </div>
+             </div>
+           </div>
+-        </div>
+-      </section>
+-
+-      <!-- 娴嬭瘎鍒嗙被 -->
+-      <div class="exam-tabs">
+-        <span
+-          v-for="tab in examTabs"
+-          :key="tab.value"
+-          class="tab-item"
+-          :class="{ active: activeTab === tab.value }"
+-          @click="activeTab = tab.value"
+-        >
+-          <span class="tab-icon" v-html="tab.icon"></span>
+-          {{ tab.label }}
+-          <span class="tab-count" v-if="tab.count">{{ tab.count }}</span>
+-        </span>
+-      </div>
+ 
+-      <!-- 娴嬭瘎鍒楄〃 -->
+-      <section class="section exam-list-section">
+-        <div class="section-title-row">
+-          <div>
+-            <h2>棰樺簱鏁版嵁</h2>
+-            <p>鍏堝睍绀哄悗绔凡淇濆瓨鐨勬祴璇勯鐩紝鏂逛究鍓嶅悗绔仈璋冦€?/p>
++          <!-- 搴曢儴鍒嗘瀽鍖?-->
++          <div class="bottom-analysis-grid">
++             <div class="analysis-card">
++                <h3>棰樺瀷鑳藉姏鍒嗗竷</h3>
++                <div class="ability-grid">
++                   <div class="ability-item" v-for="ab in abilities" :key="ab.name">
++                      <div class="ab-icon" :class="ab.type"><el-icon><component :is="ab.icon" /></el-icon></div>
++                      <div class="ab-info">
++                         <div class="ab-name">{{ ab.name }}</div>
++                         <div class="ab-score">姝ｇ‘鐜?<strong>{{ ab.score }}%</strong></div>
++                         <div class="ab-trend success">杈冧笂鍛?鈫?{{ ab.trend }}%</div>
++                      </div>
++                   </div>
++                </div>
++             </div>
++             <div class="analysis-card">
++                <div class="card-header">
++                   <h3>鏈€杩戞垚缁╄秼鍔?/h3>
++                   <div class="legend">
++                      <span class="leg-item"><span class="dot my"></span>鎴戠殑姝ｇ‘鐜?/span>
++                      <span class="leg-item"><span class="dot avg"></span>鐝骇骞冲潎</span>
++                   </div>
++                   <el-select v-model="trendPeriod" size="small" style="width: 90px; border-radius: 16px;">
++                      <el-option label="杩?澶? value="7" />
++                      <el-option label="杩?0澶? value="30" />
++                   </el-select>
++                </div>
++                <div ref="trendChartRef" style="height: 140px; width: 100%"></div>
++             </div>
+           </div>
+-          <el-button :loading="questionBankLoading" @click="fetchQuestionBank">鍒锋柊</el-button>
+         </div>
+ 
+-        <div v-if="questionBank.length" class="exam-list" style="margin-bottom: 32px;">
+-          <!-- 棰樺簱姹囨€诲崱鐗?-->
+-          <div class="exam-card">
+-            <div class="exam-status-bar">
+-              <span class="status-badge available">鍙弬涓?/span>
+-            </div>
+-            <div class="exam-info">
+-              <h3 class="exam-title">{{ selectedSpaceName || '褰撳墠绌洪棿' }} 鎬婚搴?/h3>
+-              <p class="exam-desc">鍖呭惈鎵€鏈夌煡璇嗙偣鐨勬祴璇勯鐩紝鐐瑰嚮鈥滃紑濮嬪埛棰樷€濆嵆鍙€愪竴缁冧範銆?/p>
+-              <div class="exam-meta">
+-                <span>
+-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+-                    <path d="M9 11l3 3L22 4" />
+-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+-                  </svg>
+-                  {{ questionBank.length }} 棰?-                </span>
+-                <span>
+-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+-                    <circle cx="12" cy="12" r="10" />
+-                    <polyline points="12,6 12,12 16,14" />
+-                  </svg>
+-                  鏃犳椂闂撮檺鍒?-                </span>
+-              </div>
+-            </div>
+-            <div class="exam-actions">
+-              <el-button type="primary" @click="$router.push('/exam/questions?spaceId=' + (selectedSpaceId || ''))">寮€濮嬪埛棰?/el-button>
+-            </div>
++        <div class="exam-sidebar">
++          <div class="sidebar-card radar-card">
++             <div class="card-title">瀛︿範鍒嗘瀽</div>
++             <p class="sub-title">鐭ヨ瘑鎺屾彙缁村害</p>
++             <div ref="radarChartRef" style="height: 220px; width: 100%; margin-top: -10px;"></div>
++             <div class="legend radar-legend">
++                <span class="leg-item"><span class="dot my box"></span>鎴戠殑鎺屾彙搴?/span>
++                <span class="leg-item"><span class="dot avg box"></span>鐝骇骞冲潎</span>
++             </div>
+           </div>
+-        </div>
+-
+-        <div class="exam-list">
+-          <!-- 娴嬭瘎鍗＄墖 -->
+-          <div
+-            v-for="exam in filteredExams"
+-            :key="exam.id"
+-            class="exam-card"
+-            :class="[{ 'has-result': exam.hasResult }, exam.status]"
+-          >
+-            <div class="exam-status-bar">
+-              <span class="status-badge" :class="exam.status">{{ exam.statusText }}</span>
+-              <span v-if="exam.hasResult" class="result-score" :class="getScoreClass(exam.score)">
+-                {{ exam.score }}鍒?-              </span>
+-            </div>
+-
+-            <div class="exam-info">
+-              <h3 class="exam-title">{{ exam.title }}</h3>
+-              <p class="exam-desc">{{ exam.description }}</p>
+-              <div class="exam-meta">
+-                <span>
+-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+-                    <path d="M9 11l3 3L22 4" />
+-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+-                  </svg>
+-                  {{ exam.total }} 棰?-                </span>
+-                <span>
+-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+-                    <circle cx="12" cy="12" r="10" />
+-                    <polyline points="12,6 12,12 16,14" />
+-                  </svg>
+-                  {{ exam.duration }} 鍒嗛挓
+-                </span>
+-                <span>
+-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+-                    <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" />
+-                  </svg>
+-                  {{ exam.accuracy }}% 姝ｇ‘鐜?-                </span>
+-              </div>
+-
+-              <!-- 缁撴灉灞曠ず -->
+-              <div v-if="exam.hasResult" class="result-detail">
+-                <div class="result-chart">
+-                  <div class="chart-bar-group">
+-                    <div class="chart-bar correct" :style="{ height: exam.accuracy + '%' }"></div>
+-                    <div
+-                      class="chart-bar wrong"
+-                      :style="{ height: 100 - exam.accuracy + '%' }"
+-                    ></div>
+-                  </div>
+-                  <span class="chart-label">{{ exam.accuracy }}%</span>
++          
++          <div class="sidebar-card wrong-card">
++             <div class="card-title">閿欓鏈彁閱?/div>
++             <div class="wrong-remind-grid">
++                <div class="remind-item">
++                   <div class="rm-label">浠婃棩寰呭涔?/div>
++                   <div class="rm-val"><strong>18</strong> 棰?/div>
+                 </div>
+-                <div class="result-tags">
+-                  <span v-if="exam.wrongCount > 0" class="wrong-tag">
+-                    閿欓 {{ exam.wrongCount }} 閬?-                    <span class="review-link" @click="reviewWrong(exam)">鍘诲涔?/span>
+-                  </span>
+-                  <span class="weak-tag"> 钖勫急锛歿{ exam.weakPoints.join('銆?) }} </span>
++                <div class="remind-item">
++                   <div class="rm-label">楂樹紭鍏堢骇</div>
++                   <div class="rm-val"><strong>6</strong> 棰?/div>
+                 </div>
+-              </div>
+-            </div>
+-
+-            <div class="exam-actions">
+-              <template v-if="exam.hasResult">
+-                <el-button @click="reviewWrong(exam)">鍥為【</el-button>
+-                <el-button type="primary" @click="retakeExam(exam)">閲嶆柊娴嬭瘎</el-button>
+-              </template>
+-              <template v-else>
+-                <el-button type="primary" @click="startExam(exam)">{{ exam.status === 'ongoing' ? '缁х画娴嬭瘎' : '寮€濮嬫祴璇? }}</el-button>
+-              </template>
+-            </div>
++             </div>
++             <div class="go-wrong-wrapper">
++                 <el-button class="go-wrong-btn" type="primary" plain>
++                   鍘婚敊棰樻湰澶嶄範 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
++                 </el-button>
++                 <div class="wrong-icon-bg">
++                   <svg viewBox="0 0 100 100" width="70" height="70">
++                     <rect x="22" y="15" width="56" height="70" rx="8" fill="#14b8a6" />
++                     <rect x="28" y="15" width="50" height="70" rx="4" fill="#ffffff" />
++                     <rect x="22" y="15" width="6" height="70" fill="#0d9488" />
++                     <line x1="38" y1="30" x2="68" y2="30" stroke="#0bb7aa" stroke-width="3" stroke-linecap="round" />
++                     <line x1="38" y1="42" x2="60" y2="42" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round" />
++                     <line x1="38" y1="54" x2="64" y2="54" stroke="#cbd5e1" stroke-width="3" stroke-linecap="round" />
++                     <path d="M48 85 L48 94 L53 90 L58 94 L58 85 Z" fill="#f59e0b" />
++                   </svg>
++                 </div>
++             </div>
+           </div>
+-        </div>
+-
+-        <!-- 绌虹姸鎬?-->
+-        <div class="empty-state" v-if="filteredExams.length === 0 && questionBank.length === 0">
+-          <div class="empty-icon">
+-            <svg
+-              viewBox="0 0 24 24"
+-              fill="none"
+-              stroke="currentColor"
+-              stroke-width="1.5"
+-              width="48"
+-              height="48"
+-            >
+-              <path
+-                d="M9 17H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4"
+-              />
+-              <rect x="9" y="9" width="6" height="6" rx="1" />
+-              <line x1="9" y1="13" x2="13" y2="13" />
+-              <line x1="9" y1="15" x2="11" y2="15" />
+-            </svg>
++          
++          <div class="sidebar-card streak-card">
++             <div class="card-title">瀛︿範杩炵画鎬?/div>
++             <div class="streak-info">
++                <div class="streak-text">
++                   <div class="rm-label">杩炵画瀛︿範澶╂暟</div>
++                   <div class="rm-val"><strong>12</strong> 澶?/div>
++                   <div class="streak-sub">鏈€闀胯繛缁?15 澶?/div>
++                </div>
++                <div class="streak-icon">馃敟</div>
++             </div>
++             <div class="streak-week">
++                <div class="day-item" v-for="day in weekDays" :key="day.name">
++                   <div class="day-circle" :class="{ active: day.active, current: day.current }">
++                      <el-icon v-if="day.active"><Check /></el-icon>
++                      <span v-else>鈥?/span>
++                   </div>
++                   <div class="day-name">{{ day.name }}</div>
++                </div>
++             </div>
+           </div>
+-          <h3>鏆傛棤娴嬭瘎</h3>
+-          <p>鐐瑰嚮"AI 鐢熸垚娴嬭瘎"鑾峰彇涓€у寲娴嬭瘯</p>
+         </div>
+-      </section>
+-
++      </div>
+       <!-- AI 鐢熸垚娴嬭瘎瀵硅瘽妗?-->
+       <el-dialog
+         v-model="showGenerateDialog"
+@@ -528,9 +648,13 @@
+ import { ref, computed, onMounted, watch } from 'vue'
+ import { useRouter, useRoute } from 'vue-router'
+ import { ElMessage } from 'element-plus'
+-import { Warning } from '@element-plus/icons-vue'
++import { Warning, Calendar, TopRight, Aim, MagicStick, Close, Document, EditPen, Select, DocumentCopy, Check, ArrowRight, Loading, DataAnalysis, CircleCheckFilled, MoreFilled, Bell } from '@element-plus/icons-vue'
++import * as echarts from 'echarts'
+ import AppLayout from '@/components/layout/AppLayout.vue'
+ import { useLearningSpaceStore } from '@/stores/learningSpace'
++
++const filterType = ref('all')
++const filterSort = ref('default')
+ import {
+   fetchEvaluationQuestions,
+   fetchEvaluationTasks,
+@@ -662,11 +786,162 @@ const canGenerate = computed(
+ )
+ const estimatedMinutes = computed(() => Math.max(1, Math.ceil(totalGenerateCount.value / 4)))
+ 
+-const overallScore = ref(0)
+-const weeklyCount = ref(0)
+-const weeklyAccuracy = ref(0)
+-const weakCount = ref(0)
+-const weeklyProgress = ref(0)
++const overallScore = computed(() => {
++  const finished = exams.value.filter(e => e.hasResult)
++  if (finished.length === 0) return 86
++  return Math.round(finished.reduce((sum, e) => sum + e.score, 0) / finished.length)
++})
++
++const avgAccuracy = computed(() => {
++  const finished = exams.value.filter(e => e.hasResult)
++  if (finished.length === 0) return 78
++  return Math.round(finished.reduce((sum, e) => sum + e.accuracy, 0) / finished.length)
++})
++
++const weeklyCount = computed(() => {
++  const finishedOrOngoing = exams.value.filter(e => e.status === 'ongoing' || e.hasResult)
++  return finishedOrOngoing.length > 0 ? finishedOrOngoing.length : 6
++})
++
++const weakCount = computed(() => {
++  const weakExams = exams.value.filter(e => e.hasResult && e.accuracy < 70)
++  return weakExams.length > 0 ? weakExams.length : 4
++})
++
++const weeklyProgress = ref(12)
++const radarChartRef = ref(null)
++const trendChartRef = ref(null)
++const trendPeriod = ref('7')
++
++const recommendations = ref([
++  { title: '浜屽弶鏍戜笓椤圭獊鐮?, type: 'warning', icon: 'Aim', difficulty: '涓瓑', difficultyClass: 'warning', count: 24, time: 25, desc: '寮哄寲浜屽弶鏍戦亶鍘嗐€佹瀯閫犱笌搴旂敤鑳藉姏' },
++  { title: '閾捐〃鏄撻敊棰樺涔?, type: 'success', icon: 'DocumentCopy', difficulty: '鍩虹', difficultyClass: 'success', count: 18, time: 18, desc: '閽堝楂橀閿欓锛屽珐鍥洪摼琛ㄦ搷浣滄妧宸? },
++  { title: '鍥剧畻娉曞簲鐢ㄨ缁?, type: 'primary', icon: 'MagicStick', difficulty: '鍥伴毦', difficultyClass: 'danger', count: 20, time: 30, desc: '鎻愬崌鍥剧殑閬嶅巻涓庢渶鐭矾寰勫簲鐢ㄨ兘鍔? }
++])
++
++const startRecommended = (rec) => {
++  ElMessage.success('寮€濮嬭缁? ' + rec.title)
++}
++
++const abilities = ref([
++  { name: '鍗曢€夐', icon: 'Document', score: 82, trend: 6, type: 'single' },
++  { name: '濉┖棰?, icon: 'EditPen', score: 76, trend: 4, type: 'fill' },
++  { name: '鍒ゆ柇棰?, icon: 'Select', score: 88, trend: 8, type: 'judge' },
++  { name: '浠ｇ爜鍒嗘瀽棰?, icon: 'DocumentCopy', score: 68, trend: 2, type: 'code' }
++])
++
++const weekDays = ref([
++  { name: '涓€', active: true },
++  { name: '浜?, active: true },
++  { name: '涓?, active: true },
++  { name: '鍥?, active: true },
++  { name: '浜?, active: true },
++  { name: '鍏?, active: true },
++  { name: '鏃?, active: false, current: true }
++])
++
++onMounted(() => {
++  setTimeout(() => {
++    initCharts()
++  }, 100)
++})
++
++const initCharts = () => {
++  if (radarChartRef.value) {
++    const radarChart = echarts.init(radarChartRef.value)
++    radarChart.setOption({
++      radar: {
++        indicator: [
++          { name: '鏍?, max: 100 },
++          { name: '閾捐〃', max: 100 },
++          { name: '鍥?, max: 100 },
++          { name: '鎺掑簭', max: 100 },
++          { name: '鏍堜笌闃熷垪', max: 100 }
++        ],
++        radius: '65%',
++        splitNumber: 4,
++        axisName: { color: '#64748b', fontSize: 12 },
++        splitArea: { areaStyle: { color: ['transparent'] } },
++        splitLine: { lineStyle: { color: '#e2e8f0' } },
++        axisLine: { lineStyle: { color: '#e2e8f0' } }
++      },
++      series: [{
++        type: 'radar',
++        data: [
++          {
++            value: [85, 90, 60, 75, 88],
++            name: '鎴戠殑鎺屾彙搴?,
++            itemStyle: { color: '#0bb7aa' },
++            areaStyle: { color: 'rgba(11, 183, 170, 0.2)' },
++            lineStyle: { width: 2 }
++          },
++          {
++            value: [70, 75, 55, 65, 80],
++            name: '鐝骇骞冲潎',
++            itemStyle: { color: '#94a3b8' },
++            areaStyle: { color: 'transparent' },
++            lineStyle: { type: 'dashed', width: 2 }
++          }
++        ]
++      }]
++    })
++    window.addEventListener('resize', () => radarChart.resize())
++  }
++
++  if (trendChartRef.value) {
++    const trendChart = echarts.init(trendChartRef.value)
++    trendChart.setOption({
++      grid: { top: 10, right: 10, bottom: 20, left: 35 },
++      tooltip: { trigger: 'axis' },
++      xAxis: {
++        type: 'category',
++        data: ['05-09', '05-10', '05-11', '05-12', '05-13', '05-14', '05-15'],
++        axisLine: { lineStyle: { color: '#e2e8f0' } },
++        axisLabel: { color: '#64748b', fontSize: 11 },
++        axisTick: { show: false }
++      },
++      yAxis: {
++        type: 'value',
++        min: 0,
++        max: 100,
++        splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
++        axisLabel: {
++           formatter: '{value}%',
++           color: '#94a3b8',
++           fontSize: 11
++        }
++      },
++      series: [
++        {
++          name: '鎴戠殑姝ｇ‘鐜?,
++          type: 'line',
++          data: [65, 60, 78, 85, 82, 88, 90],
++          smooth: true,
++          symbolSize: 6,
++          itemStyle: { color: '#0bb7aa' },
++          lineStyle: { width: 3 },
++          areaStyle: {
++            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
++              { offset: 0, color: 'rgba(11, 183, 170, 0.2)' },
++              { offset: 1, color: 'rgba(11, 183, 170, 0)' }
++            ])
++          }
++        },
++        {
++          name: '鐝骇骞冲潎',
++          type: 'line',
++          data: [50, 55, 60, 58, 62, 65, 68],
++          smooth: true,
++          symbolSize: 0,
++          itemStyle: { color: '#94a3b8' },
++          lineStyle: { width: 2, type: 'dashed' }
++        }
++      ]
++    })
++    window.addEventListener('resize', () => trendChart.resize())
++  }
++}
++
+ 
+ const exams = ref<any[]>([])
+ 
+@@ -679,7 +954,7 @@ const examTabs = computed(() => [
+   },
+   {
+     value: 'available',
+-    label: '鍙弬涓?,
++    label: '鎺ㄨ崘璁粌',
+     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
+     count: exams.value.filter(exam => exam.status === 'available' || exam.status === 'error').length
+   },
+@@ -691,7 +966,7 @@ const examTabs = computed(() => [
+   },
+   {
+     value: 'wrong',
+-    label: '閿欓鏈?,
++    label: '閿欓澶嶄範',
+     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+     count: exams.value.reduce((sum, exam) => sum + exam.wrongCount, 0)
+   }
+@@ -707,6 +982,50 @@ const filteredExams = computed(() => {
+   })
+ })
+ 
++const getExamTags = (exam: any) => {
++  if (exam.title.includes('浜屽弶鏍?)) return ['浜屽弶鏍?, '鏍戠殑閬嶅巻']
++  if (exam.title.includes('閾捐〃')) return ['閾捐〃', '鍙屾寚閽?]
++  if (exam.title.includes('鍥?)) return ['鍥?, 'BFS/DFS']
++  if (exam.title.includes('鏍?) || exam.title.includes('闃熷垪')) return ['鏍?, '闃熷垪']
++  return [exam.topic || '涓撻」']
++}
++
++const getCompletedCount = (exam: any) => {
++  if (exam.hasResult) return exam.total
++  if (exam.status === 'ongoing') {
++    if (exam.title.includes('浜屽弶鏍?)) return 8
++    if (exam.title.includes('閾捐〃')) return 5
++    return Math.round(exam.total * 0.4)
++  }
++  return 0
++}
++
++const getAccuracyText = (exam: any) => {
++  if (exam.hasResult) return `${exam.accuracy}%`
++  if (exam.status === 'ongoing') {
++    if (exam.title.includes('浜屽弶鏍?)) return '75%'
++    if (exam.title.includes('閾捐〃')) return '60%'
++    return '70%'
++  }
++  return '--'
++}
++
++const getDifficultyText = (exam: any) => {
++  if (exam.title.includes('鍥?)) return '鍥伴毦'
++  if (exam.title.includes('浜屽弶鏍?)) return '涓瓑'
++  return '鍩虹'
++}
++
++const getProgressPercent = (exam: any) => {
++  if (exam.hasResult) return 100
++  if (exam.status === 'ongoing') {
++    if (exam.title.includes('浜屽弶鏍?)) return 66
++    if (exam.title.includes('閾捐〃')) return 33
++    return 50
++  }
++  return 0
++}
++
+ const getScoreClass = (score: number) => {
+   if (score >= 80) return 'good'
+   if (score >= 60) return 'medium'
+@@ -993,750 +1312,1259 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
+ </script>
+ 
+ <style scoped>
+-.exam-page {
+-  width: 100%;
+-  max-width: 1400px;
+-  margin: 0 auto;
+-  padding: 4px;
+-}
+ 
++/* Header Styles */
+ .page-header {
+   display: flex;
+-  align-items: flex-start;
+   justify-content: space-between;
++  align-items: flex-start;
+   margin-bottom: var(--spacing-xl);
+   gap: var(--spacing-lg);
+ }
+ 
+-.page-title {
+-  font-size: 1.625rem;
+-  font-weight: 800;
+-  color: var(--text-dark);
+-  margin: 0 0 var(--spacing-xs);
+-  letter-spacing: -0.025em;
++.header-right {
++  display: flex;
++  flex-direction: column;
++  align-items: flex-end;
++  gap: var(--spacing-md);
+ }
+ 
+-.page-desc {
+-  font-size: 0.9rem;
+-  color: var(--text-secondary);
+-  margin: 0;
++.header-actions {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++}
++
++.space-select :deep(.el-input__wrapper) {
++  border-radius: var(--radius-lg);
++  width: 200px;
+ }
+ 
+-/* AI鐢熸垚鎸夐挳楂樼骇鍙戝厜鏁堟灉 */
+ .btn-ai-generate {
+-  background: var(--gradient-primary) !important;
+-  border: none !important;
++  background: linear-gradient(135deg, #4f6ef6 0%, #0bb7aa 100%) !important;
+   color: white !important;
+   font-weight: 600 !important;
+-  font-size: 0.875rem !important;
++  border: none !important;
++  border-radius: var(--radius-lg) !important;
+   padding: 10px 18px !important;
+   height: auto !important;
+-  border-radius: var(--radius-lg) !important;
+   box-shadow: 0 4px 14px rgba(11, 183, 170, 0.3) !important;
+-  transition: all var(--transition-base) !important;
++  transition: all 0.3s ease !important;
+   display: flex;
+   align-items: center;
+-  gap: 8px;
++  gap: 6px;
+ }
+ 
+ .btn-ai-generate:hover {
+   transform: translateY(-2px);
+-  box-shadow: 0 6px 20px rgba(11, 183, 170, 0.45), 0 0 12px rgba(79, 110, 246, 0.3) !important;
+-}
+-
+-.btn-ai-generate:active {
+-  transform: translateY(0);
++  box-shadow: 0 6px 20px rgba(11, 183, 170, 0.45) !important;
+ }
+ 
+-.btn-ai-generate svg {
++.ai-spark-icon {
+   stroke: currentColor;
+   transition: transform 0.3s ease;
+ }
+ 
+-.btn-ai-generate:hover svg {
+-  transform: rotate(30deg);
++.btn-ai-generate:hover .ai-spark-icon {
++  transform: rotate(20deg) scale(1.1);
+ }
+ 
+-/* 鎬昏鍗＄墖 - 鍗囩骇涓虹簿鑷寸（鐮傜幓鐠冭川鎰?*/
+-.section {
++.btn-notification {
++  width: 42px;
++  height: 42px;
++  border-radius: 50%;
+   background: white;
+-  border-radius: var(--radius-xl);
+-  padding: var(--spacing-xl);
+-  margin-bottom: var(--spacing-xl);
+-  border: 1px solid var(--border-light);
+-  box-shadow: var(--shadow-sm);
+-  transition: all var(--transition-base);
+-}
+-
+-.overview-cards {
++  border: 1px solid rgba(15, 23, 42, 0.08);
++  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+   display: flex;
+-  gap: var(--spacing-2xl);
+   align-items: center;
+-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(236, 253, 251, 0.6) 100%);
+-  backdrop-filter: blur(10px);
+-  border: 1px solid rgba(11, 183, 170, 0.12);
+-  box-shadow: var(--shadow-md), 0 10px 30px rgba(11, 183, 170, 0.03);
+-}
+-
+-.overview-stat {
+-  flex-shrink: 0;
++  justify-content: center;
++  color: #475569;
++  cursor: pointer;
++  position: relative;
++  transition: all 0.3s;
+ }
+ 
+-.stat-circle {
+-  width: 150px;
+-  height: 150px;
+-  position: relative;
+-  display: flex;
+-  align-items: center;
+-  justify-content: center;
+-  filter: drop-shadow(0 4px 12px rgba(11, 183, 170, 0.22));
++.btn-notification:hover {
++  border-color: rgba(11, 183, 170, 0.3);
++  color: #0bb7aa;
++  transform: translateY(-1px);
++  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.06);
+ }
+ 
+-.stat-circle svg {
++.notification-badge {
+   position: absolute;
+-  inset: 0;
++  top: 11px;
++  right: 11px;
++  width: 7px;
++  height: 7px;
++  border-radius: 50%;
++  background: #ef4444;
++  border: 1px solid white;
+ }
+ 
+-.stat-inner {
++.header-filters {
+   display: flex;
+-  flex-direction: column;
+-  align-items: center;
+-  z-index: 1;
+-}
+-
+-.stat-score {
+-  font-size: 2.75rem;
+-  font-weight: 800;
+-  background: linear-gradient(135deg, #2563eb 0%, #0bb7aa 70%, #10b981 100%);
+-  -webkit-background-clip: text;
+-  -webkit-text-fill-color: transparent;
+-  line-height: 1.1;
+-  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+-}
+-
+-.stat-score::after {
+-  content: '';
+-  display: none;
++  gap: 8px;
+ }
+ 
+-.stat-label {
+-  font-size: 0.75rem;
+-  font-weight: 600;
+-  color: var(--text-muted);
+-  margin-top: 2px;
++.filter-select :deep(.el-input__wrapper) {
++  border-radius: var(--radius-md);
++  width: 120px;
+ }
+ 
+-/* 璇︽儏鎸囨爣鍖?*/
+-.overview-details {
+-  flex: 1;
+-  display: grid;
+-  grid-template-columns: 1.1fr 1fr;
++/* Layout */
++.exam-layout {
++  display: flex;
+   gap: var(--spacing-xl);
++  align-items: flex-start;
+ }
+ 
+-.details-left {
++.exam-main {
++  flex: 1;
++  min-width: 0;
+   display: flex;
+   flex-direction: column;
+-  justify-content: center;
+-  gap: var(--spacing-md);
+-}
+-
+-.detail-item {
+-  width: 100%;
++  gap: var(--spacing-lg);
+ }
+ 
+-.detail-header {
++.exam-sidebar {
++  width: 300px;
++  flex-shrink: 0;
+   display: flex;
+-  justify-content: space-between;
+-  align-items: center;
+-  margin-bottom: var(--spacing-xs);
+-}
+-
+-.detail-label {
+-  font-size: 0.8125rem;
+-  font-weight: 600;
+-  color: var(--text-secondary);
+-}
+-
+-.detail-value {
+-  font-size: 0.9375rem;
+-  font-weight: 700;
+-}
+-
+-.detail-value.primary {
+-  color: var(--primary-color);
+-}
+-.detail-value.accent {
+-  color: var(--accent-color);
++  flex-direction: column;
++  gap: var(--spacing-lg);
+ }
+ 
+-.detail-bar {
+-  height: 8px;
+-  background: rgba(148, 163, 184, 0.12);
+-  border-radius: var(--radius-full);
+-  overflow: hidden;
++/* Metrics Grid */
++.metrics-grid {
++  display: flex;
++  gap: var(--spacing-md);
++  margin-bottom: var(--spacing-sm);
+ }
+ 
+-.bar-fill {
+-  height: 100%;
+-  background: linear-gradient(90deg, #3b5bdb, var(--primary-color));
+-  border-radius: var(--radius-full);
+-  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
++.stat-card {
++  background: white;
++  border-radius: var(--radius-xl);
++  padding: 16px;
++  flex: 1;
++  border: 1px solid rgba(15, 23, 42, 0.04);
++  box-shadow: 0 4px 12px rgba(0,0,0,0.01);
++  display: flex;
++  flex-direction: column;
++  justify-content: center;
++  transition: all 0.3s ease;
+ }
+ 
+-.detail-bar.accent .bar-fill {
+-  background: linear-gradient(90deg, var(--accent-color), var(--primary-color));
++.stat-card:hover {
++  transform: translateY(-2px);
++  box-shadow: 0 8px 24px rgba(11,183,170,0.06);
+ }
+ 
+-/* 纾佽创鎸囨爣灏忓崱鐗?*/
+-.details-right {
+-  display: grid;
+-  grid-template-columns: repeat(2, 1fr);
+-  gap: var(--spacing-md);
++.stat-card.score-card {
++  flex: 1.8;
++  padding: 16px 20px;
++  background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(240,253,250,0.5) 100%);
++  border: 1px solid rgba(11, 183, 170, 0.1);
+ }
+ 
+-.stat-tile-card {
+-  background: white;
+-  border: 1px solid rgba(15, 23, 42, 0.05);
+-  border-radius: var(--radius-lg);
+-  padding: var(--spacing-md);
++.stat-score-wrapper {
+   display: flex;
+   align-items: center;
+-  gap: var(--spacing-sm);
+-  box-shadow: var(--shadow-sm);
+-  transition: all var(--transition-base);
+-}
+-
+-.stat-tile-card:hover {
+-  transform: translateY(-2px);
+-  box-shadow: var(--shadow-md), 0 4px 12px rgba(11, 183, 170, 0.05);
+-  border-color: rgba(11, 183, 170, 0.15);
++  justify-content: space-between;
++  width: 100%;
+ }
+ 
+-.card-icon {
+-  width: 36px;
+-  height: 36px;
+-  border-radius: var(--radius-md);
++.score-left {
++  width: 110px;
++  height: 110px;
++  position: relative;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+-  flex-shrink: 0;
+-}
+-
+-.stat-tile-card.warning .card-icon {
+-  background: rgba(245, 158, 11, 0.1);
+-  color: var(--warning-color);
+ }
+ 
+-.stat-tile-card.success .card-icon {
+-  background: rgba(16, 185, 129, 0.1);
+-  color: var(--success-color);
++.score-divider {
++  width: 1px;
++  height: 70px;
++  background: rgba(15, 23, 42, 0.08);
++  margin: 0 16px;
+ }
+ 
+-.card-info {
++.score-right {
+   display: flex;
+   flex-direction: column;
++  gap: 2px;
++  flex: 1;
+ }
+ 
+-.card-label {
+-  font-size: 0.75rem;
+-  color: var(--text-secondary);
++.stat-circle {
++  width: 100px;
++  height: 100px;
++  position: relative;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++}
++
++.stat-circle svg {
++  width: 100%;
++  height: 100%;
++  position: absolute;
++  top: 0;
++  left: 0;
++}
++.circle-inner {
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  position: absolute;
++}
++
++.circle-score {
++  font-size: 2.1rem;
++  font-weight: 800;
++  color: #0f172a;
++  line-height: 1;
++}
++
++.circle-score small {
++  font-size: 0.85rem;
++  font-weight: 600;
++  color: #475569;
++  margin-left: 1px;
++}
++
++.circle-trend {
++  font-size: 0.65rem;
++  font-weight: 700;
++  margin-top: 2px;
++}
++
++.accuracy-label {
++  font-size: 0.75rem;
++  color: #64748b;
+   font-weight: 500;
+-  margin-bottom: 2px;
+ }
+ 
+-.card-value {
+-  font-size: 1rem;
++.accuracy-val {
++  font-size: 1.8rem;
++  font-weight: 800;
++  color: #0bb7aa;
++  line-height: 1.1;
++}
++
++.accuracy-trend {
++  font-size: 0.7rem;
++  font-weight: 700;
++}
++
++.text-success {
++  color: #10b981;
++}
++
++.stat-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  margin-bottom: 8px;
++}
++
++.stat-label {
++  font-size: 0.8rem;
++  color: #64748b;
++  font-weight: 600;
++}
++
++.card-icon {
++  width: 30px;
++  height: 30px;
++  border-radius: 8px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-size: 0.95rem;
++}
++
++.calendar-icon-bg {
++  background: rgba(79, 110, 246, 0.08);
++  color: #4f6ef6;
++}
++
++.warning-icon-bg {
++  background: rgba(245, 158, 11, 0.08);
++  color: #f59e0b;
++}
++
++.recommend-icon-bg {
++  background: rgba(16, 185, 129, 0.08);
++  color: #16b981;
++}
++
++.stat-value {
++  font-size: 1.35rem;
++  font-weight: 800;
++  color: #0f172a;
++  margin: 2px 0 6px;
++  display: flex;
++  align-items: baseline;
++  gap: 2px;
++}
++
++.stat-value.font-medium {
++  font-size: 0.95rem;
+   font-weight: 700;
++  color: #0bb7aa;
+ }
+ 
+-.card-value.warning {
+-  color: var(--warning-color);
++.stat-value .unit {
++  font-size: 0.75rem;
++  color: #94a3b8;
++  font-weight: 500;
+ }
+ 
+-.card-value.success {
+-  color: var(--success-color);
++.stat-trend {
++  font-size: 0.7rem;
++  color: #94a3b8;
++  font-weight: 600;
++  display: flex;
++  align-items: center;
++  gap: 2px;
+ }
+ 
+-/* 鍒嗙被鏍囩椤?- 鑳跺泭寮?*/
+-.exam-tabs {
++.stat-trend.success {
++  color: #10b981;
++}
++
++.mini-sparkline {
+   display: flex;
+-  gap: var(--spacing-xs);
+-  margin-bottom: var(--spacing-xl);
+-  padding: 6px;
+-  background: rgba(148, 163, 184, 0.08);
++  align-items: center;
++}
++
++.arrow-up-right {
++  font-size: 0.85rem;
++  font-weight: bold;
++}
++
++/* AI Recommendation Banner */
++.ai-recommend-banner {
++  position: relative;
++  padding: 20px 24px;
+   border-radius: var(--radius-xl);
+-  border: none;
++  background: linear-gradient(135deg, rgba(239, 246, 255, 0.55) 0%, rgba(236, 253, 245, 0.55) 100%);
++  border: 1px solid rgba(16, 185, 129, 0.12);
++  backdrop-filter: blur(10px);
++  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.03);
++}
++
++.ai-recommend-banner .close-icon {
++  position: absolute;
++  top: 14px;
++  right: 14px;
++  color: #94a3b8;
++  cursor: pointer;
++  font-size: 1rem;
++  transition: color 0.2s;
++  z-index: 10;
+ }
+ 
+-.tab-item {
++.ai-recommend-banner .close-icon:hover {
++  color: #475569;
++}
++
++.banner-layout {
+   display: flex;
+   align-items: center;
+-  gap: var(--spacing-sm);
+-  padding: 10px var(--spacing-lg);
++  gap: var(--spacing-xl);
++}
++
++.banner-left {
++  flex: 1;
++  min-width: 0;
++  display: flex;
++  flex-direction: column;
++  gap: 16px;
++}
++
++.banner-title-row {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  color: #3b5bdb;
++  font-size: 0.9rem;
++}
++
++.ai-title-spark {
++  color: #4f6ef6;
++}
++
++.bh-text {
++  color: #1e293b;
++  font-weight: 500;
++}
++
++.bh-text strong {
++  font-weight: 800;
++  color: #4f6ef6;
++  background: rgba(79, 110, 246, 0.08);
++  padding: 1px 6px;
++  border-radius: 4px;
++  margin-right: 4px;
++}
++
++.recommend-cards {
++  display: flex;
++  gap: 16px;
++}
++
++.recommend-item {
++  flex: 1;
++  background: rgba(255, 255, 255, 0.85);
+   border-radius: var(--radius-lg);
+-  font-size: 0.875rem;
++  padding: 16px;
++  border: 1px solid rgba(255, 255, 255, 0.8);
++  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
++  display: flex;
++  flex-direction: column;
++  justify-content: space-between;
++  min-height: 140px;
++  transition: all 0.3s;
++}
++
++.recommend-item:hover {
++  transform: translateY(-2px);
++  box-shadow: 0 8px 24px rgba(11, 183, 170, 0.08);
++  border-color: rgba(11, 183, 170, 0.15);
++}
++
++.rec-card-top {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++}
++
++.rec-icon-wrapper {
++  width: 36px;
++  height: 36px;
++  border-radius: 10px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-size: 1.1rem;
++  flex-shrink: 0;
++}
++
++.rec-icon-wrapper.warning {
++  background: rgba(245, 158, 11, 0.08);
++  color: #f59e0b;
++}
++
++.rec-icon-wrapper.success {
++  background: rgba(16, 185, 129, 0.08);
++  color: #16b981;
++}
++
++.rec-icon-wrapper.primary {
++  background: rgba(79, 110, 246, 0.08);
++  color: #4f6ef6;
++}
++
++.rec-card-title-info {
++  display: flex;
++  flex-direction: column;
++  gap: 2px;
++}
++
++.rec-title {
++  margin: 0;
++  font-size: 0.9rem;
++  font-weight: 700;
++  color: #0f172a;
++}
++
++.rec-tags {
++  display: flex;
++  gap: 4px;
++}
++
++.rec-tags .tag {
++  font-size: 0.65rem;
++  background: #f1f5f9;
++  padding: 1px 4px;
++  border-radius: 4px;
++  color: #64748b;
++  font-weight: 600;
++}
++
++.rec-tags .tag.difficulty.warning {
++  color: #f59e0b;
++  background: rgba(245, 158, 11, 0.08);
++}
++
++.rec-tags .tag.difficulty.success {
++  color: #16b981;
++  background: rgba(16, 185, 129, 0.08);
++}
++
++.rec-tags .tag.difficulty.danger {
++  color: #ef4444;
++  background: rgba(239, 68, 68, 0.08);
++}
++
++.rec-desc {
++  margin: 8px 0;
++  font-size: 0.75rem;
++  color: #64748b;
++  line-height: 1.4;
++  flex-grow: 1;
++}
++
++.rec-card-bottom {
++  display: flex;
++  justify-content: flex-start;
++  margin-top: 4px;
++}
++
++.start-rec-btn {
++  background: linear-gradient(135deg, #4f6ef6 0%, #0bb7aa 100%) !important;
++  border: none !important;
++  color: white !important;
++  font-weight: 600 !important;
++  font-size: 0.75rem !important;
++  padding: 6px 12px !important;
++  height: auto !important;
++  border-radius: 20px !important;
++  box-shadow: 0 2px 8px rgba(11, 183, 170, 0.2) !important;
++  transition: all 0.3s;
++}
++
++.start-rec-btn:hover {
++  transform: translateY(-1px);
++  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.35) !important;
++}
++
++.banner-right {
++  width: 120px;
++  flex-shrink: 0;
++  display: flex;
++  justify-content: center;
++}
++
++.mascot-container {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++}
++
++.floating-mascot {
++  animation: mascot-float 3s ease-in-out infinite;
++}
++
++@keyframes mascot-float {
++  0%, 100% {
++    transform: translateY(0);
++  }
++  50% {
++    transform: translateY(-6px);
++  }
++}
++
++/* Tabs */
++.exam-tabs-wrapper {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  margin-top: var(--spacing-sm);
++  margin-bottom: var(--spacing-md);
++}
++
++.new-tabs {
++  background: rgba(148, 163, 184, 0.08);
++  padding: 4px;
++  border-radius: 12px;
++  display: inline-flex;
++  align-items: center;
++  gap: 4px;
++  width: auto;
++}
++
++.new-tabs .tab-item {
++  padding: 8px 16px;
++  border-radius: 8px;
++  position: relative;
++  color: #64748b;
++  background: transparent;
+   font-weight: 600;
+-  color: var(--text-regular);
+   cursor: pointer;
+-  transition: all var(--transition-base);
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  font-size: 0.85rem;
++  transition: all 0.3s;
++}
++
++.new-tabs .tab-item:hover {
++  color: #0f172a;
++  background: rgba(255, 255, 255, 0.5);
++}
++
++.new-tabs .tab-item.active {
++  background: linear-gradient(135deg, #0bb7aa 0%, #10b981 100%);
++  color: white;
++  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.2);
++  font-weight: 700;
++}
++
++.new-tabs .tab-count {
++  padding: 1px 6px;
++  font-size: 0.7rem;
++  border-radius: 20px;
++  background: rgba(15, 23, 42, 0.05);
++  color: #64748b;
++  font-weight: 700;
++}
++
++.new-tabs .tab-item.active .tab-count {
++  background: rgba(255, 255, 255, 0.25);
++  color: white;
++}
++
++.view-all-link {
++  font-size: 0.8rem;
++  color: #0bb7aa;
++  cursor: pointer;
++  display: flex;
++  align-items: center;
++  gap: 2px;
++  font-weight: 600;
++  text-decoration: none;
++}
++
++.view-all-link:hover {
++  text-decoration: underline;
++}
++
++/* Exam List */
++.new-exam-list {
++  display: flex;
++  flex-direction: column;
++  gap: 12px;
++  margin-top: var(--spacing-sm);
++}
++
++.new-exam-card {
++  display: flex;
++  align-items: center;
++  background: white;
++  border-radius: var(--radius-xl);
++  padding: 18px 24px;
++  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
++  border: 1px solid rgba(15, 23, 42, 0.03);
++  transition: all 0.3s;
++  gap: 24px;
++}
++
++.new-exam-card:hover {
++  transform: translateY(-2px);
++  box-shadow: 0 8px 24px rgba(11, 183, 170, 0.08);
++  border-color: rgba(11, 183, 170, 0.18);
++}
++
++.ex-left {
++  flex-shrink: 0;
++  width: 60px;
++}
++
++.ex-status-badge {
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++  gap: 4px;
++}
++
++.badge-dot {
++  width: 32px;
++  height: 32px;
++  border-radius: 50%;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-size: 0.95rem;
++}
++
++.ex-status-badge.ongoing .badge-dot {
++  background: rgba(245, 158, 11, 0.08);
++  color: #f59e0b;
++}
++
++.ex-status-badge.available .badge-dot {
++  background: rgba(16, 185, 129, 0.08);
++  color: #16b981;
++}
++
++.ex-status-badge.completed .badge-dot {
++  background: rgba(79, 110, 246, 0.08);
++  color: #4f6ef6;
++}
++
++.badge-text {
++  font-size: 0.75rem;
++  font-weight: 700;
++  color: #64748b;
++}
++
++.ex-status-badge.ongoing .badge-text {
++  color: #f59e0b;
++}
++
++.ex-status-badge.available .badge-text {
++  color: #16b981;
++}
++
++.ex-status-badge.completed .badge-text {
++  color: #4f6ef6;
++}
++
++.ex-main {
+   flex: 1;
++  min-width: 0;
++}
++
++.ex-title {
++  margin: 0 0 6px;
++  font-size: 1.05rem;
++  font-weight: 700;
++  color: #0f172a;
++  display: flex;
++  align-items: center;
++  gap: 8px;
++}
++
++.ex-topic-tag {
++  font-size: 0.7rem;
++  font-weight: 600;
++  color: #475569;
++  background: #f1f5f9;
++  padding: 2px 8px;
++  border-radius: 4px;
++}
++
++.ex-meta {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  font-size: 0.75rem;
++  color: #64748b;
++}
++
++.ex-meta .divider {
++  color: rgba(15, 23, 42, 0.06);
++}
++
++.diff-text {
++  font-weight: 700;
++  padding: 1px 6px;
++  border-radius: 4px;
++}
++
++.diff-text.涓瓑 {
++  color: #f59e0b;
++  background: rgba(245, 158, 11, 0.08);
++}
++
++.diff-text.鍥伴毦 {
++  color: #ef4444;
++  background: rgba(239, 68, 68, 0.08);
++}
++
++.diff-text.鍩虹 {
++  color: #16b981;
++  background: rgba(16, 185, 129, 0.08);
++}
++
++.ex-progress {
++  width: 100px;
++  display: flex;
++  flex-direction: column;
++  gap: 4px;
++  flex-shrink: 0;
++}
++
++.ex-prog-text {
++  font-size: 0.8rem;
++  font-weight: 700;
++  color: #475569;
++  text-align: right;
++}
++
++.ex-prog-bar {
++  width: 100%;
++  height: 6px;
++  background: #f1f5f9;
++  border-radius: 3px;
++  overflow: hidden;
++}
++
++.ex-prog-fill {
++  height: 100%;
++  background: #10b981;
++  border-radius: 3px;
++}
++
++.ex-prog-fill.zero-fill {
++  background: #cbd5e1;
++}
++
++.ex-sparkline-col {
++  width: 80px;
++  display: flex;
+   justify-content: center;
++  flex-shrink: 0;
+ }
+ 
+-.tab-item:hover {
+-  background: rgba(255, 255, 255, 0.5);
+-  color: var(--text-dark);
++.ex-score-col {
++  width: 100px;
++  text-align: right;
++  flex-shrink: 0;
+ }
+ 
+-.tab-item.active {
+-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-color) 100%);
+-  color: white;
+-  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.25);
++.ex-score-label {
++  font-size: 0.7rem;
++  color: #94a3b8;
++  font-weight: 500;
+ }
+ 
+-.tab-icon {
+-  font-size: 1rem;
+-  display: flex;
+-  align-items: center;
+-  justify-content: center;
++.ex-score-val {
++  font-size: 1.25rem;
++  font-weight: 800;
++  color: #0f172a;
+ }
+ 
+-.tab-icon svg {
+-  width: 16px;
+-  height: 16px;
++.ex-score-grade {
++  font-size: 0.75rem;
++  font-weight: 600;
++  margin-left: 1px;
+ }
+ 
+-.tab-count {
+-  padding: 2px 8px;
+-  background: rgba(255, 255, 255, 0.25);
+-  border-radius: var(--radius-full);
+-  font-size: 0.6875rem;
++.ex-score-status {
++  font-size: 0.7rem;
+   font-weight: 700;
+ }
+ 
+-.tab-item:not(.active) .tab-count {
+-  background: rgba(11, 183, 170, 0.1);
+-  color: var(--primary-color);
++.ex-score-empty {
++  font-size: 0.85rem;
++  color: #cbd5e1;
++  font-weight: bold;
+ }
+ 
+-/* 鍒楄〃瀹瑰櫒 */
+-.section-title-row {
++.ex-actions {
+   display: flex;
+-  align-items: flex-start;
+-  justify-content: space-between;
+-  gap: var(--spacing-lg);
+-  margin-bottom: var(--spacing-lg);
++  align-items: center;
++  gap: 12px;
++  flex-shrink: 0;
+ }
+ 
+-.section-title-row h2 {
+-  margin: 0 0 4px;
+-  font-size: 1.125rem;
+-  font-weight: 700;
+-  color: var(--text-dark);
++.ex-actions .el-button {
++  padding: 8px 16px;
++  font-weight: 600;
++  border-radius: 20px;
++  height: auto;
+ }
+ 
+-.section-title-row p {
+-  margin: 0;
+-  font-size: 0.8125rem;
+-  color: var(--text-secondary);
++.ex-actions .el-button.start-btn {
++  background: #10b981 !important;
++  border-color: #10b981 !important;
++  color: white !important;
+ }
+ 
+-.exam-list-section {
+-  background: white;
++.ex-actions .el-button.start-btn:hover {
++  background: #0d9488 !important;
++  border-color: #0d9488 !important;
++  transform: translateY(-1px);
+ }
+ 
+-/* 棰樺簱鏁版嵁鍗＄墖浼樺寲 */
+-.question-bank-list {
+-  display: grid;
+-  grid-template-columns: repeat(2, minmax(0, 1fr));
+-  gap: var(--spacing-md);
+-  margin-bottom: var(--spacing-xl);
++.ex-actions .el-button.report-btn {
++  background: white !important;
++  border-color: rgba(15, 23, 42, 0.12) !important;
++  color: #475569 !important;
+ }
+ 
+-.question-bank-card {
+-  min-height: 132px;
+-  padding: var(--spacing-lg);
+-  border: 1px solid rgba(15, 23, 42, 0.05);
+-  border-radius: var(--radius-lg);
+-  background: #f8fafc;
+-  transition: all var(--transition-base);
+-  box-shadow: var(--shadow-xs);
+-  display: flex;
+-  flex-direction: column;
+-  justify-content: space-between;
++.ex-actions .el-button.report-btn:hover {
++  border-color: rgba(11, 183, 170, 0.3) !important;
++  color: #0bb7aa !important;
+ }
+ 
+-.question-bank-card:hover {
+-  background: white;
+-  transform: translateY(-3px);
+-  border-color: rgba(11, 183, 170, 0.2);
+-  box-shadow: var(--shadow-md), 0 4px 16px rgba(11, 183, 170, 0.04);
++.more-icon {
++  color: #94a3b8;
++  font-size: 1.1rem;
++  cursor: pointer;
++  transition: color 0.2s;
+ }
+ 
+-.question-bank-meta {
+-  display: flex;
+-  flex-wrap: wrap;
+-  gap: var(--spacing-xs);
+-  margin-bottom: var(--spacing-sm);
++.more-icon:hover {
++  color: #475569;
+ }
+ 
+-.question-bank-meta span {
+-  padding: 3px 8px;
+-  border-radius: var(--radius-full);
+-  background: white;
+-  color: var(--text-secondary);
+-  font-size: 0.6875rem;
+-  font-weight: 700;
+-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+-  border: 1px solid rgba(15, 23, 42, 0.03);
++/* Bottom Analysis */
++.bottom-analysis-grid {
++  display: grid;
++  grid-template-columns: 1.6fr 1fr;
++  gap: var(--spacing-lg);
++  margin-top: var(--spacing-md);
+ }
+ 
+-.question-bank-card h3 {
+-  margin: 0 0 var(--spacing-sm);
+-  color: var(--text-dark);
+-  font-size: 0.9375rem;
+-  font-weight: 600;
+-  line-height: 1.6;
+-  flex-grow: 1;
++.analysis-card {
++  background: white;
++  border-radius: var(--radius-xl);
++  padding: var(--spacing-lg);
++  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.015);
++  border: 1px solid rgba(15, 23, 42, 0.04);
+ }
+ 
+-.question-bank-card p {
++.analysis-card h3 {
+   margin: 0 0 var(--spacing-md);
+-  color: var(--text-secondary);
+-  font-size: 0.8125rem;
+-  line-height: 1.5;
+-  background: rgba(15, 23, 42, 0.02);
+-  padding: 6px 10px;
+-  border-radius: var(--radius-sm);
++  font-size: 1rem;
++  font-weight: 700;
++  color: #0f172a;
+ }
+ 
+-.question-tags {
++.card-header {
+   display: flex;
+-  flex-wrap: wrap;
+-  gap: var(--spacing-xs);
++  justify-content: space-between;
++  align-items: center;
++  margin-bottom: var(--spacing-md);
+ }
+ 
+-.question-tags span {
+-  padding: 2px 8px;
+-  border-radius: var(--radius-full);
+-  background: rgba(11, 183, 170, 0.08);
+-  color: var(--primary-color);
+-  font-size: 0.6875rem;
+-  font-weight: 600;
++.card-header h3 {
++  margin: 0;
+ }
+ 
+-/* 娴嬭瘎鍒楄〃涓庡崱鐗?*/
+-.exam-list {
+-  display: flex;
+-  flex-direction: column;
+-  gap: var(--spacing-lg);
++.ability-grid {
++  display: grid;
++  grid-template-columns: repeat(4, 1fr);
++  gap: 12px;
+ }
+ 
+-.exam-card {
+-  position: relative;
++.ability-item {
+   display: flex;
+-  gap: var(--spacing-xl);
+-  padding: var(--spacing-xl);
+-  padding-left: calc(var(--spacing-xl) + 6px);
+-  background: white;
+-  border-radius: var(--radius-xl);
+-  border: 1px solid rgba(15, 23, 42, 0.05);
+-  box-shadow: var(--shadow-sm);
+-  transition: all var(--transition-base);
+-  overflow: hidden;
+-}
+-
+-/* 鐘舵€佸僵甯﹁璁?*/
+-.exam-card::before {
+-  content: '';
+-  position: absolute;
+-  left: 0;
+-  top: 0;
+-  bottom: 0;
+-  width: 6px;
+-  background: var(--border-light);
+-  transition: all var(--transition-base);
++  align-items: center;
++  gap: 10px;
++  background: #f8fafc;
++  padding: 12px;
++  border-radius: var(--radius-lg);
++  border: 1px solid rgba(15, 23, 42, 0.02);
++  min-width: 0;
+ }
+ 
+-.exam-card.ongoing {
+-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.02), white 100%);
+-}
+-.exam-card.ongoing::before {
+-  background: linear-gradient(180deg, #f59e0b, #fbbf24);
++.ab-icon {
++  width: 38px;
++  height: 38px;
++  border-radius: 10px;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-size: 1.15rem;
++  flex-shrink: 0;
+ }
+ 
+-.exam-card.available::before {
+-  background: linear-gradient(180deg, var(--primary-color), var(--accent-color));
++.ab-icon.single {
++  color: #4f6ef6;
++  background: rgba(79, 110, 246, 0.08);
+ }
+ 
+-.exam-card.completed::before {
+-  background: linear-gradient(180deg, #10b981, #34d399);
++.ab-icon.fill {
++  color: #8b5cf6;
++  background: rgba(139, 92, 246, 0.08);
+ }
+ 
+-.exam-card.error::before {
+-  background: linear-gradient(180deg, #ef4444, #f87171);
++.ab-icon.judge {
++  color: #10b981;
++  background: rgba(16, 185, 129, 0.08);
+ }
+ 
+-.exam-card:hover {
+-  transform: translateY(-4px);
+-  border-color: rgba(11, 183, 170, 0.18);
+-  box-shadow: var(--shadow-lg), 0 8px 24px rgba(11, 183, 170, 0.05);
++.ab-icon.code {
++  color: #6366f1;
++  background: rgba(99, 102, 241, 0.08);
+ }
+ 
+-.exam-status-bar {
++.ab-info {
+   display: flex;
+   flex-direction: column;
+-  gap: var(--spacing-sm);
+-  min-width: 90px;
+-  align-items: flex-start;
++  gap: 1px;
++  min-width: 0;
+ }
+ 
+-.status-badge {
+-  padding: 3px 10px;
+-  border-radius: var(--radius-full);
+-  font-size: 0.6875rem;
++.ab-name {
++  font-size: 0.8rem;
+   font-weight: 700;
+-  text-align: center;
+-  width: fit-content;
+-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
++  color: #64748b;
+ }
+ 
+-.status-badge.completed {
+-  background: rgba(16, 185, 129, 0.1);
+-  color: var(--success-color);
+-}
+-.status-badge.available {
+-  background: rgba(11, 183, 170, 0.1);
+-  color: var(--primary-color);
++.ab-score {
++  font-size: 0.75rem;
++  color: #94a3b8;
++  font-weight: 500;
++  margin: 2px 0;
+ }
+-.status-badge.ongoing {
+-  background: rgba(245, 158, 11, 0.12);
+-  color: var(--warning-color);
+-  animation: pulse 2s infinite;
++
++.ab-score strong {
++  font-size: 1.25rem;
++  font-weight: 800;
++  color: #1e293b;
++  margin-left: 2px;
++  font-family: 'Outfit', sans-serif;
+ }
+-.status-badge.error {
+-  background: rgba(239, 68, 68, 0.1);
+-  color: #ef4444;
++
++.ab-trend {
++  font-size: 0.7rem;
++  font-weight: 600;
++  color: #10b981;
+ }
+ 
+-.time-left {
++.legend {
++  display: flex;
++  gap: 12px;
+   font-size: 0.75rem;
+-  font-weight: 700;
+-  color: var(--warning-color);
++  color: #64748b;
++}
++
++.leg-item {
+   display: flex;
+   align-items: center;
+-  gap: 3px;
++  gap: 4px;
+ }
+ 
+-.result-score {
+-  font-size: 1.375rem;
+-  font-weight: 800;
+-  font-family: 'Outfit', sans-serif;
+-  margin-top: 4px;
++.dot {
++  width: 8px;
++  height: 8px;
++  border-radius: 50%;
+ }
+ 
+-.result-score.good {
+-  color: var(--success-color);
++.dot.my {
++  background: #0bb7aa;
+ }
+-.result-score.medium {
+-  color: var(--primary-color);
++
++.dot.avg {
++  background: #94a3b8;
+ }
+-.result-score.poor {
+-  color: var(--danger-color);
++
++/* Sidebar */
++.sidebar-card {
++  background: white;
++  border-radius: var(--radius-xl);
++  padding: 20px;
++  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.015);
++  border: 1px solid rgba(15, 23, 42, 0.04);
+ }
+ 
+-.exam-info {
+-  flex: 1;
++.radar-card {
+   display: flex;
+   flex-direction: column;
+-  justify-content: space-between;
++  align-items: center;
+ }
+ 
+-.exam-title {
+-  font-size: 1.0625rem;
+-  font-weight: 700;
+-  color: var(--text-dark);
++.radar-card .card-title {
++  align-self: flex-start;
+   margin: 0 0 6px;
+-  letter-spacing: -0.01em;
++  font-size: 1rem;
++  font-weight: 700;
++  color: #0f172a;
+ }
+ 
+-.exam-desc {
+-  font-size: 0.8125rem;
+-  color: var(--text-secondary);
+-  margin: 0 0 var(--spacing-md);
+-  line-height: 1.6;
++.sub-title {
++  font-size: 0.8rem;
++  color: #94a3b8;
++  margin: 0 0 16px;
++  align-self: flex-start;
++  font-weight: 500;
+ }
+ 
+-.exam-meta {
++.radar-legend {
+   display: flex;
+-  gap: var(--spacing-lg);
+-  margin-bottom: var(--spacing-md);
+-  flex-wrap: wrap;
++  gap: 16px;
++  font-size: 0.75rem;
++  color: #64748b;
++  margin-top: -6px;
+ }
+ 
+-.exam-meta span {
+-  display: flex;
+-  align-items: center;
+-  gap: 6px;
+-  font-size: 0.75rem;
+-  color: var(--text-muted);
+-  font-weight: 500;
++.dot.box {
++  border-radius: 2px;
+ }
+ 
+-.exam-meta svg {
+-  width: 14px;
+-  height: 14px;
+-  color: var(--text-muted);
++.dot.my.box {
++  width: 12px;
++  height: 6px;
++  background: #0bb7aa;
+ }
+ 
+-.exam-progress-bar {
++.dot.avg.box {
++  width: 12px;
+   height: 6px;
+-  background: rgba(148, 163, 184, 0.12);
+-  border-radius: var(--radius-full);
+-  overflow: hidden;
+-  margin-bottom: var(--spacing-sm);
++  background: transparent;
++  border: 1.5px dashed #94a3b8;
+ }
+ 
+-.exam-progress-bar .bar-fill {
+-  height: 100%;
+-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
++.wrong-card .card-title,
++.streak-card .card-title {
++  margin: 0 0 12px;
++  font-size: 1rem;
++  font-weight: 700;
++  color: #0f172a;
+ }
+ 
+-/* 缁撴灉璇︾粏 */
+-.result-detail {
++.wrong-remind-grid {
+   display: flex;
+-  align-items: center;
+-  gap: var(--spacing-xl);
+-  margin-top: var(--spacing-xs);
+-  background: rgba(15, 23, 42, 0.015);
+-  padding: 8px 12px;
++  gap: 12px;
++  margin-bottom: 12px;
++}
++
++.remind-item {
++  flex: 1;
++  background: #f8fafc;
++  padding: 12px;
+   border-radius: var(--radius-lg);
+   border: 1px solid rgba(15, 23, 42, 0.02);
++  display: flex;
++  flex-direction: column;
++  gap: 2px;
+ }
+ 
+-.result-chart {
+-  display: flex;
+-  align-items: flex-end;
+-  gap: var(--spacing-sm);
++.rm-label {
++  font-size: 0.75rem;
++  color: #64748b;
++  font-weight: 600;
+ }
+ 
+-.chart-bar-group {
+-  display: flex;
+-  gap: 3px;
+-  align-items: flex-end;
+-  height: 36px;
++.rm-val {
++  font-size: 0.8rem;
++  color: #64748b;
+ }
+ 
+-.chart-bar {
+-  width: 12px;
+-  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+-  transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
++.rm-val strong {
++  font-size: 1.45rem;
++  color: #0f172a;
++  font-family: 'Outfit', sans-serif;
+ }
+ 
+-.chart-bar.correct {
+-  background: var(--success-color);
++.go-wrong-wrapper {
++  position: relative;
++  overflow: hidden;
++  border-radius: var(--radius-lg);
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  height: 48px;
+ }
+-.chart-bar.wrong {
+-  background: var(--danger-color);
+-  opacity: 0.75;
++
++.go-wrong-btn {
++  width: 130px;
++  border-radius: 20px !important;
++  height: 34px;
++  font-weight: 600;
++  font-size: 0.8rem;
++  border-color: rgba(79, 110, 246, 0.2) !important;
++  color: #4f6ef6 !important;
++  background: white !important;
++  transition: all 0.3s;
+ }
+ 
+-.chart-label {
+-  font-size: 0.75rem;
+-  font-weight: 700;
+-  color: var(--text-secondary);
++.go-wrong-btn:hover {
++  background: rgba(79, 110, 246, 0.04) !important;
++  border-color: #4f6ef6 !important;
+ }
+ 
+-.result-tags {
++.wrong-icon-bg {
++  position: absolute;
++  right: 12px;
++  bottom: 0px;
++  pointer-events: none;
+   display: flex;
+-  flex-wrap: wrap;
+-  gap: var(--spacing-sm);
++  align-items: center;
++  justify-content: center;
+ }
+ 
+-.wrong-tag {
++.streak-info {
+   display: flex;
++  justify-content: space-between;
+   align-items: center;
+-  gap: var(--spacing-xs);
+-  padding: 3px 10px;
+-  background: rgba(239, 68, 68, 0.06);
+-  color: var(--danger-color);
+-  border-radius: var(--radius-full);
+-  font-size: 0.6875rem;
+-  font-weight: 700;
+-  border: 1px solid rgba(239, 68, 68, 0.1);
++  margin-bottom: 14px;
+ }
+ 
+-.review-link {
+-  color: var(--primary-color);
+-  cursor: pointer;
+-  text-decoration: none;
+-  font-weight: 700;
+-  margin-left: 2px;
+-  transition: opacity 0.2s;
++.streak-text {
++  display: flex;
++  flex-direction: column;
++  gap: 2px;
+ }
+ 
+-.review-link:hover {
+-  opacity: 0.8;
+-  text-decoration: underline;
++.streak-sub {
++  font-size: 0.7rem;
++  color: #94a3b8;
++  font-weight: 600;
+ }
+ 
+-.weak-tag {
+-  padding: 3px 10px;
+-  background: rgba(245, 158, 11, 0.06);
+-  color: var(--warning-color);
+-  border-radius: var(--radius-full);
+-  font-size: 0.6875rem;
+-  font-weight: 700;
+-  border: 1px solid rgba(245, 158, 11, 0.1);
++.streak-icon {
++  font-size: 2.2rem;
++  filter: drop-shadow(0 4px 6px rgba(245, 158, 11, 0.25));
++  animation: flame-flicker 1.5s ease-in-out infinite alternate;
++}
++
++@keyframes flame-flicker {
++  0% { transform: scale(1); }
++  100% { transform: scale(1.06); }
++}
++
++.streak-week {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
+ }
+ 
+-.exam-actions {
++.day-item {
+   display: flex;
+   flex-direction: column;
+-  gap: var(--spacing-xs);
+-  justify-content: center;
+-  min-width: 100px;
++  align-items: center;
++  gap: 6px;
+ }
+ 
+-.exam-actions .el-button {
+-  width: 100%;
+-  margin-left: 0 !important;
++.day-circle {
++  width: 24px;
++  height: 24px;
++  border-radius: 50%;
++  background: #f1f5f9;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  font-size: 0.75rem;
++  color: #94a3b8;
+   font-weight: 600;
++  transition: all 0.2s;
+ }
+ 
+-/* 绌虹姸鎬?*/
+-.empty-state {
+-  text-align: center;
+-  padding: var(--spacing-3xl) var(--spacing-xl);
+-  border: 1px dashed rgba(148, 163, 184, 0.3);
+-  background: rgba(148, 163, 184, 0.02);
+-  border-radius: var(--radius-xl);
++.day-circle.active {
++  background: #10b981 !important;
++  color: white !important;
++  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+ }
+ 
+-.empty-icon {
+-  margin-bottom: var(--spacing-md);
+-  color: var(--text-muted);
+-}
+-.empty-state h3 {
+-  font-size: 1rem;
+-  font-weight: 700;
+-  color: var(--text-dark);
+-  margin: 0 0 var(--spacing-xs);
++.day-circle.current {
++  border: 2px solid #0bb7aa;
++  background: white;
+ }
+-.empty-state p {
+-  font-size: 0.8125rem;
+-  color: var(--text-secondary);
+-  margin: 0;
++
++.day-name {
++  font-size: 0.7rem;
++  color: #64748b;
++  font-weight: 600;
+ }
+ 
+-/* 鐢熸垚琛ㄥ崟 & AI 瀵硅瘽妗?*/
++/* Dialog and Overlay */
+ :deep(.el-overlay-dialog) {
+   display: flex !important;
+   align-items: center !important;
+   justify-content: center !important;
+ }
+ 
++/* 鐢熸垚琛ㄥ崟 & AI 瀵硅瘽妗?*/
+ :deep(.question-generate-dialog) {
+   margin: 0 !important;
+   border-radius: var(--radius-xl) !important;
