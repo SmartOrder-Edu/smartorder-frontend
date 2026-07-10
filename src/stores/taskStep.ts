@@ -20,6 +20,7 @@ import type {
   StudyChatMessage,
   StudyMode,
   StudyTeachingAction,
+  TeachingBoardBlock,
   TeachingFlow,
   TeachingSegment,
 } from '@/types/study'
@@ -60,6 +61,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const quizState = ref<QuizState | null>(null)
   const currentSubtitle = ref('')
   const activeSceneActions = ref<LessonSceneAction[]>([])
+  const revealedBoardBlockIndexes = ref<Record<string, number>>({})
+  const revealedBoardItemIndexes = ref<Record<string, Record<string, number>>>({})
   const sceneActionTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   const timelinePlayer = useTimelinePlayer({
@@ -192,7 +195,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         currentSegmentId: seg.id,
       },
     })
-    return { correct, explanation: quizState.value.explanation }
+    return { correct, explanation: quizState.value.explanation || '' }
   }
 
   /** 恢复教学（答题后或手动点继续） */
@@ -541,6 +544,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     mode.value = 'learn'
     teachingActive.value = false
     quizState.value = null
+    revealedBoardBlockIndexes.value = {}
+    revealedBoardItemIndexes.value = {}
   }
 
   function prepareCanvasContent(step: ScriptStep): CanvasContent {
@@ -685,8 +690,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         type: 'scene_action',
         startMs,
         endMs: Math.min(endMs, startMs + sceneAction.durationMs),
-        payload: sceneAction,
+        payload: sceneAction as unknown as Record<string, unknown>,
       })
+      appendBoardRevealCues(cues, segment, index, startMs, segmentDurationMs)
       if (waitForUser) {
         cues.push({
           id: `${segment.id}-wait`,
@@ -713,8 +719,118 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       cues,
       metadata: {
         source: 'teaching_flow_compat',
+        capabilities: [
+          'segment_reveal',
+          'scene_action',
+          'pause_at_segment_end',
+          'board_block_reveal',
+          'board_item_reveal',
+        ],
       },
     }
+  }
+
+  function appendBoardRevealCues(
+    cues: LessonCue[],
+    segment: TeachingSegment,
+    segmentIndex: number,
+    segmentStartMs: number,
+    segmentDurationMs: number,
+  ) {
+    const blocks = segment.boardBlocks || []
+    if (!blocks.length) return
+
+    const blockIntervalMs = revealIntervalMs(segmentDurationMs, blocks.length)
+    blocks.forEach((block, blockIndex) => {
+      const blockStartMs = Math.min(
+        segmentStartMs + segmentDurationMs - 1,
+        segmentStartMs + blockIndex * blockIntervalMs,
+      )
+      const blockId = boardBlockTimelineId(segment.id, block, blockIndex)
+      cues.push({
+        id: `${segment.id}-block-${blockIndex}-reveal`,
+        type: 'board_block_reveal',
+        startMs: blockStartMs,
+        endMs: blockStartMs,
+        payload: {
+          segmentId: segment.id,
+          segmentIndex,
+          blockId,
+          blockIndex,
+          blockType: block.type,
+        },
+      })
+      appendBoardItemRevealCues(cues, segment.id, segmentIndex, block, blockId, blockIndex, blockStartMs, blockIntervalMs)
+    })
+  }
+
+  function appendBoardItemRevealCues(
+    cues: LessonCue[],
+    segmentId: string,
+    segmentIndex: number,
+    block: TeachingBoardBlock,
+    blockId: string,
+    blockIndex: number,
+    blockStartMs: number,
+    blockWindowMs: number,
+  ) {
+    const itemKind = boardRevealItemKind(block)
+    if (!itemKind) return
+
+    const items = (block as unknown as Record<string, unknown>)[itemKind]
+    if (!Array.isArray(items) || !items.length) return
+
+    const itemIntervalMs = revealIntervalMs(Math.max(blockWindowMs, 900), items.length)
+    items.forEach((_, itemIndex) => {
+      const itemStartMs = blockStartMs + Math.min(blockWindowMs - 1, itemIndex * itemIntervalMs)
+      cues.push({
+        id: `${segmentId}-block-${blockIndex}-item-${itemIndex}-reveal`,
+        type: 'board_item_reveal',
+        startMs: itemStartMs,
+        endMs: itemStartMs,
+        payload: {
+          segmentId,
+          segmentIndex,
+          blockId,
+          blockIndex,
+          itemIndex,
+          itemKind,
+        },
+      })
+    })
+  }
+
+  function revealIntervalMs(durationMs: number, count: number): number {
+    if (count <= 1) return Math.max(600, durationMs)
+    return Math.max(600, Math.floor(durationMs / count))
+  }
+
+  function boardBlockTimelineId(segmentId: string, block: TeachingBoardBlock, blockIndex: number): string {
+    return block.id || `${segmentId}-block-${blockIndex}`
+  }
+
+  function boardRevealItemKind(block: TeachingBoardBlock): string {
+    const type = normalizeBoardBlockType(block.type)
+    const record = block as unknown as Record<string, unknown>
+    if (type === 'reasoning_steps' || type === 'operation_sequence') {
+      return Array.isArray(record.steps) ? 'steps' : ''
+    }
+    if (type === 'concept_breakdown') {
+      if (Array.isArray(record.points)) return 'points'
+      return Array.isArray(record.items) ? 'items' : ''
+    }
+    if (type === 'numbered_points' || type === 'ordered_checklist') {
+      if (Array.isArray(record.items)) return 'items'
+      return Array.isArray(record.points) ? 'points' : ''
+    }
+    if (type === 'invariant') {
+      return Array.isArray(record.checkpoints) ? 'checkpoints' : ''
+    }
+    return ''
+  }
+
+  function normalizeBoardBlockType(type: string): string {
+    return (type || '').toLowerCase().replace(/[-\s]/g, '_')
   }
 
   function resolveSegmentDurationMs(segment: TeachingSegment): number {
@@ -750,6 +866,16 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       return
     }
 
+    if (cue.type === 'board_block_reveal') {
+      applyBoardBlockRevealCue(cue)
+      return
+    }
+
+    if (cue.type === 'board_item_reveal') {
+      applyBoardItemRevealCue(cue)
+      return
+    }
+
     if (cue.type === 'segment_reveal' || cue.type === 'text_reveal') {
       const index = Number(cue.payload.segmentIndex)
       if (Number.isInteger(index)) {
@@ -762,9 +888,58 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     applyGenericTimelineCue(cue)
   }
 
+  function applyBoardBlockRevealCue(cue: LessonCue) {
+    const segmentId = String(cue.payload.segmentId || '')
+    const blockIndex = Number(cue.payload.blockIndex)
+    if (!segmentId || !Number.isInteger(blockIndex)) return
+
+    revealedBoardBlockIndexes.value = {
+      ...revealedBoardBlockIndexes.value,
+      [segmentId]: Math.max(revealedBoardBlockIndexes.value[segmentId] ?? -1, blockIndex),
+    }
+  }
+
+  function applyBoardItemRevealCue(cue: LessonCue) {
+    const segmentId = String(cue.payload.segmentId || '')
+    const blockIndex = Number(cue.payload.blockIndex)
+    const itemIndex = Number(cue.payload.itemIndex)
+    if (!segmentId || !Number.isInteger(blockIndex) || !Number.isInteger(itemIndex)) return
+
+    const blockId = String(cue.payload.blockId || '')
+    const existing = revealedBoardItemIndexes.value[segmentId] || {}
+    const nextSegmentItems = { ...existing }
+    const keys = [`index:${blockIndex}`]
+    if (blockId) keys.push(blockId)
+    keys.forEach((key) => {
+      nextSegmentItems[key] = Math.max(nextSegmentItems[key] ?? -1, itemIndex)
+    })
+    revealedBoardItemIndexes.value = {
+      ...revealedBoardItemIndexes.value,
+      [segmentId]: nextSegmentItems,
+    }
+  }
+
+  function getRevealedBoardBlockIndex(segmentId: string): number | null {
+    if (!hasBoardRevealCue(segmentId, 'board_block_reveal')) return null
+    return revealedBoardBlockIndexes.value[segmentId] ?? -1
+  }
+
+  function getRevealedBoardItemIndexes(segmentId: string): Record<string, number> {
+    if (!hasBoardRevealCue(segmentId, 'board_item_reveal')) return {}
+    return revealedBoardItemIndexes.value[segmentId] || {}
+  }
+
+  function hasBoardRevealCue(segmentId: string, cueType: 'board_block_reveal' | 'board_item_reveal'): boolean {
+    const timeline = currentTimeline.value
+    if (!timeline) return false
+    return timeline.cues.some((cue) => cue.type === cueType && cue.payload.segmentId === segmentId)
+  }
+
   function resetTimelineScene() {
     clearSceneActions()
     currentSubtitle.value = ''
+    revealedBoardBlockIndexes.value = {}
+    revealedBoardItemIndexes.value = {}
     const flow = currentTeachingFlow.value
     if (flow) {
       flow.currentSegmentIndex = -1
@@ -1123,6 +1298,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     currentSubtitle,
     activeSceneActions,
     getActiveSceneAction,
+    getRevealedBoardBlockIndex,
+    getRevealedBoardItemIndexes,
     currentTeachingFlow,
     currentTimeline,
     currentSegment,

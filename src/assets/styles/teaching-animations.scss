@@ -101,8 +101,10 @@
 }
 
 // ---- 教学段已过（半透明）----
+// 注意：组件实际使用的是 TeachingSegmentView.vue 内 scoped 的 .segment-past 类，
+// 此处的 .teaching-segment-past 全局类未被引用，仅保留对齐以避免日后混淆。
 .teaching-segment-past {
-  opacity: 0.55;
+  opacity: 0.42;
   transition: opacity 0.3s ease;
   pointer-events: none;
 }
