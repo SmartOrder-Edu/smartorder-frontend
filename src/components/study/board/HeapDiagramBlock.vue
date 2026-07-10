@@ -12,7 +12,13 @@
       <div class="heap-visual-panel">
         <div class="heap-tree-scroll">
           <div class="heap-tree-stage" :style="{ width: `${stageSize.width}px`, height: `${stageSize.height}px` }">
-            <svg class="heap-lines" :viewBox="`0 0 ${stageSize.width} ${stageSize.height}`" aria-hidden="true">
+            <svg
+              class="heap-lines"
+              :width="stageSize.width"
+              :height="stageSize.height"
+              :viewBox="`0 0 ${stageSize.width} ${stageSize.height}`"
+              aria-hidden="true"
+            >
               <line
                 v-for="edge in heapEdges"
                 :key="`${edge.from}-${edge.to}`"
@@ -504,7 +510,8 @@ function readPayloadArray(key: string): unknown[] | null {
 
 .heap-tree-stage {
   position: relative;
-  min-width: 100%;
+  flex: 0 0 auto;
+  margin: 0 auto;
   border-radius: 8px;
   background: rgba(248, 250, 252, 0.72);
 }
@@ -512,8 +519,6 @@ function readPayloadArray(key: string): unknown[] | null {
 .heap-lines {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
 }
 
 .heap-edge {
