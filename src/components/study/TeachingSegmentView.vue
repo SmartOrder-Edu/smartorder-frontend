@@ -684,11 +684,7 @@ function applyFocus(el: HTMLElement) {
   }
 
   .segment-board {
-    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
-
-    &::before {
-      opacity: 0.3;
-    }
+    opacity: 0.92;
   }
 
   // 「已讲」标记 chip（纯 CSS，无模板变更）
@@ -711,11 +707,9 @@ function applyFocus(el: HTMLElement) {
   opacity: 1;
   filter: none;
 
-  // 当前段通过更明显的板书阴影区分，不加左竖条避免嵌套感
+  // 当前段不再给外层板书容器加卡片阴影，避免大卡片套小卡片。
   .segment-board {
-    box-shadow:
-      0 10px 30px rgba(15, 23, 42, 0.06),
-      inset 0 0 0 1px rgba(11, 183, 170, 0.1);
+    opacity: 1;
   }
 
   // teacher-talk 在当前段内 sticky：板书滚动时老师讲话始终可见
@@ -911,28 +905,17 @@ function applyFocus(el: HTMLElement) {
   --board-frame: var(--board-accent);
 
   position: relative;
-  background:
-    linear-gradient(180deg, var(--board-surface-tint), transparent 38%),
-    var(--board-surface);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 14px;
-  padding: 18px 22px;
-  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.045);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
   line-height: 1.78;
   font-size: 14px;
   color: #334155;
 
-  // 顶部框架条 - 黑板框隐喻，颜色跟随变体强调色
   &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 16px;
-    right: 16px;
-    height: 3px;
-    border-radius: 0 0 999px 999px;
-    background: linear-gradient(90deg, var(--board-frame), rgba(2, 132, 199, 0.22));
-    pointer-events: none;
+    display: none;
   }
 
   :deep(.markdown-renderer) {
@@ -1058,6 +1041,17 @@ function applyFocus(el: HTMLElement) {
     }
     .math-block, .math-inline { font-style: italic; }
   }
+}
+
+.segment-board:not(:has(> .board-block)) {
+  padding: 16px 18px;
+  border: 1px solid rgba(203, 213, 225, 0.72);
+  border-left: 3px solid var(--board-frame);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(248, 250, 252, 0.54)),
+    rgba(255, 255, 255, 0.62);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.035);
 }
 
 // 桌面端板书使用 12 栅格，按教学语义组织主视觉、侧栏说明和概念卡片
@@ -1431,15 +1425,15 @@ function applyFocus(el: HTMLElement) {
 @keyframes formulaCardLift {
   0% {
     border-color: rgba(37, 99, 235, 0.1);
-    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+    filter: none;
   }
   42% {
     border-color: rgba(37, 99, 235, 0.38);
-    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.13);
+    filter: drop-shadow(0 8px 18px rgba(37, 99, 235, 0.12));
   }
   100% {
     border-color: rgba(15, 23, 42, 0.04);
-    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+    filter: none;
   }
 }
 
@@ -1469,10 +1463,10 @@ function applyFocus(el: HTMLElement) {
 
 @keyframes focusPulse {
   0%, 100% {
-    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+    filter: none;
   }
   45% {
-    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.08), 0 12px 28px rgba(239, 68, 68, 0.12);
+    filter: drop-shadow(0 10px 20px rgba(239, 68, 68, 0.12));
   }
 }
 

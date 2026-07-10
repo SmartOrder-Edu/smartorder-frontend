@@ -350,6 +350,13 @@ export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
   frontierIds?: string[]
   pathIds?: string[]
   compareIds?: string[]
+  heapType?: 'max' | 'min' | string
+  heapSize?: number
+  parentIndex?: number
+  childIndices?: number[]
+  swapIndices?: number[]
+  violationIndices?: number[]
+  sortedRange?: [number, number]
   rootId?: string
   directed?: boolean
   layout?: 'tree' | 'heap' | 'circle' | 'layered' | string
