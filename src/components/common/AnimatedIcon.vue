@@ -1,6 +1,6 @@
 <template>
   <div class="animated-icon" :class="[`icon-${type}`, { active: isActive }]">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <svg v-if="type !== 'messages'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <!-- Dashboard Icon - 动态网格 -->
       <g v-if="type === 'dashboard'">
         <rect class="anim-rect-1" x="3" y="3" width="7" height="7" rx="1"/>
@@ -31,13 +31,6 @@
         <circle class="anim-check" cx="8" cy="15" r="1" fill="currentColor"/>
         <circle class="anim-check" cx="12" cy="15" r="1" fill="currentColor" style="animation-delay: 0.2s"/>
         <circle class="anim-check" cx="16" cy="15" r="1" fill="currentColor" style="animation-delay: 0.4s"/>
-      </g>
-
-      <!-- Messages Icon - 信封动画 -->
-      <g v-else-if="type === 'messages'">
-        <path class="anim-envelope" d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-        <polyline class="anim-flap" points="22,6 12,13 2,6"/>
-        <circle class="anim-msg-dot" cx="18" cy="6" r="3" fill="currentColor"/>
       </g>
 
       <!-- Tasks Icon - 任务勾选 -->
@@ -173,11 +166,17 @@
       </g>
 
       <!-- Cloud Drive Icon - 云盘 -->
-      <g v-else-if="type === 'cloud-drive'">
-        <path class="anim-cloud" d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/>
-        <path class="anim-arrow" d="M12 12v-3M12 12l-2-2M12 12l2-2"/>
-        <circle class="anim-rain-1" cx="9" cy="15" r="1" fill="currentColor"/>
-        <circle class="anim-rain-2" cx="15" cy="16" r="1" fill="currentColor"/>
+      <g v-else-if="type === 'cloud-drive'" class="cd-root">
+        <path
+          class="cd-outline"
+          d="M7.2 17.4H6.3a3.8 3.8 0 0 1-.45-7.57A5.55 5.55 0 0 1 16.4 8.55a4.15 4.15 0 0 1 1.28 8.1"
+        />
+        <path class="cd-base" d="M7.5 17.4h9"/>
+        <g class="cd-arrow">
+          <path d="M12 17v-5.1"/>
+          <path d="m9.9 14 2.1-2.1 2.1 2.1"/>
+        </g>
+        <circle class="cd-dot" cx="18" cy="17.2" r="1.05" fill="currentColor"/>
       </g>
 
       <!-- Spaces Icon - 学习空间 -->
@@ -187,6 +186,60 @@
         <rect class="anim-space-3" x="2" y="15" width="8" height="6" rx="1"/>
         <rect class="anim-space-4" x="14" y="15" width="8" height="6" rx="1"/>
         <circle class="anim-connect" cx="12" cy="12" r="2" fill="currentColor"/>
+      </g>
+    </svg>
+
+    <!-- Messages Icon - 独立彩色信封动画 -->
+    <svg
+      v-else
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 160 160"
+      role="img"
+      aria-labelledby="msg-title msg-desc"
+      class="msg-svg"
+    >
+      <title id="msg-title">动态消息信封图标</title>
+      <desc id="msg-desc">信封轻微浮动、闪烁并弹出消息提示点</desc>
+
+      <defs>
+        <linearGradient id="msgGrad" x1="20" y1="30" x2="140" y2="130" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stop-color="#5B8CFF"/>
+          <stop offset="100%" stop-color="#7B61FF"/>
+        </linearGradient>
+
+        <filter id="msgShadow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#5262A8" flood-opacity="0.25"/>
+        </filter>
+
+        <clipPath id="msgClip">
+          <rect x="26" y="47" width="108" height="72" rx="16"/>
+        </clipPath>
+      </defs>
+
+      <g class="msg-icon" filter="url(#msgShadow)">
+        <rect x="26" y="47" width="108" height="72" rx="16" fill="url(#msgGrad)"/>
+
+        <g clip-path="url(#msgClip)">
+          <path d="M26 111L64 78a24 24 0 0 1 32 0l38 33v16H26z" fill="#4C5DE8" opacity=".9"/>
+          <path d="M26 55l42 35a19 19 0 0 0 24 0l42-35" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect class="msg-shine" x="17" y="38" width="24" height="102" rx="12" fill="#FFFFFF" opacity="0" transform="rotate(18 29 89)"/>
+        </g>
+
+        <path
+          class="msg-flap"
+          d="M32 53l36 30a19 19 0 0 0 24 0l36-30"
+          fill="none"
+          stroke="#FFFFFF"
+          stroke-opacity=".25"
+          stroke-width="3"
+          stroke-linecap="round"
+        />
+      </g>
+
+      <circle class="msg-badge-ring" cx="126" cy="41" r="12" fill="none" stroke="#FF4D6D" stroke-width="3" opacity="0"/>
+      <g class="msg-badge">
+        <circle cx="126" cy="41" r="12" fill="#FF4D6D"/>
+        <circle cx="126" cy="41" r="5" fill="#FFFFFF"/>
       </g>
     </svg>
 
@@ -218,36 +271,45 @@ const props = defineProps<{
   width: 24px;
   height: 24px;
   transition: all 0.3s ease;
+}
+
+.animated-icon:not(.icon-messages) svg {
   stroke: currentColor !important;
 }
 
 .icon-resources svg,
-.icon-tasks svg {
+.icon-tasks svg,
+.icon-messages svg {
   overflow: visible;
 }
 
 /* 确保SVG元素可见 */
-.animated-icon svg * {
+.animated-icon:not(.icon-messages) svg * {
   stroke: currentColor !important;
   fill: none !important;
 }
 
-.animated-icon svg circle[fill="currentColor"] {
+.animated-icon:not(.icon-messages) svg circle[fill="currentColor"] {
   fill: currentColor !important;
 }
 
 /* 激活状态 */
-.animated-icon.active svg {
+.animated-icon.active:not(.icon-messages) svg {
   filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
   stroke: white !important;
 }
 
-.animated-icon.active svg * {
+.animated-icon.active:not(.icon-messages) svg * {
   stroke: white !important;
 }
 
-.animated-icon.active svg circle[fill="currentColor"] {
+.animated-icon.active:not(.icon-messages) svg circle[fill="currentColor"] {
   fill: white !important;
+}
+
+/* Messages 激活状态 */
+.icon-messages.active svg {
+  filter: drop-shadow(0 4px 12px rgba(123, 97, 255, 0.45));
 }
 
 .icon-glow {
@@ -356,32 +418,82 @@ const props = defineProps<{
 }
 
 /* ========== Messages 动画 ========== */
-.anim-envelope {
-  animation: envelope-float 3s ease-in-out infinite;
+.msg-icon {
+  transform-box: view-box;
+  transform-origin: 80px 83px;
+  animation: msg-float 2.6s ease-in-out infinite;
 }
 
-@keyframes envelope-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
+.msg-shine {
+  transform-box: view-box;
+  animation: msg-shine 2.6s ease-in-out infinite;
 }
 
-.anim-flap {
-  animation: flap-open 3s ease-in-out infinite;
-  transform-origin: top center;
+.msg-flap {
+  transform-box: view-box;
+  transform-origin: 80px 53px;
+  animation: msg-flap 2.6s ease-in-out infinite;
 }
 
-@keyframes flap-open {
-  0%, 40%, 100% { transform: translateY(0); }
-  20% { transform: translateY(-3px); }
+.msg-badge {
+  transform-box: view-box;
+  transform-origin: 126px 41px;
+  animation: msg-badge-pop 2.6s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
 }
 
-.anim-msg-dot {
-  animation: msg-bounce 2s ease-in-out infinite;
+.msg-badge-ring {
+  transform-box: view-box;
+  transform-origin: 126px 41px;
+  animation: msg-badge-ring 2.6s ease-out infinite;
 }
 
-@keyframes msg-bounce {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.2); opacity: 0.8; }
+.animated-icon:hover .msg-icon,
+.animated-icon:hover .msg-shine,
+.animated-icon:hover .msg-flap {
+  animation-duration: 1.5s;
+}
+
+.animated-icon:hover .msg-badge,
+.animated-icon:hover .msg-badge-ring {
+  animation-duration: 1.3s;
+}
+
+@keyframes msg-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(-1deg); }
+}
+
+@keyframes msg-flap {
+  0%, 18%, 100% { transform: rotateX(0deg); }
+  38%, 55% { transform: rotateX(18deg); }
+}
+
+@keyframes msg-shine {
+  0%, 20%, 100% { opacity: 0; transform: translateX(-36px); }
+  42% { opacity: 0.8; }
+  62% { opacity: 0; transform: translateX(80px); }
+}
+
+@keyframes msg-badge-pop {
+  0%, 22%, 100% { transform: scale(0.82); }
+  40% { transform: scale(1.18); }
+  55% { transform: scale(1); }
+}
+
+@keyframes msg-badge-ring {
+  0%, 22% { opacity: 0; transform: scale(0.7); }
+  40% { opacity: 0.45; }
+  68%, 100% { opacity: 0; transform: scale(1.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-icon,
+  .msg-shine,
+  .msg-flap,
+  .msg-badge,
+  .msg-badge-ring {
+    animation: none !important;
+  }
 }
 
 /* ========== Tasks 动画 ========== */
@@ -923,39 +1035,65 @@ const props = defineProps<{
 }
 
 /* ========== Cloud Drive 动画 ========== */
-.anim-cloud {
-  animation: cloud-float 4s ease-in-out infinite;
+.cd-root {
+  transform-box: view-box;
+  transform-origin: 12px 12px;
+  animation: cd-float 3.2s ease-in-out infinite;
 }
 
-@keyframes cloud-float {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(3px); }
+.cd-outline {
+  stroke-width: 1.8;
 }
 
-.anim-arrow {
-  animation: arrow-bounce 2s ease-in-out infinite;
-  stroke-dasharray: 10;
-  stroke-dashoffset: 10;
+.cd-base {
+  stroke-width: 1.7;
+  opacity: 0.92;
 }
 
-@keyframes arrow-bounce {
-  0% { stroke-dashoffset: 10; }
-  50% { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: -10; }
+.cd-arrow {
+  stroke-width: 1.8;
+  transform-box: view-box;
+  transform-origin: 12px 15px;
+  animation: cd-arrow-upload 2.4s ease-in-out infinite;
 }
 
-.anim-rain-1, .anim-rain-2 {
-  animation: rain-fall 2s ease-in-out infinite;
+.cd-dot {
+  transform-box: view-box;
+  transform-origin: 18px 17.2px;
+  animation: cd-dot-pulse 2.4s ease-in-out infinite;
 }
 
-.anim-rain-2 {
-  animation-delay: 0.3s;
+.animated-icon:hover .cd-root {
+  animation-duration: 1.8s;
 }
 
-@keyframes rain-fall {
-  0% { transform: translateY(-2px); opacity: 0; }
-  50% { opacity: 1; }
-  100% { transform: translateY(2px); opacity: 0; }
+.animated-icon:hover .cd-arrow,
+.animated-icon:hover .cd-dot {
+  animation-duration: 1.3s;
+}
+
+@keyframes cd-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.65px); }
+}
+
+@keyframes cd-arrow-upload {
+  0%, 18%, 100% { transform: translateY(0); opacity: 0.78; }
+  45% { transform: translateY(-1.4px); opacity: 1; }
+  68% { transform: translateY(0); opacity: 0.9; }
+}
+
+@keyframes cd-dot-pulse {
+  0%, 25%, 100% { transform: scale(0.78); opacity: 0.45; }
+  52% { transform: scale(1); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cd-root,
+  .cd-arrow,
+  .cd-dot {
+    animation: none !important;
+  }
 }
 
 /* ========== Spaces 动画 ========== */
