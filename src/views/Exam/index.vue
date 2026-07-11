@@ -4,8 +4,8 @@
       <!-- 页面标题与学习空间切换 -->
       <div class="page-header">
         <div class="header-left">
-          <h1 class="page-title">AI个性化学习驾驶舱</h1>
-          <p class="page-desc">全方位追踪你的学习成效，利用 AI 进行专项训练与智能诊断</p>
+          <h1 class="page-title">AI 练习与智能测评</h1>
+          <p class="page-desc">AI 智能出题评测，精准诊断掌握度；通过专项训练与错题巩固，助你实现针对性高效提升。</p>
         </div>
         <div class="header-right">
           <div class="header-actions">
@@ -15,32 +15,14 @@
                 filterable
                 placeholder="切换学习空间"
                 class="space-select"
-                popper-class="space-select-popper"
                 :loading="learningSpaceStore.loading"
               >
-                <template #prefix>
-                  <el-icon class="space-select-prefix-icon"><Compass /></el-icon>
-                </template>
                 <el-option
                   v-for="space in learningSpaceStore.activeSpaces"
                   :key="space.id"
                   :label="space.name"
                   :value="space.id"
-                >
-                  <div class="space-option-item">
-                    <span class="space-option-icon">{{ space.icon || '📐' }}</span>
-                    <div class="space-option-info">
-                      <span class="space-option-name">{{ space.name }}</span>
-                      <span class="space-option-goal" v-if="space.goal">{{ space.goal }}</span>
-                    </div>
-                    <div class="space-option-progress">
-                      <span class="space-option-percent">{{ space.progress }}%</span>
-                      <div class="space-option-bar-wrapper">
-                        <div class="space-option-bar" :style="{ width: space.progress + '%' }"></div>
-                      </div>
-                    </div>
-                  </div>
-                </el-option>
+                />
                 <template #empty>
                   <div class="select-empty-tip">
                     <el-icon class="select-empty-icon"><Warning /></el-icon>
@@ -689,7 +671,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Warning, Calendar, TopRight, Aim, MagicStick, Close, Document, EditPen, Select, DocumentCopy, Check, ArrowRight, Loading, DataAnalysis, CircleCheckFilled, MoreFilled, Bell, Compass } from '@element-plus/icons-vue'
+import { Warning, Calendar, TopRight, Aim, MagicStick, Close, Document, EditPen, Select, DocumentCopy, Check, ArrowRight, Loading, DataAnalysis, CircleCheckFilled, MoreFilled, Bell } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
@@ -1382,12 +1364,12 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 .page-title {
-  font-size: 1.6rem;
+  font-size: 1.625rem;
   font-weight: 800;
   color: #0f172a;
   letter-spacing: -0.02em;
   margin: 0 0 6px;
-  background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -1396,6 +1378,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   font-size: 0.875rem;
   color: #64748b;
   margin: 0;
+  line-height: 1.5;
 }
 
 .header-right {
@@ -1411,10 +1394,13 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   gap: 12px;
 }
 
+.space-select {
+  width: 260px;
+}
+
 .space-select :deep(.el-input__wrapper) {
   border-radius: 12px;
   border-color: rgba(15, 23, 42, 0.08);
-  width: 180px;
   padding: 8px 12px;
   height: 38px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
@@ -3107,140 +3093,5 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   color: #f59e0b;
   font-size: 15px;
   flex-shrink: 0;
-}
-
-/* 学习空间下拉定制 */
-.space-select :deep(.el-input__wrapper) {
-  border-radius: 14px;
-  border: 1px solid rgba(11, 183, 170, 0.15);
-  background: rgba(255, 255, 255, 0.6) !important;
-  backdrop-filter: blur(8px);
-  width: 220px;
-  padding: 8px 14px;
-  height: 40px;
-  box-shadow: 0 2px 10px rgba(11, 183, 170, 0.02) !important;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  
-  &:hover, &.is-focus {
-    border-color: rgba(11, 183, 170, 0.45);
-    background: #ffffff !important;
-    box-shadow: 0 4px 14px rgba(11, 183, 170, 0.08) !important;
-  }
-  
-  .el-input__inner {
-    font-weight: 700;
-    color: #0f172a;
-    font-size: 0.85rem;
-  }
-}
-
-.space-select-prefix-icon {
-  color: #0bb7aa;
-  font-size: 1.1rem;
-  margin-right: 4px;
-  animation: spin-compass 8s linear infinite;
-}
-
-@keyframes spin-compass {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* 下拉菜单项样式优化 */
-.space-option-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 0;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.space-option-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.space-option-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.space-option-name {
-  font-weight: 700;
-  color: #0f172a;
-  font-size: 0.85rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.space-option-goal {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.space-option-progress {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  width: 60px;
-  flex-shrink: 0;
-}
-
-.space-option-percent {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #0bb7aa;
-  font-family: 'Outfit', sans-serif;
-}
-
-.space-option-bar-wrapper {
-  width: 100%;
-  height: 4px;
-  background: #e2e8f0;
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.space-option-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #0bb7aa 0%, #10b981 100%);
-  border-radius: 2px;
-}
-
-/* 深度覆盖 el-select 弹出菜单的选项容器高度 */
-:deep(.el-select-dropdown__item) {
-  height: auto !important;
-  padding: 8px 16px !important;
-  
-  &.is-hovering {
-    background-color: rgba(11, 183, 170, 0.04) !important;
-  }
-  
-  &.is-selected {
-    color: #0bb7aa !important;
-    font-weight: bold;
-    background-color: rgba(11, 183, 170, 0.08) !important;
-  }
-}
-
-/* 弹出下拉面板宽度调宽 */
-:global(.space-select-popper) {
-  min-width: 320px !important;
-  border-radius: 16px !important;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
-  border: 1px solid rgba(11, 183, 170, 0.12) !important;
-  
-  .el-select-dropdown__list {
-    padding: 6px !important;
-  }
 }
 </style>
