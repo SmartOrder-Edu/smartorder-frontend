@@ -62,7 +62,18 @@
                 <line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
             </button>
-            <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
+            <span class="current-conv-title">{{ currentConvTitle }}</span>
+            <button
+              v-if="isAssistantCollapsed"
+              class="avatar-top-toggle"
+              type="button"
+              title="展开数字人"
+              @click.stop="isAssistantCollapsed = false"
+            >
+              <span class="avatar-top-toggle-status" :class="{ active: !!avatarAuthInfo?.wssUrl }"></span>
+              <el-icon><ArrowLeft /></el-icon>
+              <span>数字人</span>
+            </button>
           </div>
             <div class="chat-flow" ref="chatFlowRef">
               <div class="chat-flow-inner">
@@ -448,21 +459,6 @@
           :auth-info-loading="avatarAuthLoading"
           @collapse="isAssistantCollapsed = true"
         />
-
-        <!-- 数字人收起态入口 -->
-        <button
-          v-if="isAssistantCollapsed"
-          class="avatar-dock"
-          type="button"
-          title="展开数字人"
-          @click.stop="isAssistantCollapsed = false"
-        >
-          <span class="avatar-dock-status" :class="{ active: !!avatarAuthInfo?.wssUrl }"></span>
-          <span class="avatar-dock-icon">
-            <el-icon><ArrowLeft /></el-icon>
-          </span>
-          <span class="avatar-dock-label">数字人</span>
-        </button>
 
         <!-- 右侧：快捷工具 + 任务执行面板 -->
         <aside class="tutor-sidebar">
@@ -1535,8 +1531,8 @@ watch(windowWidth, (newWidth, oldWidth) => {
 }
 
 .tutor-container.assistant-collapsed {
-  grid-template-columns: auto minmax(0, 1fr) 56px 280px;
-  grid-template-areas: "history chat dock sidebar";
+  grid-template-columns: auto minmax(0, 1fr) 280px;
+  grid-template-areas: "history chat sidebar";
 }
 
 .assistant-panel-slot {
@@ -1716,6 +1712,50 @@ watch(windowWidth, (newWidth, oldWidth) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.avatar-top-toggle {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  background: rgba(99, 102, 241, 0.08);
+  color: #4f46e5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.avatar-top-toggle:hover {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.38);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.12);
+  transform: translateY(-1px);
+}
+
+.avatar-top-toggle .el-icon {
+  font-size: 14px;
+}
+
+.avatar-top-toggle-status {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.avatar-top-toggle-status.active {
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.75);
 }
 
 .chat-messages {
@@ -2692,8 +2732,8 @@ watch(windowWidth, (newWidth, oldWidth) => {
   }
 
   .tutor-container.assistant-collapsed {
-    grid-template-columns: auto minmax(0, 1fr) 56px 280px;
-    grid-template-areas: "history chat dock sidebar";
+    grid-template-columns: auto minmax(0, 1fr) 280px;
+    grid-template-areas: "history chat sidebar";
   }
 
   .assistant-panel-slot {
@@ -2762,91 +2802,22 @@ watch(windowWidth, (newWidth, oldWidth) => {
   }
 }
 
-/* 数字人收起态贴边入口 */
-.avatar-dock {
-  grid-area: dock;
-  align-self: start;
-  justify-self: stretch;
-  position: relative;
-  margin-top: 72px;
-  margin-left: 8px;
-  margin-right: 0;
-  z-index: 30;
-  width: 48px;
-  min-height: 132px;
-  padding: 10px 8px;
-  box-sizing: border-box;
-  border: 1px solid rgba(99, 102, 241, 0.18);
-  border-radius: 14px 0 0 14px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #4f46e5;
-  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(16px);
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
-}
-
-.avatar-dock:hover {
-  transform: translateX(-2px);
-  border-color: rgba(99, 102, 241, 0.34);
-  box-shadow: 0 18px 42px rgba(79, 70, 229, 0.18);
-}
-
-.avatar-dock-status {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: #cbd5e1;
-}
-
-.avatar-dock-status.active {
-  background: #22c55e;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.75);
-}
-
-.avatar-dock-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 10px;
-  background: rgba(99, 102, 241, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.avatar-dock-label {
-  writing-mode: vertical-rl;
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0;
-}
-
 @media (max-width: 768px) {
-  .avatar-dock {
-    grid-area: auto;
+  .avatar-top-toggle {
     position: fixed;
     right: 16px;
     bottom: 88px;
-    top: auto;
-    width: auto;
-    min-height: 56px;
+    z-index: 210;
+    height: 44px;
     padding: 8px 12px;
-    flex-direction: row;
     border-radius: 16px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(16px);
   }
 
-  .avatar-dock:hover {
+  .avatar-top-toggle:hover {
     transform: translateY(-2px);
-  }
-
-  .avatar-dock-label {
-    writing-mode: horizontal-tb;
   }
 }
 </style>
