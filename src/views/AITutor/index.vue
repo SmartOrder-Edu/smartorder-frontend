@@ -175,6 +175,11 @@
                     v-if="msg.role === 'ai' && msg.webSearchReferences?.length"
                     :references="msg.webSearchReferences"
                   />
+                  <!-- RAG 检索来源卡片 -->
+                  <RagSources
+                    v-if="msg.role === 'ai' && msg.ragSources?.chunks?.length"
+                    :sources="msg.ragSources"
+                  />
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
                   <!-- 思维导图卡片（历史消息） -->
@@ -272,6 +277,11 @@
                   <WebSearchSources
                     v-if="agentStore.currentWebSearchReferences?.length"
                     :references="agentStore.currentWebSearchReferences"
+                  />
+                  <!-- RAG 检索来源卡片（流式实时展示） -->
+                  <RagSources
+                    v-if="agentStore.currentRagSources?.chunks?.length"
+                    :sources="agentStore.currentRagSources"
                   />
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
@@ -586,6 +596,7 @@ import LearningPlanPreview from '@/components/plan/LearningPlanPreview.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import WebSearchSources from '@/components/agent/WebSearchSources.vue'
+import RagSources from '@/components/agent/RagSources.vue'
 import MindMapCard from '@/components/agent/MindMapCard.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'

@@ -29,6 +29,28 @@ export interface WebSearchReference {
   snippet: string
 }
 
+export interface RagChunk {
+  vectorId?: string
+  content?: string
+  chunkId?: number
+  knowledgeBaseId?: number
+  fileId?: number
+  documentId?: number
+  pageNumber?: number
+  sectionTitle?: string
+  titlePath?: string
+  score?: number
+  source?: string
+  metadata?: Record<string, any>
+}
+
+export interface RagSourcePayload {
+  chunks: RagChunk[]
+  chunkCount: number
+  usedRetrievalMode: string
+  degraded: boolean
+}
+
 export interface ChatMessage {
   role: 'user' | 'ai'
   content: string
@@ -58,6 +80,8 @@ export interface ChatMessage {
   references?: RagReference[]
   /** 网络搜索引用来源 */
   webSearchReferences?: WebSearchReference[]
+  /** RAG 检索来源 */
+  ragSources?: RagSourcePayload
   /** 思维导图列表（本轮 generateMindMap 工具产出） */
   mindMaps?: MindMapData[]
 }
@@ -199,6 +223,14 @@ export function useAgentChat(scrollCallback?: () => void) {
   let abortController: AbortController | null = null
 
   const getCurrentMindMaps = (): MindMapData[] => agentStore.currentMindMaps || []
+  const getCurrentRagSources = (): RagSourcePayload | undefined => {
+    const sources = agentStore.currentRagSources
+    if (!sources?.chunks?.length) return undefined
+    return {
+      ...sources,
+      chunks: sources.chunks.map(chunk => ({ ...chunk })),
+    }
+  }
 
   /** 用户手动选择的运行模式，null 表示走意图路由 */
   const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>('REACT')
@@ -243,6 +275,7 @@ export function useAgentChat(scrollCallback?: () => void) {
         timestamp: Date.now(),
         webSearchReferences: agentStore.currentWebSearchReferences.length
           ? [...agentStore.currentWebSearchReferences] : undefined,
+        ragSources: getCurrentRagSources(),
         mindMaps: currentMindMaps.length ? [...currentMindMaps] : undefined,
       })
     }
@@ -344,6 +377,7 @@ export function useAgentChat(scrollCallback?: () => void) {
             const hasReActClarification = !!donePayload?.clarificationPayload
               && !agentStore.currentTaskList
             const currentMindMaps = getCurrentMindMaps()
+            const currentRagSources = getCurrentRagSources()
             if (agentStore.answerText || hasReActClarification || currentMindMaps.length) {
               messages.value.push({
                 role: 'ai',
@@ -361,6 +395,7 @@ export function useAgentChat(scrollCallback?: () => void) {
                 timestamp: Date.now(),
                 webSearchReferences: agentStore.currentWebSearchReferences.length
                   ? [...agentStore.currentWebSearchReferences] : undefined,
+                ragSources: currentRagSources,
                 mindMaps: currentMindMaps.length ? [...currentMindMaps] : undefined,
               })
             }
@@ -408,6 +443,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           console.error('[useAgentChat] SSE error:', err)
           // 保存已累积的内容，避免渲染突然消失（与 stopGeneration 一致）
           const currentMindMaps = getCurrentMindMaps()
+          const currentRagSources = getCurrentRagSources()
           if (agentStore.answerText || currentMindMaps.length) {
             messages.value.push({
               role: 'ai',
@@ -425,6 +461,7 @@ export function useAgentChat(scrollCallback?: () => void) {
               timestamp: Date.now(),
               webSearchReferences: agentStore.currentWebSearchReferences.length
                 ? [...agentStore.currentWebSearchReferences] : undefined,
+              ragSources: currentRagSources,
               mindMaps: currentMindMaps.length ? [...currentMindMaps] : undefined,
             })
           }
@@ -966,6 +1003,16 @@ export function useAgentChat(scrollCallback?: () => void) {
                       lastTc.result = { webSearchReferences: evt.payload.webSearchReferences }
                     }
                   }
+                }
+                break
+              }
+              case 'agent.rag.chunks': {
+                const chunks = Array.isArray(evt.payload?.chunks) ? evt.payload.chunks : []
+                chatMsg.ragSources = {
+                  chunks,
+                  chunkCount: evt.payload?.chunkCount ?? chunks.length,
+                  usedRetrievalMode: evt.payload?.usedRetrievalMode || 'unknown',
+                  degraded: evt.payload?.degraded === true,
                 }
                 break
               }
