@@ -778,7 +778,7 @@ const welcomeFeatures = computed(() => {
       label: '生成练习题'
     },
     {
-      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><g stroke="#701A75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="25" y="42" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><path d="M41 50 H52 V32 H62 M52 50 V68 H62" stroke-width="5"/><rect x="62" y="24" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><rect x="62" y="60" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/></g></svg>',
       label: '生成思维导图'
     },
     {
@@ -847,7 +847,7 @@ const quickTools = [
   },
   {
     id: 3,
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
+    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><g stroke="#701A75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="25" y="42" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><path d="M41 50 H52 V32 H62 M52 50 V68 H62" stroke-width="5"/><rect x="62" y="24" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><rect x="62" y="60" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/></g></svg>',
     label: '思维导图',
     desc: '知识可视化',
     prompt: '请为我生成一份"操作系统进程管理"的知识思维导图'
