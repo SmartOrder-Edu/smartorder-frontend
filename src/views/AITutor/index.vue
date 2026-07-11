@@ -190,7 +190,7 @@
                       :data="mm"
                     />
                   </template>
-                  <template v-else>
+                  <template v-if="msg.role === 'user'">
                     <p class="message-text">{{ msg.content }}</p>
                     <div v-if="msg.attachmentFileIds?.length" class="message-attachment-hint">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
