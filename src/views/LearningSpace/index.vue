@@ -206,7 +206,7 @@
           <!-- Tab: Agent Plan -->
           <div v-show="activeTab === 'plan'" class="tab-content">
             <div class="section-header">
-              <h3>Agent 学习计划</h3>
+              <h3>学习计划</h3>
               <span class="task-count" v-if="planDraft">{{ planDraft.phases?.length || 0 }} 个阶段</span>
             </div>
 
@@ -218,22 +218,26 @@
             <template v-else-if="planDraft">
               <div class="plan-overview">
                 <div class="plan-overview-main">
-                  <span class="plan-eyebrow">用户确认的原始规划</span>
+                  <span class="plan-eyebrow">已确认学习计划</span>
                   <h4>{{ planDraft.spaceName }}</h4>
                   <p>{{ planDraft.description }}</p>
+                  <div class="plan-next-step" v-if="planNextStep">
+                    <span>下一步</span>
+                    <strong>{{ planNextStep }}</strong>
+                  </div>
                 </div>
                 <div class="plan-overview-stats">
                   <div class="plan-stat">
                     <strong>{{ planTotalWeeks }}</strong>
-                    <span>周</span>
+                    <span>计划周数</span>
                   </div>
                   <div class="plan-stat">
-                    <strong>{{ planKnowledgePointCount }}</strong>
-                    <span>知识点</span>
+                    <strong>{{ dashboard.pathProgress.completedNodes }}/{{ dashboard.pathProgress.totalNodes }}</strong>
+                    <span>路径进度</span>
                   </div>
                   <div class="plan-stat">
-                    <strong>{{ planResourceCount }}</strong>
-                    <span>资源</span>
+                    <strong>{{ Math.round(dashboard.progress) }}%</strong>
+                    <span>完成度</span>
                   </div>
                 </div>
               </div>
@@ -241,6 +245,9 @@
               <div class="plan-meta-row">
                 <span v-if="planDraft.startDate">开始：{{ planDraft.startDate }}</span>
                 <span v-if="planDraft.targetEndDate">目标完成：{{ planDraft.targetEndDate }}</span>
+                <span>{{ planKnowledgePointCount }} 个知识点</span>
+                <span>{{ planResourceCount }} 个资源</span>
+                <span :class="['plan-risk-pill', dashboard.riskStatus]">状态：{{ riskLabel(dashboard.riskStatus) }}</span>
               </div>
 
               <div class="plan-goals" v-if="planDraft.goals?.length">
@@ -253,34 +260,78 @@
                   v-for="phase in planDraft.phases"
                   :key="phase.phaseIndex || phase.phaseName"
                   class="plan-phase-card"
+                  :class="{ active: isActivePlanPhase(phase), collapsed: !isPhaseExpanded(phase) }"
                 >
-                  <div class="plan-phase-head">
-                    <div>
-                      <span class="phase-index">阶段 {{ phase.phaseIndex }}</span>
-                      <h4>{{ phase.phaseName }}</h4>
+                  <button class="plan-phase-head" type="button" @click="togglePhase(phase)">
+                    <div class="phase-head-main">
+                      <span class="phase-index">
+                        <span class="phase-number">{{ phase.phaseIndex || '-' }}</span>
+                        <span>阶段</span>
+                        <em v-if="isActivePlanPhase(phase)">当前关注</em>
+                      </span>
+                      <h4>{{ phase.phaseName || `第 ${phase.phaseIndex} 阶段` }}</h4>
+                      <p>{{ phaseSummary(phase) }}</p>
                     </div>
-                    <span class="phase-duration">{{ phase.weeks || 0 }} 周</span>
-                  </div>
-
-                  <div class="phase-section" v-if="phase.knowledgePoints?.length">
-                    <span class="children-label">知识点</span>
-                    <div class="phase-kps">
-                      <span v-for="kp in phase.knowledgePoints" :key="kp" class="kp-chip">{{ kp }}</span>
-                    </div>
-                  </div>
-
-                  <div class="phase-section" v-if="phase.resources?.length">
-                    <span class="children-label">计划资源</span>
-                    <div class="phase-resources">
-                      <div
-                        v-for="resource in phase.resources"
-                        :key="resource.resourceType + resource.title"
-                        class="phase-resource"
+                    <div class="phase-head-meta">
+                      <span class="phase-duration">{{ phase.weeks || 0 }} 周</span>
+                      <span>{{ phase.knowledgePoints?.length || 0 }} 知识点</span>
+                      <span>{{ phase.resources?.length || 0 }} 资源</span>
+                      <svg
+                        class="phase-toggle-icon"
+                        :class="{ open: isPhaseExpanded(phase) }"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        width="16"
+                        height="16"
                       >
-                        <span>{{ resourceIcon(resource.resourceType) }}</span>
-                        <div>
-                          <strong>{{ resource.title }}</strong>
-                          <em>{{ resourceTypeLabel(resource.resourceType) }}</em>
+                        <polyline points="6,9 12,15 18,9"/>
+                      </svg>
+                    </div>
+                  </button>
+
+                  <div v-show="isPhaseExpanded(phase)" class="phase-detail">
+                    <div class="phase-section" v-if="phase.knowledgePoints?.length">
+                      <span class="children-label">本阶段重点</span>
+                      <div class="phase-kp-list">
+                        <div v-for="(kp, index) in phase.knowledgePoints" :key="kp" class="phase-kp-item">
+                          <span class="kp-order">{{ index + 1 }}</span>
+                          <div class="kp-body">
+                            <div class="kp-title-row">
+                              <strong>{{ kp }}</strong>
+                              <span v-if="knowledgeImportanceLabel(kp)" class="kp-importance">
+                                {{ knowledgeImportanceLabel(kp) }}
+                              </span>
+                            </div>
+                            <p v-if="knowledgeDescription(kp)">{{ knowledgeDescription(kp) }}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="phase-section" v-if="phase.resources?.length">
+                      <span class="children-label">配套资源</span>
+                      <div class="phase-resource-groups">
+                        <div
+                          v-for="group in phaseResourceGroups(phase)"
+                          :key="group.type"
+                          class="phase-resource-group"
+                        >
+                          <div class="resource-group-head">
+                            <span>{{ resourceIcon(group.type) }}</span>
+                            <strong>{{ resourceTypeLabel(group.type) }}</strong>
+                            <em>{{ group.items.length }} 项</em>
+                          </div>
+                          <div class="phase-resources">
+                            <div
+                              v-for="resource in group.items"
+                              :key="resource.resourceType + resource.title"
+                              class="phase-resource"
+                            >
+                              <strong>{{ resource.title }}</strong>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -439,7 +490,7 @@ import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
 import type { RiskStatus, TaskVO } from '@/types/learningSpace'
-import type { LearningPlanDraft } from '@/types/planExecute'
+import type { LearningPlanDraft, PhaseInfo, ResourceInfo, KnowledgeNode } from '@/types/planExecute'
 
 const route = useRoute()
 const router = useRouter()
@@ -450,6 +501,7 @@ const activeTab = ref('today')
 const showAddTask = ref(false)
 const planDraft = ref<LearningPlanDraft | null>(null)
 const planLoading = ref(false)
+const expandedPhaseKeys = ref<string[]>([])
 
 const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
@@ -495,6 +547,40 @@ const planResourceCount = computed(() =>
   (planDraft.value?.phases || []).reduce((sum, phase) => sum + (phase.resources?.length || 0), 0)
 )
 
+const knowledgeNodeMap = computed(() => {
+  const map = new Map<string, KnowledgeNode>()
+  ;(planDraft.value?.knowledgeGraph?.nodes || []).forEach(node => {
+    if (node.name) map.set(normalizeText(node.name), node)
+  })
+  return map
+})
+
+const currentPlanPhaseKey = computed(() => {
+  const phases = planDraft.value?.phases || []
+  if (!phases.length) return ''
+
+  const runtimePhase = findPhaseByRuntimeContext(phases)
+  if (runtimePhase) return phaseKey(runtimePhase)
+
+  const rawProgress = dashboard.value?.pathProgress?.percent ?? dashboard.value?.progress ?? 0
+  const progress = Math.min(Math.max(Number(rawProgress) || 0, 0), 100)
+  const index = Math.min(phases.length - 1, Math.floor((progress / 100) * phases.length))
+  return phaseKey(phases[index])
+})
+
+const activePlanPhase = computed(() => {
+  const key = currentPlanPhaseKey.value
+  return (planDraft.value?.phases || []).find(phase => phaseKey(phase) === key) || null
+})
+
+const planNextStep = computed(() => {
+  if (nextTodayTask.value?.title) return nextTodayTask.value.title
+  const phase = activePlanPhase.value
+  const firstKnowledgePoint = phase?.knowledgePoints?.[0]
+  if (firstKnowledgePoint) return `进入「${firstKnowledgePoint}」`
+  return ''
+})
+
 // PathTimeline 需要的全集任务：合并今日 / 待办 / 逾期，按 id 去重
 const allTasks = computed<TaskVO[]>(() => {
   const d = dashboard.value
@@ -518,6 +604,95 @@ function resourceIcon(t: string) {
 function resourceTypeLabel(t: string) {
   const m: Record<string, string> = { doc: '文档', ppt: 'PPT', video: '视频', mind_map: '思维导图', quiz: '练习题', case_study: '案例', flashcard_set: '闪卡', image: '图片', audio: '音频', link: '链接' }
   return m[t] || t
+}
+
+function normalizeText(text: string | null | undefined) {
+  return String(text || '').trim().toLowerCase()
+}
+
+function phaseKey(phase: PhaseInfo) {
+  return `${phase.phaseIndex || 'x'}-${phase.phaseName || ''}`
+}
+
+function isPhaseExpanded(phase: PhaseInfo) {
+  return expandedPhaseKeys.value.includes(phaseKey(phase))
+}
+
+function togglePhase(phase: PhaseInfo) {
+  const key = phaseKey(phase)
+  expandedPhaseKeys.value = isPhaseExpanded(phase)
+    ? expandedPhaseKeys.value.filter(item => item !== key)
+    : [...expandedPhaseKeys.value, key]
+}
+
+function isActivePlanPhase(phase: PhaseInfo) {
+  return phaseKey(phase) === currentPlanPhaseKey.value
+}
+
+function phaseSummary(phase: PhaseInfo) {
+  const points = phase.knowledgePoints || []
+  if (!points.length) return '暂无明确知识点，等待 Agent 补全阶段内容'
+  return points.slice(0, 3).join(' / ') + (points.length > 3 ? ` 等 ${points.length} 个重点` : '')
+}
+
+function phaseResourceGroups(phase: PhaseInfo) {
+  const groups = new Map<string, ResourceInfo[]>()
+  ;(phase.resources || []).forEach(resource => {
+    const type = resource.resourceType || 'doc'
+    const list = groups.get(type) || []
+    list.push(resource)
+    groups.set(type, list)
+  })
+  return [...groups.entries()].map(([type, items]) => ({ type, items }))
+}
+
+function knowledgeNodeByName(name: string) {
+  return knowledgeNodeMap.value.get(normalizeText(name))
+}
+
+function knowledgeDescription(name: string) {
+  return knowledgeNodeByName(name)?.description || ''
+}
+
+function knowledgeImportanceLabel(name: string) {
+  const importance = Number(knowledgeNodeByName(name)?.importance || 0)
+  if (!importance) return ''
+  if (importance >= 4) return '重点'
+  if (importance >= 3) return '常规'
+  return '了解'
+}
+
+function findPhaseByRuntimeContext(phases: PhaseInfo[]) {
+  const d = dashboard.value
+  if (!d) return null
+
+  const candidateNodeIds = [nextTodayTask.value?.pathNodeId, d.pathProgress?.currentNodeId]
+    .filter((id): id is string => Boolean(id))
+  for (const nodeId of candidateNodeIds) {
+    const node = d.pathNodes.find(item => item.id === nodeId)
+    const matched = node ? findPhaseByText(phases, node.title) : null
+    if (matched) return matched
+  }
+
+  if (nextTodayTask.value?.title) {
+    return findPhaseByText(phases, nextTodayTask.value.title)
+  }
+
+  return null
+}
+
+function findPhaseByText(phases: PhaseInfo[], text: string | null | undefined) {
+  const normalized = normalizeText(text)
+  if (!normalized) return null
+
+  return phases.find(phase => {
+    const phaseName = normalizeText(phase.phaseName)
+    const points = (phase.knowledgePoints || []).map(normalizeText).filter(Boolean)
+    return (!!phaseName && phaseName === normalized)
+      || (!!phaseName && phaseName.includes(normalized))
+      || (!!phaseName && normalized.includes(phaseName))
+      || points.some(point => point === normalized || point.includes(normalized) || normalized.includes(point))
+  }) || null
 }
 
 function formatDateShort(date: string) {
@@ -613,8 +788,14 @@ function handleAgentMessage(text: string) {
 async function loadLearningPlan(id: string) {
   planLoading.value = true
   planDraft.value = null
+  expandedPhaseKeys.value = []
   try {
     planDraft.value = await agentApi.getLearningPlanBySpace(id)
+    const phases = planDraft.value?.phases || []
+    if (phases.length) {
+      const runtimePhase = findPhaseByRuntimeContext(phases) || phases[0]
+      expandedPhaseKeys.value = [phaseKey(runtimePhase)]
+    }
   } catch (e) {
     console.warn('Failed to load learning plan draft:', e)
     planDraft.value = null
@@ -635,6 +816,11 @@ onMounted(loadDashboard)
 watch(() => route.params.spaceId, () => {
   loadDashboard()
   activeTab.value = 'today'
+})
+watch(currentPlanPhaseKey, key => {
+  if (key && !expandedPhaseKeys.value.includes(key)) {
+    expandedPhaseKeys.value = [key, ...expandedPhaseKeys.value]
+  }
 })
 </script>
 
@@ -901,10 +1087,11 @@ watch(() => route.params.spaceId, () => {
 }
 
 .plan-overview {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
-  padding: 18px 20px;
+  align-items: stretch;
+  padding: 20px;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
   background: white;
@@ -934,15 +1121,44 @@ watch(() => route.params.spaceId, () => {
   font-weight: 600;
 }
 
+.plan-next-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  max-width: 680px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+
+  span {
+    color: #0a9e94;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  strong {
+    min-width: 0;
+    color: #334155;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 .plan-overview-stats {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(86px, 1fr));
   gap: 12px;
-  flex-shrink: 0;
 }
 
 .plan-stat {
-  min-width: 72px;
-  padding: 10px 12px;
+  min-width: 86px;
+  padding: 12px;
   border-radius: 10px;
   background: #f9fafb;
   text-align: center;
@@ -956,7 +1172,9 @@ watch(() => route.params.spaceId, () => {
 
   span {
     color: #9ca3af;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    white-space: nowrap;
   }
 }
 
@@ -971,6 +1189,24 @@ watch(() => route.params.spaceId, () => {
     background: #f3f4f6;
     color: #6b7280;
     font-size: 0.75rem;
+  }
+}
+
+.plan-risk-pill {
+  &.good,
+  &.normal {
+    background: #ecfdf5;
+    color: #047857;
+  }
+
+  &.warning {
+    background: #fffbeb;
+    color: #b45309;
+  }
+
+  &.danger {
+    background: #fef2f2;
+    color: #b91c1c;
   }
 }
 
@@ -1014,33 +1250,120 @@ watch(() => route.params.spaceId, () => {
 }
 
 .plan-phase-card {
-  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
   border-radius: 12px;
   border: 1px solid #f0f0f0;
   background: white;
+
+  &.active {
+    border-color: rgba(11, 183, 170, 0.32);
+    box-shadow: 0 10px 28px rgba(11, 183, 170, 0.08);
+  }
+
+  &.active::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: #0bb7aa;
+  }
 }
 
 .plan-phase-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 16px 18px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 
   h4 {
     margin: 3px 0 0;
     font-size: 0.9375rem;
     color: #1a1a2e;
+    line-height: 1.45;
+  }
+
+  p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  &:hover {
+    background: #f8fafc;
   }
 }
 
+.phase-head-main {
+  min-width: 0;
+}
+
 .phase-index {
-  color: #8c8ca1;
-  font-size: 0.6875rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+
+  em {
+    margin-left: 2px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #ecfdfb;
+    color: #0a9e94;
+    font-style: normal;
+    font-size: 0.625rem;
+  }
+}
+
+.phase-number {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ecfdfb;
+  color: #0a9e94;
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 1px rgba(11, 183, 170, 0.12);
+}
+
+.plan-phase-card.active .phase-number {
+  background: #0bb7aa;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+}
+
+.phase-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  white-space: nowrap;
+
+  > span:not(.phase-duration) {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #f8fafc;
+  }
 }
 
 .phase-duration {
-  align-self: flex-start;
   padding: 3px 10px;
   border-radius: 999px;
   background: #ecfdf5;
@@ -1050,44 +1373,144 @@ watch(() => route.params.spaceId, () => {
   white-space: nowrap;
 }
 
-.phase-section + .phase-section {
-  margin-top: 14px;
+.phase-toggle-icon {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: transform 0.18s ease;
+
+  &.open {
+    transform: rotate(180deg);
+  }
 }
 
-.phase-kps {
-  display: flex;
+.phase-detail {
+  padding: 0 18px 18px;
+}
+
+.phase-section + .phase-section {
+  margin-top: 16px;
+}
+
+.phase-kp-list {
+  display: grid;
   gap: 8px;
-  flex-wrap: wrap;
+}
+
+.phase-kp-item {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.kp-order {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.kp-body {
+  min-width: 0;
+
+  p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+}
+
+.kp-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  strong {
+    color: #1f2937;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+}
+
+.kp-importance {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.phase-resource-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.phase-resource-group {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.resource-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+
+  strong {
+    color: #334155;
+    font-size: 0.8125rem;
+  }
+
+  em {
+    margin-left: auto;
+    color: #94a3b8;
+    font-size: 0.6875rem;
+    font-style: normal;
+  }
 }
 
 .phase-resources {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 0;
 }
 
 .phase-resource {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
   padding: 10px 12px;
-  border-radius: 10px;
-  background: #f9fafb;
-  border: 1px solid #f3f4f6;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+
+  &:nth-child(1),
+  &:nth-child(2) {
+    border-top: 0;
+  }
+
+  &:nth-child(odd) {
+    border-right: 1px solid rgba(148, 163, 184, 0.08);
+  }
 
   strong {
     display: block;
     color: #374151;
     font-size: 0.8125rem;
     line-height: 1.4;
-  }
-
-  em {
-    display: block;
-    margin-top: 2px;
-    color: #9ca3af;
-    font-size: 0.6875rem;
-    font-style: normal;
+    word-break: break-word;
   }
 }
 
@@ -1821,6 +2244,36 @@ watch(() => route.params.spaceId, () => {
   .phase-resources,
   .resource-grid {
     grid-template-columns: 1fr;
+  }
+
+  .plan-overview,
+  .plan-phase-head {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-overview-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .phase-head-meta {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .plan-next-step {
+    grid-template-columns: 1fr;
+
+    strong {
+      white-space: normal;
+    }
+  }
+
+  .phase-resource {
+    border-right: 0;
+
+    &:nth-child(2) {
+      border-top: 1px solid rgba(148, 163, 184, 0.08);
+    }
   }
 
   .assessment-summary {
