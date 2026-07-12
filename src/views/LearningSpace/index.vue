@@ -428,7 +428,8 @@
                     v-for="r in group.items"
                     :key="r.id"
                     class="resource-card"
-                    @click="goResourceDetail(r)"
+                    :class="{ disabled: isResourceBusy(r) }"
+                    @click="handleResourceCardClick(r)"
                   >
                     <div class="res-icon" :class="r.resourceType">
                       <span>{{ resourceIcon(r.resourceType) }}</span>
@@ -441,14 +442,34 @@
                         <span class="res-source" :class="r.source">
                           {{ resourceSourceLabel(r) }}
                         </span>
-                        <span v-if="r.status" class="res-status" :class="r.status">
-                          {{ resourceStatusLabel(r.status) }}
+                        <span v-if="r.status" class="res-status" :class="displayResourceStatus(r)">
+                          {{ resourceStatusLabel(displayResourceStatus(r)) }}
                         </span>
                       </div>
                       <p v-if="r.agentReason" class="res-reason">Agent 判断：{{ r.agentReason }}</p>
                       <div class="res-tags">
                         <span v-if="r.knowledgePoint">{{ r.knowledgePoint }}</span>
                         <span v-if="r.studyScenario">{{ r.studyScenario }}</span>
+                      </div>
+                      <div class="res-actions">
+                        <el-button
+                          v-if="canGenerateResource(r)"
+                          size="small"
+                          type="primary"
+                          plain
+                          :loading="isResourceBusy(r)"
+                          @click.stop="handleGenerateSingleResource(r)"
+                        >
+                          {{ r.status === 'failed' ? '重试生成' : '生成' }}
+                        </el-button>
+                        <el-button
+                          v-else-if="r.status === 'generated'"
+                          size="small"
+                          text
+                          @click.stop="goResourceDetail(r)"
+                        >
+                          查看
+                        </el-button>
                       </div>
                     </div>
                   </div>
@@ -588,6 +609,7 @@ import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
 import { resourcePackageApi } from '@/api/spaceDashboard'
+import { learningResourceApi } from '@/api/learningResource'
 import type { ResourcePackageGenerateDTO, ResourcePackageVO, ResourceType, ResourceVO, RiskStatus, TaskVO } from '@/types/learningSpace'
 import type { LearningPlanDraft, PhaseInfo, ResourceInfo, KnowledgeNode } from '@/types/planExecute'
 
@@ -607,6 +629,7 @@ const packagePreviewLoading = ref(false)
 const packageGenerating = ref(false)
 const packageRunningSteps = ref<{ reason: string; status: string }[]>([])
 const selectedPackageTypes = ref<ResourceType[]>(['doc', 'mind_map', 'quiz', 'link'])
+const generatingResourceIds = ref<string[]>([])
 
 const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
@@ -769,6 +792,10 @@ function resourceStatusLabel(status: string) {
   return m[status] || status
 }
 
+function displayResourceStatus(resource: ResourceVO) {
+  return generatingResourceIds.value.includes(resource.id) ? 'generating' : (resource.status || 'generated')
+}
+
 function taskTitle(taskId: string | null | undefined) {
   if (!taskId) return ''
   return allTasks.value.find(task => task.id === taskId)?.title || ''
@@ -777,6 +804,36 @@ function taskTitle(taskId: string | null | undefined) {
 function goResourceDetail(resource: ResourceVO) {
   if (!resource?.id) return
   router.push(`/resources/${resource.id}`)
+}
+
+function canGenerateResource(resource: ResourceVO) {
+  return resource.status === 'planned' || resource.status === 'failed'
+}
+
+function isResourceBusy(resource: ResourceVO) {
+  return resource.status === 'generating' || generatingResourceIds.value.includes(resource.id)
+}
+
+function handleResourceCardClick(resource: ResourceVO) {
+  if (isResourceBusy(resource)) return
+  if (resource.status === 'generated' || !resource.status) {
+    goResourceDetail(resource)
+  }
+}
+
+async function handleGenerateSingleResource(resource: ResourceVO) {
+  if (!resource.id || isResourceBusy(resource)) return
+  generatingResourceIds.value = [...generatingResourceIds.value, resource.id]
+  try {
+    await learningResourceApi.generate(resource.id)
+    await dashStore.fetchDashboard(spaceId.value)
+    ElMessage.success('资料已生成，可以开始学习')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '资料生成失败，请稍后重试')
+    await dashStore.fetchDashboard(spaceId.value).catch(() => {})
+  } finally {
+    generatingResourceIds.value = generatingResourceIds.value.filter(id => id !== resource.id)
+  }
 }
 
 function normalizeText(text: string | null | undefined) {
@@ -1915,6 +1972,11 @@ watch(currentPlanPhaseKey, key => {
   cursor: pointer;
   transition: all 0.15s;
   &:hover { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06); transform: translateY(-1px); }
+
+  &.disabled {
+    cursor: wait;
+    opacity: 0.78;
+  }
 }
 
 .res-icon {
@@ -1977,6 +2039,12 @@ watch(currentPlanPhaseKey, key => {
     font-size: 0.65rem;
     font-weight: 700;
   }
+}
+
+.res-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 
 .package-preview {
