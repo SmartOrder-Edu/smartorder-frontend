@@ -471,9 +471,7 @@ const handleLogout = async () => {
   padding: var(--spacing-sm) var(--spacing-lg);
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: #ffffff;
   border-right: 1px solid rgba(139, 92, 246, 0.15);
   box-shadow:
     4px 0 30px rgba(139, 92, 246, 0.1),
@@ -513,10 +511,7 @@ const handleLogout = async () => {
   transition: all 0.3s ease;
 }
 
-.sidebar-logo:hover {
-  background: rgba(139, 92, 246, 0.1);
-  transform: translateX(4px);
-}
+
 
 /* 折叠后的 Logo 区域 */
 .sidebar-logo-collapsed {
@@ -604,15 +599,7 @@ const handleLogout = async () => {
   transition: all 0.3s ease;
 }
 
-.sidebar-logo:hover .sidebar-logo-img {
-  transform: scale(1.05);
-  filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.5));
-}
 
-.sidebar-logo:hover .sidebar-logo-img {
-  transform: scale(1.05);
-  filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.5));
-}
 
 .sidebar-logo-text {
   position: relative;
@@ -701,24 +688,8 @@ const handleLogout = async () => {
   transition: transform 0.3s ease;
 }
 
-/* 动态图标容器样式由AnimatedIcon组件处理 */
-.nav-item :deep(.animated-icon) {
-  background: rgba(139, 92, 246, 0.08);
-  border-radius: 10px;
-  transition: all 0.3s ease;
-}
+/* 动态图标容器：纯布局，视觉由AnimatedIcon组件自身管理 */
 
-.nav-item:hover :deep(.animated-icon) {
-  background: rgba(139, 92, 246, 0.2);
-  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
-}
-
-.nav-item.active :deep(.animated-icon) {
-  background: rgba(255, 255, 255, 0.2);
-  box-shadow:
-    0 0 20px rgba(255, 255, 255, 0.3),
-    inset 0 0 10px rgba(255, 255, 255, 0.1);
-}
 
 .nav-item .nav-label {
   font-size: 0.9375rem;
