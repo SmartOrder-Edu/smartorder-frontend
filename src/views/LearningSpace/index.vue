@@ -365,32 +365,96 @@
           <!-- Tab: Resources -->
           <div v-show="activeTab === 'resources'" class="tab-content">
             <div class="section-header">
-              <h3>学习资源</h3>
+              <h3>学习资料工坊</h3>
               <span class="task-count">{{ dashboard.resources.length }} 项</span>
             </div>
 
-            <div class="resource-grid" v-if="dashboard.resources.length">
-              <div
-                v-for="r in dashboard.resources"
-                :key="r.id"
-                class="resource-card"
-              >
-                <div class="res-icon" :class="r.resourceType">
-                  <span>{{ resourceIcon(r.resourceType) }}</span>
-                </div>
-                <div class="res-body">
-                  <h4 class="res-title">{{ r.title }}</h4>
-                  <p class="res-desc">{{ r.description }}</p>
-                  <div class="res-meta">
-                    <span class="res-type">{{ resourceTypeLabel(r.resourceType) }}</span>
-                    <span class="res-source" :class="r.source">
-                      {{ r.isAiGenerated ? 'AI生成' : r.source === 'curated' ? '精选' : '用户上传' }}
-                    </span>
-                  </div>
+            <div class="resource-agent-panel">
+              <div class="resource-agent-main">
+                <span class="resource-agent-eyebrow">Resource Agent 建议</span>
+                <h4>{{ resourcePackageTarget.title }}</h4>
+                <p>{{ resourcePackageTarget.reason }}</p>
+                <div class="resource-type-selector">
+                  <button
+                    v-for="type in packageTypeOptions"
+                    :key="type.value"
+                    class="type-chip"
+                    :class="{ active: selectedPackageTypes.includes(type.value) }"
+                    type="button"
+                    @click="togglePackageType(type.value)"
+                  >
+                    <span>{{ resourceIcon(type.value) }}</span>{{ type.label }}
+                  </button>
                 </div>
               </div>
+              <div class="resource-agent-actions">
+                <el-button :loading="packagePreviewLoading" @click="handlePreviewResourcePackage">
+                  预览资料包
+                </el-button>
+                <el-button type="primary" :loading="packageGenerating" @click="handleGenerateResourcePackage">
+                  生成建议资料
+                </el-button>
+              </div>
             </div>
-            <el-empty v-else description="暂无资源，等待 Agent 生成" :image-size="100" />
+
+            <div v-if="packageRunningSteps.length" class="resource-progress">
+              <div
+                v-for="step in packageRunningSteps"
+                :key="step.reason"
+                class="resource-progress-step"
+                :class="step.status"
+              >
+                <span class="step-dot"></span>
+                <span>{{ step.reason }}</span>
+              </div>
+            </div>
+
+            <div v-if="groupedResources.length" class="resource-package-list">
+              <section
+                v-for="group in groupedResources"
+                :key="group.key"
+                class="resource-package-section"
+              >
+                <div class="resource-package-head">
+                  <div>
+                    <span class="resource-package-eyebrow">{{ group.label }}</span>
+                    <h4>{{ group.title }}</h4>
+                  </div>
+                  <span class="task-count">{{ group.items.length }} 项</span>
+                </div>
+
+                <div class="resource-grid">
+                  <div
+                    v-for="r in group.items"
+                    :key="r.id"
+                    class="resource-card"
+                  >
+                    <div class="res-icon" :class="r.resourceType">
+                      <span>{{ resourceIcon(r.resourceType) }}</span>
+                    </div>
+                    <div class="res-body">
+                      <h4 class="res-title">{{ r.title }}</h4>
+                      <p class="res-desc">{{ r.description }}</p>
+                      <div class="res-meta">
+                        <span class="res-type">{{ resourceTypeLabel(r.resourceType) }}</span>
+                        <span class="res-source" :class="r.source">
+                          {{ resourceSourceLabel(r) }}
+                        </span>
+                        <span v-if="r.status" class="res-status" :class="r.status">
+                          {{ resourceStatusLabel(r.status) }}
+                        </span>
+                      </div>
+                      <p v-if="r.agentReason" class="res-reason">Agent 判断：{{ r.agentReason }}</p>
+                      <div class="res-tags">
+                        <span v-if="r.knowledgePoint">{{ r.knowledgePoint }}</span>
+                        <span v-if="r.studyScenario">{{ r.studyScenario }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <el-empty v-else description="暂无资源，等待 Agent 为任务生成资料包" :image-size="100" />
 
             <!-- Assessment Summary -->
             <div class="section-header mt-32">
@@ -413,6 +477,39 @@
             <div class="weakness-list">
               <span class="weakness-tag" v-for="w in weaknesses" :key="w">{{ w }}</span>
             </div>
+
+            <el-dialog
+              v-model="packagePreviewVisible"
+              title="确认生成资料包"
+              width="680px"
+              :close-on-click-modal="false"
+            >
+              <div v-if="resourcePackagePreview" class="package-preview">
+                <span class="resource-agent-eyebrow">待确认方案</span>
+                <h3>{{ resourcePackagePreview.title }}</h3>
+                <p>{{ resourcePackagePreview.reason }}</p>
+                <div class="preview-resource-list">
+                  <div
+                    v-for="r in resourcePackagePreview.resources"
+                    :key="r.resourceType + r.title"
+                    class="preview-resource-item"
+                  >
+                    <span class="preview-icon">{{ resourceIcon(r.resourceType) }}</span>
+                    <div>
+                      <strong>{{ r.title }}</strong>
+                      <p>{{ r.description }}</p>
+                    </div>
+                    <em>{{ resourceTypeLabel(r.resourceType) }}</em>
+                  </div>
+                </div>
+              </div>
+              <template #footer>
+                <el-button @click="packagePreviewVisible = false">取消</el-button>
+                <el-button type="primary" :loading="packageGenerating" @click="handleGenerateResourcePackage">
+                  确认生成
+                </el-button>
+              </template>
+            </el-dialog>
           </div>
 
           <!-- Tab: Records -->
@@ -489,7 +586,8 @@ import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
-import type { RiskStatus, TaskVO } from '@/types/learningSpace'
+import { resourcePackageApi } from '@/api/spaceDashboard'
+import type { ResourcePackageGenerateDTO, ResourcePackageVO, ResourceType, ResourceVO, RiskStatus, TaskVO } from '@/types/learningSpace'
 import type { LearningPlanDraft, PhaseInfo, ResourceInfo, KnowledgeNode } from '@/types/planExecute'
 
 const route = useRoute()
@@ -502,6 +600,12 @@ const showAddTask = ref(false)
 const planDraft = ref<LearningPlanDraft | null>(null)
 const planLoading = ref(false)
 const expandedPhaseKeys = ref<string[]>([])
+const resourcePackagePreview = ref<ResourcePackageVO | null>(null)
+const packagePreviewVisible = ref(false)
+const packagePreviewLoading = ref(false)
+const packageGenerating = ref(false)
+const packageRunningSteps = ref<{ reason: string; status: string }[]>([])
+const selectedPackageTypes = ref<ResourceType[]>(['doc', 'mind_map', 'quiz', 'link'])
 
 const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
@@ -515,6 +619,14 @@ const tabs = computed(() => [
 ])
 
 const weaknesses = ['洛必达法则适用条件', '无穷小阶数比较', '间断点分类']
+const packageTypeOptions: { value: ResourceType; label: string }[] = [
+  { value: 'doc', label: '文档' },
+  { value: 'html', label: 'HTML' },
+  { value: 'mind_map', label: '思维导图' },
+  { value: 'quiz', label: '练习' },
+  { value: 'image', label: '图解' },
+  { value: 'link', label: 'B站推荐' },
+]
 
 const themeGradient = computed(() => 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)')
 
@@ -591,19 +703,74 @@ const allTasks = computed<TaskVO[]>(() => {
   return [...map.values()]
 })
 
+const resourcePackageTarget = computed(() => {
+  const task = nextTodayTask.value
+  const phase = activePlanPhase.value
+  const knowledgePoint = task?.title || phase?.knowledgePoints?.[0] || dashboard.value?.currentGoal || dashboard.value?.space.name || '当前目标'
+  if (task) {
+    return {
+      title: `为「${task.title}」生成今日任务资料包`,
+      reason: task.aiSuggestion || `Agent 将围绕「${knowledgePoint}」补齐讲义、框架、练习和视频推荐。`,
+      knowledgePoint,
+      taskId: task.id,
+      pathNodeId: task.pathNodeId,
+    }
+  }
+  return {
+    title: `为「${knowledgePoint}」生成阶段资料包`,
+    reason: dashboard.value?.agentInsight || 'Agent 将基于当前空间目标生成可直接学习的资料组合。',
+    knowledgePoint,
+    taskId: null,
+    pathNodeId: dashboard.value?.pathProgress?.currentNodeId || null,
+  }
+})
+
+const groupedResources = computed(() => {
+  const groups = new Map<string, { key: string; title: string; label: string; items: ResourceVO[] }>()
+  ;(dashboard.value?.resources || []).forEach(resource => {
+    const key = resource.taskId ? `task-${resource.taskId}` : resource.knowledgePoint ? `kp-${resource.knowledgePoint}` : 'space'
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        title: resource.knowledgePoint || taskTitle(resource.taskId) || '空间通用资料',
+        label: resource.taskId ? '任务资料包' : resource.knowledgePoint ? '知识点资料包' : '空间资料',
+        items: [],
+      })
+    }
+    groups.get(key)!.items.push(resource)
+  })
+  return [...groups.values()]
+})
+
 function riskLabel(s: RiskStatus) {
   const m: Record<string, string> = { good: '良好', normal: '正常', warning: '注意', danger: '危险' }
   return m[s] || s
 }
 
 function resourceIcon(t: string) {
-  const m: Record<string, string> = { doc: '📄', video: '🎬', mind_map: '🧠', quiz: '📝', case_study: '📋', flashcard_set: '🃏', image: '🖼', audio: '🎵', link: '🔗', ppt: '📊' }
+  const m: Record<string, string> = { doc: '📄', html: '🌐', video: '🎬', mind_map: '🧠', quiz: '📝', case_study: '📋', flashcard_set: '🃏', image: '🖼', audio: '🎵', link: '🔗', ppt: '📊' }
   return m[t] || '📄'
 }
 
 function resourceTypeLabel(t: string) {
-  const m: Record<string, string> = { doc: '文档', ppt: 'PPT', video: '视频', mind_map: '思维导图', quiz: '练习题', case_study: '案例', flashcard_set: '闪卡', image: '图片', audio: '音频', link: '链接' }
+  const m: Record<string, string> = { doc: '文档', html: 'HTML', ppt: 'PPT', video: '视频', mind_map: '思维导图', quiz: '练习题', case_study: '案例', flashcard_set: '闪卡', image: '图片', audio: '音频', link: 'B站推荐' }
   return m[t] || t
+}
+
+function resourceSourceLabel(resource: ResourceVO) {
+  if (resource.source === 'curated') return resource.resourceType === 'link' ? 'AI筛选' : '精选'
+  if (resource.isAiGenerated) return 'AI生成'
+  return '用户上传'
+}
+
+function resourceStatusLabel(status: string) {
+  const m: Record<string, string> = { planned: '待生成', generating: '生成中', generated: '可使用', failed: '失败' }
+  return m[status] || status
+}
+
+function taskTitle(taskId: string | null | undefined) {
+  if (!taskId) return ''
+  return allTasks.value.find(task => task.id === taskId)?.title || ''
 }
 
 function normalizeText(text: string | null | undefined) {
@@ -697,6 +864,75 @@ function findPhaseByText(phases: PhaseInfo[], text: string | null | undefined) {
 
 function formatDateShort(date: string) {
   return date.slice(5)
+}
+
+function togglePackageType(type: ResourceType) {
+  if (selectedPackageTypes.value.includes(type)) {
+    if (selectedPackageTypes.value.length === 1) {
+      ElMessage.info('至少保留一种资料类型')
+      return
+    }
+    selectedPackageTypes.value = selectedPackageTypes.value.filter(item => item !== type)
+    return
+  }
+  selectedPackageTypes.value = [...selectedPackageTypes.value, type]
+}
+
+function buildPackagePayload(): ResourcePackageGenerateDTO {
+  const target = resourcePackageTarget.value
+  return {
+    taskId: target.taskId,
+    pathNodeId: target.pathNodeId,
+    knowledgePoint: target.knowledgePoint,
+    resourceTypes: selectedPackageTypes.value,
+    userIntent: target.reason,
+    packageMode: target.taskId ? 'task' : 'review',
+    targetMinutes: nextTodayTask.value?.estimatedDurationMinutes || 30,
+  }
+}
+
+async function handlePreviewResourcePackage() {
+  if (!spaceId.value) return
+  packagePreviewLoading.value = true
+  packageRunningSteps.value = []
+  try {
+    resourcePackagePreview.value = await resourcePackageApi.preview(spaceId.value, buildPackagePayload())
+    packageRunningSteps.value = resourcePackagePreview.value.agentActions.map(action => ({
+      reason: action.reason,
+      status: action.status,
+    }))
+    packagePreviewVisible.value = true
+  } catch (e: any) {
+    ElMessage.error(e?.message || '资料包预览失败')
+  } finally {
+    packagePreviewLoading.value = false
+  }
+}
+
+async function handleGenerateResourcePackage() {
+  if (!spaceId.value) return
+  packageGenerating.value = true
+  packageRunningSteps.value = [
+    { reason: '资源 Agent 正在分析当前任务和知识点', status: 'running' },
+    { reason: '正在生成资料包资源记录并绑定任务', status: 'running' },
+    { reason: 'Supervisor Agent 正在检查资料来源和使用场景', status: 'running' },
+  ]
+  try {
+    const result = await resourcePackageApi.generate(spaceId.value, buildPackagePayload())
+    packageRunningSteps.value = result.agentActions.map(action => ({
+      reason: action.reason,
+      status: action.status,
+    }))
+    packagePreviewVisible.value = false
+    resourcePackagePreview.value = result
+    await dashStore.fetchDashboard(spaceId.value)
+    ElMessage.success('资料包已生成并加入资料库')
+  } catch (e: any) {
+    packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'failed' }))
+    ElMessage.error(e?.message || '资料包生成失败')
+  } finally {
+    packageGenerating.value = false
+  }
 }
 
 async function handleStartTask(task: TaskVO) {
@@ -1515,6 +1751,131 @@ watch(currentPlanPhaseKey, key => {
 }
 
 /* ========== Resource Grid ========== */
+.resource-agent-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  background: linear-gradient(135deg, #ffffff, #ecfdfb);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+}
+
+.resource-agent-main {
+  min-width: 0;
+
+  h4 {
+    margin: 4px 0 6px;
+    color: #0f172a;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  p {
+    margin: 0 0 12px;
+    color: #64748b;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+  }
+}
+
+.resource-agent-eyebrow,
+.resource-package-eyebrow {
+  color: #0a9e94;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.resource-type-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &.active {
+    border-color: rgba(11, 183, 170, 0.32);
+    background: #ecfdfb;
+    color: #0a9e94;
+  }
+}
+
+.resource-agent-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.resource-progress {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.resource-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 0.75rem;
+
+  &.success { color: #059669; }
+  &.running { color: #0284c7; }
+  &.failed { color: #dc2626; }
+  &.waiting_user_confirm { color: #d97706; }
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.resource-package-list {
+  display: grid;
+  gap: 18px;
+}
+
+.resource-package-section {
+  padding-top: 2px;
+}
+
+.resource-package-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+
+  h4 {
+    margin: 3px 0 0;
+    color: #0f172a;
+    font-size: 0.95rem;
+  }
+}
+
 .resource-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1557,7 +1918,7 @@ watch(currentPlanPhaseKey, key => {
 .res-body { flex: 1; min-width: 0; }
 .res-title { font-size: 0.875rem; font-weight: 600; color: #1a1a2e; margin: 0 0 2px; }
 .res-desc { font-size: 0.75rem; color: #6b7280; margin: 0 0 6px; line-height: 1.4; }
-.res-meta { display: flex; gap: 8px; }
+.res-meta { display: flex; gap: 8px; flex-wrap: wrap; }
 .res-type { font-size: 0.6875rem; color: #9ca3af; }
 .res-source {
   font-size: 0.6875rem;
@@ -1565,6 +1926,100 @@ watch(currentPlanPhaseKey, key => {
   &.ai { background: #ede9fe; color: #7c3aed; }
   &.curated { background: #f0fdf4; color: #16a34a; }
   &.user { background: #f3f4f6; color: #6b7280; }
+}
+.res-status {
+  font-size: 0.6875rem;
+  padding: 1px 6px;
+  border-radius: 99px;
+
+  &.generated { background: #ecfdf5; color: #059669; }
+  &.planned { background: #fffbeb; color: #d97706; }
+  &.generating { background: #eff6ff; color: #2563eb; }
+  &.failed { background: #fef2f2; color: #dc2626; }
+}
+
+.res-reason {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.res-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+
+  span {
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 0.65rem;
+    font-weight: 700;
+  }
+}
+
+.package-preview {
+  h3 {
+    margin: 4px 0 8px;
+    color: #0f172a;
+    font-size: 1.05rem;
+  }
+
+  > p {
+    margin: 0 0 14px;
+    color: #64748b;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+  }
+}
+
+.preview-resource-list {
+  display: grid;
+  gap: 10px;
+}
+
+.preview-resource-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: #ffffff;
+
+  strong {
+    display: block;
+    color: #1f2937;
+    font-size: 0.8125rem;
+  }
+
+  p {
+    margin: 3px 0 0;
+    color: #64748b;
+    font-size: 0.72rem;
+    line-height: 1.45;
+  }
+
+  em {
+    color: #94a3b8;
+    font-size: 0.7rem;
+    font-style: normal;
+    white-space: nowrap;
+  }
+}
+
+.preview-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #f8fafc;
 }
 
 /* ========== Assessment Summary ========== */
