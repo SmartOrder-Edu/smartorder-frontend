@@ -575,6 +575,15 @@
               </div>
             </div>
 
+            <div v-if="questionTypeRows.find(r => r.questionType === 'code')?.enabled" class="form-item">
+              <label>编程语言</label>
+              <el-select v-model="codeProgrammingLanguage" style="width: 100%;">
+                <el-option label="C" value="C" />
+                <el-option label="C++" value="C++" />
+                <el-option label="Java" value="Java" />
+              </el-select>
+            </div>
+
             <div class="form-item difficulty-section">
               <div class="field-heading" style="margin-bottom: 32px;">
                 <label>难度级别</label>
@@ -715,7 +724,7 @@ interface GenerationPreviewBuffer {
 const learningSpaceStore = useLearningSpaceStore()
 const router = useRouter()
 const route = useRoute()
-const activeTab = ref('available')
+const activeTab = ref('ongoing')
 const showGenerateDialog = ref(false)
 const generating = ref(false)
 const selectedSpaceId = ref<string | null>(null)
@@ -733,6 +742,7 @@ const generationPreviewBuffers = ref<Partial<Record<QuestionTypeCode, Generation
 const generationJobNo = ref('')
 const generationTokenCount = ref(0)
 const generationError = ref('')
+const codeProgrammingLanguage = ref('C')
 const questionBank = ref<EvaluationQuestion[]>([])
 const questionBankLoading = ref(false)
 let generationAbortController: AbortController | null = null
@@ -977,7 +987,7 @@ const examTabs = computed(() => [
   },
   {
     value: 'available',
-    label: '推荐训练',
+    label: '推荐测评',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
     count: exams.value.filter(exam => exam.status === 'available' || exam.status === 'error').length
   },
@@ -1055,20 +1065,11 @@ const getScoreClass = (score: number) => {
   return 'poor'
 }
 
-const startExam = async (exam: any) => {
+const startExam = (exam: any) => {
   const spaceId = exam.learningSpaceId || selectedSpaceId.value
   if (!spaceId) {
     ElMessage.warning('请先选择学习空间，或先生成一套题库')
     return
-  }
-
-  // 仅当后端 status 为 'todo'（尚未开始）时才通知后端开始答题
-  if (exam.rawStatus === 'todo') {
-    try {
-      await startSession(exam.id)
-    } catch {
-      // 忽略异常，不阻断跳转
-    }
   }
 
   router.push({
@@ -1152,6 +1153,7 @@ const buildGeneratePayload = (): GenerateQuestionPayload | null => {
       count: row.count,
       difficulty: generateDifficulty.value,
       optionCount: row.isChoice ? 4 : undefined,
+      programmingLanguage: row.questionType === 'code' ? codeProgrammingLanguage.value : undefined,
       sort: index + 1
     }))
   }
@@ -1814,6 +1816,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
 .rec-tags {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 
   .tag {
@@ -1823,6 +1826,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
     border-radius: 4px;
     color: #64748b;
     font-weight: 600;
+    white-space: nowrap;
 
     &.difficulty {
       &.warning { color: #f59e0b; background: rgba(245, 158, 11, 0.06); }
@@ -2224,9 +2228,14 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 20px;
   
-  h3 { margin: 0; }
+  h3 {
+    margin: 0;
+    white-space: nowrap;
+  }
 }
 
 /* 合并的掌握度卡片内容 */
@@ -2352,6 +2361,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   gap: 12px;
   font-size: 0.75rem;
   color: #64748b;
+  white-space: nowrap;
 }
 
 .leg-item {
@@ -3044,6 +3054,65 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   padding: 8px;
   border-radius: 6px;
   border-left: 2.5px solid #ef4444;
+}
+
+/* 中屏响应式优化 */
+@media (max-width: 1350px) {
+  .metrics-grid {
+    gap: 12px;
+  }
+  .stat-card {
+    padding: 16px;
+  }
+  .stat-card.score-card {
+    padding: 12px 16px;
+  }
+  .score-left, .stat-circle {
+    width: 84px;
+    height: 84px;
+  }
+  .circle-score {
+    font-size: 1.6rem;
+  }
+  .accuracy-val {
+    font-size: 1.5rem;
+  }
+  .score-divider {
+    margin: 0 8px;
+    height: 52px;
+  }
+  .stat-value {
+    font-size: 1.35rem;
+  }
+  .recommend-cards {
+    gap: 10px;
+  }
+  .recommend-item {
+    padding: 14px;
+  }
+  .rec-icon-wrapper {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+  .ability-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1200px) {
+  .ability-card-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ability-divider {
+    width: 100%;
+    height: 1px;
+    margin: 12px 0;
+  }
+  .ability-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 /* 移动端响应式 */

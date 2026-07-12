@@ -96,10 +96,11 @@ onMounted(async () => {
 
   try {
     loading.value = true
-    questionBank.value = await fetchEvaluationQuestions({
+    const rawQs = await fetchEvaluationQuestions({
       learningSpaceId: spaceId,
       limit: 100 // 加大数量以获取全部
     })
+    questionBank.value = (rawQs || []).filter(q => q.questionType !== 'code')
     console.log('Fetched questions:', questionBank.value)
   } catch (error: any) {
     console.error('Fetch error:', error)

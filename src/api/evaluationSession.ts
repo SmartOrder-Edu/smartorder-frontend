@@ -50,28 +50,46 @@ export interface SessionReportVO {
 }
 
 /** 获取试卷题目列表 */
-export function fetchSessionQuestions(sessionId: number) {
+export function fetchSessionQuestions(sessionId: number | string) {
   return request.get<EvaluationQuestion[]>(`/evaluation/session/${sessionId}/questions`)
 }
 
 /** 开始答题 */
-export function startSession(sessionId: number) {
+export function startSession(sessionId: number | string) {
   return request.put<void>(`/evaluation/session/${sessionId}/start`)
 }
 
 /** 提交全部答案 */
-export function submitAnswers(sessionId: number, payload: SubmitAnswersPayload) {
+export function submitAnswers(sessionId: number | string, payload: SubmitAnswersPayload) {
   return request.post<SessionResultVO>(`/evaluation/session/${sessionId}/submit`, payload)
 }
 
 /** 查看判分结果 */
-export function getSessionResult(sessionId: number) {
+export function getSessionResult(sessionId: number | string) {
   return request.get<SessionResultVO>(`/evaluation/session/${sessionId}/result`)
 }
 
 /** 查看学习报告 */
-export function getSessionReport(sessionId: number) {
+export function getSessionReport(sessionId: number | string) {
   return request.get<SessionReportVO>(`/evaluation/session/${sessionId}/report`)
+}
+
+// ======================== 自动保存与草稿恢复 ========================
+
+export interface DraftAnswerVO {
+  questionId: number
+  userAnswer: Record<string, unknown>
+  updatedAt: string
+}
+
+/** 保存答题进度（草稿，不判分） */
+export function saveProgress(sessionId: number | string, payload: SubmitAnswersPayload) {
+  return request.post<void>(`/evaluation/session/${sessionId}/save-progress`, payload)
+}
+
+/** 获取草稿答案（用于恢复答题进度） */
+export function fetchDraftAnswers(sessionId: number | string) {
+  return request.get<DraftAnswerVO[]>(`/evaluation/session/${sessionId}/draft`)
 }
 
 // ======================== 直接提交（无 session，任务模式） ========================

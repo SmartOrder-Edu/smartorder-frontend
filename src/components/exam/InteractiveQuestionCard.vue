@@ -75,6 +75,21 @@
         </button>
       </div>
 
+      <!-- 代码题 -->
+      <div v-else-if="question.questionType === 'code'" class="code-answer-section">
+        <select v-model="codeLang" :disabled="showAnswer" class="lang-select">
+          <option value="c11">C (C11)</option>
+          <option value="cpp17">C++ (C++17)</option>
+        </select>
+        <CodeEditor
+          v-model="textAnswer"
+          :readonly="showAnswer"
+          :language="codeLang"
+          placeholder="// 在此编写代码...&#10;#include <stdio.h>&#10;&#10;int main() {&#10;    // 你的代码&#10;    return 0;&#10;}"
+          :show-footer="false"
+        />
+      </div>
+
       <!-- 主观/填空/代码题 -->
       <el-input
         v-else
@@ -139,6 +154,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { EvaluationQuestion } from '@/api/evaluationQuestion'
+import CodeEditor from '@/components/exam/CodeEditor.vue'
 import {
   getQuestionAnswerText,
   getQuestionTypeName,
@@ -153,6 +169,7 @@ const props = defineProps<{
 
 const selectedOptions = ref<string[]>([])
 const textAnswer = ref('')
+const codeLang = ref('c11')
 
 const currentOptions = computed(() => normalizeQuestionOptions(props.question.options))
 const answerText = computed(() => getQuestionAnswerText(props.question.correctAnswer))
@@ -379,6 +396,35 @@ function toggleOption(label: string) {
   background: white;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
+}
+
+.code-answer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lang-select {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1.5px solid #e2e8f0;
+  background: #fff;
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.lang-select:focus {
+  border-color: #0bb7aa;
+}
+
+.lang-select:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 .action-row {
