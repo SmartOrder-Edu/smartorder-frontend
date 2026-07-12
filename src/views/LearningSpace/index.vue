@@ -428,6 +428,7 @@
                     v-for="r in group.items"
                     :key="r.id"
                     class="resource-card"
+                    @click="goResourceDetail(r)"
                   >
                     <div class="res-icon" :class="r.resourceType">
                       <span>{{ resourceIcon(r.resourceType) }}</span>
@@ -773,6 +774,11 @@ function taskTitle(taskId: string | null | undefined) {
   return allTasks.value.find(task => task.id === taskId)?.title || ''
 }
 
+function goResourceDetail(resource: ResourceVO) {
+  if (!resource?.id) return
+  router.push(`/resources/${resource.id}`)
+}
+
 function normalizeText(text: string | null | undefined) {
   return String(text || '').trim().toLowerCase()
 }
@@ -1048,11 +1054,23 @@ function loadDashboard() {
   }
 }
 
-onMounted(loadDashboard)
+function syncActiveTabFromRoute() {
+  const tab = String(route.query.tab || '')
+  if (['today', 'plan', 'path', 'resources', 'records'].includes(tab)) {
+    activeTab.value = tab
+  }
+}
+
+onMounted(() => {
+  syncActiveTabFromRoute()
+  loadDashboard()
+})
 watch(() => route.params.spaceId, () => {
   loadDashboard()
-  activeTab.value = 'today'
+  syncActiveTabFromRoute()
+  if (!route.query.tab) activeTab.value = 'today'
 })
+watch(() => route.query.tab, syncActiveTabFromRoute)
 watch(currentPlanPhaseKey, key => {
   if (key && !expandedPhaseKeys.value.includes(key)) {
     expandedPhaseKeys.value = [key, ...expandedPhaseKeys.value]

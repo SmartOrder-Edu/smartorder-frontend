@@ -125,6 +125,25 @@ export interface ResourcePackageVO {
   agentActions: AgentActionVO[]
 }
 
+export interface ResourceContentVO {
+  id: string
+  resourceId: string
+  contentType: 'markdown' | 'html' | 'json' | 'external_link'
+  content: string
+  version: number
+  status: string
+  reviewResult: string | null
+  createTime: string
+  updateTime: string
+}
+
+export interface ResourceDetailVO {
+  resource: ResourceVO
+  content: ResourceContentVO | null
+  spaceName: string
+  taskTitle: string | null
+}
+
 // ---- Learning Record ----
 
 export interface LearningRecordVO {
