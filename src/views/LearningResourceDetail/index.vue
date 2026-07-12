@@ -114,7 +114,7 @@
                     <button class="bili-cover" type="button" @click="openVideo(video.url)">
                       <img
                         v-if="video.coverUrl"
-                        :src="video.coverUrl"
+                        :src="videoCoverUrl(video.coverUrl)"
                         :alt="video.title"
                         @error="handleCoverError"
                       />
@@ -283,6 +283,29 @@ function formatPercent(value: number | string | undefined) {
   if (!score) return ''
   if (score > 1) return `${Math.round(score)}%`
   return `${Math.round(score * 100)}%`
+}
+
+function videoCoverUrl(url: string | undefined) {
+  if (!url) return ''
+  if (!isBilibiliCoverUrl(url)) return url
+  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  return `${base}/resources/bilibili/cover?url=${base64UrlEncode(url)}`
+}
+
+function isBilibiliCoverUrl(url: string) {
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' && parsed.hostname.endsWith('.hdslb.com')
+  } catch {
+    return false
+  }
+}
+
+function base64UrlEncode(value: string) {
+  return btoa(unescape(encodeURIComponent(value)))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
 }
 
 function handleCoverError(event: Event) {
