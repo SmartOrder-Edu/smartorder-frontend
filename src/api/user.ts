@@ -39,7 +39,7 @@ export interface ChangePasswordParams {
 }
 
 export interface UserInfoResponse {
-  id: number
+  id: string
   username: string
   email: string
   phone?: string
@@ -59,6 +59,11 @@ export const userApi = {
   /** 密码登录，返回accessToken和shortToken，refreshToken通过HttpOnly Cookie自动携带 */
   login(params: LoginParams) {
     return request.post<LoginResponse>('/auth/login', params)
+  },
+
+  /** GitHub 登录，接收 code 和 state，返回系统 accessToken，刷新 token 写入 Cookie */
+  githubLogin(code: string, state?: string) {
+    return request.post<string>('/auth/github/login', { code, state })
   },
 
   /** 邮箱注册 */

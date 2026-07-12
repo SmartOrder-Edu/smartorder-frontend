@@ -5,6 +5,16 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [vue(), VueDevTools()],
+  define: {
+    // 自动检测并注入 Windows 本地系统环境变量 (支持 github_client_id / client_id 各种小写变体)
+    'import.meta.env.VITE_GITHUB_CLIENT_ID': JSON.stringify(
+      process.env.VITE_GITHUB_CLIENT_ID ||
+      process.env.github_client_id ||
+      process.env.client_id ||
+      process.env.GITHUB_CLIENT_ID ||
+      'MOCK'
+    )
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),

@@ -13,6 +13,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '登录 - 知序智学', guest: true }
   },
   {
+    path: '/oauth/callback/github',
+    name: 'GithubCallback',
+    component: () => import('@/views/Login/GithubCallback.vue'),
+    meta: { title: 'GitHub 登录中 - 知序智学', guest: true }
+  },
+  {
     path: '/register',
     name: 'Register',
     component: () => import('@/views/Register/index.vue'),
