@@ -539,7 +539,7 @@
                 class="tool-card"
                 @click="sendQuickMessage(tool.prompt)"
               >
-                <span class="tool-icon" v-html="tool.icon"></span>
+                <span class="tool-icon" :class="{ 'tool-icon-lg': tool.id === 3 }" v-html="tool.icon"></span>
                 <span class="tool-label">{{ tool.label }}</span>
                 <span class="tool-desc">{{ tool.desc }}</span>
               </button>
@@ -750,7 +750,7 @@ const welcomeFeatures = computed(() => {
   if (activeContext.value === 'evaluation') {
     return [
       {
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+        icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M320.618717 709.570751l311.023685-316.464605-159.049412-162.715919-320.259024 320.694953-3.094478 19.460214L312.765865 710.198038l7.852852-0.627287z m365.842198-372.018875l110.612237-112.471584 7.225565-44.74918L685.639201 62.11571l-47.529503 2.531659-116.408244 116.51569 164.759461 156.388817zM100.216981 789.613762l138.302903-59.706847-112.839975-92.719728-46.859237 112.450095-14.23419 51.919487 35.630499-11.943007z m9.216919 79.440283c-24.663726 0.084934-44.587498 20.031219-44.608987 44.694945 0.021489 24.659633 19.946284 44.649919 44.608987 44.75839h806.904567c24.661679 0 44.651966-19.990287 44.651965-44.649919v-0.108471c0-24.663726-19.990287-44.654013-44.61001-44.694945H109.4339z m806.450219-111.931278c24.856108 0 45.105291-20.206204 45.10529-45.128827s-20.249183-45.083801-45.10529-45.083801H468.374922c-24.90011 0-45.083801 20.24816-45.083801 45.299719 0 24.74866 20.183691 44.912909 45.083801 44.912909h447.509197z" fill="#59C666"></path></svg>',
         label: '生成微测验随堂练'
       },
       {
@@ -774,7 +774,7 @@ const welcomeFeatures = computed(() => {
       label: '解释知识点'
     },
     {
-      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M320.618717 709.570751l311.023685-316.464605-159.049412-162.715919-320.259024 320.694953-3.094478 19.460214L312.765865 710.198038l7.852852-0.627287z m365.842198-372.018875l110.612237-112.471584 7.225565-44.74918L685.639201 62.11571l-47.529503 2.531659-116.408244 116.51569 164.759461 156.388817zM100.216981 789.613762l138.302903-59.706847-112.839975-92.719728-46.859237 112.450095-14.23419 51.919487 35.630499-11.943007z m9.216919 79.440283c-24.663726 0.084934-44.587498 20.031219-44.608987 44.694945 0.021489 24.659633 19.946284 44.649919 44.608987 44.75839h806.904567c24.661679 0 44.651966-19.990287 44.651965-44.649919v-0.108471c0-24.663726-19.990287-44.654013-44.61001-44.694945H109.4339z m806.450219-111.931278c24.856108 0 45.105291-20.206204 45.10529-45.128827s-20.249183-45.083801-45.10529-45.083801H468.374922c-24.90011 0-45.083801 20.24816-45.083801 45.299719 0 24.74866 20.183691 44.912909 45.083801 44.912909h447.509197z" fill="#59C666"></path></svg>',
       label: '生成练习题'
     },
     {
@@ -840,7 +840,7 @@ const quickTools = [
   },
   {
     id: 2,
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M320.618717 709.570751l311.023685-316.464605-159.049412-162.715919-320.259024 320.694953-3.094478 19.460214L312.765865 710.198038l7.852852-0.627287z m365.842198-372.018875l110.612237-112.471584 7.225565-44.74918L685.639201 62.11571l-47.529503 2.531659-116.408244 116.51569 164.759461 156.388817zM100.216981 789.613762l138.302903-59.706847-112.839975-92.719728-46.859237 112.450095-14.23419 51.919487 35.630499-11.943007z m9.216919 79.440283c-24.663726 0.084934-44.587498 20.031219-44.608987 44.694945 0.021489 24.659633 19.946284 44.649919 44.608987 44.75839h806.904567c24.661679 0 44.651966-19.990287 44.651965-44.649919v-0.108471c0-24.663726-19.990287-44.654013-44.61001-44.694945H109.4339z m806.450219-111.931278c24.856108 0 45.105291-20.206204 45.10529-45.128827s-20.249183-45.083801-45.10529-45.083801H468.374922c-24.90011 0-45.083801 20.24816-45.083801 45.299719 0 24.74866 20.183691 44.912909 45.083801 44.912909h447.509197z" fill="#59C666"></path></svg>',
     label: '生成练习',
     desc: '针对薄弱点',
     prompt: '请根据我的学习记录，生成10道关于进程同步与互斥的专项练习题'
@@ -1515,8 +1515,8 @@ watch(windowWidth, (newWidth, oldWidth) => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  margin: calc(var(--spacing-xl) * -1) calc(var(--spacing-2xl) * -1) calc(var(--spacing-xl) * -1);
-  padding: var(--spacing-xs) var(--spacing-2xl) 0;
+  margin: calc(var(--spacing-xl) * -1) auto calc(var(--spacing-xl) * -1);
+  padding: var(--spacing-xs) 0 0;
 }
 
 .tutor-container {
@@ -1671,6 +1671,11 @@ watch(windowWidth, (newWidth, oldWidth) => {
   width: 100%;
 }
 
+/* 收起历史侧边栏后，扩大聊天内容区域以填充多出的空间 */
+.chat-area:not(.sidebar-open) .chat-flow-inner {
+  max-width: min(1150px, 100%);
+}
+
 .chat-area-top-bar {
   display: flex;
   align-items: center;
@@ -1774,6 +1779,10 @@ watch(windowWidth, (newWidth, oldWidth) => {
   align-self: stretch;
   padding-bottom: 2px;
   background: linear-gradient(180deg, var(--background-color, #f8fafc) 0%, rgba(248, 250, 252, 0.88) 78%, rgba(248, 250, 252, 0) 100%);
+}
+
+.chat-area:not(.sidebar-open) .planning-execution-shelf {
+  max-width: min(1150px, 100%);
 }
 
 .planning-execution-shelf :deep(.task-execution-panel) {
@@ -1880,6 +1889,10 @@ watch(windowWidth, (newWidth, oldWidth) => {
   width: 100%;
   min-width: 0;
   max-width: 820px;
+}
+
+.chat-area:not(.sidebar-open) .message-wrapper.ai .message-content {
+  max-width: 1050px;
 }
 
 .message-avatar {
@@ -2437,6 +2450,7 @@ watch(windowWidth, (newWidth, oldWidth) => {
 
 .tool-icon { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
 .tool-icon :deep(svg) { width: 100%; height: 100%; }
+.tool-icon-lg { width: 26px; height: 26px; }
 .tool-label { font-size: 0.6875rem; font-weight: 600; color: var(--text-dark); }
 .tool-desc { font-size: 0.5625rem; color: var(--text-muted); }
 
