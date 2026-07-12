@@ -89,11 +89,71 @@
             </div>
 
             <div v-else-if="renderMode === 'external'" class="external-content">
-              <span class="external-icon">🔗</span>
-              <h2>{{ externalData?.title || detail.resource.title }}</h2>
-              <p>{{ externalData?.reason || detail.resource.agentReason }}</p>
-              <p v-if="externalData?.usageAdvice">{{ externalData.usageAdvice }}</p>
-              <el-button type="primary" @click="openExternal">打开 B站推荐入口</el-button>
+              <template v-if="isBilibiliRecommendation">
+                <div class="bili-head">
+                  <div>
+                    <span class="bili-label">B站学习视频推荐</span>
+                    <h2>{{ externalData?.title || detail.resource.title }}</h2>
+                    <p>{{ externalData?.reason || detail.resource.agentReason }}</p>
+                  </div>
+                  <el-button v-if="externalUrl" type="primary" plain @click="openExternal">
+                    打开搜索入口
+                  </el-button>
+                </div>
+
+                <div v-if="externalData?.usageAdvice" class="bili-advice">
+                  {{ externalData.usageAdvice }}
+                </div>
+
+                <div class="bili-video-list">
+                  <article
+                    v-for="video in bilibiliVideos"
+                    :key="video.url || video.title"
+                    class="bili-video-card"
+                  >
+                    <button class="bili-cover" type="button" @click="openVideo(video.url)">
+                      <img
+                        v-if="video.coverUrl"
+                        :src="video.coverUrl"
+                        :alt="video.title"
+                        @error="handleCoverError"
+                      />
+                      <span v-else>暂无封面</span>
+                      <strong v-if="video.durationSeconds">{{ formatDuration(video.durationSeconds) }}</strong>
+                    </button>
+                    <div class="bili-main">
+                      <div class="bili-title-row">
+                        <h3>{{ video.title }}</h3>
+                        <span v-if="video.matchScore" class="bili-score">
+                          {{ formatPercent(video.matchScore) }}
+                        </span>
+                      </div>
+                      <div class="bili-meta">
+                        <span v-if="video.upName">UP主：{{ video.upName }}</span>
+                        <span v-if="video.fitStage">{{ video.fitStage }}</span>
+                        <span v-if="video.playCount">{{ formatCount(video.playCount) }}播放</span>
+                        <span v-if="video.publishTime">{{ video.publishTime }}</span>
+                      </div>
+                      <p v-if="video.reason" class="bili-reason">{{ video.reason }}</p>
+                      <div class="bili-actions">
+                        <el-button type="primary" size="small" @click="openVideo(video.url)">
+                          打开 B站观看
+                        </el-button>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+
+                <el-empty v-if="!bilibiliVideos.length" description="暂无可展示的视频推荐" :image-size="100" />
+              </template>
+
+              <template v-else>
+                <span class="external-icon">🔗</span>
+                <h2>{{ externalData?.title || detail.resource.title }}</h2>
+                <p>{{ externalData?.reason || detail.resource.agentReason }}</p>
+                <p v-if="externalData?.usageAdvice">{{ externalData.usageAdvice }}</p>
+                <el-button type="primary" @click="openExternal">打开外部资源</el-button>
+              </template>
             </div>
 
             <el-empty v-else description="该资源暂无可预览内容" :image-size="100" />
@@ -136,6 +196,11 @@ const markdownContent = computed(() => detail.value?.content?.content || '')
 const quizData = computed<any | null>(() => parseJson(detail.value?.content?.content))
 const externalData = computed<any | null>(() => parseJson(detail.value?.content?.content))
 const externalUrl = computed(() => externalData.value?.url || detail.value?.resource.url || '')
+const isBilibiliRecommendation = computed(() => externalData.value?.type === 'bilibili_recommendation')
+const bilibiliVideos = computed<any[]>(() => {
+  const videos = externalData.value?.videos
+  return Array.isArray(videos) ? videos : []
+})
 
 const sourceLabel = computed(() => {
   const resource = detail.value?.resource
@@ -188,6 +253,41 @@ function openExternal() {
     return
   }
   window.open(externalUrl.value, '_blank', 'noopener,noreferrer')
+}
+
+function openVideo(url: string | undefined) {
+  if (!url) {
+    ElMessage.info('暂无可打开的视频链接')
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+function formatDuration(seconds: number | string | undefined) {
+  const value = Number(seconds || 0)
+  if (!value) return ''
+  const min = Math.floor(value / 60)
+  const sec = value % 60
+  return `${min}:${String(sec).padStart(2, '0')}`
+}
+
+function formatCount(count: number | string | undefined) {
+  const value = Number(count || 0)
+  if (!value) return '0'
+  if (value >= 10000) return `${(value / 10000).toFixed(value >= 100000 ? 0 : 1)}万`
+  return String(value)
+}
+
+function formatPercent(value: number | string | undefined) {
+  const score = Number(value || 0)
+  if (!score) return ''
+  if (score > 1) return `${Math.round(score)}%`
+  return `${Math.round(score * 100)}%`
+}
+
+function handleCoverError(event: Event) {
+  const image = event.target as HTMLImageElement | null
+  if (image) image.style.display = 'none'
 }
 
 async function loadDetail() {
@@ -419,7 +519,7 @@ watch(resourceId, loadDetail)
 }
 
 .external-content {
-  max-width: 620px;
+  max-width: 920px;
   margin: 20px auto;
   text-align: center;
 
@@ -432,6 +532,140 @@ watch(resourceId, loadDetail)
     color: #64748b;
     line-height: 1.6;
   }
+}
+
+.bili-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+
+  h2 {
+    margin: 6px 0 8px;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.bili-label {
+  color: #dc2626;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.bili-advice {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  text-align: left;
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.bili-video-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.bili-video-card {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: left;
+}
+
+.bili-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  strong {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: rgba(15, 23, 42, 0.78);
+    color: #ffffff;
+    font-size: 0.72rem;
+  }
+}
+
+.bili-main {
+  min-width: 0;
+}
+
+.bili-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+
+  h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+}
+
+.bili-score {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #059669;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.bili-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 8px;
+
+  span {
+    color: #64748b;
+    font-size: 0.76rem;
+  }
+}
+
+.bili-reason {
+  margin: 10px 0 0;
+  color: #475569;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.bili-actions {
+  margin-top: 12px;
 }
 
 .external-icon {
@@ -453,6 +687,14 @@ watch(resourceId, loadDetail)
 
   .back-btn {
     width: 100%;
+  }
+
+  .bili-head {
+    display: block;
+  }
+
+  .bili-video-card {
+    grid-template-columns: 1fr;
   }
 }
 </style>
