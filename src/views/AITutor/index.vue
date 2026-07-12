@@ -52,25 +52,6 @@
           </div>
         </aside>
 
-        <!-- 数字人展开按钮（收起状态时显示） -->
-        <div 
-          v-if="false && isAssistantCollapsed" 
-          class="expand-btn-avatar" 
-          @click="isAssistantCollapsed = false"
-          title="展开数字人"
-        >
-          <el-icon><ArrowRight /></el-icon>
-        </div>
-
-        <!-- 数字人面板 -->
-        <AssistantPanel 
-          v-show="!isAssistantCollapsed"
-          :latestAiMessage="latestAiMessageForAvatar"
-          :initial-auth-info="avatarAuthInfo"
-          :auth-info-loading="avatarAuthLoading"
-          @collapse="isAssistantCollapsed = true"
-        />
-
         <!-- 聊天区域 -->
         <main class="chat-area" :class="{ 'sidebar-open': historySidebarOpen }">
           <div class="chat-area-top-bar">
@@ -81,16 +62,18 @@
                 <line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
             </button>
+            <span class="current-conv-title">{{ currentConvTitle }}</span>
             <button
               v-if="isAssistantCollapsed"
-              class="avatar-toggle-btn"
-              @click="isAssistantCollapsed = false"
+              class="avatar-top-toggle"
+              type="button"
               title="展开数字人"
+              @click.stop="isAssistantCollapsed = false"
             >
-              <el-icon><ArrowRight /></el-icon>
+              <span class="avatar-top-toggle-status" :class="{ active: !!avatarAuthInfo?.wssUrl }"></span>
+              <el-icon><ArrowLeft /></el-icon>
               <span>数字人</span>
             </button>
-            <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
           </div>
             <div class="chat-flow" ref="chatFlowRef">
               <div class="chat-flow-inner">
@@ -175,6 +158,11 @@
                     v-if="msg.role === 'ai' && msg.webSearchReferences?.length"
                     :references="msg.webSearchReferences"
                   />
+                  <!-- RAG 检索来源卡片 -->
+                  <RagSources
+                    v-if="msg.role === 'ai' && msg.ragSources?.chunks?.length"
+                    :sources="msg.ragSources"
+                  />
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
                   <!-- 思维导图卡片（历史消息） -->
@@ -185,7 +173,7 @@
                       :data="mm"
                     />
                   </template>
-                  <template v-else>
+                  <template v-if="msg.role === 'user'">
                     <p class="message-text">{{ msg.content }}</p>
                     <div v-if="msg.attachmentFileIds?.length" class="message-attachment-hint">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
@@ -272,6 +260,11 @@
                   <WebSearchSources
                     v-if="agentStore.currentWebSearchReferences?.length"
                     :references="agentStore.currentWebSearchReferences"
+                  />
+                  <!-- RAG 检索来源卡片（流式实时展示） -->
+                  <RagSources
+                    v-if="agentStore.currentRagSources?.chunks?.length"
+                    :sources="agentStore.currentRagSources"
                   />
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
@@ -457,6 +450,16 @@
           </div>
         </main>
 
+        <!-- 数字人面板：聊天区右侧的辅助陪伴面板 -->
+        <AssistantPanel
+          v-show="!isAssistantCollapsed"
+          class="assistant-panel-slot"
+          :latestAiMessage="latestAiMessageForAvatar"
+          :initial-auth-info="avatarAuthInfo"
+          :auth-info-loading="avatarAuthLoading"
+          @collapse="isAssistantCollapsed = true"
+        />
+
         <!-- 右侧：快捷工具 + 任务执行面板 -->
         <aside class="tutor-sidebar">
           <!-- 知识库引用选择与展示区 -->
@@ -586,13 +589,14 @@ import LearningPlanPreview from '@/components/plan/LearningPlanPreview.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import WebSearchSources from '@/components/agent/WebSearchSources.vue'
+import RagSources from '@/components/agent/RagSources.vue'
 import MindMapCard from '@/components/agent/MindMapCard.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
 import type { RagReference } from '@/composables/useAgentChat'
 import AssistantPanel from '@/components/AssistantPanel.vue'
-import { ArrowRight } from '@element-plus/icons-vue'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import { getAvatarAuthInfo, type AvatarAuthInfo } from '@/api/avatar'
 
 const userStore = useUserStore()
@@ -774,7 +778,7 @@ const welcomeFeatures = computed(() => {
       label: '生成练习题'
     },
     {
-      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><g stroke="#701A75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="25" y="42" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><path d="M41 50 H52 V32 H62 M52 50 V68 H62" stroke-width="5"/><rect x="62" y="24" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><rect x="62" y="60" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/></g></svg>',
       label: '生成思维导图'
     },
     {
@@ -843,7 +847,7 @@ const quickTools = [
   },
   {
     id: 3,
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
+    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><g stroke="#701A75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="25" y="42" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><path d="M41 50 H52 V32 H62 M52 50 V68 H62" stroke-width="5"/><rect x="62" y="24" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><rect x="62" y="60" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/></g></svg>',
     label: '思维导图',
     desc: '知识可视化',
     prompt: '请为我生成一份"操作系统进程管理"的知识思维导图'
@@ -1463,7 +1467,7 @@ watch(
 )
 
 onMounted(() => {
-  isAssistantCollapsed.value = false
+  isAssistantCollapsed.value = window.innerWidth < 1280
   preloadAvatarAuthInfo()
   agentStore.fetchConversations()
   if (window.innerWidth < 768) {
@@ -1495,7 +1499,10 @@ onUnmounted(() => {
   }
 })
 
-watch(windowWidth, (newWidth) => {
+watch(windowWidth, (newWidth, oldWidth) => {
+  if (newWidth < 1280 && oldWidth >= 1280) {
+    isAssistantCollapsed.value = true
+  }
   if (newWidth < 768) {
     historySidebarOpen.value = false
   }
@@ -1514,19 +1521,34 @@ watch(windowWidth, (newWidth) => {
 
 .tutor-container {
   display: grid;
-  grid-template-columns: auto auto 1fr 280px;
+  grid-template-columns: auto minmax(0, 1fr) clamp(292px, 19vw, 320px) 280px;
+  grid-template-areas: "history chat assistant sidebar";
   gap: 0;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .tutor-container.assistant-collapsed {
   grid-template-columns: auto minmax(0, 1fr) 280px;
+  grid-template-areas: "history chat sidebar";
+}
+
+.assistant-panel-slot {
+  grid-area: assistant;
+  width: calc(100% - 12px);
+  margin-left: 12px;
+  align-self: stretch;
+}
+
+.tutor-container.assistant-collapsed .assistant-panel-slot {
+  display: none !important;
 }
 
 /* 历史会话侧边栏 */
 .history-sidebar {
+  grid-area: history;
   width: 0;
   overflow: hidden;
   opacity: 0;
@@ -1594,6 +1616,7 @@ watch(windowWidth, (newWidth) => {
 
 /* 聊天区域 */
 .chat-area {
+  grid-area: chat;
   background: white;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-light);
@@ -1682,33 +1705,6 @@ watch(windowWidth, (newWidth) => {
 
 .history-toggle-btn svg { width: 16px; height: 16px; }
 
-.avatar-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(99, 102, 241, 0.22);
-  background: rgba(99, 102, 241, 0.08);
-  color: #6366f1;
-  font-size: 0.75rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
-}
-
-.avatar-toggle-btn:hover {
-  background: rgba(99, 102, 241, 0.14);
-  border-color: rgba(99, 102, 241, 0.36);
-}
-
-.avatar-toggle-btn .el-icon {
-  font-size: 14px;
-}
-
 .current-conv-title {
   font-size: 0.8125rem;
   font-weight: 500;
@@ -1716,6 +1712,50 @@ watch(windowWidth, (newWidth) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.avatar-top-toggle {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  background: rgba(99, 102, 241, 0.08);
+  color: #4f46e5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.avatar-top-toggle:hover {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.38);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.12);
+  transform: translateY(-1px);
+}
+
+.avatar-top-toggle .el-icon {
+  font-size: 14px;
+}
+
+.avatar-top-toggle-status {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.avatar-top-toggle-status.active {
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.75);
 }
 
 .chat-messages {
@@ -2345,12 +2385,14 @@ watch(windowWidth, (newWidth) => {
 
 /* 侧边栏 */
 .tutor-sidebar {
+  grid-area: sidebar;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
   min-height: 0;
   overflow-y: auto;
-  margin-left: var(--spacing-md);
+  padding-left: var(--spacing-md);
+  box-sizing: border-box;
 }
 
 .sidebar-section {
@@ -2683,9 +2725,50 @@ watch(windowWidth, (newWidth) => {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@media (max-width: 1280px) {
+  .tutor-container {
+    grid-template-columns: auto minmax(0, 1fr) 280px;
+    grid-template-areas: "history chat sidebar";
+  }
+
+  .tutor-container.assistant-collapsed {
+    grid-template-columns: auto minmax(0, 1fr) 280px;
+    grid-template-areas: "history chat sidebar";
+  }
+
+  .assistant-panel-slot {
+    position: absolute;
+    top: 0;
+    right: 280px;
+    bottom: 0;
+    z-index: 35;
+    width: min(320px, calc(100% - 300px));
+    min-width: 292px;
+    height: 100%;
+    margin-left: 0;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+  }
+}
+
 @media (max-width: 768px) {
-  .tutor-container { grid-template-columns: 1fr; }
+  .tutor-container,
+  .tutor-container.assistant-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-areas: "chat";
+  }
   .tutor-sidebar { display: none; }
+  .assistant-panel-slot {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    top: auto;
+    z-index: 210;
+    width: auto;
+    min-width: 0;
+    height: min(70vh, 620px);
+    margin-left: 0;
+  }
   .history-sidebar {
     position: fixed;
     top: 0;
@@ -2719,26 +2802,22 @@ watch(windowWidth, (newWidth) => {
   }
 }
 
-/* 数字人展开按钮 */
-.expand-btn-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  min-width: 40px;
-  height: 100%;
-  background: rgba(99, 102, 241, 0.08);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
+@media (max-width: 768px) {
+  .avatar-top-toggle {
+    position: fixed;
+    right: 16px;
+    bottom: 88px;
+    z-index: 210;
+    height: 44px;
+    padding: 8px 12px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(16px);
+  }
 
-.expand-btn-avatar:hover {
-  background: rgba(99, 102, 241, 0.15);
-}
-
-.expand-btn-avatar .el-icon {
-  color: #6366f1;
-  font-size: 16px;
+  .avatar-top-toggle:hover {
+    transform: translateY(-2px);
+  }
 }
 </style>

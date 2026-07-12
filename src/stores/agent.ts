@@ -11,7 +11,7 @@ import type {
   LearningPlanDraft,
   PhaseInfo,
 } from '@/types/planExecute'
-import type { WebSearchReference } from '@/composables/useAgentChat'
+import type { RagSourcePayload, WebSearchReference } from '@/composables/useAgentChat'
 import type { MindMapData } from '@/types/mindMap'
 
 export interface AgentTraceEvent<T = any> {
@@ -118,6 +118,9 @@ export const useAgentStore = defineStore('agent', () => {
   // === 网络搜索引用状态 ===
   const currentWebSearchReferences = ref<WebSearchReference[]>([])
 
+  // === RAG 检索来源状态 ===
+  const currentRagSources = ref<RagSourcePayload | null>(null)
+
   // === 思维导图状态（本轮生成的思维导图列表） ===
   const currentMindMaps = ref<MindMapData[]>([])
 
@@ -165,6 +168,8 @@ export const useAgentStore = defineStore('agent', () => {
     learningPlanSpaceCreated.value = null
     // 网络搜索引用状态——每次新对话重置
     currentWebSearchReferences.value = []
+    // RAG 检索来源状态——每次新对话重置
+    currentRagSources.value = null
     // 思维导图状态——每次新对话重置
     currentMindMaps.value = []
   }
@@ -320,6 +325,17 @@ export const useAgentStore = defineStore('agent', () => {
       case 'agent.route.completed':
         routeResult.value = data.payload
         break
+
+      case 'agent.rag.chunks': {
+        const chunks = Array.isArray(data.payload?.chunks) ? data.payload.chunks : []
+        currentRagSources.value = {
+          chunks,
+          chunkCount: data.payload?.chunkCount ?? chunks.length,
+          usedRetrievalMode: data.payload?.usedRetrievalMode || 'unknown',
+          degraded: data.payload?.degraded === true,
+        }
+        break
+      }
 
       case 'agent.phase.change':
         currentPhase.value = data.payload?.phase || ''
@@ -777,6 +793,7 @@ export const useAgentStore = defineStore('agent', () => {
     learningPlanPreviewReadonly.value = false
     learningPlanSpaceCreated.value = null
     currentWebSearchReferences.value = []
+    currentRagSources.value = null
     currentMindMaps.value = []
   }
 
@@ -817,6 +834,7 @@ export const useAgentStore = defineStore('agent', () => {
     learningPlanPreviewReadonly,
     learningPlanSpaceCreated,
     currentWebSearchReferences,
+    currentRagSources,
     currentMindMaps,
     startNewTurn,
     handleEvent,
