@@ -281,8 +281,8 @@ const props = defineProps<{
 }
 
 .animated-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   transition: all 0.3s ease;
 }
 
@@ -308,7 +308,6 @@ const props = defineProps<{
 
 /* 激活状态 */
 .animated-icon.active:not(.icon-messages):not(.icon-ai-tutor) svg {
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
   stroke: white !important;
 }
 

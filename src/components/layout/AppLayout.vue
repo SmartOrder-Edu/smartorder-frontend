@@ -674,20 +674,6 @@ const handleLogout = async () => {
   overflow: hidden;
 }
 
-.nav-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%) scaleY(0);
-  width: 3px;
-  height: 60%;
-  background: var(--gradient-primary);
-  border-radius: 0 4px 4px 0;
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
-  transition: transform 0.3s ease;
-}
-
 /* 动态图标容器：纯布局，视觉由AnimatedIcon组件自身管理 */
 
 
@@ -712,16 +698,19 @@ const handleLogout = async () => {
 }
 
 .nav-item.active {
-  background: var(--gradient-primary);
-  color: white;
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
   font-weight: 600;
-  box-shadow:
-    0 4px 15px rgba(139, 92, 246, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: none;
 }
 
-.nav-item.active::before {
-  transform: translateY(-50%) scaleY(1);
+/* 选中态下图标跟随文字颜色，不强制变白 */
+.nav-item.active :deep(.animated-icon.active) svg,
+.nav-item.active :deep(.animated-icon.active) svg * {
+  stroke: currentColor !important;
+}
+.nav-item.active :deep(.animated-icon.active) svg circle[fill="currentColor"] {
+  fill: currentColor !important;
 }
 
 .nav-item.active .nav-icon {
@@ -1382,7 +1371,7 @@ const handleLogout = async () => {
 .page-container {
   flex: 1;
   min-height: 0;
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
   padding: var(--spacing-xl) var(--spacing-2xl) var(--spacing-xl) var(--spacing-2xl);
   scrollbar-gutter: stable;

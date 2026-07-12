@@ -2123,7 +2123,6 @@ watch(windowWidth, (newWidth, oldWidth) => {
 /* 输入区域 */
 .chat-input-area {
   padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
-  border-top: 1px solid var(--border-light);
   background: white;
 }
 
