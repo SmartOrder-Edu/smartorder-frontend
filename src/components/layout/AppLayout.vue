@@ -76,70 +76,71 @@
           <div class="nav-divider" v-if="!sidebarCollapsed"></div>
 
           <!-- 学习空间 -->
-          <div class="nav-section" v-if="!sidebarCollapsed">
-            <div class="nav-section-header">
-              <router-link to="/spaces" class="nav-section-title-link">学习空间</router-link>
-              <button class="nav-section-action" @click="showCreateSpace = true" title="新建学习空间">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <div class="space-workspace" v-if="!sidebarCollapsed">
+            <div class="space-workspace-header">
+              <div class="space-workspace-title">
+                <span class="space-title-icon">
+                  <AnimatedIcon type="spaces" :isActive="isSpacesRoute" />
+                </span>
+                <div class="space-title-copy">
+                  <router-link to="/spaces" class="space-title-link">学习空间</router-link>
+                  <span class="space-title-meta">{{ spaceStore.spaceCount }} 个进行中</span>
+                </div>
+              </div>
+              <button class="space-create-btn" @click="showCreateSpace = true" title="新建学习空间">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </button>
             </div>
-            <div class="nav-space-list">
+
+            <div class="space-empty" v-if="!spaceStore.loading && displayedSpaces.length === 0">
+              <span>还没有进行中的空间</span>
+              <button @click="showCreateSpace = true">新建</button>
+            </div>
+
+            <div class="nav-space-list" v-else>
               <router-link
                 v-for="space in displayedSpaces"
                 :key="space.id"
                 :to="`/space/${space.id}`"
-                class="nav-item nav-space-item"
-                :class="{ active: isActiveSpace(space.id) }"
+                class="nav-space-card"
+                :class="[`health-${space.healthStatus}`, { active: isActiveSpace(space.id) }]"
                 :title="space.name"
               >
-                <span class="space-indicator" :class="space.healthStatus" :style="{ background: space.color }"></span>
-                <span class="nav-label nav-space-label">{{ space.name }}</span>
-                <span class="space-progress-text">{{ Math.round(space.progress) }}%</span>
+                <span class="space-row-dot" :style="{ background: space.color }"></span>
+                <span class="space-row-name">{{ space.name }}</span>
+                <span class="space-row-meta" :class="space.healthStatus">
+                  {{ formatProgress(space.progress) }}%
+                </span>
               </router-link>
             </div>
-            <router-link
-              v-if="spaceStore.activeSpaces.length > maxVisibleSpaces"
-              to="/spaces"
-              class="nav-space-more"
-            >
-              还有 {{ spaceStore.activeSpaces.length - maxVisibleSpaces }} 个空间
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <polyline points="9,6 15,12 9,18"/>
-              </svg>
-            </router-link>
-            <button class="nav-item nav-add-space" @click="showCreateSpace = true">
-              <span class="nav-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+
+            <div class="space-workspace-footer">
+              <router-link
+                to="/spaces"
+                class="space-manage-link"
+              >
+                <span>{{ hiddenSpaceCount > 0 ? `查看全部，还有 ${hiddenSpaceCount} 个` : '管理全部空间' }}</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9,6 15,12 9,18"/>
                 </svg>
-              </span>
-              <span class="nav-label">新建学习空间</span>
-            </button>
-          </div>
-          <div class="nav-section-mini" v-else>
-            <div
-              v-for="space in displayedSpaces"
-              :key="space.id"
-              class="nav-item"
-              :class="{ active: isActiveSpace(space.id) }"
-              :title="space.name"
-              @click="$router.push(`/space/${space.id}`)"
-            >
-              <span class="space-mini-dot" :class="space.healthStatus" :style="{ background: space.color }"></span>
+              </router-link>
             </div>
+          </div>
+          <div class="nav-section-mini space-mini-rail" v-else>
             <router-link
-              v-if="spaceStore.activeSpaces.length > maxVisibleSpaces"
               to="/spaces"
-              class="nav-item space-mini-more"
-              title="查看全部学习空间"
+              class="nav-item space-mini-home"
+              :class="{ active: isSpacesRoute }"
+              :title="`学习空间${spaceStore.spaceCount ? `（${spaceStore.spaceCount} 个进行中）` : ''}`"
             >
-              <span class="space-mini-more-text">+{{ spaceStore.activeSpaces.length - maxVisibleSpaces }}</span>
+              <AnimatedIcon type="spaces" :isActive="isSpacesRoute" />
+              <span v-if="spaceStore.spaceCount > 0" class="space-mini-count">{{ spaceStore.spaceCount }}</span>
             </router-link>
-            <div class="nav-item" title="新建学习空间" @click="showCreateSpace = true">
-              <span class="nav-icon" style="width:18px;height:18px">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+            <div class="nav-item space-mini-add" title="新建学习空间" @click="showCreateSpace = true">
+              <span class="space-mini-plus">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
               </span>
@@ -352,6 +353,8 @@ onBeforeUnmount(() => {
 const showCreateSpace = ref(false)
 const maxVisibleSpaces = 5
 
+const isSpacesRoute = computed(() => route.path === '/spaces' || route.name === 'LearningSpace')
+
 const displayedSpaces = computed(() => {
   const all = spaceStore.activeSpaces
   if (all.length <= maxVisibleSpaces) {
@@ -369,6 +372,15 @@ const displayedSpaces = computed(() => {
   }
   return visible
 })
+
+const hiddenSpaceCount = computed(() => {
+  return Math.max(spaceStore.activeSpaces.length - displayedSpaces.value.length, 0)
+})
+
+const formatProgress = (progress: number | null | undefined) => {
+  const value = Math.round(Number(progress) || 0)
+  return Math.min(100, Math.max(0, value))
+}
 
 const topMenuItems = [
   { id: 'dashboard', label: '总学习指挥台', path: '/dashboard', type: 'dashboard' },
@@ -471,9 +483,7 @@ const handleLogout = async () => {
   padding: var(--spacing-sm) var(--spacing-lg);
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: #ffffff;
   border-right: 1px solid rgba(139, 92, 246, 0.15);
   box-shadow:
     4px 0 30px rgba(139, 92, 246, 0.1),
@@ -513,10 +523,7 @@ const handleLogout = async () => {
   transition: all 0.3s ease;
 }
 
-.sidebar-logo:hover {
-  background: rgba(139, 92, 246, 0.1);
-  transform: translateX(4px);
-}
+
 
 /* 折叠后的 Logo 区域 */
 .sidebar-logo-collapsed {
@@ -604,15 +611,7 @@ const handleLogout = async () => {
   transition: all 0.3s ease;
 }
 
-.sidebar-logo:hover .sidebar-logo-img {
-  transform: scale(1.05);
-  filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.5));
-}
 
-.sidebar-logo:hover .sidebar-logo-img {
-  transform: scale(1.05);
-  filter: drop-shadow(0 0 15px rgba(139, 92, 246, 0.5));
-}
 
 .sidebar-logo-text {
   position: relative;
@@ -687,38 +686,8 @@ const handleLogout = async () => {
   overflow: hidden;
 }
 
-.nav-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%) scaleY(0);
-  width: 3px;
-  height: 60%;
-  background: var(--gradient-primary);
-  border-radius: 0 4px 4px 0;
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
-  transition: transform 0.3s ease;
-}
+/* 动态图标容器：纯布局，视觉由AnimatedIcon组件自身管理 */
 
-/* 动态图标容器样式由AnimatedIcon组件处理 */
-.nav-item :deep(.animated-icon) {
-  background: rgba(139, 92, 246, 0.08);
-  border-radius: 10px;
-  transition: all 0.3s ease;
-}
-
-.nav-item:hover :deep(.animated-icon) {
-  background: rgba(139, 92, 246, 0.2);
-  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
-}
-
-.nav-item.active :deep(.animated-icon) {
-  background: rgba(255, 255, 255, 0.2);
-  box-shadow:
-    0 0 20px rgba(255, 255, 255, 0.3),
-    inset 0 0 10px rgba(255, 255, 255, 0.1);
-}
 
 .nav-item .nav-label {
   font-size: 0.9375rem;
@@ -741,16 +710,19 @@ const handleLogout = async () => {
 }
 
 .nav-item.active {
-  background: var(--gradient-primary);
-  color: white;
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
   font-weight: 600;
-  box-shadow:
-    0 4px 15px rgba(139, 92, 246, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: none;
 }
 
-.nav-item.active::before {
-  transform: translateY(-50%) scaleY(1);
+/* 选中态下图标跟随文字颜色，不强制变白 */
+.nav-item.active :deep(.animated-icon.active) svg,
+.nav-item.active :deep(.animated-icon.active) svg * {
+  stroke: currentColor !important;
+}
+.nav-item.active :deep(.animated-icon.active) svg circle[fill="currentColor"] {
+  fill: currentColor !important;
 }
 
 .nav-item.active .nav-icon {
@@ -790,198 +762,326 @@ const handleLogout = async () => {
   box-shadow: 0 0 10px rgba(139, 92, 246, 0.6);
 }
 
-/* 导航分组 */
-.nav-section {
+/* 学习空间工作区 */
+.space-workspace {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(11, 183, 170, 0.14);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(236, 253, 251, 0.9) 0%, rgba(255, 255, 255, 0.95) 44%),
+    #ffffff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
 }
 
-.nav-section-header {
+.space-workspace-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-xs) var(--spacing-sm);
+  gap: 8px;
 }
 
-.nav-section-title,
-.nav-section-title-link {
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-.nav-section-title-link {
-  text-decoration: none;
-  transition: color 0.15s;
-}
-.nav-section-title-link:hover {
-  color: var(--primary-color, #3b5bdb);
-}
-
-.nav-section-action {
+.space-workspace-title {
   display: flex;
   align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.space-title-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  border-radius: 10px;
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--primary-color);
+  flex-shrink: 0;
+}
+
+.space-title-icon :deep(.animated-icon) {
   width: 24px;
   height: 24px;
-  border-radius: var(--radius-sm);
-  background: none;
-  border: none;
+}
+
+.space-title-icon :deep(.animated-icon svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.space-title-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.space-title-link {
+  width: fit-content;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  text-decoration: none;
+}
+
+.space-title-link:hover {
+  color: var(--primary-color);
+}
+
+.space-title-meta {
+  margin-top: 2px;
+  font-size: 0.625rem;
   color: var(--text-muted);
-  cursor: pointer;
+}
+
+.space-create-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--primary-color);
+  background: #ffffff;
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  box-shadow: var(--shadow-xs);
   transition: all var(--transition-fast);
 }
 
-.nav-section-action:hover {
-  background: rgba(11, 183, 170, 0.08);
-  color: var(--primary-color);
+.space-create-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
-/* 学习空间列表：独立滚动区域 */
-.nav-space-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  max-height: calc(5 * 40px);
-  overflow-y: auto;
-  scrollbar-gutter: stable;
+.space-create-btn:hover {
+  color: #ffffff;
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  box-shadow: 0 8px 16px rgba(11, 183, 170, 0.22);
 }
 
-/* 查看更多空间 */
-.nav-space-more {
+.space-empty {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 100%;
-  padding: var(--spacing-xs) 0;
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-.nav-space-more:hover {
-  color: var(--primary-color);
-}
-
-/* 学习空间导航项 */
-.nav-space-item {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  gap: var(--spacing-xs);
-}
-
-.space-indicator {
-  position: relative;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  transition: all 0.3s ease;
-}
-
-.space-indicator.good {
-  box-shadow:
-    0 0 8px currentColor,
-    0 0 16px currentColor;
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-
-.space-indicator.warning {
-  box-shadow: 0 0 8px currentColor;
-  animation: pulse-dot 1.5s ease-in-out infinite;
-}
-
-.space-indicator.danger {
-  box-shadow: 0 0 8px currentColor;
-  animation: blink-dot 1s ease-in-out infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.15);
-  }
-}
-
-@keyframes blink-dot {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(0.85);
-  }
-}
-
-.nav-item .nav-space-label {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.9);
+  color: var(--text-secondary);
   font-size: 0.75rem;
 }
 
-.space-progress-text {
-  font-size: 0.625rem;
+.space-empty button {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.nav-space-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 210px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: 1px;
+}
+
+.nav-space-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  color: var(--text-primary);
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid transparent;
+  overflow: hidden;
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.nav-space-card:hover {
+  transform: translateX(2px);
+  background: rgba(11, 183, 170, 0.06);
+  border-color: rgba(11, 183, 170, 0.12);
+  box-shadow: none;
+}
+
+.nav-space-card.active {
+  background: rgba(11, 183, 170, 0.1);
+  border-color: rgba(11, 183, 170, 0.18);
+  box-shadow: inset 3px 0 0 var(--primary-color);
+}
+
+.space-row-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.1);
+}
+
+.nav-space-card.health-warning .space-row-dot,
+.nav-space-card.health-danger .space-row-dot {
+  animation: blink-warn 1.4s ease-in-out infinite;
+}
+
+.space-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.nav-space-card.active .space-row-name {
+  color: var(--text-dark);
+}
+
+.space-row-meta {
+  flex-shrink: 0;
+  min-width: 34px;
+  text-align: right;
   color: var(--text-muted);
-  font-weight: 500;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.space-row-meta.warning {
+  color: #b45309;
+}
+
+.space-row-meta.danger {
+  color: #dc2626;
+}
+
+.space-row-meta.good {
+  color: #059669;
+}
+
+.space-workspace-footer {
+  padding-top: 2px;
+}
+
+.space-manage-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.space-manage-link svg {
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
 }
 
-.nav-add-space {
-  color: var(--text-muted);
-  cursor: pointer;
-  border: 1px dashed var(--border-default);
-  border-radius: var(--radius-md);
-  margin-top: 2px;
-}
-
-.nav-add-space:hover {
+.space-manage-link:hover {
   color: var(--primary-color);
-  border-color: var(--primary-color);
-  background: rgba(11, 183, 170, 0.04);
+  background: rgba(11, 183, 170, 0.07);
 }
 
-/* 收起时的迷你空间 */
+/* 收起时的学习空间轨道 */
 .nav-section-mini {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   padding: var(--spacing-xs) 0;
 }
 
-.space-mini-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.space-mini-rail {
+  padding: 8px 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
 }
 
-.space-mini-dot.danger { animation: blink-warn 1s ease-in-out infinite; }
-
-.space-mini-more {
-  text-decoration: none;
-  cursor: pointer;
+.space-mini-home :deep(.animated-icon) {
+  width: 30px;
+  height: 30px;
 }
 
-.space-mini-more-text {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-tertiary, #94a3b8);
+.space-mini-home :deep(.animated-icon svg) {
+  width: 22px;
+  height: 22px;
+}
+
+.space-mini-home {
+  position: relative;
+}
+
+.space-mini-count {
+  position: absolute;
+  right: 7px;
+  top: 5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--primary-color);
+  color: #ffffff;
+  border: 1px solid #ffffff;
+  font-size: 9px;
+  font-weight: 700;
   line-height: 1;
 }
 
+.space-mini-add {
+  cursor: pointer;
+}
+
+.space-mini-plus {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.space-mini-plus svg {
+  width: 16px;
+  height: 16px;
+}
+
+.space-mini-add:hover .space-mini-plus {
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--primary-color);
+}
+
 @keyframes blink-warn {
-  0%, 100% { opacity: 0.3; }
+  0%, 100% { opacity: 0.45; }
   50% { opacity: 1; }
 }
 
@@ -1411,7 +1511,7 @@ const handleLogout = async () => {
 .page-container {
   flex: 1;
   min-height: 0;
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
   padding: var(--spacing-xl) var(--spacing-2xl) var(--spacing-xl) var(--spacing-2xl);
   scrollbar-gutter: stable;

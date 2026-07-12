@@ -1,11 +1,23 @@
 import request from './request'
-import type { SpaceDashboardVO, TaskVO, TaskStatus } from '@/types/learningSpace'
+import type { SpaceDashboardVO, TaskVO, TaskStatus, ResourcePackageGenerateDTO, ResourcePackageVO } from '@/types/learningSpace'
 
 // ---- Space Dashboard ----
 
 export const spaceDashboardApi = {
   async getDashboard(spaceId: string): Promise<SpaceDashboardVO> {
     return request.get(`/learning-spaces/${spaceId}/dashboard`)
+  },
+}
+
+// ---- Resource Package ----
+
+export const resourcePackageApi = {
+  async preview(spaceId: string, data: ResourcePackageGenerateDTO): Promise<ResourcePackageVO> {
+    return request.post(`/learning-spaces/${spaceId}/resource-package/preview`, data)
+  },
+
+  async generate(spaceId: string, data: ResourcePackageGenerateDTO): Promise<ResourcePackageVO> {
+    return request.post(`/learning-spaces/${spaceId}/resource-package/generate`, data)
   },
 }
 
