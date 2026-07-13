@@ -444,10 +444,18 @@ const handleLogin = async () => {
   }
 }
 
+// GitHub 登录相关配置
+const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID
+const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/oauth/callback/github`
+
 const handleGithubLogin = () => {
-  // GitHub 授权发起改由后端 /auth/github/authorize 负责：后端生成一次性 state、设置 HttpOnly flow Cookie 并 302 跳转
-  const apiBase = import.meta.env.VITE_API_BASE_URL || "/api"
-  window.location.assign(`${apiBase}/auth/github/authorize`)
+  if (!GITHUB_CLIENT_ID) {
+    ElMessage.error('GitHub Client ID 未配置，请在前端环境配置中进行配置')
+    return
+  }
+  // 跳转至真实的 GitHub OAuth 授权页面 (申请 read:user 和 user:email 权限以读取私有主邮箱)
+  const authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=read:user%20user:email`
+  window.location.href = authorizeUrl
 }
 </script>
 
