@@ -1,6 +1,8 @@
 <template>
   <AppLayout>
     <div class="resource-detail-page">
+      <ParticleBackground />
+      <div class="resource-detail-content">
       <div v-if="loading" class="loading-panel">
         <el-skeleton :rows="8" animated />
       </div>
@@ -175,6 +177,7 @@
           </section>
         </main>
       </template>
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -185,6 +188,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import ParticleBackground from '@/components/ParticleBackground.vue'
 import { learningResourceApi } from '@/api/learningResource'
 import type { ResourceDetailVO, ResourceGenerationJobVO } from '@/types/learningSpace'
 
@@ -409,10 +413,16 @@ watch(resourceId, () => {
 
 <style scoped lang="scss">
 .resource-detail-page {
+  position: relative;
   width: 100%;
   max-width: 1320px;
   margin: 0 auto;
   padding: 24px;
+}
+
+.resource-detail-content {
+  position: relative;
+  z-index: 1;
 }
 
 .loading-panel,
