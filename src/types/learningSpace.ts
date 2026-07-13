@@ -120,7 +120,7 @@ export interface ResourcePackageVO {
   reason: string
   knowledgePoint: string
   packageMode: string
-  status: 'preview' | 'generated' | 'failed'
+  status: 'preview' | 'generating' | 'generated' | 'failed'
   resources: ResourceVO[]
   agentActions: AgentActionVO[]
 }
