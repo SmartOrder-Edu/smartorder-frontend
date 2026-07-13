@@ -450,7 +450,7 @@ const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${windo
 
 const handleGithubLogin = () => {
   if (!GITHUB_CLIENT_ID) {
-    ElMessage.error('GitHub Client ID 未配置，请在前端环境配置中进行配置')
+    ElMessage.error('系统未配置 GitHub 登录参数')
     return
   }
   // 跳转至真实的 GitHub OAuth 授权页面 (申请 read:user 和 user:email 权限以读取私有主邮箱)

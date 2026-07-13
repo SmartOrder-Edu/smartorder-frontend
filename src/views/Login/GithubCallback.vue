@@ -40,7 +40,6 @@ const statusText = ref('正在连接 GitHub 认证中心...')
 const subText = ref('请稍候，这通常需要几秒钟')
 const loginLoading = ref(false)
 
-// 挂载时触发
 onMounted(() => {
   const code = route.query.code as string
   const state = route.query.state as string
@@ -79,12 +78,14 @@ const doLogin = async (code: string, state?: string) => {
   } catch (error: any) {
     console.error(error)
     statusText.value = '登录认证失败'
-    subText.value = error.message || '可能由于网络抖动或配置失效，您可以尝试下方模拟模式。'
-    ElMessage.error('登录认证失败，请检查网络或使用模拟测试登录')
+    subText.value = error.message || '可能由于网络抖动或配置失效，请重新尝试。'
+    ElMessage.error('登录认证失败，请检查网络并重试')
   } finally {
     loginLoading.value = false
   }
 }
+
+
 
 
 </script>
@@ -269,4 +270,6 @@ const doLogin = async (code: string, state?: string) => {
     transform: translateY(0);
   }
 }
+
+
 </style>
