@@ -21,20 +21,7 @@
       <h3 class="status-title">{{ statusText }}</h3>
       <p class="status-subtitle">{{ subText }}</p>
 
-      <!-- 容错 Mock 按钮 -->
-      <div v-if="showMockOption" class="mock-option-panel animate-fade-in">
-        <div class="mock-divider"></div>
-        <p class="mock-tip">如遇到网络超时或未配置 GitHub Client Secret：</p>
-        <el-button 
-          type="primary" 
-          plain 
-          class="mock-btn"
-          :loading="loginLoading"
-          @click="handleMockLogin"
-        >
-          一键模拟登录测试
-        </el-button>
-      </div>
+
     </div>
   </div>
 </template>
@@ -51,15 +38,10 @@ const userStore = useUserStore()
 
 const statusText = ref('正在连接 GitHub 认证中心...')
 const subText = ref('请稍候，这通常需要几秒钟')
-const showMockOption = ref(false)
 const loginLoading = ref(false)
 
-// 挂载时触发，并在2.5秒后展示一键模拟登录测试
+// 挂载时触发
 onMounted(() => {
-  setTimeout(() => {
-    showMockOption.value = true
-  }, 2500)
-
   const code = route.query.code as string
   const state = route.query.state as string
 
@@ -104,10 +86,7 @@ const doLogin = async (code: string, state?: string) => {
   }
 }
 
-const handleMockLogin = () => {
-  // 直接以特殊 mock_code 向后端登录
-  doLogin('mock_github_developer_code_' + Date.now())
-}
+
 </script>
 
 <style scoped>
@@ -244,41 +223,7 @@ const handleMockLogin = () => {
   margin: 0 0 8px 0;
 }
 
-/* Mock 按钮面板 */
-.mock-option-panel {
-  margin-top: 32px;
-}
 
-.mock-divider {
-  width: 100%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1) 20%, rgba(255, 255, 255, 0.1) 80%, transparent);
-  margin-bottom: 24px;
-}
-
-.mock-tip {
-  font-size: 12px;
-  color: #adb5bd;
-  margin-bottom: 16px;
-  line-height: 1.4;
-}
-
-.mock-btn {
-  width: 100%;
-  border-radius: 12px;
-  font-weight: 500;
-  background: rgba(59, 91, 219, 0.08) !important;
-  border-color: rgba(59, 91, 219, 0.3) !important;
-  color: #5c7cfa !important;
-  transition: all 0.3s;
-}
-
-.mock-btn:hover {
-  background: rgba(59, 91, 219, 0.18) !important;
-  border-color: #3b5bdb !important;
-  color: #fff !important;
-  box-shadow: 0 0 15px rgba(59, 91, 219, 0.2);
-}
 
 /* 动画定义 */
 @keyframes floatAround {

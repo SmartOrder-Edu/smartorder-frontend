@@ -444,31 +444,18 @@ const handleLogin = async () => {
   }
 }
 
-// GitHub 登录相关配置 (支持 .env 或本地兜底 MOCK)
-const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || 'MOCK'
+// GitHub 登录相关配置
+const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID
 const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/oauth/callback/github`
 
 const handleGithubLogin = () => {
-  if (GITHUB_CLIENT_ID === 'MOCK') {
-    // 提示用户正在使用本地 MOCK 调试模式
-    import('element-plus').then(({ ElMessageBox }) => {
-      ElMessageBox.confirm(
-        '系统检测到当前处于 GitHub 模拟调试模式（VITE_GITHUB_CLIENT_ID 未配置或为 MOCK），是否直接跳往模拟回调页面进行一键登录与自动建号测试？',
-        '模拟调试提示',
-        {
-          confirmButtonText: '确定前往',
-          cancelButtonText: '取消',
-          type: 'info'
-        }
-      ).then(() => {
-        router.push(`/oauth/callback/github?code=mock_github_developer_code_${Date.now()}`)
-      }).catch(() => {})
-    })
-  } else {
-    // 跳转至真实的 GitHub OAuth 授权页面 (申请 read:user 和 user:email 权限以读取私有主邮箱)
-    const authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=read:user%20user:email`
-    window.location.href = authorizeUrl
+  if (!GITHUB_CLIENT_ID) {
+    ElMessage.error('GitHub Client ID 未配置，请在前端环境配置中进行配置')
+    return
   }
+  // 跳转至真实的 GitHub OAuth 授权页面 (申请 read:user 和 user:email 权限以读取私有主邮箱)
+  const authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=read:user%20user:email`
+  window.location.href = authorizeUrl
 }
 </script>
 
