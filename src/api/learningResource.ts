@@ -6,7 +6,7 @@ export const learningResourceApi = {
     return request.get(`/resources/${resourceId}`)
   },
 
-  async generate(resourceId: string): Promise<ResourceDetailVO> {
+  async generate(resourceId: string): Promise<ResourceGenerationJobVO> {
     return request.post(`/resources/${resourceId}/generate`)
   },
 
