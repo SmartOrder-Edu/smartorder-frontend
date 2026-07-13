@@ -650,7 +650,7 @@ const packagePreviewVisible = ref(false)
 const packagePreviewLoading = ref(false)
 const packageGenerating = ref(false)
 const packageRunningSteps = ref<{ reason: string; status: string }[]>([])
-const selectedPackageTypes = ref<ResourceType[]>(['doc', 'mind_map', 'quiz', 'link'])
+const selectedPackageTypes = ref<ResourceType[]>(['doc', 'html', 'mind_map', 'quiz', 'link'])
 const generatingResourceIds = ref<string[]>([])
 const resourceGenerationJobs = ref<ResourceGenerationJobVO[]>([])
 const resourcePollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
@@ -2128,7 +2128,7 @@ watch(
   flex-shrink: 0;
   font-size: 20px;
 
-  &.doc, &.ppt { background: #eff6ff; } &.video { background: #fef2f2; }
+  &.doc, &.ppt { background: #eff6ff; } &.html { background: #f0fdf4; } &.video { background: #fef2f2; }
   &.mind_map { background: #ede9fe; } &.quiz { background: #ecfdf5; }
   &.case_study { background: #fef3c7; } &.flashcard_set { background: #fce7f3; }
   &.image { background: #f0fdf4; } &.audio { background: #fff7ed; } &.link { background: #f3f4f6; }
