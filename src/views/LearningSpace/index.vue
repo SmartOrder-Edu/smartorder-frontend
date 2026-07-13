@@ -784,11 +784,11 @@ function resourceIcon(t: string) {
 }
 
 function resourceIconClass(resource: ResourceVO) {
-  return bilibiliPreview(resource) ? 'video' : resource.resourceType
+  return bilibiliPreview(resource) ? 'link' : resource.resourceType
 }
 
 function resourceIconName(resource: ResourceVO) {
-  return resourceIcon(bilibiliPreview(resource) ? 'video' : resource.resourceType)
+  return resourceIcon(bilibiliPreview(resource) ? 'link' : resource.resourceType)
 }
 
 function resourceTypeLabel(t: string) {
