@@ -1,6 +1,6 @@
 <template>
   <div class="animated-icon" :class="[`icon-${type}`, { active: isActive }]">
-    <svg v-if="type !== 'messages'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <svg v-if="type !== 'messages' && type !== 'ai-tutor'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <!-- Dashboard Icon - 动态网格 -->
       <g v-if="type === 'dashboard'">
         <rect class="anim-rect-1" x="3" y="3" width="7" height="7" rx="1"/>
@@ -11,16 +11,6 @@
         <circle class="anim-dot" cx="17.5" cy="6.5" r="1.5" fill="currentColor" style="animation-delay: 0.2s"/>
         <circle class="anim-dot" cx="17.5" cy="17.5" r="1.5" fill="currentColor" style="animation-delay: 0.4s"/>
         <circle class="anim-dot" cx="6.5" cy="17.5" r="1.5" fill="currentColor" style="animation-delay: 0.6s"/>
-      </g>
-
-      <!-- AI Tutor Icon - 聊天机器人 -->
-      <g v-else-if="type === 'ai-tutor'">
-        <circle class="anim-face" cx="12" cy="12" r="10"/>
-        <circle class="anim-eye" cx="9" cy="10" r="1.5" fill="currentColor"/>
-        <circle class="anim-eye" cx="15" cy="10" r="1.5" fill="currentColor" style="animation-delay: 0.1s"/>
-        <path class="anim-smile" d="M8 15s1.5 2 4 2 4-2 4-2"/>
-        <path class="anim-spark" d="M19 4l1 1m0-1l-1 1" stroke-width="2"/>
-        <path class="anim-spark" d="M5 19l1 1m0-1l-1 1" stroke-width="2" style="animation-delay: 0.3s"/>
       </g>
 
       <!-- Daily Plan Icon - 动态日历 -->
@@ -189,6 +179,29 @@
       </g>
     </svg>
 
+    <!-- AI Tutor Icon - 动态原子图标 -->
+    <svg
+      v-else-if="type === 'ai-tutor'"
+      class="dynamic-atom-icon"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 1024 1024"
+      role="img"
+      aria-label="动态原子图标"
+    >
+      <path class="icon-bg" d="M791.405714 1024H232.725943A233.3696 233.3696 0 0 1 0 791.303314V232.799086A233.398857 233.398857 0 0 1 232.725943 0h558.548114A233.3696 233.3696 0 0 1 1024 232.696686v558.504228A233.252571 233.252571 0 0 1 791.405714 1024z" fill="transparent"/>
+      <g class="atom-shadow">
+        <path d="M552.5504 693.847771h-13.911771A570.514286 570.514286 0 0 1 326.217143 652.668343c-60.298971-26.463086-93.066971-62.449371-92.16-100.937143 0.643657-37.551543 33.060571-71.387429 91.2384-95.378286a547.869257 547.869257 0 0 1 204.682971-35.108571h13.911772a564.4288 564.4288 0 0 1 212.406857 41.252571c60.298971 26.463086 93.066971 62.449371 92.16 100.937143-0.585143 37.507657-33.104457 71.343543-91.282286 95.349029a547.854629 547.854629 0 0 1-204.682971 35.108571zM530.285714 446.815086a522.24 522.24 0 0 0-194.794057 33.236114c-47.3088 19.675429-74.825143 45.831314-75.439543 71.972571-0.6144 27.077486 27.516343 55.061943 76.682972 76.917029a543.626971 543.626971 0 0 0 202.474057 39.072914h13.297371a520.572343 520.572343 0 0 0 194.486857-33.221485c47.3088-19.690057 74.825143-45.845943 75.439543-71.9872 0.6144-27.077486-27.516343-55.061943-76.682971-76.917029a543.202743 543.202743 0 0 0-202.152229-39.072914c-4.388571 0.3072-8.967314 0-13.297371 0z m139.761372 377.168457c-34.011429 0-75.439543-18.461257-119.661715-53.525943a601.073371 601.073371 0 0 1-123.055542-137.8304 564.399543 564.399543 0 0 1-86.308572-197.485714c-12.053943-64.365714-0.9216-111.674514 31.232-132.900572a72.718629 72.718629 0 0 1 40.813714-11.381028c34.011429 0 75.439543 18.461257 119.661715 53.525943a601.073371 601.073371 0 0 1 123.055543 137.8304 564.399543 564.399543 0 0 1 86.308571 197.485714c12.053943 64.365714 0.9216 111.674514-31.232 132.900571a72.733257 72.733257 0 0 1-40.813714 11.381029zM412.789029 316.679314a48.903314 48.903314 0 0 0-26.594743 7.080229c-22.571886 14.760229-29.988571 53.833143-20.099657 106.452114a539.574857 539.574857 0 0 0 82.549028 187.977143 577.418971 577.418971 0 0 0 117.803886 131.978971c38.955886 30.72 75.746743 47.996343 103.584914 47.996343a49.737143 49.737143 0 0 0 26.594743-7.080228c22.571886-14.760229 29.988571-53.833143 20.099657-106.452115a539.574857 539.574857 0 0 0-82.549028-187.977142 577.418971 577.418971 0 0 0-117.803886-131.978972c-38.955886-30.72-75.746743-47.996343-103.584914-47.996343zM427.637029 833.828571a70.773029 70.773029 0 0 1-34.318629-8.309028c-34.011429-18.461257-48.859429-64.599771-42.057143-129.828572a557.582629 557.582629 0 0 1 70.217143-203.658971c42.422857-76.302629 96.782629-141.2096 149.035886-178.132114a12.887771 12.887771 0 0 1 17.934628 3.072 12.756114 12.756114 0 0 1-3.086628 17.846857c-49.473829 34.450286-101.098057 96.299886-141.297372 169.515886a537.029486 537.029486 0 0 0-67.101257 194.121142c-5.558857 53.525943 4.944457 91.677257 28.759772 104.594286s61.834971 1.2288 104.199314-31.992686a537.9072 537.9072 0 0 0 128.936228-159.978057c40.506514-73.216 65.243429-149.518629 68.022858-209.5104a13.0048 13.0048 0 0 1 25.965714 1.2288c-3.086629 63.985371-29.066971 144.2816-71.416686 220.584229a565.3504 565.3504 0 0 1-135.431314 167.979886C490.0864 819.434057 456.382171 833.828571 427.637029 833.828571z m183.661714-520.543085A65.082514 65.082514 0 1 0 676.234971 248.685714a64.760686 64.760686 0 0 0-64.936228 64.599772z" fill="#1763F7" opacity=".18"/>
+      </g>
+      <circle class="electron-glow" cx="567" cy="255" r="72" fill="#1763F7" opacity=".22"/>
+      <g class="atom-main">
+        <path d="M508.664686 635.333486h-13.911772A570.514286 570.514286 0 0 1 282.331429 594.154057c-60.298971-26.463086-93.066971-62.449371-92.16-100.937143 0.643657-37.551543 33.060571-71.387429 91.2384-95.378285a547.869257 547.869257 0 0 1 204.682971-35.108572h13.911771a564.4288 564.4288 0 0 1 212.406858 41.252572c60.298971 26.463086 93.066971 62.449371 92.16 100.937142-0.585143 37.507657-33.104457 71.343543-91.282286 95.349029a547.854629 547.854629 0 0 1-204.682972 35.108571zM486.4 388.3008a522.24 522.24 0 0 0-194.794057 33.236114c-47.3088 19.675429-74.825143 45.831314-75.439543 71.972572-0.6144 27.077486 27.516343 55.061943 76.682971 76.917028a543.626971 543.626971 0 0 0 202.474058 39.072915h13.297371a520.572343 520.572343 0 0 0 194.486857-33.221486c47.3088-19.690057 74.825143-45.845943 75.439543-71.9872 0.6144-27.077486-27.516343-55.061943-76.682971-76.917029a543.202743 543.202743 0 0 0-202.152229-39.072914c-4.388571 0.3072-8.967314 0-13.297371 0z m139.761371 377.168457c-34.011429 0-75.439543-18.461257-119.661714-53.525943a601.073371 601.073371 0 0 1-123.055543-137.8304 564.399543 564.399543 0 0 1-86.308571-197.485714c-12.053943-64.365714-0.9216-111.674514 31.232-132.900571a72.718629 72.718629 0 0 1 40.813714-11.381029c34.011429 0 75.439543 18.461257 119.661714 53.525943a601.073371 601.073371 0 0 1 123.055543 137.8304 564.399543 564.399543 0 0 1 86.308572 197.485714c12.053943 64.365714 0.9216 111.674514-31.232 132.900572a72.733257 72.733257 0 0 1-40.813715 11.381028zM368.903314 258.165029a48.903314 48.903314 0 0 0-26.594743 7.080228c-22.571886 14.760229-29.988571 53.833143-20.099657 106.452114a539.574857 539.574857 0 0 0 82.549029 187.977143 577.418971 577.418971 0 0 0 117.803886 131.978972c38.955886 30.72 75.746743 47.996343 103.584914 47.996343a49.737143 49.737143 0 0 0 26.594743-7.080229c22.571886-14.760229 29.988571-53.833143 20.099657-106.452114a539.574857 539.574857 0 0 0-82.549029-187.977143 577.418971 577.418971 0 0 0-117.803885-131.978972c-38.955886-30.72-75.746743-47.996343-103.584915-47.996342zM383.751314 775.314286a70.773029 70.773029 0 0 1-34.318628-8.309029c-34.011429-18.461257-48.859429-64.599771-42.057143-129.828571a557.582629 557.582629 0 0 1 70.217143-203.658972c42.422857-76.302629 96.782629-141.2096 149.035885-178.132114a12.887771 12.887771 0 0 1 17.934629 3.072 12.756114 12.756114 0 0 1-3.086629 17.846857c-49.473829 34.450286-101.098057 96.299886-141.297371 169.515886a537.029486 537.029486 0 0 0-67.101257 194.121143c-5.558857 53.525943 4.944457 91.677257 28.759771 104.594285s61.834971 1.2288 104.199315-31.992685a537.9072 537.9072 0 0 0 128.936228-159.978057c40.506514-73.216 65.243429-149.518629 68.022857-209.5104a13.0048 13.0048 0 0 1 25.965715 1.2288c-3.086629 63.985371-29.066971 144.2816-71.416686 220.584228a565.3504 565.3504 0 0 1-135.431314 167.979886C446.200686 760.919771 412.496457 775.314286 383.751314 775.314286z m183.661715-520.543086A65.082514 65.082514 0 1 0 632.349257 190.171429a64.760686 64.760686 0 0 0-64.936228 64.599771z" fill="#1763F7"/>
+      </g>
+      <g fill="#FFFFFF">
+        <circle class="atom-spark" cx="619" cy="217" r="9"/>
+        <circle class="atom-spark atom-spark-delay" cx="544" cy="281" r="6"/>
+      </g>
+    </svg>
+
     <!-- Messages Icon - 独立彩色信封动画 -->
     <svg
       v-else
@@ -268,12 +281,12 @@ const props = defineProps<{
 }
 
 .animated-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   transition: all 0.3s ease;
 }
 
-.animated-icon:not(.icon-messages) svg {
+.animated-icon:not(.icon-messages):not(.icon-ai-tutor) svg {
   stroke: currentColor !important;
 }
 
@@ -284,26 +297,25 @@ const props = defineProps<{
 }
 
 /* 确保SVG元素可见 */
-.animated-icon:not(.icon-messages) svg * {
+.animated-icon:not(.icon-messages):not(.icon-ai-tutor) svg * {
   stroke: currentColor !important;
   fill: none !important;
 }
 
-.animated-icon:not(.icon-messages) svg circle[fill="currentColor"] {
+.animated-icon:not(.icon-messages):not(.icon-ai-tutor) svg circle[fill="currentColor"] {
   fill: currentColor !important;
 }
 
 /* 激活状态 */
-.animated-icon.active:not(.icon-messages) svg {
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
+.animated-icon.active:not(.icon-messages):not(.icon-ai-tutor) svg {
   stroke: white !important;
 }
 
-.animated-icon.active:not(.icon-messages) svg * {
+.animated-icon.active:not(.icon-messages):not(.icon-ai-tutor) svg * {
   stroke: white !important;
 }
 
-.animated-icon.active:not(.icon-messages) svg circle[fill="currentColor"] {
+.animated-icon.active:not(.icon-messages):not(.icon-ai-tutor) svg circle[fill="currentColor"] {
   fill: white !important;
 }
 
@@ -1126,5 +1138,91 @@ const props = defineProps<{
 
 .animated-icon.active:hover svg {
   transform: scale(1.05);
+}
+
+/* ========== AI Tutor 动态原子图标 ========== */
+.icon-ai-tutor .dynamic-atom-icon {
+  width: 32px;
+  height: 32px;
+  overflow: visible;
+}
+
+.icon-ai-tutor .icon-bg {
+  transform-box: view-box;
+  transform-origin: 512px 512px;
+  animation: atom-bg-breath 3.2s ease-in-out infinite;
+}
+
+.icon-ai-tutor .atom-shadow {
+  transform-box: view-box;
+  transform-origin: 512px 512px;
+  animation: atom-shadow-orbit 11s linear infinite;
+}
+
+.icon-ai-tutor .atom-main {
+  transform-box: view-box;
+  transform-origin: 512px 512px;
+  animation: atom-orbit 8s linear infinite;
+}
+
+.icon-ai-tutor .atom-main path {
+  animation: atom-color-pulse 3.2s ease-in-out infinite;
+}
+
+.icon-ai-tutor .electron-glow {
+  transform-box: view-box;
+  transform-origin: 567px 255px;
+  animation: atom-electron-pulse 1.8s ease-in-out infinite;
+}
+
+.icon-ai-tutor .atom-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: atom-sparkle 2.4s ease-in-out infinite;
+}
+
+.icon-ai-tutor .atom-spark-delay {
+  animation-delay: -1.2s;
+}
+
+@keyframes atom-bg-breath {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.985); opacity: 0.9; }
+}
+
+@keyframes atom-shadow-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes atom-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes atom-color-pulse {
+  0%, 100% { fill: #1763F7; filter: drop-shadow(0 0 0 rgba(23, 99, 247, 0)); }
+  50% { fill: #3B82FF; filter: drop-shadow(0 0 18px rgba(23, 99, 247, 0.26)); }
+}
+
+@keyframes atom-electron-pulse {
+  0%, 100% { transform: scale(0.82); opacity: 0.18; }
+  50% { transform: scale(1.28); opacity: 0.5; }
+}
+
+@keyframes atom-sparkle {
+  0%, 100% { transform: scale(0.45); opacity: 0; }
+  35%, 60% { transform: scale(1); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-ai-tutor .icon-bg,
+  .icon-ai-tutor .atom-shadow,
+  .icon-ai-tutor .atom-main,
+  .icon-ai-tutor .atom-main path,
+  .icon-ai-tutor .electron-glow,
+  .icon-ai-tutor .atom-spark {
+    animation: none;
+  }
 }
 </style>

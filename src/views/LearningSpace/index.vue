@@ -206,7 +206,7 @@
           <!-- Tab: Agent Plan -->
           <div v-show="activeTab === 'plan'" class="tab-content">
             <div class="section-header">
-              <h3>Agent 学习计划</h3>
+              <h3>学习计划</h3>
               <span class="task-count" v-if="planDraft">{{ planDraft.phases?.length || 0 }} 个阶段</span>
             </div>
 
@@ -218,22 +218,26 @@
             <template v-else-if="planDraft">
               <div class="plan-overview">
                 <div class="plan-overview-main">
-                  <span class="plan-eyebrow">用户确认的原始规划</span>
+                  <span class="plan-eyebrow">已确认学习计划</span>
                   <h4>{{ planDraft.spaceName }}</h4>
                   <p>{{ planDraft.description }}</p>
+                  <div class="plan-next-step" v-if="planNextStep">
+                    <span>下一步</span>
+                    <strong>{{ planNextStep }}</strong>
+                  </div>
                 </div>
                 <div class="plan-overview-stats">
                   <div class="plan-stat">
                     <strong>{{ planTotalWeeks }}</strong>
-                    <span>周</span>
+                    <span>计划周数</span>
                   </div>
                   <div class="plan-stat">
-                    <strong>{{ planKnowledgePointCount }}</strong>
-                    <span>知识点</span>
+                    <strong>{{ dashboard.pathProgress.completedNodes }}/{{ dashboard.pathProgress.totalNodes }}</strong>
+                    <span>路径进度</span>
                   </div>
                   <div class="plan-stat">
-                    <strong>{{ planResourceCount }}</strong>
-                    <span>资源</span>
+                    <strong>{{ Math.round(dashboard.progress) }}%</strong>
+                    <span>完成度</span>
                   </div>
                 </div>
               </div>
@@ -241,6 +245,9 @@
               <div class="plan-meta-row">
                 <span v-if="planDraft.startDate">开始：{{ planDraft.startDate }}</span>
                 <span v-if="planDraft.targetEndDate">目标完成：{{ planDraft.targetEndDate }}</span>
+                <span>{{ planKnowledgePointCount }} 个知识点</span>
+                <span>{{ planResourceCount }} 个资源</span>
+                <span :class="['plan-risk-pill', dashboard.riskStatus]">状态：{{ riskLabel(dashboard.riskStatus) }}</span>
               </div>
 
               <div class="plan-goals" v-if="planDraft.goals?.length">
@@ -253,34 +260,78 @@
                   v-for="phase in planDraft.phases"
                   :key="phase.phaseIndex || phase.phaseName"
                   class="plan-phase-card"
+                  :class="{ active: isActivePlanPhase(phase), collapsed: !isPhaseExpanded(phase) }"
                 >
-                  <div class="plan-phase-head">
-                    <div>
-                      <span class="phase-index">阶段 {{ phase.phaseIndex }}</span>
-                      <h4>{{ phase.phaseName }}</h4>
+                  <button class="plan-phase-head" type="button" @click="togglePhase(phase)">
+                    <div class="phase-head-main">
+                      <span class="phase-index">
+                        <span class="phase-number">{{ phase.phaseIndex || '-' }}</span>
+                        <span>阶段</span>
+                        <em v-if="isActivePlanPhase(phase)">当前关注</em>
+                      </span>
+                      <h4>{{ phase.phaseName || `第 ${phase.phaseIndex} 阶段` }}</h4>
+                      <p>{{ phaseSummary(phase) }}</p>
                     </div>
-                    <span class="phase-duration">{{ phase.weeks || 0 }} 周</span>
-                  </div>
-
-                  <div class="phase-section" v-if="phase.knowledgePoints?.length">
-                    <span class="children-label">知识点</span>
-                    <div class="phase-kps">
-                      <span v-for="kp in phase.knowledgePoints" :key="kp" class="kp-chip">{{ kp }}</span>
-                    </div>
-                  </div>
-
-                  <div class="phase-section" v-if="phase.resources?.length">
-                    <span class="children-label">计划资源</span>
-                    <div class="phase-resources">
-                      <div
-                        v-for="resource in phase.resources"
-                        :key="resource.resourceType + resource.title"
-                        class="phase-resource"
+                    <div class="phase-head-meta">
+                      <span class="phase-duration">{{ phase.weeks || 0 }} 周</span>
+                      <span>{{ phase.knowledgePoints?.length || 0 }} 知识点</span>
+                      <span>{{ phase.resources?.length || 0 }} 资源</span>
+                      <svg
+                        class="phase-toggle-icon"
+                        :class="{ open: isPhaseExpanded(phase) }"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        width="16"
+                        height="16"
                       >
-                        <span>{{ resourceIcon(resource.resourceType) }}</span>
-                        <div>
-                          <strong>{{ resource.title }}</strong>
-                          <em>{{ resourceTypeLabel(resource.resourceType) }}</em>
+                        <polyline points="6,9 12,15 18,9"/>
+                      </svg>
+                    </div>
+                  </button>
+
+                  <div v-show="isPhaseExpanded(phase)" class="phase-detail">
+                    <div class="phase-section" v-if="phase.knowledgePoints?.length">
+                      <span class="children-label">本阶段重点</span>
+                      <div class="phase-kp-list">
+                        <div v-for="(kp, index) in phase.knowledgePoints" :key="kp" class="phase-kp-item">
+                          <span class="kp-order">{{ index + 1 }}</span>
+                          <div class="kp-body">
+                            <div class="kp-title-row">
+                              <strong>{{ kp }}</strong>
+                              <span v-if="knowledgeImportanceLabel(kp)" class="kp-importance">
+                                {{ knowledgeImportanceLabel(kp) }}
+                              </span>
+                            </div>
+                            <p v-if="knowledgeDescription(kp)">{{ knowledgeDescription(kp) }}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="phase-section" v-if="phase.resources?.length">
+                      <span class="children-label">配套资源</span>
+                      <div class="phase-resource-groups">
+                        <div
+                          v-for="group in phaseResourceGroups(phase)"
+                          :key="group.type"
+                          class="phase-resource-group"
+                        >
+                          <div class="resource-group-head">
+                            <span v-html="resourceIcon(group.type)"></span>
+                            <strong>{{ resourceTypeLabel(group.type) }}</strong>
+                            <em>{{ group.items.length }} 项</em>
+                          </div>
+                          <div class="phase-resources">
+                            <div
+                              v-for="resource in group.items"
+                              :key="resource.resourceType + resource.title"
+                              class="phase-resource"
+                            >
+                              <strong>{{ resource.title }}</strong>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -314,32 +365,125 @@
           <!-- Tab: Resources -->
           <div v-show="activeTab === 'resources'" class="tab-content">
             <div class="section-header">
-              <h3>学习资源</h3>
+              <h3>学习资料工坊</h3>
               <span class="task-count">{{ dashboard.resources.length }} 项</span>
             </div>
 
-            <div class="resource-grid" v-if="dashboard.resources.length">
-              <div
-                v-for="r in dashboard.resources"
-                :key="r.id"
-                class="resource-card"
-              >
-                <div class="res-icon" :class="r.resourceType">
-                  <span>{{ resourceIcon(r.resourceType) }}</span>
-                </div>
-                <div class="res-body">
-                  <h4 class="res-title">{{ r.title }}</h4>
-                  <p class="res-desc">{{ r.description }}</p>
-                  <div class="res-meta">
-                    <span class="res-type">{{ resourceTypeLabel(r.resourceType) }}</span>
-                    <span class="res-source" :class="r.source">
-                      {{ r.isAiGenerated ? 'AI生成' : r.source === 'curated' ? '精选' : '用户上传' }}
-                    </span>
-                  </div>
+            <div class="resource-agent-panel">
+              <div class="resource-agent-main">
+                <span class="resource-agent-eyebrow">Resource Agent 建议</span>
+                <h4>{{ resourcePackageTarget.title }}</h4>
+                <p>{{ resourcePackageTarget.reason }}</p>
+                <div class="resource-type-selector">
+                  <button
+                    v-for="type in packageTypeOptions"
+                    :key="type.value"
+                    class="type-chip"
+                    :class="{ active: selectedPackageTypes.includes(type.value) }"
+                    type="button"
+                    @click="togglePackageType(type.value)"
+                  >
+                    <span :class="type.value" v-html="resourceIcon(type.value)"></span>{{ type.label }}
+                  </button>
                 </div>
               </div>
+              <div class="resource-agent-actions">
+                <el-button :loading="packagePreviewLoading" @click="handlePreviewResourcePackage">
+                  预览资料包
+                </el-button>
+                <el-button type="primary" :loading="packageGenerating" @click="handleGenerateResourcePackage">
+                  生成建议资料
+                </el-button>
+              </div>
             </div>
-            <el-empty v-else description="暂无资源，等待 Agent 生成" :image-size="100" />
+
+            <div v-if="packageRunningSteps.length" class="resource-progress">
+              <div
+                v-for="step in packageRunningSteps"
+                :key="step.reason"
+                class="resource-progress-step"
+                :class="step.status"
+              >
+                <span class="step-dot"></span>
+                <span>{{ step.reason }}</span>
+              </div>
+            </div>
+
+            <div v-if="groupedResources.length" class="resource-package-list">
+              <section
+                v-for="group in groupedResources"
+                :key="group.key"
+                class="resource-package-section"
+              >
+                <div class="resource-package-head">
+                  <div>
+                    <span class="resource-package-eyebrow">{{ group.label }}</span>
+                    <h4>{{ group.title }}</h4>
+                  </div>
+                  <span class="task-count">{{ group.items.length }} 项</span>
+                </div>
+
+                <div class="resource-grid">
+                  <div
+                    v-for="r in group.items"
+                    :key="r.id"
+                    class="resource-card"
+                    :class="{ disabled: isResourceBusy(r) }"
+                    @click="handleResourceCardClick(r)"
+                  >
+                    <div class="res-icon" :class="resourceIconClass(r)">
+                      <span v-html="resourceIconName(r)"></span>
+                    </div>
+                    <div class="res-body">
+                      <h4 class="res-title">{{ r.title }}</h4>
+                      <p v-if="bilibiliPreview(r)?.title" class="res-video-title">
+                        {{ bilibiliPreview(r)?.title }}
+                      </p>
+                      <p class="res-desc">{{ r.description }}</p>
+                      <div class="res-meta">
+                        <span class="res-type">{{ resourceTypeLabel(r.resourceType) }}</span>
+                        <span class="res-source" :class="r.source">
+                          {{ resourceSourceLabel(r) }}
+                        </span>
+                        <span v-if="r.status" class="res-status" :class="displayResourceStatus(r)">
+                          {{ resourceStatusLabel(displayResourceStatus(r)) }}
+                        </span>
+                      </div>
+                      <p v-if="r.agentReason" class="res-reason">Agent 判断：{{ r.agentReason }}</p>
+                      <div class="res-tags">
+                        <span v-if="r.knowledgePoint">{{ r.knowledgePoint }}</span>
+                        <span v-if="r.studyScenario">{{ r.studyScenario }}</span>
+                        <span v-if="bilibiliPreview(r)?.upName">{{ bilibiliPreview(r)?.upName }}</span>
+                        <span v-if="bilibiliPreview(r)?.durationSeconds">
+                          {{ formatDuration(bilibiliPreview(r)?.durationSeconds) }}
+                        </span>
+                      </div>
+                      <div class="res-actions">
+                        <el-button
+                          v-if="canGenerateResource(r)"
+                          size="small"
+                          type="primary"
+                          plain
+                          :loading="isResourceBusy(r)"
+                          @click.stop="handleGenerateSingleResource(r)"
+                        >
+                          {{ r.status === 'failed' ? '重试生成' : '生成' }}
+                        </el-button>
+                        <el-button
+                          v-else-if="r.status === 'generated'"
+                          size="small"
+                          text
+                          @click.stop="goResourceDetail(r)"
+                        >
+                          查看
+                        </el-button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+            <el-empty v-else description="暂无资源，等待 Agent 为任务生成资料包" :image-size="100" />
 
             <!-- Assessment Summary -->
             <div class="section-header mt-32">
@@ -362,6 +506,39 @@
             <div class="weakness-list">
               <span class="weakness-tag" v-for="w in weaknesses" :key="w">{{ w }}</span>
             </div>
+
+            <el-dialog
+              v-model="packagePreviewVisible"
+              title="确认生成资料包"
+              width="680px"
+              :close-on-click-modal="false"
+            >
+              <div v-if="resourcePackagePreview" class="package-preview">
+                <span class="resource-agent-eyebrow">待确认方案</span>
+                <h3>{{ resourcePackagePreview.title }}</h3>
+                <p>{{ resourcePackagePreview.reason }}</p>
+                <div class="preview-resource-list">
+                  <div
+                    v-for="r in resourcePackagePreview.resources"
+                    :key="r.resourceType + r.title"
+                    class="preview-resource-item"
+                  >
+                    <span class="preview-icon" v-html="resourceIcon(r.resourceType)"></span>
+                    <div>
+                      <strong>{{ r.title }}</strong>
+                      <p>{{ r.description }}</p>
+                    </div>
+                    <em>{{ resourceTypeLabel(r.resourceType) }}</em>
+                  </div>
+                </div>
+              </div>
+              <template #footer>
+                <el-button @click="packagePreviewVisible = false">取消</el-button>
+                <el-button type="primary" :loading="packageGenerating" @click="handleGenerateResourcePackage">
+                  确认生成
+                </el-button>
+              </template>
+            </el-dialog>
           </div>
 
           <!-- Tab: Records -->
@@ -438,8 +615,10 @@ import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
-import type { RiskStatus, TaskVO } from '@/types/learningSpace'
-import type { LearningPlanDraft } from '@/types/planExecute'
+import { resourcePackageApi } from '@/api/spaceDashboard'
+import { learningResourceApi } from '@/api/learningResource'
+import type { ResourcePackageGenerateDTO, ResourcePackageVO, ResourceType, ResourceVO, RiskStatus, TaskVO } from '@/types/learningSpace'
+import type { LearningPlanDraft, PhaseInfo, ResourceInfo, KnowledgeNode } from '@/types/planExecute'
 
 const route = useRoute()
 const router = useRouter()
@@ -450,6 +629,14 @@ const activeTab = ref('today')
 const showAddTask = ref(false)
 const planDraft = ref<LearningPlanDraft | null>(null)
 const planLoading = ref(false)
+const expandedPhaseKeys = ref<string[]>([])
+const resourcePackagePreview = ref<ResourcePackageVO | null>(null)
+const packagePreviewVisible = ref(false)
+const packagePreviewLoading = ref(false)
+const packageGenerating = ref(false)
+const packageRunningSteps = ref<{ reason: string; status: string }[]>([])
+const selectedPackageTypes = ref<ResourceType[]>(['doc', 'mind_map', 'quiz', 'link'])
+const generatingResourceIds = ref<string[]>([])
 
 const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
@@ -463,6 +650,14 @@ const tabs = computed(() => [
 ])
 
 const weaknesses = ['洛必达法则适用条件', '无穷小阶数比较', '间断点分类']
+const packageTypeOptions: { value: ResourceType; label: string }[] = [
+  { value: 'doc', label: '文档' },
+  { value: 'html', label: 'HTML' },
+  { value: 'mind_map', label: '思维导图' },
+  { value: 'quiz', label: '练习' },
+  { value: 'image', label: '图解' },
+  { value: 'link', label: 'B站推荐' },
+]
 
 const themeGradient = computed(() => 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)')
 
@@ -495,6 +690,40 @@ const planResourceCount = computed(() =>
   (planDraft.value?.phases || []).reduce((sum, phase) => sum + (phase.resources?.length || 0), 0)
 )
 
+const knowledgeNodeMap = computed(() => {
+  const map = new Map<string, KnowledgeNode>()
+  ;(planDraft.value?.knowledgeGraph?.nodes || []).forEach(node => {
+    if (node.name) map.set(normalizeText(node.name), node)
+  })
+  return map
+})
+
+const currentPlanPhaseKey = computed(() => {
+  const phases = planDraft.value?.phases || []
+  if (!phases.length) return ''
+
+  const runtimePhase = findPhaseByRuntimeContext(phases)
+  if (runtimePhase) return phaseKey(runtimePhase)
+
+  const rawProgress = dashboard.value?.pathProgress?.percent ?? dashboard.value?.progress ?? 0
+  const progress = Math.min(Math.max(Number(rawProgress) || 0, 0), 100)
+  const index = Math.min(phases.length - 1, Math.floor((progress / 100) * phases.length))
+  return phaseKey(phases[index])
+})
+
+const activePlanPhase = computed(() => {
+  const key = currentPlanPhaseKey.value
+  return (planDraft.value?.phases || []).find(phase => phaseKey(phase) === key) || null
+})
+
+const planNextStep = computed(() => {
+  if (nextTodayTask.value?.title) return nextTodayTask.value.title
+  const phase = activePlanPhase.value
+  const firstKnowledgePoint = phase?.knowledgePoints?.[0]
+  if (firstKnowledgePoint) return `进入「${firstKnowledgePoint}」`
+  return ''
+})
+
 // PathTimeline 需要的全集任务：合并今日 / 待办 / 逾期，按 id 去重
 const allTasks = computed<TaskVO[]>(() => {
   const d = dashboard.value
@@ -505,23 +734,301 @@ const allTasks = computed<TaskVO[]>(() => {
   return [...map.values()]
 })
 
+const resourcePackageTarget = computed(() => {
+  const task = nextTodayTask.value
+  const phase = activePlanPhase.value
+  const knowledgePoint = task?.title || phase?.knowledgePoints?.[0] || dashboard.value?.currentGoal || dashboard.value?.space.name || '当前目标'
+  if (task) {
+    return {
+      title: `为「${task.title}」生成今日任务资料包`,
+      reason: task.aiSuggestion || `Agent 将围绕「${knowledgePoint}」补齐讲义、框架、练习和视频推荐。`,
+      knowledgePoint,
+      taskId: task.id,
+      pathNodeId: task.pathNodeId,
+    }
+  }
+  return {
+    title: `为「${knowledgePoint}」生成阶段资料包`,
+    reason: dashboard.value?.agentInsight || 'Agent 将基于当前空间目标生成可直接学习的资料组合。',
+    knowledgePoint,
+    taskId: null,
+    pathNodeId: dashboard.value?.pathProgress?.currentNodeId || null,
+  }
+})
+
+const groupedResources = computed(() => {
+  const groups = new Map<string, { key: string; title: string; label: string; items: ResourceVO[] }>()
+  ;(dashboard.value?.resources || []).forEach(resource => {
+    const key = resource.taskId ? `task-${resource.taskId}` : resource.knowledgePoint ? `kp-${resource.knowledgePoint}` : 'space'
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        title: resource.knowledgePoint || taskTitle(resource.taskId) || '空间通用资料',
+        label: resource.taskId ? '任务资料包' : resource.knowledgePoint ? '知识点资料包' : '空间资料',
+        items: [],
+      })
+    }
+    groups.get(key)!.items.push(resource)
+  })
+  return [...groups.values()]
+})
+
 function riskLabel(s: RiskStatus) {
   const m: Record<string, string> = { good: '良好', normal: '正常', warning: '注意', danger: '危险' }
   return m[s] || s
 }
 
 function resourceIcon(t: string) {
-  const m: Record<string, string> = { doc: '📄', video: '🎬', mind_map: '🧠', quiz: '📝', case_study: '📋', flashcard_set: '🃏', image: '🖼', audio: '🎵', link: '🔗', ppt: '📊' }
+  const m: Record<string, string> = { doc: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M537.152 414.72h-288.64a29.44 29.44 0 0 1-26.24-30.72 29.44 29.44 0 0 1 26.24-32h288.64a29.44 29.44 0 0 1 26.24 32 29.44 29.44 0 0 1-26.24 30.72z m209.92 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z m0 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z" fill="#333333"></path><path d="M192.832 0a128 128 0 0 0-128 128v768a128 128 0 0 0 128 128h640a128 128 0 0 0 128-128l7.04-670.72L748.992 0h-556.16z m512 64l192 192h-160.64a31.36 31.36 0 0 1-31.36-31.36V64z m128 896h-640a64 64 0 0 1-64-64V128a64 64 0 0 1 64-64h448v192a64 64 0 0 0 64 64h192v576a64 64 0 0 1-64 64z" fill="#333333"></path></svg>', html: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M112 16h736v992H112z" fill="#AED796"></path><path d="M392.176 846.08c8.032 4.544 18.208 2.032 22.704-5.616l159.344-256.496c4.496-7.648 1.648-17.504-6.384-22.048s-18.208-2.032-22.704 5.616l-159.344 256.496c-4.512 7.632-1.648 17.504 6.384 22.048z m204.416-50.672a15.84 15.84 0 0 0 22.464 0l79.344-79.344c0.336-0.288 0.752-0.384 1.056-0.704a15.776 15.776 0 0 0 4.592-11.52 15.808 15.808 0 0 0-4.656-11.264c-0.224-0.224-0.512-0.304-0.752-0.496l-79.552-79.552a15.872 15.872 0 1 0-22.464 22.464l68.944 68.944-68.992 68.992a15.888 15.888 0 0 0 0.016 22.48zM261.6 716.064l79.328 79.344a15.84 15.84 0 0 0 22.464 0 15.84 15.84 0 0 0 0-22.464L294.4 703.952l68.944-68.944a15.872 15.872 0 1 0-22.464-22.464l-79.552 79.552c-0.224 0.208-0.528 0.288-0.736 0.496a15.744 15.744 0 0 0-4.656 11.264 15.808 15.808 0 0 0 4.592 11.52c0.32 0.288 0.736 0.4 1.072 0.688zM896 128h-32V32a32 32 0 0 0-32-32H128a32 32 0 0 0-32 32v960a32 32 0 0 0 32 32h704a32 32 0 0 0 32-32V416h32a32 32 0 0 0 32-32V160a32 32 0 0 0-32-32z m-64 0H352a32 32 0 0 0-32 32v224a32 32 0 0 0 32 32h480v576H128V32h704v96z" fill="#2B3139"></path><path d="M352 160h544v224H352z" fill="#FFFFFF"></path><path d="M387.696 213.824h35.184v39.664h32.944v-39.664h35.184V328h-35.184v-45.264H422.88V328h-35.184v-114.176zM535.856 243.088h-31.984v-29.264h99.136v29.264h-31.984V328h-35.168v-84.912zM615.872 213.824h50.048l16.32 67.168h0.32l16.32-67.168h50.064V328H715.68v-73.248h-0.336l-19.84 73.248H669.28l-19.824-73.248h-0.336V328h-33.248v-114.176zM767.056 213.824h35.184v84.912h50.528V328h-85.712v-114.176z" fill="#2B3139"></path></svg>', video: '🎵', mind_map: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g stroke="#701A75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="25" y="42" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><path d="M41 50 H52 V32 H62 M52 50 V68 H62" stroke-width="5"/><rect x="62" y="24" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><rect x="62" y="60" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/></g></svg>', quiz: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M320.618717 709.570751l311.023685-316.464605-159.049412-162.715919-320.259024 320.694953-3.094478 19.460214L312.765865 710.198038l7.852852-0.627287z m365.842198-372.018875l110.612237-112.471584 7.225565-44.74918L685.639201 62.11571l-47.529503 2.531659-116.408244 116.51569 164.759461 156.388817zM100.216981 789.613762l138.302903-59.706847-112.839975-92.719728-46.859237 112.450095-14.23419 51.919487 35.630499-11.943007z m9.216919 79.440283c-24.663726 0.084934-44.587498 20.031219-44.608987 44.694945 0.021489 24.659633 19.946284 44.649919 44.608987 44.75839h806.904567c24.661679 0 44.651966-19.990287 44.651965-44.649919v-0.108471c0-24.663726-19.990287-44.654013-44.61001-44.694945H109.4339z m806.450219-111.931278c24.856108 0 45.105291-20.206204 45.10529-45.128827s-20.249183-45.083801-45.10529-45.083801H468.374922c-24.90011 0-45.083801 20.24816-45.083801 45.299719 0 24.74866 20.183691 44.912909 45.083801 44.912909h447.509197z" fill="#59C666"></path></svg>', case_study: '📋', flashcard_set: '🃏', image: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M853.161077 892.549156 362.595248 892.549156l-209.432916-0.413416c-0.605797-0.001023-1.210571-0.031722-1.813299-0.092098-24.848944-2.484587-47.825238-14.060227-64.696488-32.594349-16.990976-18.665105-26.349111-42.85504-26.349111-68.112284L60.303434 264.62596c0-55.80805 45.403073-101.211123 101.211123-101.211123l691.645496 0c55.80805 0 101.2101 45.403073 101.2101 101.211123l0 225.51315c0 0.275269-0.00614 0.551562-0.01842 0.825808-0.021489 0.494257-1.971911 51.723012 15.481599 85.46244 4.716418 9.118682 1.14815 20.335141-7.970532 25.052582-9.116635 4.714372-20.335141 1.149173-25.052582-7.970532-21.300119-41.176818-19.844977-97.642854-19.618826-103.738689L917.191392 264.62596c0-35.307134-28.724205-64.031339-64.031339-64.031339L161.51558 200.594621c-35.307134 0-64.031339 28.724205-64.031339 64.031339l0 526.71105c0 32.755008 24.320918 59.957557 56.717769 63.61997l208.4311 0.412392 490.528989 0c35.307134 0 64.031339-28.725228 64.031339-64.032362l-0.382717-93.676519c-0.104377-1.749854-1.587148-19.548218-19.549242-42.499953-0.050142-0.063445-0.098237-0.125867-0.147356-0.190335L875.401614 626.481358 758.174726 471.362464c-0.415462-0.550539-38.995129-50.852178-86.271876-45.534056-38.335097 4.314259-75.954903 45.163619-108.789729 118.131491-17.615193 39.141462-34.650171 68.26885-52.082192 89.046059-17.607006 20.985964-35.679617 33.519418-55.251372 38.316677-43.422975 10.638291-81.049944-18.99461-120.886231-50.372248l-5.057179-3.980661c-46.555315-36.57808-68.750827-28.223808-158.330028 59.60247-7.330966 7.187703-19.101033 7.071046-26.288736-0.25992-7.187703-7.330966-7.071046-19.101033 0.25992-26.287713 46.658669-45.74588 77.544097-72.726372 107.085924-84.282568 33.357735-13.048177 64.274886-6.266727 100.242052 21.99392l5.092995 4.00829c33.9226 26.719548 63.219857 49.795103 89.028663 43.466977 25.618471-6.279007 53.30095-42.114167 82.279958-106.508779 39.139415-86.97591 85.837994-134.027529 138.79716-139.849118 68.454068-7.515161 117.823476 57.404408 119.891578 60.171428l117.122511 154.980747 21.599947 28.343535c26.276457 33.630958 27.333532 61.638849 27.367301 64.72514 0.001023 0.042979 0.001023 0.084934 0.001023 0.127913l0.38374 94.059236C954.371176 847.146083 908.969127 892.549156 853.161077 892.549156z" fill="#FF9000"></path><path d="M312.328401 446.967868c-42.324968 0-76.759221-34.434254-76.759221-76.759221s34.434254-76.759221 76.759221-76.759221 76.759221 34.434254 76.759221 76.759221S354.654392 446.967868 312.328401 446.967868zM312.328401 330.628186c-21.824051 0-39.579437 17.755386-39.579437 39.579437s17.755386 39.579437 39.579437 39.579437 39.579437-17.755386 39.579437-39.579437S334.153476 330.628186 312.328401 330.628186z" fill="#FF9000"></path></svg>', audio: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M113.7664 540.4672c0-219.9552 178.2784-398.2336 398.2336-398.2336S910.2336 320.512 910.2336 540.4672v284.4672c0 31.4368-25.4976 56.9344-56.9344 56.9344h-56.9344c-31.4368 0-56.9344-25.4976-56.9344-56.9344V597.2992c0-31.4368 25.4976-56.9344 56.9344-56.9344h56.9344c0-188.5184-152.7808-341.2992-341.2992-341.2992S170.7008 351.9488 170.7008 540.4672h56.9344c31.4368 0 56.9344 25.4976 56.9344 56.9344v227.5328c0 31.4368-25.4976 56.9344-56.9344 56.9344h-56.9344c-31.4368 0-56.9344-25.4976-56.9344-56.9344V540.4672z" fill="#323233"></path></svg>', link: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M209.8 496.7c17.1 0 31.1-13.9 31.1-31.1 0-17.1-13.9-31-31.1-31s-31 13.9-31 31c-0.1 17.2 13.8 31.1 31 31.1zM345.1 750.2h-66c-37.3 0-45.9-8.6-45.9-45.9V534l-0.2-2.2h-0.2c-1.6-12.7-12.2-22.3-25.1-22.3-12.9 0-23.5 9.6-25.1 22.3h-0.4v172.4c0 66 30.8 96.8 96.8 96.8h66c14 0 25.4-11.4 25.4-25.4 0.1-14.1-11.3-25.4-25.3-25.4z" fill="#6B400D"></path><path d="M959.3 251.8c0-71.9-58.5-130.4-130.4-130.4H194.7c-71.9 0-130.4 58.5-130.4 130.4v523.3c0 71.9 58.5 130.4 130.4 130.4h634.2c71.9 0 130.4-58.5 130.4-130.4V251.8z m-50.6 523.3c0 44-35.8 79.8-79.8 79.8H194.7c-44 0-79.8-35.8-79.8-79.8V251.8c0-44 35.8-79.8 79.8-79.8h634.2c44 0 79.8 35.8 79.8 79.8v523.3z" fill="#6B400D"></path><path d="M684.1 469.8L486.1 343c-8.6-4.8-17.8-7-29.7-7-34 0-56 17.4-56 44.3v266.2c0 26.9 22 44.3 56 44.3 6.4 0 18.8-0.9 29.9-7.1l197.4-126.5c17.7-9 28.2-25.5 28.2-43.9 0-18.3-10.5-34.7-27.8-43.5z m-27.5 55.7L472 643.7c-3.2 1.5-4.9 1.5-8.1 1.5-8.1 0-16.2-6-16.2-15.1V396.7c0-9 8.1-15.1 16.2-15.1 3.2 0 6.5 0 8.1 1.5l184.6 118.2c6.5 4.5 8.1 10.5 8.1 12 0 3.2 0 9.2-8.1 12.2z" fill="#6B400D"></path><path d="M656.6 501.4L472 383.2c-1.6-1.5-4.9-1.5-8.1-1.5-8.1 0-16.2 6-16.2 15.1v233.4c0 9 8.1 15.1 16.2 15.1 3.2 0 4.9 0 8.1-1.5l184.6-118.2c8.1-3 8.1-9 8.1-12 0-1.6-1.7-7.7-8.1-12.2z" fill="#FFD524"></path></svg>', ppt: '📊' }
   return m[t] || '📄'
 }
 
+function resourceIconClass(resource: ResourceVO) {
+  return bilibiliPreview(resource) ? 'video' : resource.resourceType
+}
+
+function resourceIconName(resource: ResourceVO) {
+  return resourceIcon(bilibiliPreview(resource) ? 'video' : resource.resourceType)
+}
+
 function resourceTypeLabel(t: string) {
-  const m: Record<string, string> = { doc: '文档', ppt: 'PPT', video: '视频', mind_map: '思维导图', quiz: '练习题', case_study: '案例', flashcard_set: '闪卡', image: '图片', audio: '音频', link: '链接' }
+  const m: Record<string, string> = { doc: '文档', html: 'HTML', ppt: 'PPT', video: '视频', mind_map: '思维导图', quiz: '练习题', case_study: '案例', flashcard_set: '闪卡', image: '图片', audio: '音频', link: 'B站推荐' }
   return m[t] || t
+}
+
+function resourceSourceLabel(resource: ResourceVO) {
+  if (resource.source === 'curated') return resource.resourceType === 'link' ? 'AI筛选' : '精选'
+  if (resource.isAiGenerated) return 'AI生成'
+  return '用户上传'
+}
+
+function bilibiliPreview(resource: ResourceVO): any | null {
+  if (resource.resourceType !== 'link' || !resource.metadata) return null
+  try {
+    const metadata = JSON.parse(resource.metadata)
+    return metadata.bilibiliPreview || null
+  } catch {
+    return null
+  }
+}
+
+function resourceStatusLabel(status: string) {
+  const m: Record<string, string> = { planned: '待生成', generating: '生成中', generated: '可使用', failed: '失败' }
+  return m[status] || status
+}
+
+function formatDuration(seconds: number | string | undefined) {
+  const value = Number(seconds || 0)
+  if (!value) return ''
+  const min = Math.floor(value / 60)
+  const sec = value % 60
+  return `${min}:${String(sec).padStart(2, '0')}`
+}
+
+function displayResourceStatus(resource: ResourceVO) {
+  return generatingResourceIds.value.includes(resource.id) ? 'generating' : (resource.status || 'generated')
+}
+
+function taskTitle(taskId: string | null | undefined) {
+  if (!taskId) return ''
+  return allTasks.value.find(task => task.id === taskId)?.title || ''
+}
+
+function goResourceDetail(resource: ResourceVO) {
+  if (!resource?.id) return
+  router.push(`/resources/${resource.id}`)
+}
+
+function canGenerateResource(resource: ResourceVO) {
+  return resource.status === 'planned' || resource.status === 'failed'
+}
+
+function isResourceBusy(resource: ResourceVO) {
+  return resource.status === 'generating' || generatingResourceIds.value.includes(resource.id)
+}
+
+function handleResourceCardClick(resource: ResourceVO) {
+  if (isResourceBusy(resource)) return
+  if (resource.status === 'generated' || !resource.status) {
+    goResourceDetail(resource)
+  }
+}
+
+async function handleGenerateSingleResource(resource: ResourceVO) {
+  if (!resource.id || isResourceBusy(resource)) return
+  generatingResourceIds.value = [...generatingResourceIds.value, resource.id]
+  try {
+    await learningResourceApi.generate(resource.id)
+    await dashStore.fetchDashboard(spaceId.value)
+    ElMessage.success('资料已生成，可以开始学习')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '资料生成失败，请稍后重试')
+    await dashStore.fetchDashboard(spaceId.value).catch(() => {})
+  } finally {
+    generatingResourceIds.value = generatingResourceIds.value.filter(id => id !== resource.id)
+  }
+}
+
+function normalizeText(text: string | null | undefined) {
+  return String(text || '').trim().toLowerCase()
+}
+
+function phaseKey(phase: PhaseInfo) {
+  return `${phase.phaseIndex || 'x'}-${phase.phaseName || ''}`
+}
+
+function isPhaseExpanded(phase: PhaseInfo) {
+  return expandedPhaseKeys.value.includes(phaseKey(phase))
+}
+
+function togglePhase(phase: PhaseInfo) {
+  const key = phaseKey(phase)
+  expandedPhaseKeys.value = isPhaseExpanded(phase)
+    ? expandedPhaseKeys.value.filter(item => item !== key)
+    : [...expandedPhaseKeys.value, key]
+}
+
+function isActivePlanPhase(phase: PhaseInfo) {
+  return phaseKey(phase) === currentPlanPhaseKey.value
+}
+
+function phaseSummary(phase: PhaseInfo) {
+  const points = phase.knowledgePoints || []
+  if (!points.length) return '暂无明确知识点，等待 Agent 补全阶段内容'
+  return points.slice(0, 3).join(' / ') + (points.length > 3 ? ` 等 ${points.length} 个重点` : '')
+}
+
+function phaseResourceGroups(phase: PhaseInfo) {
+  const groups = new Map<string, ResourceInfo[]>()
+  ;(phase.resources || []).forEach(resource => {
+    const type = resource.resourceType || 'doc'
+    const list = groups.get(type) || []
+    list.push(resource)
+    groups.set(type, list)
+  })
+  return [...groups.entries()].map(([type, items]) => ({ type, items }))
+}
+
+function knowledgeNodeByName(name: string) {
+  return knowledgeNodeMap.value.get(normalizeText(name))
+}
+
+function knowledgeDescription(name: string) {
+  return knowledgeNodeByName(name)?.description || ''
+}
+
+function knowledgeImportanceLabel(name: string) {
+  const importance = Number(knowledgeNodeByName(name)?.importance || 0)
+  if (!importance) return ''
+  if (importance >= 4) return '重点'
+  if (importance >= 3) return '常规'
+  return '了解'
+}
+
+function findPhaseByRuntimeContext(phases: PhaseInfo[]) {
+  const d = dashboard.value
+  if (!d) return null
+
+  const candidateNodeIds = [nextTodayTask.value?.pathNodeId, d.pathProgress?.currentNodeId]
+    .filter((id): id is string => Boolean(id))
+  for (const nodeId of candidateNodeIds) {
+    const node = d.pathNodes.find(item => item.id === nodeId)
+    const matched = node ? findPhaseByText(phases, node.title) : null
+    if (matched) return matched
+  }
+
+  if (nextTodayTask.value?.title) {
+    return findPhaseByText(phases, nextTodayTask.value.title)
+  }
+
+  return null
+}
+
+function findPhaseByText(phases: PhaseInfo[], text: string | null | undefined) {
+  const normalized = normalizeText(text)
+  if (!normalized) return null
+
+  return phases.find(phase => {
+    const phaseName = normalizeText(phase.phaseName)
+    const points = (phase.knowledgePoints || []).map(normalizeText).filter(Boolean)
+    return (!!phaseName && phaseName === normalized)
+      || (!!phaseName && phaseName.includes(normalized))
+      || (!!phaseName && normalized.includes(phaseName))
+      || points.some(point => point === normalized || point.includes(normalized) || normalized.includes(point))
+  }) || null
 }
 
 function formatDateShort(date: string) {
   return date.slice(5)
+}
+
+function togglePackageType(type: ResourceType) {
+  if (selectedPackageTypes.value.includes(type)) {
+    if (selectedPackageTypes.value.length === 1) {
+      ElMessage.info('至少保留一种资料类型')
+      return
+    }
+    selectedPackageTypes.value = selectedPackageTypes.value.filter(item => item !== type)
+    return
+  }
+  selectedPackageTypes.value = [...selectedPackageTypes.value, type]
+}
+
+function buildPackagePayload(): ResourcePackageGenerateDTO {
+  const target = resourcePackageTarget.value
+  return {
+    taskId: target.taskId,
+    pathNodeId: target.pathNodeId,
+    knowledgePoint: target.knowledgePoint,
+    resourceTypes: selectedPackageTypes.value,
+    userIntent: target.reason,
+    packageMode: target.taskId ? 'task' : 'review',
+    targetMinutes: nextTodayTask.value?.estimatedDurationMinutes || 30,
+  }
+}
+
+async function handlePreviewResourcePackage() {
+  if (!spaceId.value) return
+  packagePreviewLoading.value = true
+  packageRunningSteps.value = []
+  try {
+    resourcePackagePreview.value = await resourcePackageApi.preview(spaceId.value, buildPackagePayload())
+    packageRunningSteps.value = resourcePackagePreview.value.agentActions.map(action => ({
+      reason: action.reason,
+      status: action.status,
+    }))
+    packagePreviewVisible.value = true
+  } catch (e: any) {
+    ElMessage.error(e?.message || '资料包预览失败')
+  } finally {
+    packagePreviewLoading.value = false
+  }
+}
+
+async function handleGenerateResourcePackage() {
+  if (!spaceId.value) return
+  packageGenerating.value = true
+  packageRunningSteps.value = [
+    { reason: '资源 Agent 正在分析当前任务和知识点', status: 'running' },
+    { reason: '正在生成资料包资源记录并绑定任务', status: 'running' },
+    { reason: 'Supervisor Agent 正在检查资料来源和使用场景', status: 'running' },
+  ]
+  try {
+    const result = await resourcePackageApi.generate(spaceId.value, buildPackagePayload())
+    packageRunningSteps.value = result.agentActions.map(action => ({
+      reason: action.reason,
+      status: action.status,
+    }))
+    packagePreviewVisible.value = false
+    resourcePackagePreview.value = result
+    await dashStore.fetchDashboard(spaceId.value)
+    ElMessage.success('资料包已生成并加入资料库')
+  } catch (e: any) {
+    packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'failed' }))
+    ElMessage.error(e?.message || '资料包生成失败')
+  } finally {
+    packageGenerating.value = false
+  }
 }
 
 async function handleStartTask(task: TaskVO) {
@@ -613,8 +1120,14 @@ function handleAgentMessage(text: string) {
 async function loadLearningPlan(id: string) {
   planLoading.value = true
   planDraft.value = null
+  expandedPhaseKeys.value = []
   try {
     planDraft.value = await agentApi.getLearningPlanBySpace(id)
+    const phases = planDraft.value?.phases || []
+    if (phases.length) {
+      const runtimePhase = findPhaseByRuntimeContext(phases) || phases[0]
+      expandedPhaseKeys.value = [phaseKey(runtimePhase)]
+    }
   } catch (e) {
     console.warn('Failed to load learning plan draft:', e)
     planDraft.value = null
@@ -631,10 +1144,27 @@ function loadDashboard() {
   }
 }
 
-onMounted(loadDashboard)
+function syncActiveTabFromRoute() {
+  const tab = String(route.query.tab || '')
+  if (['today', 'plan', 'path', 'resources', 'records'].includes(tab)) {
+    activeTab.value = tab
+  }
+}
+
+onMounted(() => {
+  syncActiveTabFromRoute()
+  loadDashboard()
+})
 watch(() => route.params.spaceId, () => {
   loadDashboard()
-  activeTab.value = 'today'
+  syncActiveTabFromRoute()
+  if (!route.query.tab) activeTab.value = 'today'
+})
+watch(() => route.query.tab, syncActiveTabFromRoute)
+watch(currentPlanPhaseKey, key => {
+  if (key && !expandedPhaseKeys.value.includes(key)) {
+    expandedPhaseKeys.value = [key, ...expandedPhaseKeys.value]
+  }
 })
 </script>
 
@@ -901,10 +1431,11 @@ watch(() => route.params.spaceId, () => {
 }
 
 .plan-overview {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
-  padding: 18px 20px;
+  align-items: stretch;
+  padding: 20px;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
   background: white;
@@ -934,15 +1465,44 @@ watch(() => route.params.spaceId, () => {
   font-weight: 600;
 }
 
+.plan-next-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  max-width: 680px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+
+  span {
+    color: #0a9e94;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  strong {
+    min-width: 0;
+    color: #334155;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 .plan-overview-stats {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(86px, 1fr));
   gap: 12px;
-  flex-shrink: 0;
 }
 
 .plan-stat {
-  min-width: 72px;
-  padding: 10px 12px;
+  min-width: 86px;
+  padding: 12px;
   border-radius: 10px;
   background: #f9fafb;
   text-align: center;
@@ -956,7 +1516,9 @@ watch(() => route.params.spaceId, () => {
 
   span {
     color: #9ca3af;
-    font-size: 0.75rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    white-space: nowrap;
   }
 }
 
@@ -971,6 +1533,24 @@ watch(() => route.params.spaceId, () => {
     background: #f3f4f6;
     color: #6b7280;
     font-size: 0.75rem;
+  }
+}
+
+.plan-risk-pill {
+  &.good,
+  &.normal {
+    background: #ecfdf5;
+    color: #047857;
+  }
+
+  &.warning {
+    background: #fffbeb;
+    color: #b45309;
+  }
+
+  &.danger {
+    background: #fef2f2;
+    color: #b91c1c;
   }
 }
 
@@ -1014,33 +1594,120 @@ watch(() => route.params.spaceId, () => {
 }
 
 .plan-phase-card {
-  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
   border-radius: 12px;
   border: 1px solid #f0f0f0;
   background: white;
+
+  &.active {
+    border-color: rgba(11, 183, 170, 0.32);
+    box-shadow: 0 10px 28px rgba(11, 183, 170, 0.08);
+  }
+
+  &.active::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: #0bb7aa;
+  }
 }
 
 .plan-phase-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 16px 18px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
 
   h4 {
     margin: 3px 0 0;
     font-size: 0.9375rem;
     color: #1a1a2e;
+    line-height: 1.45;
+  }
+
+  p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 0.75rem;
+    line-height: 1.45;
+  }
+
+  &:hover {
+    background: #f8fafc;
   }
 }
 
+.phase-head-main {
+  min-width: 0;
+}
+
 .phase-index {
-  color: #8c8ca1;
-  font-size: 0.6875rem;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+
+  em {
+    margin-left: 2px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #ecfdfb;
+    color: #0a9e94;
+    font-style: normal;
+    font-size: 0.625rem;
+  }
+}
+
+.phase-number {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ecfdfb;
+  color: #0a9e94;
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 1px rgba(11, 183, 170, 0.12);
+}
+
+.plan-phase-card.active .phase-number {
+  background: #0bb7aa;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+}
+
+.phase-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  white-space: nowrap;
+
+  > span:not(.phase-duration) {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: #f8fafc;
+  }
 }
 
 .phase-duration {
-  align-self: flex-start;
   padding: 3px 10px;
   border-radius: 999px;
   background: #ecfdf5;
@@ -1050,48 +1717,273 @@ watch(() => route.params.spaceId, () => {
   white-space: nowrap;
 }
 
-.phase-section + .phase-section {
-  margin-top: 14px;
+.phase-toggle-icon {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: transform 0.18s ease;
+
+  &.open {
+    transform: rotate(180deg);
+  }
 }
 
-.phase-kps {
-  display: flex;
+.phase-detail {
+  padding: 0 18px 18px;
+}
+
+.phase-section + .phase-section {
+  margin-top: 16px;
+}
+
+.phase-kp-list {
+  display: grid;
   gap: 8px;
-  flex-wrap: wrap;
+}
+
+.phase-kp-item {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.kp-order {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.kp-body {
+  min-width: 0;
+
+  p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+}
+
+.kp-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  strong {
+    color: #1f2937;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+}
+
+.kp-importance {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #c2410c;
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.phase-resource-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.phase-resource-group {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.resource-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+
+  strong {
+    color: #334155;
+    font-size: 0.8125rem;
+  }
+
+  em {
+    margin-left: auto;
+    color: #94a3b8;
+    font-size: 0.6875rem;
+    font-style: normal;
+  }
 }
 
 .phase-resources {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 0;
 }
 
 .phase-resource {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
   padding: 10px 12px;
-  border-radius: 10px;
-  background: #f9fafb;
-  border: 1px solid #f3f4f6;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+
+  &:nth-child(1),
+  &:nth-child(2) {
+    border-top: 0;
+  }
+
+  &:nth-child(odd) {
+    border-right: 1px solid rgba(148, 163, 184, 0.08);
+  }
 
   strong {
     display: block;
     color: #374151;
     font-size: 0.8125rem;
     line-height: 1.4;
-  }
-
-  em {
-    display: block;
-    margin-top: 2px;
-    color: #9ca3af;
-    font-size: 0.6875rem;
-    font-style: normal;
+    word-break: break-word;
   }
 }
 
 /* ========== Resource Grid ========== */
+.resource-agent-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  background: linear-gradient(135deg, #ffffff, #ecfdfb);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+}
+
+.resource-agent-main {
+  min-width: 0;
+
+  h4 {
+    margin: 4px 0 6px;
+    color: #0f172a;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+
+  p {
+    margin: 0 0 12px;
+    color: #64748b;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+  }
+}
+
+.resource-agent-eyebrow,
+.resource-package-eyebrow {
+  color: #0a9e94;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.resource-type-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &.active {
+    border-color: rgba(11, 183, 170, 0.32);
+    background: #ecfdfb;
+    color: #0a9e94;
+  }
+}
+
+.resource-agent-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.resource-progress {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.resource-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 0.75rem;
+
+  &.success { color: #059669; }
+  &.running { color: #0284c7; }
+  &.failed { color: #dc2626; }
+  &.waiting_user_confirm { color: #d97706; }
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
+}
+
+.resource-package-list {
+  display: grid;
+  gap: 18px;
+}
+
+.resource-package-section {
+  padding-top: 2px;
+}
+
+.resource-package-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+
+  h4 {
+    margin: 3px 0 0;
+    color: #0f172a;
+    font-size: 0.95rem;
+  }
+}
+
 .resource-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -1113,6 +2005,11 @@ watch(() => route.params.spaceId, () => {
   cursor: pointer;
   transition: all 0.15s;
   &:hover { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06); transform: translateY(-1px); }
+
+  &.disabled {
+    cursor: wait;
+    opacity: 0.78;
+  }
 }
 
 .res-icon {
@@ -1131,10 +2028,23 @@ watch(() => route.params.spaceId, () => {
   &.image { background: #f0fdf4; } &.audio { background: #fff7ed; } &.link { background: #f3f4f6; }
 }
 
+.res-icon :deep(svg) { width: 24px; height: 24px; }
+.res-icon.mind_map :deep(svg) { width: 32px; height: 32px; }
+
 .res-body { flex: 1; min-width: 0; }
 .res-title { font-size: 0.875rem; font-weight: 600; color: #1a1a2e; margin: 0 0 2px; }
+.res-video-title {
+  margin: 0 0 5px;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 .res-desc { font-size: 0.75rem; color: #6b7280; margin: 0 0 6px; line-height: 1.4; }
-.res-meta { display: flex; gap: 8px; }
+.res-meta { display: flex; gap: 8px; flex-wrap: wrap; }
 .res-type { font-size: 0.6875rem; color: #9ca3af; }
 .res-source {
   font-size: 0.6875rem;
@@ -1143,6 +2053,111 @@ watch(() => route.params.spaceId, () => {
   &.curated { background: #f0fdf4; color: #16a34a; }
   &.user { background: #f3f4f6; color: #6b7280; }
 }
+.res-status {
+  font-size: 0.6875rem;
+  padding: 1px 6px;
+  border-radius: 99px;
+
+  &.generated { background: #ecfdf5; color: #059669; }
+  &.planned { background: #fffbeb; color: #d97706; }
+  &.generating { background: #eff6ff; color: #2563eb; }
+  &.failed { background: #fef2f2; color: #dc2626; }
+}
+
+.res-reason {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.res-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+
+  span {
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 0.65rem;
+    font-weight: 700;
+  }
+}
+
+.res-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.package-preview {
+  h3 {
+    margin: 4px 0 8px;
+    color: #0f172a;
+    font-size: 1.05rem;
+  }
+
+  > p {
+    margin: 0 0 14px;
+    color: #64748b;
+    font-size: 0.8125rem;
+    line-height: 1.55;
+  }
+}
+
+.preview-resource-list {
+  display: grid;
+  gap: 10px;
+}
+
+.preview-resource-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: #ffffff;
+
+  strong {
+    display: block;
+    color: #1f2937;
+    font-size: 0.8125rem;
+  }
+
+  p {
+    margin: 3px 0 0;
+    color: #64748b;
+    font-size: 0.72rem;
+    line-height: 1.45;
+  }
+
+  em {
+    color: #94a3b8;
+    font-size: 0.7rem;
+    font-style: normal;
+    white-space: nowrap;
+  }
+}
+
+.preview-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.preview-icon :deep(svg) { width: 22px; height: 22px; }
+.resource-group-head :deep(svg) { width: 1em; height: 1em; vertical-align: middle; }
+.type-chip :deep(svg) { width: 1em; height: 1em; vertical-align: middle; }
+.type-chip .mind_map :deep(svg) { width: 1.5em; height: 1.5em; }
 
 /* ========== Assessment Summary ========== */
 .assessment-summary {
@@ -1821,6 +2836,36 @@ watch(() => route.params.spaceId, () => {
   .phase-resources,
   .resource-grid {
     grid-template-columns: 1fr;
+  }
+
+  .plan-overview,
+  .plan-phase-head {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-overview-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .phase-head-meta {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .plan-next-step {
+    grid-template-columns: 1fr;
+
+    strong {
+      white-space: normal;
+    }
+  }
+
+  .phase-resource {
+    border-right: 0;
+
+    &:nth-child(2) {
+      border-top: 1px solid rgba(148, 163, 184, 0.08);
+    }
   }
 
   .assessment-summary {
