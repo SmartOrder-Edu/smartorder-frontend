@@ -18,7 +18,11 @@
     <div v-else-if="dashboard" class="learning-space-page">
       <!-- Space Header -->
       <section class="space-hero">
-        <div class="hero-bg" :style="{ background: themeGradient }"></div>
+        <div
+          class="hero-bg"
+          :class="{ 'has-cover': Boolean(dashboard.space.coverUrl) }"
+          :style="heroBackgroundStyle"
+        ></div>
         <div class="hero-content">
           <div class="hero-top">
             <button class="back-btn" @click="$router.push('/spaces')">
@@ -450,6 +454,13 @@
                         </span>
                       </div>
                       <p v-if="r.agentReason" class="res-reason">Agent 判断：{{ r.agentReason }}</p>
+                      <p
+                        v-if="resourceGenerationHint(r)"
+                        class="res-generation-hint"
+                        :class="displayResourceStatus(r)"
+                      >
+                        {{ resourceGenerationHint(r) }}
+                      </p>
                       <div class="res-tags">
                         <span v-if="r.knowledgePoint">{{ r.knowledgePoint }}</span>
                         <span v-if="r.studyScenario">{{ r.studyScenario }}</span>
@@ -603,7 +614,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -615,9 +626,17 @@ import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
-import { resourcePackageApi } from '@/api/spaceDashboard'
+import { resourceGenerationJobApi, resourcePackageApi } from '@/api/spaceDashboard'
 import { learningResourceApi } from '@/api/learningResource'
-import type { ResourcePackageGenerateDTO, ResourcePackageVO, ResourceType, ResourceVO, RiskStatus, TaskVO } from '@/types/learningSpace'
+import type {
+  ResourceGenerationJobVO,
+  ResourcePackageGenerateDTO,
+  ResourcePackageVO,
+  ResourceType,
+  ResourceVO,
+  RiskStatus,
+  TaskVO,
+} from '@/types/learningSpace'
 import type { LearningPlanDraft, PhaseInfo, ResourceInfo, KnowledgeNode } from '@/types/planExecute'
 
 const route = useRoute()
@@ -635,8 +654,11 @@ const packagePreviewVisible = ref(false)
 const packagePreviewLoading = ref(false)
 const packageGenerating = ref(false)
 const packageRunningSteps = ref<{ reason: string; status: string }[]>([])
-const selectedPackageTypes = ref<ResourceType[]>(['doc', 'mind_map', 'quiz', 'link'])
+const selectedPackageTypes = ref<ResourceType[]>(['doc', 'html', 'mind_map', 'quiz', 'link'])
 const generatingResourceIds = ref<string[]>([])
+const resourceGenerationJobs = ref<ResourceGenerationJobVO[]>([])
+const resourcePollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const resourcePollingInFlight = ref(false)
 
 const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
@@ -659,7 +681,25 @@ const packageTypeOptions: { value: ResourceType; label: string }[] = [
   { value: 'link', label: 'B站推荐' },
 ]
 
-const themeGradient = computed(() => 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)')
+const spaceCoverThemes: Record<string, string> = {
+  course: 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
+  exam: 'linear-gradient(135deg, #059669 0%, #34d399 100%)',
+  project: 'linear-gradient(135deg, #d97706 0%, #facc15 100%)',
+  career: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
+  competition: 'linear-gradient(135deg, #dc2626 0%, #fb7185 100%)',
+}
+
+const heroBackgroundStyle = computed(() => {
+  const coverUrl = dashboard.value?.space.coverUrl
+  if (coverUrl) {
+    return {
+      backgroundImage: `linear-gradient(135deg, rgba(15, 23, 42, 0.42), rgba(2, 132, 199, 0.18)), url(${JSON.stringify(coverUrl)})`,
+    }
+  }
+  return {
+    background: spaceCoverThemes[dashboard.value?.space.type || 'course'] || spaceCoverThemes.course,
+  }
+})
 
 const maxDuration = computed(() => {
   if (!dashboard.value?.recentRecords.length) return 60
@@ -773,6 +813,16 @@ const groupedResources = computed(() => {
   return [...groups.values()]
 })
 
+const generationJobByResourceId = computed(() => {
+  const map = new Map<string, ResourceGenerationJobVO>()
+  resourceGenerationJobs.value.forEach(job => {
+    if (job.resourceId && !map.has(job.resourceId)) {
+      map.set(job.resourceId, job)
+    }
+  })
+  return map
+})
+
 function riskLabel(s: RiskStatus) {
   const m: Record<string, string> = { good: '良好', normal: '正常', warning: '注意', danger: '危险' }
   return m[s] || s
@@ -784,11 +834,11 @@ function resourceIcon(t: string) {
 }
 
 function resourceIconClass(resource: ResourceVO) {
-  return bilibiliPreview(resource) ? 'video' : resource.resourceType
+  return bilibiliPreview(resource) ? 'link' : resource.resourceType
 }
 
 function resourceIconName(resource: ResourceVO) {
-  return resourceIcon(bilibiliPreview(resource) ? 'video' : resource.resourceType)
+  return resourceIcon(bilibiliPreview(resource) ? 'link' : resource.resourceType)
 }
 
 function resourceTypeLabel(t: string) {
@@ -826,7 +876,25 @@ function formatDuration(seconds: number | string | undefined) {
 }
 
 function displayResourceStatus(resource: ResourceVO) {
-  return generatingResourceIds.value.includes(resource.id) ? 'generating' : (resource.status || 'generated')
+  if (generatingResourceIds.value.includes(resource.id)) return 'generating'
+  const job = latestGenerationJob(resource)
+  if (job?.status === 'pending' || job?.status === 'generating') return 'generating'
+  if (job?.status === 'failed' && resource.status !== 'generated') return 'failed'
+  return resource.status || 'generated'
+}
+
+function latestGenerationJob(resource: ResourceVO) {
+  return resource.id ? generationJobByResourceId.value.get(resource.id) : undefined
+}
+
+function resourceGenerationHint(resource: ResourceVO) {
+  const status = displayResourceStatus(resource)
+  const job = latestGenerationJob(resource)
+  if (status === 'generating') return '后台正在生成内容，完成后会自动刷新。'
+  if (status === 'failed') {
+    return job?.errorMessage ? `生成失败：${job.errorMessage}` : '生成失败，可重试。'
+  }
+  return ''
 }
 
 function taskTitle(taskId: string | null | undefined) {
@@ -840,11 +908,12 @@ function goResourceDetail(resource: ResourceVO) {
 }
 
 function canGenerateResource(resource: ResourceVO) {
-  return resource.status === 'planned' || resource.status === 'failed'
+  const status = displayResourceStatus(resource)
+  return status === 'planned' || status === 'failed'
 }
 
 function isResourceBusy(resource: ResourceVO) {
-  return resource.status === 'generating' || generatingResourceIds.value.includes(resource.id)
+  return displayResourceStatus(resource) === 'generating'
 }
 
 function handleResourceCardClick(resource: ResourceVO) {
@@ -858,15 +927,60 @@ async function handleGenerateSingleResource(resource: ResourceVO) {
   if (!resource.id || isResourceBusy(resource)) return
   generatingResourceIds.value = [...generatingResourceIds.value, resource.id]
   try {
-    await learningResourceApi.generate(resource.id)
+    if (displayResourceStatus(resource) === 'failed') {
+      await learningResourceApi.retryGeneration(resource.id)
+      ElMessage.success('已重新提交生成任务')
+    } else {
+      await learningResourceApi.generate(resource.id)
+      ElMessage.success('资料已生成，可以开始学习')
+    }
     await dashStore.fetchDashboard(spaceId.value)
-    ElMessage.success('资料已生成，可以开始学习')
+    await refreshResourceGenerationJobs()
+    startResourceGenerationPolling()
   } catch (e: any) {
     ElMessage.error(e?.message || '资料生成失败，请稍后重试')
     await dashStore.fetchDashboard(spaceId.value).catch(() => {})
+    await refreshResourceGenerationJobs().catch(() => {})
   } finally {
     generatingResourceIds.value = generatingResourceIds.value.filter(id => id !== resource.id)
   }
+}
+
+async function refreshResourceGenerationJobs(showError = false) {
+  if (!spaceId.value || resourcePollingInFlight.value) return
+  resourcePollingInFlight.value = true
+  try {
+    resourceGenerationJobs.value = await resourceGenerationJobApi.list(spaceId.value, 20)
+  } catch (e: any) {
+    if (showError) ElMessage.error(e?.message || '资源生成状态刷新失败')
+  } finally {
+    resourcePollingInFlight.value = false
+  }
+}
+
+function hasActiveResourceGeneration() {
+  const resources = dashboard.value?.resources || []
+  return generatingResourceIds.value.length > 0
+    || resources.some(resource => resource.status === 'generating')
+    || resourceGenerationJobs.value.some(job => job.status === 'pending' || job.status === 'generating')
+}
+
+function startResourceGenerationPolling() {
+  if (resourcePollingTimer.value) return
+  resourcePollingTimer.value = setInterval(async () => {
+    await refreshResourceGenerationJobs()
+    if (spaceId.value && hasActiveResourceGeneration()) {
+      await dashStore.fetchDashboard(spaceId.value)
+      return
+    }
+    stopResourceGenerationPolling()
+  }, 4000)
+}
+
+function stopResourceGenerationPolling() {
+  if (!resourcePollingTimer.value) return
+  clearInterval(resourcePollingTimer.value)
+  resourcePollingTimer.value = null
 }
 
 function normalizeText(text: string | null | undefined) {
@@ -1022,7 +1136,9 @@ async function handleGenerateResourcePackage() {
     packagePreviewVisible.value = false
     resourcePackagePreview.value = result
     await dashStore.fetchDashboard(spaceId.value)
-    ElMessage.success('资料包已生成并加入资料库')
+    await refreshResourceGenerationJobs()
+    startResourceGenerationPolling()
+    ElMessage.success('资料包已提交生成，完成后会自动刷新')
   } catch (e: any) {
     packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'failed' }))
     ElMessage.error(e?.message || '资料包生成失败')
@@ -1139,7 +1255,10 @@ async function loadLearningPlan(id: string) {
 function loadDashboard() {
   const id = spaceId.value
   if (id) {
-    dashStore.fetchDashboard(id)
+    dashStore.fetchDashboard(id).then(async () => {
+      await refreshResourceGenerationJobs()
+      if (hasActiveResourceGeneration()) startResourceGenerationPolling()
+    })
     loadLearningPlan(id)
   }
 }
@@ -1155,7 +1274,10 @@ onMounted(() => {
   syncActiveTabFromRoute()
   loadDashboard()
 })
+onUnmounted(stopResourceGenerationPolling)
 watch(() => route.params.spaceId, () => {
+  stopResourceGenerationPolling()
+  resourceGenerationJobs.value = []
   loadDashboard()
   syncActiveTabFromRoute()
   if (!route.query.tab) activeTab.value = 'today'
@@ -1166,6 +1288,12 @@ watch(currentPlanPhaseKey, key => {
     expandedPhaseKeys.value = [key, ...expandedPhaseKeys.value]
   }
 })
+watch(
+  () => dashboard.value?.resources?.map(resource => `${resource.id}:${resource.status}`).join('|') || '',
+  () => {
+    if (hasActiveResourceGeneration()) startResourceGenerationPolling()
+  }
+)
 </script>
 
 <style scoped lang="scss">
@@ -1212,6 +1340,9 @@ watch(currentPlanPhaseKey, key => {
   position: absolute;
   inset: 0;
   opacity: 0.05;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .hero-content {
@@ -2022,7 +2153,7 @@ watch(currentPlanPhaseKey, key => {
   flex-shrink: 0;
   font-size: 20px;
 
-  &.doc, &.ppt { background: #eff6ff; } &.video { background: #fef2f2; }
+  &.doc, &.ppt { background: #eff6ff; } &.html { background: #f0fdf4; } &.video { background: #fef2f2; }
   &.mind_map { background: #ede9fe; } &.quiz { background: #ecfdf5; }
   &.case_study { background: #fef3c7; } &.flashcard_set { background: #fce7f3; }
   &.image { background: #f0fdf4; } &.audio { background: #fff7ed; } &.link { background: #f3f4f6; }
@@ -2069,6 +2200,15 @@ watch(currentPlanPhaseKey, key => {
   color: #475569;
   font-size: 0.72rem;
   line-height: 1.5;
+}
+
+.res-generation-hint {
+  margin: 7px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+
+  &.generating { color: #2563eb; }
+  &.failed { color: #dc2626; }
 }
 
 .res-tags {
@@ -2298,6 +2438,11 @@ watch(currentPlanPhaseKey, key => {
 .hero-bg {
   opacity: 0.22;
   filter: saturate(130%);
+}
+
+.hero-bg.has-cover {
+  opacity: 0.36;
+  filter: saturate(112%) contrast(104%);
 }
 
 .hero-content {

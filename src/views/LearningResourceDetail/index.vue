@@ -1,6 +1,8 @@
 <template>
   <AppLayout>
     <div class="resource-detail-page">
+      <ParticleBackground />
+      <div class="resource-detail-content">
       <div v-if="loading" class="loading-panel">
         <el-skeleton :rows="8" animated />
       </div>
@@ -21,11 +23,11 @@
             <div class="resource-meta">
               <span>{{ resourceTypeLabel(detail.resource.resourceType) }}</span>
               <span>{{ sourceLabel }}</span>
-              <span v-if="detail.resource.status">{{ resourceStatusLabel(detail.resource.status) }}</span>
+              <span>{{ resourceStatusLabel(resourceStatus) }}</span>
               <span v-if="detail.taskTitle">任务：{{ detail.taskTitle }}</span>
             </div>
           </div>
-          <el-button v-if="externalUrl" type="primary" plain @click="openExternal">
+          <el-button v-if="externalUrl && resourceStatus === 'generated'" type="primary" plain @click="openExternal">
             打开外部资源
           </el-button>
         </header>
@@ -51,8 +53,23 @@
           </aside>
 
           <section class="content-panel">
+            <div v-if="resourceStatus === 'generating'" class="generation-state generating">
+              <div class="generation-icon"></div>
+              <h2>资源正在生成</h2>
+              <p>Resource Agent 正在后台生成内容，完成后页面会自动刷新。</p>
+            </div>
+
+            <div v-else-if="resourceStatus === 'failed'" class="generation-state failed">
+              <div class="generation-icon"></div>
+              <h2>资源生成失败</h2>
+              <p>{{ generationError || '本次生成没有返回明确错误，可以重新提交生成任务。' }}</p>
+              <el-button type="primary" :loading="retrying" @click="handleRetryGeneration">
+                重试生成
+              </el-button>
+            </div>
+
             <MarkdownRenderer
-              v-if="renderMode === 'markdown'"
+              v-else-if="renderMode === 'markdown'"
               :content="markdownContent"
             />
 
@@ -160,25 +177,30 @@
           </section>
         </main>
       </template>
+      </div>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import ParticleBackground from '@/components/ParticleBackground.vue'
 import { learningResourceApi } from '@/api/learningResource'
-import type { ResourceDetailVO } from '@/types/learningSpace'
+import type { ResourceDetailVO, ResourceGenerationJobVO } from '@/types/learningSpace'
 
 const route = useRoute()
 const router = useRouter()
 
 const detail = ref<ResourceDetailVO | null>(null)
+const generationJob = ref<ResourceGenerationJobVO | null>(null)
 const loading = ref(false)
 const error = ref('')
+const retrying = ref(false)
+const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const resourceId = computed(() => String(route.params.resourceId || ''))
 
@@ -192,6 +214,13 @@ const renderMode = computed(() => {
 })
 
 const markdownContent = computed(() => detail.value?.content?.content || '')
+const resourceStatus = computed(() => {
+  const jobStatus = generationJob.value?.status
+  if (jobStatus === 'pending' || jobStatus === 'generating') return 'generating'
+  if (jobStatus === 'failed' && detail.value?.resource.status !== 'generated') return 'failed'
+  return detail.value?.resource.status || 'generated'
+})
+const generationError = computed(() => generationJob.value?.errorMessage || '')
 
 const quizData = computed<any | null>(() => parseJson(detail.value?.content?.content))
 const externalData = computed<any | null>(() => parseJson(detail.value?.content?.content))
@@ -318,7 +347,7 @@ async function loadDetail() {
   loading.value = true
   error.value = ''
   try {
-    detail.value = await learningResourceApi.detail(resourceId.value)
+    await fetchDetail()
   } catch (e: any) {
     error.value = e?.message || '加载学习资源失败'
     detail.value = null
@@ -327,16 +356,73 @@ async function loadDetail() {
   }
 }
 
+async function fetchDetail() {
+  detail.value = await learningResourceApi.detail(resourceId.value)
+  await refreshGenerationJob()
+  if (resourceStatus.value === 'generating') {
+    startPolling()
+  } else {
+    stopPolling()
+  }
+}
+
+async function refreshGenerationJob() {
+  generationJob.value = await learningResourceApi.latestGenerationJob(resourceId.value)
+}
+
+async function handleRetryGeneration() {
+  if (!resourceId.value || retrying.value) return
+  retrying.value = true
+  try {
+    generationJob.value = await learningResourceApi.retryGeneration(resourceId.value)
+    if (detail.value) detail.value.resource.status = 'generating'
+    startPolling()
+    ElMessage.success('已重新提交生成任务')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '重试生成失败')
+  } finally {
+    retrying.value = false
+  }
+}
+
+function startPolling() {
+  if (pollingTimer.value) return
+  pollingTimer.value = setInterval(async () => {
+    try {
+      await fetchDetail()
+    } catch (e) {
+      console.warn('Failed to refresh resource generation status:', e)
+    }
+  }, 4000)
+}
+
+function stopPolling() {
+  if (!pollingTimer.value) return
+  clearInterval(pollingTimer.value)
+  pollingTimer.value = null
+}
+
 onMounted(loadDetail)
-watch(resourceId, loadDetail)
+onUnmounted(stopPolling)
+watch(resourceId, () => {
+  stopPolling()
+  generationJob.value = null
+  loadDetail()
+})
 </script>
 
 <style scoped lang="scss">
 .resource-detail-page {
+  position: relative;
   width: 100%;
   max-width: 1320px;
   margin: 0 auto;
   padding: 24px;
+}
+
+.resource-detail-content {
+  position: relative;
+  z-index: 1;
 }
 
 .loading-panel,
@@ -455,9 +541,78 @@ watch(resourceId, loadDetail)
   border-radius: 16px;
 }
 
+.generation-state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  min-height: 260px;
+  padding: 44px 20px;
+  text-align: center;
+
+  h2 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1.15rem;
+  }
+
+  p {
+    max-width: 520px;
+    margin: 0;
+    color: #64748b;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  &.generating .generation-icon {
+    border-color: rgba(37, 99, 235, 0.18);
+    border-top-color: #2563eb;
+    animation: spin 0.9s linear infinite;
+  }
+
+  &.failed .generation-icon {
+    border-color: rgba(220, 38, 38, 0.18);
+    background: #fef2f2;
+  }
+}
+
+.generation-icon {
+  width: 44px;
+  height: 44px;
+  border: 4px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .html-content {
   color: #1f2937;
   line-height: 1.7;
+
+  :deep(.generated-resource-html) {
+    display: grid;
+    gap: 18px;
+    max-width: 920px;
+    margin: 0 auto;
+  }
+
+  :deep(section) {
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  :deep(section:last-child) {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  :deep(.hero-block) {
+    padding: 18px 20px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #ecfdfb, #f8fafc);
+    border: 1px solid rgba(11, 183, 170, 0.14);
+  }
 
   :deep(h1) {
     margin-top: 0;
@@ -465,8 +620,65 @@ watch(resourceId, loadDetail)
   }
 
   :deep(h2) {
+    margin: 0 0 10px;
     color: #0f172a;
     font-size: 1.05rem;
+  }
+
+  :deep(h3) {
+    margin: 0 0 6px;
+    color: #334155;
+    font-size: 0.92rem;
+  }
+
+  :deep(p) {
+    margin: 0;
+  }
+
+  :deep(.note) {
+    color: #475569;
+  }
+
+  :deep(.goal-list),
+  :deep(.step-list),
+  :deep(.check-list),
+  :deep(.review-list) {
+    margin: 0;
+    padding-left: 20px;
+  }
+
+  :deep(.concept-table) {
+    width: 100%;
+    border-collapse: collapse;
+    overflow: hidden;
+    border-radius: 8px;
+    font-size: 0.86rem;
+  }
+
+  :deep(.concept-table th),
+  :deep(.concept-table td) {
+    padding: 10px 12px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  :deep(.concept-table th) {
+    background: #f8fafc;
+    color: #334155;
+  }
+
+  :deep(.comparison-grid) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  :deep(.comparison-grid > div) {
+    padding: 13px 14px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid rgba(148, 163, 184, 0.16);
   }
 }
 
@@ -718,6 +930,12 @@ watch(resourceId, loadDetail)
 
   .bili-video-card {
     grid-template-columns: 1fr;
+  }
+
+  .html-content {
+    :deep(.comparison-grid) {
+      grid-template-columns: 1fr;
+    }
   }
 }
 </style>

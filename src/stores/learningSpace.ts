@@ -38,11 +38,11 @@ function extractPrimaryGoal(goalsJson: string | null | undefined): string {
 }
 
 const TYPE_COLORS: Record<string, { color: string; gradient: string; icon: string; bg: string }> = {
-  course:      { color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', icon: '📐', bg: '#eff6ff' },
-  exam:        { color: '#10b981', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', icon: '📝', bg: '#ecfdf5' },
-  project:     { color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', icon: '💻', bg: '#fffbeb' },
-  career:      { color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', icon: '🚀', bg: '#f5f3ff' },
-  competition: { color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', icon: '🏆', bg: '#fef2f2' },
+  course:      { color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', icon: '📐', bg: '#e2eeff' },
+  exam:        { color: '#10b981', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', icon: '📝', bg: '#ddfaeb' },
+  project:     { color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', icon: '💻', bg: '#fff5d6' },
+  career:      { color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', icon: '🚀', bg: '#ede4ff' },
+  competition: { color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', icon: '🏆', bg: '#fde2e2' },
 }
 
 function deriveTodaySuggestion(space: LearningSpaceVO): string {
