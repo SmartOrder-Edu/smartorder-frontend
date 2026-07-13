@@ -1,6 +1,8 @@
 <template>
   <AppLayout>
     <div class="spaces-page">
+      <ParticleBackground />
+      <div class="spaces-content">
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
@@ -240,6 +242,7 @@
           <el-button type="primary" :loading="submitting" @click="handleSubmit">保存修改</el-button>
         </template>
       </el-dialog>
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -249,6 +252,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import ParticleBackground from '@/components/ParticleBackground.vue'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
 import type { LearningSpaceDisplay, LearningSpaceType } from '@/api/learningSpace'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -439,10 +443,15 @@ onMounted(() => { spaceStore.fetchSpaces() })
 
 <style scoped>
 .spaces-page {
+  position: relative;
   width: 100%;
   max-width: 1500px;
   margin: 0 auto;
   padding: 24px;
+}
+.spaces-content {
+  position: relative;
+  z-index: 1;
 }
 
 /* Header */
@@ -512,8 +521,8 @@ onMounted(() => { spaceStore.fetchSpaces() })
   box-shadow: 0 8px 24px rgba(67, 97, 238, 0.15); 
   transform: translateY(-2px);
 }
-.stat-value { display: block; font-size: 2.2rem; font-weight: 900; color: #0f172a; line-height: 1.1; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
-.stat-label { display: block; font-size: 0.875rem; font-weight: 600; color: #64748b; letter-spacing: 0.02em; }
+.stat-value { display: block; font-size: 1.75rem; font-weight: 700; color: #0f172a; line-height: 1.1; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+.stat-label { display: block; font-size: 0.8125rem; font-weight: 600; color: #94a3b8; letter-spacing: 0.02em; }
 
 /* Filter */
 .filter-bar {
@@ -567,11 +576,17 @@ onMounted(() => { spaceStore.fetchSpaces() })
   flex-direction: column;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 8px rgba(0, 0, 0, 0.04),
+    0 12px 24px rgba(0, 0, 0, 0.06);
 }
 .space-card:hover {
-  transform: translateY(-6px) scale(1.01);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(67, 97, 238, 0.08);
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 2px rgba(11, 183, 170, 0.06),
+    0 8px 16px rgba(0, 0, 0, 0.06),
+    0 20px 40px rgba(11, 183, 170, 0.08);
   border-color: rgba(67, 97, 238, 0.3);
   filter: brightness(0.99);
 }
@@ -581,14 +596,14 @@ onMounted(() => { spaceStore.fetchSpaces() })
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, rgba(67, 97, 238, 0.8), transparent);
-  opacity: 0.3;
-  transition: opacity 0.4s, height 0.4s;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(11, 183, 170, 0.6), transparent);
+  opacity: 0.4;
+  transition: opacity 0.4s, box-shadow 0.4s;
 }
 .space-card:hover::before {
   opacity: 1;
-  height: 4px;
+  box-shadow: 0 0 12px rgba(11, 183, 170, 0.3);
 }
 .space-card.danger::before { background: linear-gradient(90deg, transparent, #ef4444, transparent); opacity: 0.8; }
 .space-card.warning::before { background: linear-gradient(90deg, transparent, #f59e0b, transparent); opacity: 0.8; }
@@ -599,7 +614,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 20px 14px;
+  padding: 20px 24px 16px;
   cursor: pointer;
 }
 .card-head-left {
@@ -638,7 +653,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
 
 /* Card Body */
 .card-body {
-  padding: 12px 20px 20px;
+  padding: 0 24px 20px;
   cursor: pointer;
   flex: 1;
 }
@@ -675,10 +690,15 @@ onMounted(() => { spaceStore.fetchSpaces() })
   position: relative;
   box-shadow: 0 0 10px rgba(0,0,0,0.2);
 }
-.progress-fill::after { 
-  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+.progress-fill::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
   background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
-  animation: shimmer 2s infinite linear;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.space-card:hover .progress-fill::after {
+  opacity: 1;
+  animation: shimmer 1.5s ease-in-out 1;
 }
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
@@ -721,7 +741,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
 .card-actions {
   display: flex;
   background: rgba(248, 250, 252, 0.5);
-  padding: 14px 20px;
+  padding: 14px 24px;
   gap: 14px;
   border-top: 1px solid rgba(226, 232, 240, 0.8);
 }
@@ -752,17 +772,17 @@ onMounted(() => { spaceStore.fetchSpaces() })
   grid-column: 1 / -1;
   text-align: center;
   padding: 80px 20px;
-  background: rgba(255,255,255,0.5);
-  border: 2px dashed rgba(226, 232, 240, 0.8);
+  background: rgba(248, 250, 252, 0.6);
+  border: 2px dashed rgba(203, 213, 225, 0.6);
   border-radius: 20px;
   margin-top: 10px;
 }
 .empty-state svg {
-  color: #cbd5e1;
+  color: #d1d5db;
   margin-bottom: 8px;
 }
-.empty-state h3 { margin: 16px 0 8px; color: #0f172a; font-size: 1.125rem; font-weight: 700; }
-.empty-state p { color: #64748b; margin: 0 0 24px; font-size: 0.95rem; }
+.empty-state h3 { margin: 16px 0 8px; color: #334155; font-size: 1.125rem; font-weight: 700; }
+.empty-state p { color: #94a3b8; margin: 0 0 24px; font-size: 0.95rem; }
 .empty-state .el-button {
   border-radius: 12px;
   padding: 12px 28px;
