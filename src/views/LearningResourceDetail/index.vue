@@ -21,11 +21,11 @@
             <div class="resource-meta">
               <span>{{ resourceTypeLabel(detail.resource.resourceType) }}</span>
               <span>{{ sourceLabel }}</span>
-              <span v-if="detail.resource.status">{{ resourceStatusLabel(detail.resource.status) }}</span>
+              <span>{{ resourceStatusLabel(resourceStatus) }}</span>
               <span v-if="detail.taskTitle">任务：{{ detail.taskTitle }}</span>
             </div>
           </div>
-          <el-button v-if="externalUrl" type="primary" plain @click="openExternal">
+          <el-button v-if="externalUrl && resourceStatus === 'generated'" type="primary" plain @click="openExternal">
             打开外部资源
           </el-button>
         </header>
@@ -51,8 +51,23 @@
           </aside>
 
           <section class="content-panel">
+            <div v-if="resourceStatus === 'generating'" class="generation-state generating">
+              <div class="generation-icon"></div>
+              <h2>资源正在生成</h2>
+              <p>Resource Agent 正在后台生成内容，完成后页面会自动刷新。</p>
+            </div>
+
+            <div v-else-if="resourceStatus === 'failed'" class="generation-state failed">
+              <div class="generation-icon"></div>
+              <h2>资源生成失败</h2>
+              <p>{{ generationError || '本次生成没有返回明确错误，可以重新提交生成任务。' }}</p>
+              <el-button type="primary" :loading="retrying" @click="handleRetryGeneration">
+                重试生成
+              </el-button>
+            </div>
+
             <MarkdownRenderer
-              v-if="renderMode === 'markdown'"
+              v-else-if="renderMode === 'markdown'"
               :content="markdownContent"
             />
 
@@ -165,20 +180,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import { learningResourceApi } from '@/api/learningResource'
-import type { ResourceDetailVO } from '@/types/learningSpace'
+import type { ResourceDetailVO, ResourceGenerationJobVO } from '@/types/learningSpace'
 
 const route = useRoute()
 const router = useRouter()
 
 const detail = ref<ResourceDetailVO | null>(null)
+const generationJob = ref<ResourceGenerationJobVO | null>(null)
 const loading = ref(false)
 const error = ref('')
+const retrying = ref(false)
+const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const resourceId = computed(() => String(route.params.resourceId || ''))
 
@@ -192,6 +210,13 @@ const renderMode = computed(() => {
 })
 
 const markdownContent = computed(() => detail.value?.content?.content || '')
+const resourceStatus = computed(() => {
+  const jobStatus = generationJob.value?.status
+  if (jobStatus === 'pending' || jobStatus === 'generating') return 'generating'
+  if (jobStatus === 'failed' && detail.value?.resource.status !== 'generated') return 'failed'
+  return detail.value?.resource.status || 'generated'
+})
+const generationError = computed(() => generationJob.value?.errorMessage || '')
 
 const quizData = computed<any | null>(() => parseJson(detail.value?.content?.content))
 const externalData = computed<any | null>(() => parseJson(detail.value?.content?.content))
@@ -318,7 +343,7 @@ async function loadDetail() {
   loading.value = true
   error.value = ''
   try {
-    detail.value = await learningResourceApi.detail(resourceId.value)
+    await fetchDetail()
   } catch (e: any) {
     error.value = e?.message || '加载学习资源失败'
     detail.value = null
@@ -327,8 +352,59 @@ async function loadDetail() {
   }
 }
 
+async function fetchDetail() {
+  detail.value = await learningResourceApi.detail(resourceId.value)
+  await refreshGenerationJob()
+  if (resourceStatus.value === 'generating') {
+    startPolling()
+  } else {
+    stopPolling()
+  }
+}
+
+async function refreshGenerationJob() {
+  generationJob.value = await learningResourceApi.latestGenerationJob(resourceId.value)
+}
+
+async function handleRetryGeneration() {
+  if (!resourceId.value || retrying.value) return
+  retrying.value = true
+  try {
+    generationJob.value = await learningResourceApi.retryGeneration(resourceId.value)
+    if (detail.value) detail.value.resource.status = 'generating'
+    startPolling()
+    ElMessage.success('已重新提交生成任务')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '重试生成失败')
+  } finally {
+    retrying.value = false
+  }
+}
+
+function startPolling() {
+  if (pollingTimer.value) return
+  pollingTimer.value = setInterval(async () => {
+    try {
+      await fetchDetail()
+    } catch (e) {
+      console.warn('Failed to refresh resource generation status:', e)
+    }
+  }, 4000)
+}
+
+function stopPolling() {
+  if (!pollingTimer.value) return
+  clearInterval(pollingTimer.value)
+  pollingTimer.value = null
+}
+
 onMounted(loadDetail)
-watch(resourceId, loadDetail)
+onUnmounted(stopPolling)
+watch(resourceId, () => {
+  stopPolling()
+  generationJob.value = null
+  loadDetail()
+})
 </script>
 
 <style scoped lang="scss">
@@ -453,6 +529,51 @@ watch(resourceId, loadDetail)
   min-width: 0;
   padding: 24px;
   border-radius: 16px;
+}
+
+.generation-state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  min-height: 260px;
+  padding: 44px 20px;
+  text-align: center;
+
+  h2 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1.15rem;
+  }
+
+  p {
+    max-width: 520px;
+    margin: 0;
+    color: #64748b;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  &.generating .generation-icon {
+    border-color: rgba(37, 99, 235, 0.18);
+    border-top-color: #2563eb;
+    animation: spin 0.9s linear infinite;
+  }
+
+  &.failed .generation-icon {
+    border-color: rgba(220, 38, 38, 0.18);
+    background: #fef2f2;
+  }
+}
+
+.generation-icon {
+  width: 44px;
+  height: 44px;
+  border: 4px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .html-content {

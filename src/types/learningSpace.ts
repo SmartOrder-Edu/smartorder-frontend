@@ -80,6 +80,7 @@ export type ResourceType =
   | 'case_study' | 'flashcard_set' | 'image' | 'audio' | 'link'
 export type ResourceSource = 'ai' | 'user' | 'curated'
 export type ResourceStatus = 'planned' | 'generating' | 'generated' | 'failed'
+export type ResourceGenerationJobStatus = 'pending' | 'generating' | 'generated' | 'failed'
 
 export interface ResourceVO {
   id: string
@@ -123,6 +124,22 @@ export interface ResourcePackageVO {
   status: 'preview' | 'generating' | 'generated' | 'failed'
   resources: ResourceVO[]
   agentActions: AgentActionVO[]
+}
+
+export interface ResourceGenerationJobVO {
+  id: string
+  spaceId: string
+  resourceId: string
+  packageId: string | null
+  resourceType: ResourceType
+  title: string
+  reason: string
+  status: ResourceGenerationJobStatus
+  retryCount: number
+  errorMessage: string | null
+  traceId: string | null
+  createTime: string
+  updateTime: string
 }
 
 export interface ResourceContentVO {
