@@ -18,7 +18,11 @@
     <div v-else-if="dashboard" class="learning-space-page">
       <!-- Space Header -->
       <section class="space-hero">
-        <div class="hero-bg" :style="{ background: themeGradient }"></div>
+        <div
+          class="hero-bg"
+          :class="{ 'has-cover': Boolean(dashboard.space.coverUrl) }"
+          :style="heroBackgroundStyle"
+        ></div>
         <div class="hero-content">
           <div class="hero-top">
             <button class="back-btn" @click="$router.push('/spaces')">
@@ -677,7 +681,25 @@ const packageTypeOptions: { value: ResourceType; label: string }[] = [
   { value: 'link', label: 'B站推荐' },
 ]
 
-const themeGradient = computed(() => 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)')
+const spaceCoverThemes: Record<string, string> = {
+  course: 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
+  exam: 'linear-gradient(135deg, #059669 0%, #34d399 100%)',
+  project: 'linear-gradient(135deg, #d97706 0%, #facc15 100%)',
+  career: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
+  competition: 'linear-gradient(135deg, #dc2626 0%, #fb7185 100%)',
+}
+
+const heroBackgroundStyle = computed(() => {
+  const coverUrl = dashboard.value?.space.coverUrl
+  if (coverUrl) {
+    return {
+      backgroundImage: `linear-gradient(135deg, rgba(15, 23, 42, 0.42), rgba(2, 132, 199, 0.18)), url(${JSON.stringify(coverUrl)})`,
+    }
+  }
+  return {
+    background: spaceCoverThemes[dashboard.value?.space.type || 'course'] || spaceCoverThemes.course,
+  }
+})
 
 const maxDuration = computed(() => {
   if (!dashboard.value?.recentRecords.length) return 60
@@ -1318,6 +1340,9 @@ watch(
   position: absolute;
   inset: 0;
   opacity: 0.05;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .hero-content {
@@ -2413,6 +2438,11 @@ watch(
 .hero-bg {
   opacity: 0.22;
   filter: saturate(130%);
+}
+
+.hero-bg.has-cover {
+  opacity: 0.36;
+  filter: saturate(112%) contrast(104%);
 }
 
 .hero-content {
