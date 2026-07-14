@@ -30,18 +30,30 @@
           </div>
           
           <div class="settings-row-item">
-            <span class="item-label">{{ t('phone') }}</span>
+            <span class="item-label">{{ t('gitee') }}</span>
             <div class="item-value action-value">
-              <span>{{ userStore.userInfo?.phone || '156******99' }}</span>
-              <button class="action-link-btn" @click="handleResetPhone">{{ t('change') }}</button>
+              <span style="display:inline-flex;align-items:center;gap:6px;">
+                <!-- Gitee SVG -->
+                <svg viewBox="0 0 1024 1024" width="16" height="16" style="vertical-align:middle;">
+                  <path d="M512 0C229.12 0 0 229.12 0 512s229.12 512 512 512 512-229.12 512-512S794.88 0 512 0zm233.6 374.4H448c-17.92 0-32 14.08-32 32v192h192c17.92 0 32 14.08 32 32s-14.08 32-32 32H384c-17.92 0-32-14.08-32-32V406.4c0-52.48 42.88-96 96-96h297.6c17.92 0 32 14.08 32 32s-14.08 32-32 32z" fill="#C71D23"/>
+                </svg>
+                已绑定
+              </span>
+              <button class="action-link-btn" @click="handleBindGitee">{{ t('unbind') }}</button>
             </div>
           </div>
           
           <div class="settings-row-item">
-            <span class="item-label">{{ t('wechat') }}</span>
+            <span class="item-label">{{ t('github') }}</span>
             <div class="item-value action-value">
-              <span>已绑定</span>
-              <button class="action-link-btn" @click="handleUnbindWechat">{{ t('unbind') }}</button>
+              <span style="display:inline-flex;align-items:center;gap:6px;">
+                <!-- GitHub SVG -->
+                <svg viewBox="0 0 1024 1024" width="16" height="16" style="vertical-align:middle;color:#24292e;" class="github-icon">
+                  <path d="M512 0C229.25 0 0 229.25 0 512c0 226.25 146.69 418.13 350.16 485.83 25.59 4.69 34.94-11.12 34.94-24.69 0-12.19-.47-52.56-.69-95.31-142.44 30.94-172.5-60.44-172.5-60.44-23.31-59.25-56.88-75-56.88-75-46.5-31.81 3.53-31.13 3.53-31.13 51.41 3.63 78.44 52.81 78.44 52.81 45.63 78.19 119.75 55.63 148.94 42.56 4.63-33.06 17.88-55.63 32.44-68.38-113.69-12.94-233.19-56.88-233.19-253.06 0-55.88 20-101.56 52.81-137.44-5.31-12.94-22.88-65.06 5-135.56 0 0 43.06-13.81 141.06 52.56 40.94-11.38 84.88-17.06 128.5-17.25 43.63.19 87.63 5.88 128.63 17.25 97.88-66.38 140.88-52.56 140.88-52.56 27.94 70.5 10.38 122.63 5.06 135.56 32.88 35.88 52.75 81.56 52.75 137.44 0 196.69-119.75 239.94-233.81 252.56 18.38 15.88 34.75 47.13 34.75 94.94 0 68.56-.63 123.75-.63 140.63 0 13.69 9.25 29.63 35.25 24.63C877.44 930 1024 738.13 1024 512 1024 229.25 794.75 0 512 0z" fill="currentColor"/>
+                </svg>
+                未绑定
+              </span>
+              <button class="action-link-btn" @click="handleBindGithub">绑定</button>
             </div>
           </div>
           
@@ -228,15 +240,11 @@ const handleClearChats = () => {
   }).catch(() => {})
 }
 
-const handleResetPhone = () => {
-  ElMessage.info(locale.value === 'en-US' ? 'Changing phone is not supported currently' : '暂不支持自主修改手机号，请联系管理员')
-}
-
-const handleUnbindWechat = () => {
+const handleBindGitee = () => {
   ElMessageBox.confirm(
     locale.value === 'en-US'
-      ? 'Are you sure you want to unbind WeChat? You will lose WeChat quick login.'
-      : '确定要解绑微信账号吗？解绑后将无法使用微信快捷登录。',
+      ? 'Are you sure you want to unbind your Gitee account?'
+      : '确定要解绑 Gitee 账号吗？解绑后将无法使用 Gitee 快捷登录。',
     locale.value === 'en-US' ? 'Prompt' : '提示',
     {
       confirmButtonText: locale.value === 'en-US' ? 'Confirm' : '确定解绑',
@@ -244,8 +252,12 @@ const handleUnbindWechat = () => {
       type: 'warning'
     }
   ).then(() => {
-    ElMessage.success(locale.value === 'en-US' ? 'WeChat unbound successfully' : '微信解绑成功')
+    ElMessage.success(locale.value === 'en-US' ? 'Gitee unbound successfully' : 'Gitee 解绑成功')
   }).catch(() => {})
+}
+
+const handleBindGithub = () => {
+  ElMessage.info(locale.value === 'en-US' ? 'GitHub binding is not supported currently' : '暂不支持自主绑定 GitHub，请联系管理员')
 }
 
 const handleLogoutDevices = () => {
@@ -272,7 +284,9 @@ const handleLogoutDevices = () => {
   scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  height: 100%;
+  box-sizing: border-box;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -303,11 +317,8 @@ const handleLogoutDevices = () => {
 }
 
 .settings-card {
-  background-color: var(--panel-bg);
-  border: 1px solid var(--border-color);
   border-radius: 14px;
   padding: 20px;
-  box-shadow: 0 4px 16px  var(--color-shadow);
   display: flex;
   flex-direction: column;
 
@@ -438,8 +449,6 @@ const handleLogoutDevices = () => {
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border: 1px dashed rgba(245, 108, 108, 0.4);
-    background-color: rgba(245, 108, 108, 0.05);
     border-radius: 14px;
     gap: 20px;
     
@@ -470,10 +479,7 @@ const handleLogoutDevices = () => {
 
 /* 服务协议查看器 */
 .terms-viewer {
-  background-color: var(--panel-bg);
-  border: 1px solid var(--border-color);
   border-radius: 14px;
-  box-shadow: 0 4px 16px  var(--color-shadow);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -536,6 +542,46 @@ const handleLogoutDevices = () => {
       color: var(--text-secondary);
       text-align: justify;
     }
+  }
+}
+
+/* 浅色主题下的卡片面板 */
+html[data-theme='light'] {
+  .settings-card {
+    background-color: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+  }
+  
+  .terms-viewer {
+    background-color: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+  }
+
+  .danger-box {
+    border: 1px dashed rgba(245, 108, 108, 0.4);
+    background-color: rgba(245, 108, 108, 0.02);
+  }
+}
+
+/* 深色主题下的卡片面板 */
+html[data-theme='dark'] {
+  .settings-card {
+    background-color: var(--panel-bg-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 16px var(--shadow-color);
+  }
+  
+  .terms-viewer {
+    background-color: var(--panel-bg-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 4px 16px var(--shadow-color);
+  }
+
+  .danger-box {
+    border: 1px dashed rgba(245, 108, 108, 0.4);
+    background-color: rgba(245, 108, 108, 0.04);
   }
 }
 </style>

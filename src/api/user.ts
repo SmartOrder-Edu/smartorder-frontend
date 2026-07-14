@@ -61,9 +61,24 @@ export const userApi = {
     return request.post<LoginResponse>('/auth/login', params)
   },
 
+  /** 获取 GitHub OAuth state（防 CSRF） */
+  getGithubOAuthState() {
+    return request.get<string>('/auth/github/state')
+  },
+
   /** GitHub 登录，接收 code 和 state，返回系统 accessToken，刷新 token 写入 Cookie */
   githubLogin(code: string, state?: string) {
     return request.post<string>('/auth/github/login', { code, state })
+  },
+
+  /** 获取 Gitee OAuth state（防 CSRF） */
+  getGiteeOAuthState() {
+    return request.get<string>('/auth/gitee/state')
+  },
+
+  /** Gitee 登录，接收 code 和 state，返回系统 accessToken，刷新 token 写入 Cookie */
+  giteeLogin(code: string, state?: string) {
+    return request.post<string>('/auth/gitee/login', { code, state })
   },
 
   /** 邮箱注册 */

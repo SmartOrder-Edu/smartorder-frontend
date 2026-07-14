@@ -19,6 +19,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: 'GitHub 登录中 - 知序智学', guest: true }
   },
   {
+    path: '/oauth/callback/gitee',
+    name: 'GiteeCallback',
+    component: () => import('@/views/Login/GiteeCallback.vue'),
+    meta: { title: 'Gitee 登录中 - 知序智学', guest: true }
+  },
+  {
     path: '/register',
     name: 'Register',
     component: () => import('@/views/Register/index.vue'),

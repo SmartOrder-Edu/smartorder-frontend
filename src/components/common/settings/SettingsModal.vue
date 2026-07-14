@@ -1,39 +1,37 @@
 <template>
   <teleport to="body">
-    <transition name="dialog-fade">
+    <div 
+      v-if="isRendered" 
+      class="settings-overlay"
+      :class="{ open: isAnimateOpen }"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+      @click="handleOverlayClick"
+    >
       <div 
-        v-if="modelValue" 
-        class="custom-dialog-overlay" 
-        role="dialog"
-        aria-modal="true"
-        :aria-label="t('settings')"
-        @click="handleOverlayClick"
+        ref="modalRef"
+        class="settings-modal"
       >
-        <div 
-          ref="modalRef"
-          class="custom-dialog-container" 
-          @click.stop
-        >
-          <!-- 弹窗头部 -->
-          <div class="custom-dialog-header">
-            <span class="dialog-title">{{ t('settings') }}</span>
-            <button 
-              class="modal-close-btn" 
-              :aria-label="t('closeSettings')"
-              @click="handleClose" 
-            >
-              <el-icon><Close /></el-icon>
-            </button>
-          </div>
+        <!-- 弹窗头部 -->
+        <div class="settings-header">
+          <span id="settings-title" class="dialog-title">{{ t('settings') }}</span>
+          <button 
+            class="modal-close-btn" 
+            :aria-label="t('closeSettings')"
+            @click="closeSettings" 
+          >
+            <el-icon><Close /></el-icon>
+          </button>
+        </div>
 
-          <!-- 弹窗主体 -->
-          <div class="custom-dialog-body">
-            <!-- 插入 Sidebar 和 Content -->
-            <slot></slot>
-          </div>
+        <!-- 弹窗主体 -->
+        <div class="settings-body">
+          <!-- 插入 Sidebar 和 Content -->
+          <slot></slot>
         </div>
       </div>
-    </transition>
+    </div>
   </teleport>
 </template>
 
@@ -53,18 +51,28 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const modalRef = ref<HTMLElement | null>(null)
+
+const isRendered = ref(false)
+const isAnimateOpen = ref(false)
+
 let previousActiveElement: HTMLElement | null = null
 
-// 滚动条位置锁定与恢复，焦点锁定控制
+// 监听弹窗打开状态
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     // 记录之前获得焦点的元素
     previousActiveElement = document.activeElement as HTMLElement
     
-    // 禁止背景滚动
-    document.body.classList.add('modal-open')
+    // 打开 DOM 并控制滚动
+    isRendered.value = true
+    document.body.style.overflow = 'hidden'
     
-    // 异步聚焦到弹窗的第一个可聚焦元素
+    // 异步加上过渡类名，使过渡生效
+    setTimeout(() => {
+      isAnimateOpen.value = true
+    }, 20)
+    
+    // 自动聚焦到弹窗的第一个可聚焦元素
     setTimeout(() => {
       if (modalRef.value) {
         const focusableSelectors = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -73,33 +81,54 @@ watch(() => props.modelValue, (isOpen) => {
           focusables[0].focus()
         }
       }
-    }, 50)
+    }, 80)
   } else {
-    // 恢复背景滚动
-    document.body.classList.remove('modal-open')
-    
-    // 还原焦点
-    if (previousActiveElement) {
-      previousActiveElement.focus()
+    // 外部直接置为 false 时的同步回退处理
+    if (isAnimateOpen.value) {
+      isAnimateOpen.value = false
+      setTimeout(() => {
+        isRendered.value = false
+        document.body.style.overflow = ''
+      }, 180)
     }
   }
 }, { immediate: true })
 
-const handleClose = () => {
-  emit('update:modelValue', false)
-  emit('close')
+// 统一的关闭函数
+const closeSettings = () => {
+  isAnimateOpen.value = false
+  setTimeout(() => {
+    isRendered.value = false
+    document.body.style.overflow = ''
+    
+    emit('update:modelValue', false)
+    emit('close')
+    
+    // 还原焦点并添加销毁后的 Fallback 逻辑
+    if (previousActiveElement && document.body.contains(previousActiveElement)) {
+      previousActiveElement.focus()
+    } else {
+      const fallback = document.querySelector('.sidebar-user-info, .sidebar-avatar-wrap') as HTMLElement
+      if (fallback) {
+        fallback.focus()
+      }
+    }
+  }, 180)
 }
 
-const handleOverlayClick = () => {
-  handleClose()
+// 遮罩点击校验
+const handleOverlayClick = (e: MouseEvent) => {
+  if (e.target === e.currentTarget) {
+    closeSettings()
+  }
 }
 
 // 焦点锁定 (Focus Lock) 键盘控制与 Esc 关闭
 const handleKeyDown = (e: KeyboardEvent) => {
-  if (!props.modelValue) return
+  if (!props.modelValue || !isRendered.value) return
 
   if (e.key === 'Escape') {
-    handleClose()
+    closeSettings()
     e.preventDefault()
   } else if (e.key === 'Tab') {
     if (!modalRef.value) return
@@ -132,142 +161,165 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown, true)
-  // 防止组件销毁时没有清理滚动锁定
-  document.body.classList.remove('modal-open')
+  // 确保卸载时恢复 body 滚动
+  document.body.style.overflow = ''
 })
 </script>
 
 <style lang="scss">
 /* 声明全局/弹窗配色样式 */
-.custom-dialog-overlay {
+.settings-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: var(--mask-bg);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
   overflow: hidden;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-
-  .custom-dialog-container {
-    display: grid;
-    grid-template-rows: 60px 1fr;
-    width: 720px;
-    height: 470px;
-    background-color: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 22px;
-    box-shadow: 0 12px 32px  var(--color-shadow);
-    overflow: hidden;
-    max-width: calc(100vw - 48px);
-    max-height: calc(100vh - 48px);
-    
-    @media (max-width: 1024px) {
-      max-width: calc(100vw - 32px);
-      max-height: calc(100vh - 32px);
-    }
-    
-    @media (max-width: 768px) {
-      width: calc(100vw - 24px);
-      height: 80vh;
-      max-width: none;
-      max-height: none;
-    }
-  }
-
-  .custom-dialog-header {
-    height: 60px;
-    padding: 0 22px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background-color: var(--panel-bg);
-    flex-shrink: 0;
-
-    .dialog-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-primary);
-      letter-spacing: 0.5px;
-    }
-  }
-
-  .modal-close-btn {
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: transparent;
-    border-radius: 50%;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    font-size: 16px;
-    outline: none;
-
-    &:hover {
-      background-color: var(--hover-bg);
-      color: var(--text-primary);
-    }
-
-    &:focus-visible {
-      box-shadow: 0 0 0 2px var(--el-color-primary);
-    }
-  }
-
-  .custom-dialog-body {
-    display: grid;
-    grid-template-columns: 170px 1fr;
-    min-height: 0;
-    overflow: hidden;
-    background-color: var(--panel-bg);
-  }
-}
-
-/* 禁止背景滚动的样式定义 */
-body.modal-open {
-  overflow: hidden !important;
-  width: 100%;
-}
-
-/* 过渡动画：包含毛玻璃模糊与缩放淡入淡出 */
-.dialog-fade-enter-active,
-.dialog-fade-leave-active {
-  transition: opacity 0.25s cubic-bezier(0.25, 1, 0.5, 1), backdrop-filter 0.25s cubic-bezier(0.25, 1, 0.5, 1);
-
-  .custom-dialog-container {
-    transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease;
-  }
-}
-
-.dialog-fade-enter-from,
-.dialog-fade-leave-to {
   opacity: 0;
-  backdrop-filter: blur(0px);
-  -webkit-backdrop-filter: blur(0px);
+  transition: opacity 180ms ease;
+}
 
-  .custom-dialog-container {
-    transform: scale(0.95) translate3d(0, 10px, 0);
-    opacity: 0;
+.settings-overlay.open {
+  opacity: 1;
+}
+
+.settings-modal {
+  display: flex;
+  flex-direction: column;
+  width: 720px;
+  height: 470px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  border-radius: 22px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(6px) scale(0.985);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.settings-overlay.open .settings-modal {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* 兼容减少动画 */
+@media (prefers-reduced-motion: reduce) {
+  .settings-overlay,
+  .settings-modal {
+    transition: none !important;
   }
 }
 
-.dialog-fade-enter-to,
-.dialog-fade-leave-from {
-  opacity: 1;
+/* 浅色主题配色 */
+html[data-theme='light'] .settings-overlay {
+  background: rgba(15, 23, 42, 0.38);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
 
-  .custom-dialog-container {
-    transform: scale(1) translate3d(0, 0, 0);
-    opacity: 1;
+html[data-theme='light'] .settings-modal {
+  background: #ffffff;
+  color: #1f2329;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18);
+}
+
+/* 深色主题配色 */
+html[data-theme='dark'] .settings-overlay {
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+html[data-theme='dark'] .settings-modal {
+  background: #2b2d31;
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.48);
+}
+
+/* 图标跟随文字颜色 */
+.settings-modal svg {
+  color: currentColor !important;
+  stroke: currentColor !important;
+}
+
+/* 深色模式下的文字颜色覆盖 */
+html[data-theme='dark'] {
+  .dialog-title,
+  .settings-title,
+  .settings-section-title,
+  .section-title,
+  .settings-menu-item,
+  .theme-option,
+  .language-select,
+  .item-label,
+  .danger-title {
+    color: var(--text-primary) !important;
   }
+
+  .settings-menu-item:not(.active),
+  .settings-description,
+  .section-desc,
+  .item-value,
+  .danger-box-desc,
+  .terms-update-time,
+  .terms-paragraph p {
+    color: var(--text-secondary) !important;
+  }
+}
+
+.settings-header {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  flex-shrink: 0;
+
+  .dialog-title {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+}
+
+.modal-close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  font-size: 16px;
+  outline: none;
+
+  &:hover {
+    background-color: var(--hover-bg);
+    color: var(--text-primary);
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 2px var(--el-color-primary);
+  }
+}
+
+.settings-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  min-height: 0;
+  overflow: hidden;
 }
 </style>

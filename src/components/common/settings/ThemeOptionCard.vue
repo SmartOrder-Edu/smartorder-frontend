@@ -1,6 +1,6 @@
 <template>
   <div
-    class="theme-option-card"
+    class="theme-option-card theme-option"
     :class="{ active }"
     role="option"
     :aria-selected="active"
@@ -63,8 +63,8 @@ defineEmits<{
   }
 
   &:hover {
-    background-color: var(--hover-bg);
-    border-color: var(--border-color);
+    background-color: var(--item-hover-bg);
+    border-color: var(--border-color-strong);
 
     .theme-icon {
       color: var(--text-primary);
@@ -79,9 +79,6 @@ defineEmits<{
   }
 
   &.active {
-    border-color: transparent;
-    background-color: var(--hover-bg);
-
     .theme-icon {
       color: var(--text-primary);
     }
@@ -90,6 +87,53 @@ defineEmits<{
       color: var(--text-primary);
       font-weight: 600;
     }
+  }
+}
+
+html[data-theme='light'] .theme-option-card {
+  &:hover:not(.active) {
+    background-color: rgba(15, 23, 42, 0.03);
+    border-color: rgba(15, 23, 42, 0.1);
+  }
+
+  &.active {
+    border-color: rgba(15, 23, 42, 0.12);
+    background-color: rgba(15, 23, 42, 0.05);
+  }
+}
+
+/* 深色模式下样式适配 */
+html[data-theme='dark'] .theme-option {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+
+  .theme-icon,
+  span {
+    color: var(--text-secondary);
+  }
+}
+
+html[data-theme='dark'] .theme-option:hover {
+  background: var(--item-hover-bg);
+  color: var(--text-primary);
+  border-color: var(--border-color-strong);
+
+  .theme-icon,
+  span {
+    color: var(--text-primary);
+  }
+}
+
+html[data-theme='dark'] .theme-option.active {
+  background: #464a52 !important;
+  color: #ffffff !important;
+  border-color: #565b65 !important;
+
+  .theme-icon,
+  span {
+    color: #ffffff !important;
+    font-weight: 600;
   }
 }
 </style>
