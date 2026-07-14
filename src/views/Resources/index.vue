@@ -82,7 +82,32 @@
 
         <!-- 加载状态 -->
         <div v-if="isLoading" class="resources-grid">
-          <div v-for="n in 6" :key="n" class="resource-card skeleton-card"></div>
+          <div v-for="n in 6" :key="n" class="resource-card skeleton-card">
+            <div class="card-header-section">
+              <div class="skel-icon"></div>
+              <div class="skel-badge"></div>
+            </div>
+            <div class="card-body">
+              <div class="skel-line skel-title"></div>
+              <div class="skel-line skel-desc"></div>
+              <div class="skel-line skel-desc-short"></div>
+              <div class="skel-line skel-publisher"></div>
+              <div class="skel-tags-row">
+                <span class="skel-tag"></span>
+                <span class="skel-tag"></span>
+                <span class="skel-tag skel-tag-sm"></span>
+              </div>
+              <div class="skel-meta-row">
+                <span class="skel-meta"></span>
+                <span class="skel-meta"></span>
+                <span class="skel-meta skel-meta-sm"></span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <span class="skel-btn"></span>
+              <span class="skel-btn skel-btn-sm"></span>
+            </div>
+          </div>
         </div>
 
         <!-- 空状态 -->
@@ -673,6 +698,125 @@ const collectResource = async (resource: ResourceSquareVO) => {
   font-weight: 600;
   color: var(--text-dark);
   margin-bottom: var(--spacing-sm);
+}
+
+/* ==================== 骨架屏加载动画 ==================== */
+.skeleton-card {
+  pointer-events: none;
+  border: 1px solid #f1f5f9 !important;
+  box-shadow: none !important;
+}
+
+.skeleton-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 全局骨架扫光动画 */
+.skeleton-card .skel-icon,
+.skeleton-card .skel-badge,
+.skeleton-card .skel-line,
+.skeleton-card .skel-tag,
+.skeleton-card .skel-meta,
+.skeleton-card .skel-btn {
+  background: linear-gradient(110deg, #eef2f7 30%, #f8fafc 50%, #eef2f7 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* 骨架图标 */
+.skel-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px !important;
+}
+
+.skel-badge {
+  width: 48px;
+  height: 18px;
+  border-radius: 99px !important;
+}
+
+/* 骨架文本行 */
+.skel-line {
+  height: 14px;
+  margin-bottom: 10px;
+}
+
+.skel-title {
+  width: 75%;
+  height: 16px;
+}
+
+.skel-desc {
+  width: 92%;
+}
+
+.skel-desc-short {
+  width: 55%;
+}
+
+.skel-publisher {
+  width: 40%;
+  height: 12px;
+  margin-top: 12px;
+  margin-bottom: 10px;
+  background: #f1f5f9 !important;
+  animation: none !important;
+}
+
+/* 骨架标签行 */
+.skel-tags-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.skel-tag {
+  width: 42px;
+  height: 20px;
+  border-radius: 4px !important;
+}
+
+.skel-tag-sm {
+  width: 30px;
+}
+
+/* 骨架元信息行 */
+.skel-meta-row {
+  display: flex;
+  gap: 16px;
+}
+
+.skel-meta {
+  width: 56px;
+  height: 12px;
+}
+
+.skel-meta-sm {
+  width: 32px;
+}
+
+/* 骨架按钮 */
+.skeleton-card .card-footer {
+  display: flex;
+  justify-content: space-between;
+}
+
+.skel-btn {
+  width: 64px;
+  height: 28px;
+  border-radius: 6px !important;
+}
+
+.skel-btn-sm {
+  width: 48px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 @media (max-width: 1024px) {
