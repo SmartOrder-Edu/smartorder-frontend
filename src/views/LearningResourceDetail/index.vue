@@ -2,181 +2,207 @@
   <AppLayout>
     <div class="resource-detail-page">
       <ParticleBackground />
+      <ReadingProgress />
       <div class="resource-detail-content">
-      <div v-if="loading" class="loading-panel">
-        <el-skeleton :rows="8" animated />
-      </div>
+        <div v-if="loading" class="loading-panel">
+          <el-skeleton :rows="8" animated />
+        </div>
 
-      <el-empty v-else-if="error || !detail" description="学习资源不存在或加载失败" :image-size="120">
-        <el-button type="primary" @click="goBack">返回学习空间</el-button>
-      </el-empty>
+        <el-empty v-else-if="error || !detail" description="学习资源不存在或加载失败" :image-size="120">
+          <el-button type="primary" @click="goBack">返回学习空间</el-button>
+        </el-empty>
 
-      <template v-else>
-        <header class="resource-header">
-          <button class="back-btn" type="button" @click="goBack">
-            <span>‹</span>
-          </button>
-          <div class="resource-title-block">
-            <span class="resource-eyebrow">{{ detail.spaceName }}</span>
-            <h1>{{ detail.resource.title }}</h1>
-            <p>{{ detail.resource.description }}</p>
-            <div class="resource-meta">
-              <span>{{ resourceTypeLabel(detail.resource.resourceType) }}</span>
-              <span>{{ sourceLabel }}</span>
-              <span>{{ resourceStatusLabel(resourceStatus) }}</span>
-              <span v-if="detail.taskTitle">任务：{{ detail.taskTitle }}</span>
-            </div>
-          </div>
-          <el-button v-if="externalUrl && resourceStatus === 'generated'" type="primary" plain @click="openExternal">
-            打开外部资源
-          </el-button>
-        </header>
-
-        <main class="resource-body">
-          <aside class="resource-side">
-            <section class="side-section">
-              <span class="side-label">知识点</span>
-              <strong>{{ detail.resource.knowledgePoint || '空间通用资料' }}</strong>
-            </section>
-            <section class="side-section">
-              <span class="side-label">使用场景</span>
-              <strong>{{ detail.resource.studyScenario || '学习' }}</strong>
-            </section>
-            <section class="side-section">
-              <span class="side-label">Agent 判断</span>
-              <p>{{ detail.resource.agentReason || 'Agent 为当前学习目标生成的配套资料。' }}</p>
-            </section>
-            <section v-if="detail.content" class="side-section">
-              <span class="side-label">内容版本</span>
-              <strong>v{{ detail.content.version }}</strong>
-            </section>
-          </aside>
-
-          <section class="content-panel">
-            <div v-if="resourceStatus === 'generating'" class="generation-state generating">
-              <div class="generation-icon"></div>
-              <h2>资源正在生成</h2>
-              <p>Resource Agent 正在后台生成内容，完成后页面会自动刷新。</p>
-            </div>
-
-            <div v-else-if="resourceStatus === 'failed'" class="generation-state failed">
-              <div class="generation-icon"></div>
-              <h2>资源生成失败</h2>
-              <p>{{ generationError || '本次生成没有返回明确错误，可以重新提交生成任务。' }}</p>
-              <el-button type="primary" :loading="retrying" @click="handleRetryGeneration">
-                重试生成
+        <template v-else>
+          <!-- Header -->
+          <header class="resource-header">
+            <div class="header-main">
+              <button class="back-btn" type="button" @click="goBack">
+                <span>‹</span>
+              </button>
+              <div class="header-info">
+                <div class="header-top-row">
+                  <span class="header-space-label">{{ detail.spaceName }}</span>
+                  <span v-if="detail.taskTitle" class="header-task-label">· {{ detail.taskTitle }}</span>
+                </div>
+                <h1 class="header-title">{{ detail.resource.title }}</h1>
+                <p v-if="detail.resource.description" class="header-desc">{{ detail.resource.description }}</p>
+                <div class="header-meta-row">
+                  <div class="meta-pills">
+                    <span class="meta-pill type">{{ resourceTypeLabel(detail.resource.resourceType) }}</span>
+                    <span class="meta-pill source">{{ sourceLabel }}</span>
+                    <span class="meta-pill status">{{ resourceStatusLabel(resourceStatus) }}</span>
+                    <span v-if="detail.resource.knowledgePoint" class="meta-pill kp">
+                      知识点：{{ detail.resource.knowledgePoint }}
+                    </span>
+                    <span v-if="detail.resource.studyScenario" class="meta-pill scenario">
+                      {{ detail.resource.studyScenario }}
+                    </span>
+                  </div>
+                  <p v-if="detail.resource.agentReason" class="agent-reason">
+                    {{ detail.resource.agentReason }}
+                  </p>
+                </div>
+              </div>
+              <el-button
+                v-if="externalUrl && resourceStatus === 'generated' && renderMode === 'external'"
+                type="primary"
+                plain
+                @click="openExternal"
+                class="header-ext-btn"
+              >
+                打开外部资源
               </el-button>
             </div>
+          </header>
 
-            <MarkdownRenderer
-              v-else-if="renderMode === 'markdown'"
-              :content="markdownContent"
+          <!-- Body -->
+          <main class="resource-body">
+            <ResourceTOC
+              v-if="renderMode === 'markdown' && markdownContent"
+              :markdown="markdownContent"
+              content-selector=".content-panel"
             />
 
-            <div
-              v-else-if="renderMode === 'html'"
-              class="html-content"
-              v-html="detail.content?.content || ''"
-            ></div>
-
-            <div v-else-if="renderMode === 'quiz'" class="quiz-content">
-              <div class="quiz-head">
-                <span>专项练习</span>
-                <strong>{{ quizData?.questions?.length || 0 }} 题</strong>
+            <section class="content-panel" :class="{ 'wide': renderMode !== 'markdown' || !markdownContent }">
+              <!-- Generating -->
+              <div v-if="resourceStatus === 'generating'" class="generation-state generating">
+                <div class="generation-icon"></div>
+                <h2>资源正在生成</h2>
+                <p>Resource Agent 正在后台生成内容，完成后页面会自动刷新。</p>
               </div>
-              <article
-                v-for="(question, index) in quizData?.questions || []"
-                :key="index"
-                class="quiz-card"
-              >
-                <span class="quiz-index">{{ index + 1 }}</span>
-                <div class="quiz-main">
-                  <h3>{{ question.stem }}</h3>
-                  <div v-if="question.options?.length" class="quiz-options">
-                    <span v-for="option in question.options" :key="option">{{ option }}</span>
-                  </div>
-                  <div v-if="question.items?.length" class="quiz-options">
-                    <span v-for="item in question.items" :key="item">{{ item }}</span>
-                  </div>
-                  <p v-if="question.answer"><strong>参考答案：</strong>{{ question.answer }}</p>
-                  <p v-if="question.referenceAnswer"><strong>参考答案：</strong>{{ question.referenceAnswer }}</p>
-                  <p v-if="question.explanation">{{ question.explanation }}</p>
-                </div>
-              </article>
-            </div>
 
-            <div v-else-if="renderMode === 'external'" class="external-content">
-              <template v-if="isBilibiliRecommendation">
-                <div class="bili-head">
-                  <div>
-                    <span class="bili-label">B站学习视频推荐</span>
-                    <h2>{{ externalData?.title || detail.resource.title }}</h2>
-                    <p>{{ externalData?.reason || detail.resource.agentReason }}</p>
-                  </div>
-                  <el-button v-if="externalUrl" type="primary" plain @click="openExternal">
-                    打开搜索入口
-                  </el-button>
-                </div>
+              <!-- Failed -->
+              <div v-else-if="resourceStatus === 'failed'" class="generation-state failed">
+                <div class="generation-icon"></div>
+                <h2>资源生成失败</h2>
+                <p>{{ generationError || '本次生成没有返回明确错误，可以重新提交生成任务。' }}</p>
+                <el-button type="primary" :loading="retrying" @click="handleRetryGeneration">
+                  重试生成
+                </el-button>
+              </div>
 
-                <div v-if="externalData?.usageAdvice" class="bili-advice">
-                  {{ externalData.usageAdvice }}
-                </div>
+              <!-- Markdown -->
+              <MarkdownRenderer
+                v-else-if="renderMode === 'markdown'"
+                :content="markdownContent"
+              />
 
-                <div class="bili-video-list">
-                  <article
-                    v-for="video in bilibiliVideos"
-                    :key="video.url || video.title"
-                    class="bili-video-card"
-                  >
-                    <button class="bili-cover" type="button" @click="openVideo(video.url)">
-                      <img
-                        v-if="video.coverUrl"
-                        :src="videoCoverUrl(video.coverUrl)"
-                        :alt="video.title"
-                        @error="handleCoverError"
-                      />
-                      <span v-else>暂无封面</span>
-                      <strong v-if="video.durationSeconds">{{ formatDuration(video.durationSeconds) }}</strong>
-                    </button>
-                    <div class="bili-main">
-                      <div class="bili-title-row">
-                        <h3>{{ video.title }}</h3>
-                        <span v-if="video.matchScore" class="bili-score">
-                          {{ formatPercent(video.matchScore) }}
-                        </span>
-                      </div>
-                      <div class="bili-meta">
-                        <span v-if="video.upName">UP主：{{ video.upName }}</span>
-                        <span v-if="video.fitStage">{{ video.fitStage }}</span>
-                        <span v-if="video.playCount">{{ formatCount(video.playCount) }}播放</span>
-                        <span v-if="video.publishTime">{{ video.publishTime }}</span>
-                      </div>
-                      <p v-if="video.reason" class="bili-reason">{{ video.reason }}</p>
-                      <div class="bili-actions">
-                        <el-button type="primary" size="small" @click="openVideo(video.url)">
-                          打开 B站观看
-                        </el-button>
-                      </div>
+              <!-- HTML -->
+              <div
+                v-else-if="renderMode === 'html'"
+                class="html-content"
+                v-html="detail.content?.content || ''"
+              ></div>
+
+              <!-- Quiz -->
+              <div v-else-if="renderMode === 'quiz'" class="quiz-content">
+                <div class="quiz-head">
+                  <span>专项练习</span>
+                  <strong>{{ quizData?.questions?.length || 0 }} 题</strong>
+                </div>
+                <article
+                  v-for="(question, index) in quizData?.questions || []"
+                  :key="index"
+                  class="quiz-card"
+                >
+                  <span class="quiz-index">{{ index + 1 }}</span>
+                  <div class="quiz-main">
+                    <h3>{{ question.stem }}</h3>
+                    <div v-if="question.options?.length" class="quiz-options">
+                      <span v-for="option in question.options" :key="option">{{ option }}</span>
                     </div>
-                  </article>
-                </div>
+                    <div v-if="question.items?.length" class="quiz-options">
+                      <span v-for="item in question.items" :key="item">{{ item }}</span>
+                    </div>
+                    <p v-if="question.answer"><strong>参考答案：</strong>{{ question.answer }}</p>
+                    <p v-if="question.referenceAnswer"><strong>参考答案：</strong>{{ question.referenceAnswer }}</p>
+                    <p v-if="question.explanation">{{ question.explanation }}</p>
+                  </div>
+                </article>
+              </div>
 
-                <el-empty v-if="!bilibiliVideos.length" description="暂无可展示的视频推荐" :image-size="100" />
-              </template>
+              <!-- External -->
+              <div v-else-if="renderMode === 'external'" class="external-content">
+                <template v-if="isBilibiliRecommendation">
+                  <div class="bili-head">
+                    <div>
+                      <span class="bili-label">B站学习视频推荐</span>
+                      <h2>{{ externalData?.title || detail.resource.title }}</h2>
+                      <p>{{ externalData?.reason || detail.resource.agentReason }}</p>
+                    </div>
+                    <el-button v-if="externalUrl" type="primary" plain @click="openExternal">
+                      打开搜索入口
+                    </el-button>
+                  </div>
 
-              <template v-else>
-                <span class="external-icon">🔗</span>
-                <h2>{{ externalData?.title || detail.resource.title }}</h2>
-                <p>{{ externalData?.reason || detail.resource.agentReason }}</p>
-                <p v-if="externalData?.usageAdvice">{{ externalData.usageAdvice }}</p>
-                <el-button type="primary" @click="openExternal">打开外部资源</el-button>
-              </template>
-            </div>
+                  <div v-if="externalData?.usageAdvice" class="bili-advice">
+                    {{ externalData.usageAdvice }}
+                  </div>
 
-            <el-empty v-else description="该资源暂无可预览内容" :image-size="100" />
-          </section>
-        </main>
-      </template>
+                  <div class="bili-video-list">
+                    <article
+                      v-for="video in bilibiliVideos"
+                      :key="video.url || video.title"
+                      class="bili-video-card"
+                    >
+                      <button class="bili-cover" type="button" @click="openVideo(video.url)">
+                        <img
+                          v-if="video.coverUrl"
+                          :src="videoCoverUrl(video.coverUrl)"
+                          :alt="video.title"
+                          @error="handleCoverError"
+                        />
+                        <span v-else>暂无封面</span>
+                        <strong v-if="video.durationSeconds">{{ formatDuration(video.durationSeconds) }}</strong>
+                      </button>
+                      <div class="bili-main">
+                        <div class="bili-title-row">
+                          <h3>{{ video.title }}</h3>
+                          <span v-if="video.matchScore" class="bili-score">
+                            {{ formatPercent(video.matchScore) }}
+                          </span>
+                        </div>
+                        <div class="bili-meta">
+                          <span v-if="video.upName">UP主：{{ video.upName }}</span>
+                          <span v-if="video.fitStage">{{ video.fitStage }}</span>
+                          <span v-if="video.playCount">{{ formatCount(video.playCount) }}播放</span>
+                          <span v-if="video.publishTime">{{ video.publishTime }}</span>
+                        </div>
+                        <p v-if="video.reason" class="bili-reason">{{ video.reason }}</p>
+                        <div class="bili-actions">
+                          <el-button type="primary" size="small" @click="openVideo(video.url)">
+                            打开 B站观看
+                          </el-button>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+
+                  <el-empty v-if="!bilibiliVideos.length" description="暂无可展示的视频推荐" :image-size="100" />
+                </template>
+
+                <template v-else>
+                  <span class="external-icon">🔗</span>
+                  <h2>{{ externalData?.title || detail.resource.title }}</h2>
+                  <p>{{ externalData?.reason || detail.resource.agentReason }}</p>
+                  <p v-if="externalData?.usageAdvice">{{ externalData.usageAdvice }}</p>
+                  <el-button type="primary" @click="openExternal">打开外部资源</el-button>
+                </template>
+              </div>
+
+              <!-- Empty -->
+              <el-empty v-else description="该资源暂无可预览内容" :image-size="100" />
+            </section>
+
+            <ResourceAIPanel
+              :resource-id="resourceId"
+              :resource-title="detail.resource.title"
+              :resource-type="detail.resource.resourceType"
+              :knowledge-point="detail.resource.knowledgePoint"
+              :content="detail.content?.contentType === 'markdown' ? detail.content?.content || '' : ''"
+            />
+          </main>
+        </template>
       </div>
     </div>
   </AppLayout>
@@ -189,6 +215,9 @@ import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import ParticleBackground from '@/components/ParticleBackground.vue'
+import ReadingProgress from '@/components/ReadingProgress.vue'
+import ResourceTOC from '@/components/ResourceTOC.vue'
+import ResourceAIPanel from '@/components/ResourceAIPanel.vue'
 import { learningResourceApi } from '@/api/learningResource'
 import type { ResourceDetailVO, ResourceGenerationJobVO } from '@/types/learningSpace'
 
@@ -418,6 +447,7 @@ watch(resourceId, () => {
   max-width: 1320px;
   margin: 0 auto;
   padding: 24px;
+  padding-top: 28px;
 }
 
 .resource-detail-content {
@@ -427,120 +457,170 @@ watch(resourceId, () => {
 
 .loading-panel,
 .content-panel,
-.resource-side,
 .resource-header {
-  border: 1px solid rgba(148, 163, 184, 0.18);
   background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
 }
 
-.resource-header {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-  padding: 20px;
+.loading-panel {
   border-radius: 18px;
+  padding: 24px;
+}
+
+/* ========== Header ========== */
+.resource-header {
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+
+.header-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
 }
 
 .back-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.24);
   background: #ffffff;
   color: #475569;
-  font-size: 26px;
+  font-size: 24px;
   cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+
+  &:hover {
+    border-color: rgba(10, 158, 148, 0.35);
+    color: #0a9e94;
+  }
 }
 
-.resource-title-block {
+.header-info {
+  flex: 1;
   min-width: 0;
-
-  h1 {
-    margin: 4px 0 6px;
-    color: #0f172a;
-    font-size: 1.45rem;
-    line-height: 1.35;
-  }
-
-  p {
-    margin: 0;
-    color: #64748b;
-    font-size: 0.875rem;
-    line-height: 1.6;
-  }
 }
 
-.resource-eyebrow,
-.side-label {
+.header-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.header-space-label {
   color: #0a9e94;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
-.resource-meta {
+.header-task-label {
+  color: #94a3b8;
+  font-size: 0.72rem;
+}
+
+.header-title {
+  margin: 2px 0 4px;
+  color: #0f172a;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.header-desc {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.header-meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meta-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 6px;
+  align-items: center;
+}
 
-  span {
-    padding: 3px 9px;
-    border-radius: 999px;
+.meta-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+
+  &.type {
+    background: rgba(10, 158, 148, 0.08);
+    color: #0a9e94;
+  }
+
+  &.source {
+    background: linear-gradient(135deg, rgba(59, 91, 219, 0.1), rgba(92, 124, 250, 0.1));
+    color: #3b5bdb;
+  }
+
+  &.status {
     background: #f1f5f9;
     color: #64748b;
-    font-size: 0.72rem;
-    font-weight: 700;
+  }
+
+  &.kp {
+    background: rgba(139, 92, 246, 0.06);
+    color: #7c3aed;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &.scenario {
+    background: rgba(245, 158, 11, 0.07);
+    color: #d97706;
   }
 }
 
+.agent-reason {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  font-style: italic;
+}
+
+.header-ext-btn {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ========== Body ========== */
 .resource-body {
-  display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  display: flex;
   gap: 18px;
-  margin-top: 18px;
-  align-items: start;
-}
-
-.resource-side {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 16px;
-}
-
-.side-section {
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-
-  &:last-child {
-    padding-bottom: 0;
-    border-bottom: 0;
-  }
-
-  strong {
-    display: block;
-    margin-top: 4px;
-    color: #1f2937;
-    font-size: 0.9rem;
-    line-height: 1.45;
-  }
-
-  p {
-    margin: 6px 0 0;
-    color: #64748b;
-    font-size: 0.78rem;
-    line-height: 1.55;
-  }
+  align-items: flex-start;
 }
 
 .content-panel {
+  flex: 1;
   min-width: 0;
   padding: 24px;
   border-radius: 16px;
+
+  &.wide {
+    flex: 1;
+  }
 }
 
+/* ========== Generation States ========== */
 .generation-state {
   display: grid;
   justify-items: center;
@@ -586,6 +666,7 @@ watch(resourceId, () => {
   to { transform: rotate(360deg); }
 }
 
+/* ========== HTML Content ========== */
 .html-content {
   color: #1f2937;
   line-height: 1.7;
@@ -682,6 +763,7 @@ watch(resourceId, () => {
   }
 }
 
+/* ========== Quiz Content ========== */
 .quiz-content {
   display: grid;
   gap: 14px;
@@ -753,6 +835,7 @@ watch(resourceId, () => {
   }
 }
 
+/* ========== External / Bilibili Content ========== */
 .external-content {
   max-width: 920px;
   margin: 20px auto;
@@ -914,14 +997,32 @@ watch(resourceId, () => {
   font-size: 26px;
 }
 
-@media (max-width: 900px) {
-  .resource-header,
+/* ========== Responsive ========== */
+@media (max-width: 1024px) {
   .resource-body {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
   }
 
-  .back-btn {
-    width: 100%;
+  .resource-ai-panel {
+    position: fixed;
+    right: 16px;
+    bottom: 80px;
+    top: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .resource-detail-page {
+    padding: 16px;
+  }
+
+  .header-main {
+    flex-wrap: wrap;
+  }
+
+  .resource-body {
+    flex-direction: column;
+    gap: 12px;
   }
 
   .bili-head {
