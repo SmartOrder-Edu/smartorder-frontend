@@ -168,14 +168,23 @@
               >
                 {{ isSubmitting ? '提交中...' : '提交测评' }}
               </button>
-              <button 
-                v-else 
-                type="button" 
-                class="btn-sidebar-submit return-btn" 
-                @click="goBack"
-              >
-                返回测评中心
-              </button>
+              <template v-else>
+                <button
+                  type="button"
+                  class="btn-sidebar-submit report-btn"
+                  :disabled="reportLoading"
+                  @click="handleViewReport"
+                >
+                  {{ reportLoading ? '查询中...' : '查看练习分析报告' }}
+                </button>
+                <button 
+                  type="button" 
+                  class="btn-sidebar-submit return-btn" 
+                  @click="goBack"
+                >
+                  返回测评中心
+                </button>
+              </template>
               <div v-if="!showAnswer" class="shortcut-tip">
                 按 <strong>Ctrl + Enter</strong> 提交
                 <el-tooltip content="在任意作答焦点下按 Ctrl + Enter 即可快捷提交试卷" placement="top">
@@ -186,6 +195,66 @@
           </div>
         </aside>
       </div>
+
+      <el-drawer
+        v-model="reportDrawerVisible"
+        title="练习分析报告"
+        size="560px"
+        class="practice-report-drawer"
+      >
+        <div v-if="selectedReport" class="report-content">
+          <div class="report-score-grid">
+            <div class="report-score-item">
+              <span class="label">得分</span>
+              <strong>{{ formatScore(selectedReport.actualScore) }}/{{ formatScore(selectedReport.totalScore) }}</strong>
+            </div>
+            <div class="report-score-item">
+              <span class="label">正确率</span>
+              <strong>{{ formatPercent(selectedReport.accuracy) }}</strong>
+            </div>
+            <div class="report-score-item">
+              <span class="label">生成方式</span>
+              <strong>{{ selectedReport.generatedBy === 'agent' ? 'AI分析' : '系统分析' }}</strong>
+            </div>
+          </div>
+
+          <section class="report-section" v-if="selectedReport.reportContent">
+            <h3>整体分析</h3>
+            <p class="report-text">{{ selectedReport.reportContent }}</p>
+          </section>
+
+          <section class="report-section" v-if="selectedReport.weakPoints?.length">
+            <h3>薄弱点</h3>
+            <div class="report-list">
+              <div v-for="(item, idx) in selectedReport.weakPoints" :key="'weak-' + idx" class="report-list-item weak">
+                <strong>{{ reportItemTitle(item, 'knowledgePoint') }}</strong>
+                <span>得分率 {{ formatPercent(item.scoreRate ?? item.accuracy) }}，{{ item.correctCount ?? 0 }}/{{ item.totalCount ?? 0 }} 题正确</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="report-section" v-if="selectedReport.strongPoints?.length">
+            <h3>优势点</h3>
+            <div class="report-list">
+              <div v-for="(item, idx) in selectedReport.strongPoints" :key="'strong-' + idx" class="report-list-item strong">
+                <strong>{{ reportItemTitle(item, 'knowledgePoint') }}</strong>
+                <span>得分率 {{ formatPercent(item.scoreRate ?? item.accuracy) }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="report-section" v-if="selectedReport.learningSuggestions?.length">
+            <h3>学习建议</h3>
+            <div class="suggestion-list">
+              <div v-for="(item, idx) in selectedReport.learningSuggestions" :key="'suggestion-' + idx" class="suggestion-item">
+                <strong>{{ String(item.title || `建议 ${idx + 1}`) }}</strong>
+                <span v-if="item.reason">{{ String(item.reason) }}</span>
+                <p>{{ String(item.action || item.description || '') }}</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </el-drawer>
 
       <!-- 提示未完成弹窗 -->
       <div class="modal-overlay" v-if="showUnfinishedModal" @click.self="showUnfinishedModal = false">
@@ -231,8 +300,10 @@ import {
   getSessionResult,
   submitExamAnswers,
   getExamResult,
+  getSessionReport,
   type SessionResultVO,
-  type AnswerDetailVO
+  type AnswerDetailVO,
+  type SessionReportVO
 } from '@/api/evaluationSession'
 import {
   getQuestionAnswerText,
@@ -259,12 +330,16 @@ const showAnswer = ref(false)
 // 后端判分结果
 const gradingResult = ref<SessionResultVO | null>(null)
 const isSubmitting = ref(false)
+const reportLoading = ref(false)
+const reportDrawerVisible = ref(false)
+const selectedReport = ref<SessionReportVO | null>(null)
 
 const examTitle = computed(() => String(route.query.title || '章节测验'))
 const spaceId = computed(() => route.query.spaceId ? String(route.query.spaceId) : undefined)
 const taskId = computed(() => route.query.taskId ? String(route.query.taskId) : undefined)
 const sessionId = computed(() => route.query.sessionId ? String(route.query.sessionId) : undefined)
 const rawStatus = computed(() => route.query.rawStatus ? String(route.query.rawStatus) : undefined)
+const reportSessionId = computed(() => sessionId.value || taskId.value)
 
 const numberMap = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
 
@@ -557,6 +632,7 @@ const fetchQuestions = async () => {
         try {
           const result = await getSessionResult(sessionId.value as any)
           gradingResult.value = result
+          applyResultUserAnswers(result)
         } catch (e) {
           console.error('获取历史答题结果失败:', e)
         }
@@ -703,6 +779,103 @@ const buildUserAnswer = (q: EvaluationQuestion): Record<string, unknown> => {
   }
 }
 
+const normalizeBooleanAnswer = (value: unknown): string => {
+  const text = String(value ?? '').trim()
+  if (text === '正确' || text === '对' || text.toLowerCase() === 'true' || text === '1') {
+    return 'true'
+  }
+  if (text === '错误' || text === '错' || text.toLowerCase() === 'false' || text === '0') {
+    return 'false'
+  }
+  return text
+}
+
+const resultUserAnswerToInputValue = (q: EvaluationQuestion, userAnswer?: Record<string, unknown>): string => {
+  if (!userAnswer) return ''
+
+  if (q.questionType === 'single_choice' || q.questionType === 'multiple_choice') {
+    const selected = userAnswer.selectedOptions
+    if (Array.isArray(selected)) {
+      return selected.map(v => String(v)).filter(Boolean).join('、')
+    }
+    return selected == null ? '' : String(selected)
+  }
+
+  if (q.questionType === 'judge') {
+    return normalizeBooleanAnswer(userAnswer.value)
+  }
+
+  if (q.questionType === 'fill_blank') {
+    const blanks = userAnswer.blanks
+    if (Array.isArray(blanks)) {
+      return blanks.map(v => String(v ?? '')).join(';;')
+    }
+    return blanks == null ? '' : String(blanks)
+  }
+
+  const text = userAnswer.text ?? userAnswer.code
+  return text == null ? '' : String(text)
+}
+
+const applyResultUserAnswers = (result: SessionResultVO | null | undefined) => {
+  if (!result?.detail?.length) return
+  const questionMap = new Map(questions.value.map(q => [String(q.id), q]))
+  result.detail.forEach(detail => {
+    const q = questionMap.get(String(detail.questionId))
+    if (!q) return
+    const value = resultUserAnswerToInputValue(q, detail.userAnswer)
+    if (value) {
+      answers.value[q.id as any] = value
+    }
+  })
+}
+
+const handleViewReport = async () => {
+  const id = reportSessionId.value
+  if (!id) {
+    ElMessage.info('当前练习暂未关联可生成报告的测评任务')
+    return
+  }
+
+  reportLoading.value = true
+  try {
+    const report = await getSessionReport(id)
+    if (report.status !== 'ready') {
+      const message = report.message || report.errorMessage || '练习分析报告尚未生成，请稍后再来查看。'
+      if (report.status === 'failed') {
+        ElMessage.warning(message)
+      } else {
+        ElMessage.info(message)
+      }
+      return
+    }
+
+    selectedReport.value = report
+    reportDrawerVisible.value = true
+  } catch (error: any) {
+    ElMessage.error(error?.message || '报告查询失败，请稍后重试')
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+const formatScore = (value?: number | string | null) => {
+  const num = Number(value ?? 0)
+  if (!Number.isFinite(num)) return '0'
+  return Number.isInteger(num) ? String(num) : num.toFixed(1)
+}
+
+const formatPercent = (value?: unknown) => {
+  const num = Number(value ?? 0)
+  if (!Number.isFinite(num)) return '0%'
+  const percent = num <= 1 ? num * 100 : num
+  return `${percent.toFixed(1)}%`
+}
+
+const reportItemTitle = (item: Record<string, unknown>, primaryKey: string) => {
+  return String(item[primaryKey] || item.name || item.label || '未标注知识点')
+}
+
 const doSubmitExam = async () => {
   isSubmitting.value = true
   try {
@@ -718,11 +891,13 @@ const doSubmitExam = async () => {
       // 后端 session 模式：调用 submit API
       const result = await submitAnswers(sessionId.value as any, { answers: answerItems })
       gradingResult.value = result
+      applyResultUserAnswers(result)
       ElMessage.success(`提交成功！客观题得分: ${result.objectiveScore}/${result.objectiveTotal}${result.subjectivePending > 0 ? `，${result.subjectivePending}道主观题等待AI批阅` : ''}`)
     } else if (taskId.value) {
       // 任务模式：直接提交到后端判分
       const result = await submitExamAnswers(taskId.value as any, spaceId.value as any, { answers: answerItems })
       gradingResult.value = result as any
+      applyResultUserAnswers(result as any)
       ElMessage.success(`提交成功！客观题得分: ${result.objectiveScore}/${result.objectiveTotal}${result.subjectivePending > 0 ? `，${result.subjectivePending}道主观题等待AI批阅` : ''}`)
     } else {
       // 旧流程：仅 client-side grading
@@ -758,6 +933,7 @@ const startPollingResult = () => {
         return
       }
       gradingResult.value = result as any
+      applyResultUserAnswers(result as any)
       if (result.subjectivePending === 0) {
         if (pollingTimer) clearInterval(pollingTimer)
         pollingTimer = null
@@ -1154,6 +1330,16 @@ const isAnalysisExpanded = (questionId: string | number) => {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.03);
 }
 
+.btn-sidebar-submit.report-btn {
+  background: linear-gradient(135deg, #2563eb, #14b8a6);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.18);
+}
+
+.btn-sidebar-submit.report-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2f6ff0, #18c5b2);
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.24);
+}
+
 .btn-sidebar-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -1179,6 +1365,103 @@ const isAnalysisExpanded = (questionId: string | number) => {
   font-size: 14px;
   color: #98a2b3;
   cursor: help;
+}
+
+.report-content {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  color: #334155;
+}
+
+.report-score-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.report-score-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.report-score-item .label {
+  font-size: 12px;
+  font-weight: 750;
+  color: #64748b;
+}
+
+.report-score-item strong {
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.report-section {
+  border-top: 1px solid #edf2f7;
+  padding-top: 18px;
+}
+
+.report-section h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 850;
+  color: #182230;
+}
+
+.report-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.75;
+  font-size: 14px;
+  color: #475569;
+}
+
+.report-list,
+.suggestion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.report-list-item,
+.suggestion-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.report-list-item.weak {
+  border-color: #fecaca;
+  background: #fffafa;
+}
+
+.report-list-item.strong {
+  border-color: #bbf7d0;
+  background: #f8fffb;
+}
+
+.report-list-item strong,
+.suggestion-item strong {
+  color: #1e293b;
+  font-size: 14px;
+}
+
+.report-list-item span,
+.suggestion-item span,
+.suggestion-item p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
 }
 
 /* 提示弹窗 */
@@ -1430,6 +1713,43 @@ html[data-theme='dark'] .btn-sidebar-submit.return-btn:hover {
   border-color: #475569;
   color: #f4f7fb;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme='dark'] .report-score-item,
+html[data-theme='dark'] .report-list-item,
+html[data-theme='dark'] .suggestion-item {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html[data-theme='dark'] .report-section {
+  border-top-color: #334155;
+}
+
+html[data-theme='dark'] .report-content,
+html[data-theme='dark'] .report-section h3,
+html[data-theme='dark'] .report-score-item strong,
+html[data-theme='dark'] .report-list-item strong,
+html[data-theme='dark'] .suggestion-item strong {
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .report-text,
+html[data-theme='dark'] .report-score-item .label,
+html[data-theme='dark'] .report-list-item span,
+html[data-theme='dark'] .suggestion-item span,
+html[data-theme='dark'] .suggestion-item p {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .report-list-item.weak {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+html[data-theme='dark'] .report-list-item.strong {
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(34, 197, 94, 0.08);
 }
 
 html[data-theme='dark'] .shortcut-tip {

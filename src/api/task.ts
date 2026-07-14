@@ -18,6 +18,7 @@ export interface TaskAnswerDetailVO {
   isCorrect: boolean | null
   score: number
   status: 'graded' | 'pending_review'
+  userAnswer?: Record<string, unknown>
   judgeResult?: Record<string, unknown>
 }
 
