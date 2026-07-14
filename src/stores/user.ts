@@ -10,7 +10,7 @@ const SHORT_TOKEN_KEY = 'shortToken'
 const ACCOUNT_KEY = 'remembered_account'
 
 export interface UserInfo {
-  id: number
+  id: string
   username: string
   email: string
   phone?: string
@@ -59,6 +59,11 @@ export const useUserStore = defineStore('user', () => {
       setToken(response.accessToken)
       setShortToken(response.shortToken)
     }
+  }
+
+  async function githubLogin(code: string, state?: string) {
+    const response = await userApi.githubLogin(code, state)
+    setToken(response)
   }
 
   async function register(params: {
@@ -138,6 +143,7 @@ export const useUserStore = defineStore('user', () => {
     setShortToken,
     setUserInfo,
     login,
+    githubLogin,
     register,
     fetchUserInfo,
     logout,

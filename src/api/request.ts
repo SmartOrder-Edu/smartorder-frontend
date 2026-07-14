@@ -1,5 +1,8 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
+import JSONBig from 'json-bigint'
+
+const JSONBigString = JSONBig({ storeAsString: true })
 
 export interface RequestConfig extends AxiosRequestConfig {
   showError?: boolean
@@ -60,6 +63,18 @@ class Request {
       headers: {
         'Content-Type': 'application/json;charset=UTF-8'
       },
+      transformResponse: [
+        function (data) {
+          if (typeof data === 'string') {
+            try {
+              return JSONBigString.parse(data)
+            } catch (e) {
+              return data
+            }
+          }
+          return data
+        }
+      ],
       ...config
     })
 

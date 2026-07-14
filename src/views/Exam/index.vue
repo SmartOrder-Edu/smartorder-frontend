@@ -4,8 +4,8 @@
       <!-- 页面标题与学习空间切换 -->
       <div class="page-header">
         <div class="header-left">
-          <h1 class="page-title">AI个性化学习驾驶舱</h1>
-          <p class="page-desc">全方位追踪你的学习成效，利用 AI 进行专项训练与智能诊断</p>
+          <h1 class="page-title">AI 练习与智能测评</h1>
+          <p class="page-desc">AI 智能出题评测，精准诊断掌握度；通过专项训练与错题巩固，助你实现针对性高效提升。</p>
         </div>
         <div class="header-right">
           <div class="header-actions">
@@ -15,32 +15,14 @@
                 filterable
                 placeholder="切换学习空间"
                 class="space-select"
-                popper-class="space-select-popper"
                 :loading="learningSpaceStore.loading"
               >
-                <template #prefix>
-                  <el-icon class="space-select-prefix-icon"><Compass /></el-icon>
-                </template>
                 <el-option
                   v-for="space in learningSpaceStore.activeSpaces"
                   :key="space.id"
                   :label="space.name"
                   :value="space.id"
-                >
-                  <div class="space-option-item">
-                    <span class="space-option-icon">{{ space.icon || '📐' }}</span>
-                    <div class="space-option-info">
-                      <span class="space-option-name">{{ space.name }}</span>
-                      <span class="space-option-goal" v-if="space.goal">{{ space.goal }}</span>
-                    </div>
-                    <div class="space-option-progress">
-                      <span class="space-option-percent">{{ space.progress }}%</span>
-                      <div class="space-option-bar-wrapper">
-                        <div class="space-option-bar" :style="{ width: space.progress + '%' }"></div>
-                      </div>
-                    </div>
-                  </div>
-                </el-option>
+                />
                 <template #empty>
                   <div class="select-empty-tip">
                     <el-icon class="select-empty-icon"><Warning /></el-icon>
@@ -593,6 +575,15 @@
               </div>
             </div>
 
+            <div v-if="questionTypeRows.find(r => r.questionType === 'code')?.enabled" class="form-item">
+              <label>编程语言</label>
+              <el-select v-model="codeProgrammingLanguage" style="width: 100%;">
+                <el-option label="C" value="C" />
+                <el-option label="C++" value="C++" />
+                <el-option label="Java" value="Java" />
+              </el-select>
+            </div>
+
             <div class="form-item difficulty-section">
               <div class="field-heading" style="margin-bottom: 32px;">
                 <label>难度级别</label>
@@ -689,7 +680,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Warning, Calendar, TopRight, Aim, MagicStick, Close, Document, EditPen, Select, DocumentCopy, Check, ArrowRight, Loading, DataAnalysis, CircleCheckFilled, MoreFilled, Bell, Compass } from '@element-plus/icons-vue'
+import { Warning, Calendar, TopRight, Aim, MagicStick, Close, Document, EditPen, Select, DocumentCopy, Check, ArrowRight, Loading, DataAnalysis, CircleCheckFilled, MoreFilled, Bell } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
@@ -733,7 +724,7 @@ interface GenerationPreviewBuffer {
 const learningSpaceStore = useLearningSpaceStore()
 const router = useRouter()
 const route = useRoute()
-const activeTab = ref('available')
+const activeTab = ref('ongoing')
 const showGenerateDialog = ref(false)
 const generating = ref(false)
 const selectedSpaceId = ref<string | null>(null)
@@ -751,6 +742,7 @@ const generationPreviewBuffers = ref<Partial<Record<QuestionTypeCode, Generation
 const generationJobNo = ref('')
 const generationTokenCount = ref(0)
 const generationError = ref('')
+const codeProgrammingLanguage = ref('C')
 const questionBank = ref<EvaluationQuestion[]>([])
 const questionBankLoading = ref(false)
 let generationAbortController: AbortController | null = null
@@ -995,7 +987,7 @@ const examTabs = computed(() => [
   },
   {
     value: 'available',
-    label: '推荐训练',
+    label: '推荐测评',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
     count: exams.value.filter(exam => exam.status === 'available' || exam.status === 'error').length
   },
@@ -1073,20 +1065,11 @@ const getScoreClass = (score: number) => {
   return 'poor'
 }
 
-const startExam = async (exam: any) => {
+const startExam = (exam: any) => {
   const spaceId = exam.learningSpaceId || selectedSpaceId.value
   if (!spaceId) {
     ElMessage.warning('请先选择学习空间，或先生成一套题库')
     return
-  }
-
-  // 仅当后端 status 为 'todo'（尚未开始）时才通知后端开始答题
-  if (exam.rawStatus === 'todo') {
-    try {
-      await startSession(exam.id)
-    } catch {
-      // 忽略异常，不阻断跳转
-    }
   }
 
   router.push({
@@ -1170,6 +1153,7 @@ const buildGeneratePayload = (): GenerateQuestionPayload | null => {
       count: row.count,
       difficulty: generateDifficulty.value,
       optionCount: row.isChoice ? 4 : undefined,
+      programmingLanguage: row.questionType === 'code' ? codeProgrammingLanguage.value : undefined,
       sort: index + 1
     }))
   }
@@ -1382,12 +1366,12 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 }
 
 .page-title {
-  font-size: 1.6rem;
+  font-size: 1.625rem;
   font-weight: 800;
   color: #0f172a;
   letter-spacing: -0.02em;
   margin: 0 0 6px;
-  background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -1396,6 +1380,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   font-size: 0.875rem;
   color: #64748b;
   margin: 0;
+  line-height: 1.5;
 }
 
 .header-right {
@@ -1411,10 +1396,13 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   gap: 12px;
 }
 
+.space-select {
+  width: 260px;
+}
+
 .space-select :deep(.el-input__wrapper) {
   border-radius: 12px;
   border-color: rgba(15, 23, 42, 0.08);
-  width: 180px;
   padding: 8px 12px;
   height: 38px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
@@ -1828,6 +1816,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
 .rec-tags {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 
   .tag {
@@ -1837,6 +1826,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
     border-radius: 4px;
     color: #64748b;
     font-weight: 600;
+    white-space: nowrap;
 
     &.difficulty {
       &.warning { color: #f59e0b; background: rgba(245, 158, 11, 0.06); }
@@ -2238,9 +2228,14 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 20px;
   
-  h3 { margin: 0; }
+  h3 {
+    margin: 0;
+    white-space: nowrap;
+  }
 }
 
 /* 合并的掌握度卡片内容 */
@@ -2366,6 +2361,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   gap: 12px;
   font-size: 0.75rem;
   color: #64748b;
+  white-space: nowrap;
 }
 
 .leg-item {
@@ -3060,6 +3056,65 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   border-left: 2.5px solid #ef4444;
 }
 
+/* 中屏响应式优化 */
+@media (max-width: 1350px) {
+  .metrics-grid {
+    gap: 12px;
+  }
+  .stat-card {
+    padding: 16px;
+  }
+  .stat-card.score-card {
+    padding: 12px 16px;
+  }
+  .score-left, .stat-circle {
+    width: 84px;
+    height: 84px;
+  }
+  .circle-score {
+    font-size: 1.6rem;
+  }
+  .accuracy-val {
+    font-size: 1.5rem;
+  }
+  .score-divider {
+    margin: 0 8px;
+    height: 52px;
+  }
+  .stat-value {
+    font-size: 1.35rem;
+  }
+  .recommend-cards {
+    gap: 10px;
+  }
+  .recommend-item {
+    padding: 14px;
+  }
+  .rec-icon-wrapper {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+  .ability-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1200px) {
+  .ability-card-content {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ability-divider {
+    width: 100%;
+    height: 1px;
+    margin: 12px 0;
+  }
+  .ability-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* 移动端响应式 */
 @media (max-width: 1024px) {
   .exam-layout {
@@ -3107,140 +3162,5 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   color: #f59e0b;
   font-size: 15px;
   flex-shrink: 0;
-}
-
-/* 学习空间下拉定制 */
-.space-select :deep(.el-input__wrapper) {
-  border-radius: 14px;
-  border: 1px solid rgba(11, 183, 170, 0.15);
-  background: rgba(255, 255, 255, 0.6) !important;
-  backdrop-filter: blur(8px);
-  width: 220px;
-  padding: 8px 14px;
-  height: 40px;
-  box-shadow: 0 2px 10px rgba(11, 183, 170, 0.02) !important;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-  
-  &:hover, &.is-focus {
-    border-color: rgba(11, 183, 170, 0.45);
-    background: #ffffff !important;
-    box-shadow: 0 4px 14px rgba(11, 183, 170, 0.08) !important;
-  }
-  
-  .el-input__inner {
-    font-weight: 700;
-    color: #0f172a;
-    font-size: 0.85rem;
-  }
-}
-
-.space-select-prefix-icon {
-  color: #0bb7aa;
-  font-size: 1.1rem;
-  margin-right: 4px;
-  animation: spin-compass 8s linear infinite;
-}
-
-@keyframes spin-compass {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* 下拉菜单项样式优化 */
-.space-option-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 6px 0;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.space-option-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.space-option-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.space-option-name {
-  font-weight: 700;
-  color: #0f172a;
-  font-size: 0.85rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.space-option-goal {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.space-option-progress {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  width: 60px;
-  flex-shrink: 0;
-}
-
-.space-option-percent {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #0bb7aa;
-  font-family: 'Outfit', sans-serif;
-}
-
-.space-option-bar-wrapper {
-  width: 100%;
-  height: 4px;
-  background: #e2e8f0;
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.space-option-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #0bb7aa 0%, #10b981 100%);
-  border-radius: 2px;
-}
-
-/* 深度覆盖 el-select 弹出菜单的选项容器高度 */
-:deep(.el-select-dropdown__item) {
-  height: auto !important;
-  padding: 8px 16px !important;
-  
-  &.is-hovering {
-    background-color: rgba(11, 183, 170, 0.04) !important;
-  }
-  
-  &.is-selected {
-    color: #0bb7aa !important;
-    font-weight: bold;
-    background-color: rgba(11, 183, 170, 0.08) !important;
-  }
-}
-
-/* 弹出下拉面板宽度调宽 */
-:global(.space-select-popper) {
-  min-width: 320px !important;
-  border-radius: 16px !important;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
-  border: 1px solid rgba(11, 183, 170, 0.12) !important;
-  
-  .el-select-dropdown__list {
-    padding: 6px !important;
-  }
 }
 </style>

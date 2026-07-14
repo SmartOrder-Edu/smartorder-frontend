@@ -18,6 +18,7 @@ export interface QuestionTypeCountConfig {
   count: number
   difficulty: number
   optionCount?: number
+  programmingLanguage?: string
   sort?: number
 }
 
