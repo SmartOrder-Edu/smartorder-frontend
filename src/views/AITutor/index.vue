@@ -173,6 +173,11 @@
                   />
                   <!-- AI 消息使用 Markdown 渲染 -->
                   <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
+                  <!-- 学习空间卡片（业务结果展示） -->
+                  <LearningSpaceCards
+                    v-if="msg.role === 'ai' && msg.learningSpaceCards?.length"
+                    :cards="msg.learningSpaceCards"
+                  />
                   <!-- 思维导图卡片（历史消息） -->
                   <template v-if="msg.role === 'ai' && msg.mindMaps?.length">
                     <MindMapCard
@@ -281,6 +286,11 @@
                   <!-- 回答内容（流式） -->
                   <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
                   <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
+                  <!-- 学习空间卡片（流式实时展示） -->
+                  <LearningSpaceCards
+                    v-if="liveLearningSpaceCards.length"
+                    :cards="liveLearningSpaceCards"
+                  />
                   <!-- 思维导图卡片（流式实时展示） -->
                   <template v-if="agentStore.currentMindMaps?.length">
                     <MindMapCard
@@ -393,6 +403,23 @@
                 </div>
               </div>
               <div class="mode-selector">
+                <button
+                  class="mode-btn"
+                  :class="{ active: currentMode === 'AUTO' }"
+                  @click="switchMode('AUTO')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <path d="M12 2v4"/>
+                    <path d="M12 18v4"/>
+                    <path d="M4.93 4.93l2.83 2.83"/>
+                    <path d="M16.24 16.24l2.83 2.83"/>
+                    <path d="M2 12h4"/>
+                    <path d="M18 12h4"/>
+                    <path d="M4.93 19.07l2.83-2.83"/>
+                    <path d="M16.24 7.76l2.83-2.83"/>
+                  </svg>
+                  <span>智能路由</span>
+                </button>
                 <button
                   class="mode-btn"
                   :class="{ active: currentMode === 'REACT' }"
@@ -584,7 +611,11 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { useAgentChat, type ChatMessage } from '@/composables/useAgentChat'
+import {
+  extractLearningSpaceCardsFromToolCalls,
+  useAgentChat,
+  type ChatMessage,
+} from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationVO } from '@/api/agent'
 import { agentApi } from '@/api/agent'
@@ -603,6 +634,7 @@ import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import WebSearchSources from '@/components/agent/WebSearchSources.vue'
 import RagSources from '@/components/agent/RagSources.vue'
 import MindMapCard from '@/components/agent/MindMapCard.vue'
+import LearningSpaceCards from '@/components/agent/LearningSpaceCards.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
@@ -613,6 +645,7 @@ import { getAvatarAuthInfo, type AvatarAuthInfo } from '@/api/avatar'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
+const liveLearningSpaceCards = computed(() => extractLearningSpaceCardsFromToolCalls(agentStore.toolCalls))
 const route = useRoute()
 
 const inputMessage = ref('')
@@ -667,12 +700,14 @@ const {
   confirmGateViaSSE,
 } = useAgentChat(scrollToBottom)
 
-// 用户手动选择的对话模式
-const currentMode = ref<'REACT' | 'PLAN_AND_EXECUTE'>('REACT')
+type ChatMode = 'AUTO' | 'REACT' | 'PLAN_AND_EXECUTE'
 
-const switchMode = (mode: 'REACT' | 'PLAN_AND_EXECUTE') => {
+// 默认使用后端意图路由，让系统按用户问题选择工具集
+const currentMode = ref<ChatMode>('AUTO')
+
+const switchMode = (mode: ChatMode) => {
   currentMode.value = mode
-  currentForceMode.value = mode
+  currentForceMode.value = mode === 'AUTO' ? null : mode
 }
 
 // 监听 AI 消息变化，将最新消息传递给数字人

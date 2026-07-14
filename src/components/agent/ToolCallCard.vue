@@ -109,6 +109,8 @@ const props = defineProps<{
 const expanded = ref(true)
 const router = useRouter()
 
+const normalizedResult = computed(() => normalizeResult(props.result))
+
 const quizResult = computed(() => {
   if (
     (props.toolName !== 'generateQuiz' && props.toolName !== 'assessment_tool') ||
@@ -117,7 +119,7 @@ const quizResult = computed(() => {
   ) {
     return null
   }
-  return normalizeResult(props.result)
+  return normalizedResult.value
 })
 
 const startQuiz = (quiz: any) => {
@@ -142,7 +144,7 @@ function normalizeResult(result: any): Record<string, any> | null {
 
 const searchRefs = computed<SearchReference[]>(() => {
   if (props.toolName !== 'webSearch' || props.status !== 'completed' || !props.result) return []
-  const obj = normalizeResult(props.result)
+  const obj = normalizedResult.value
   if (!obj) return []
   const refs = obj.references ?? obj.webSearchReferences
   if (!Array.isArray(refs) || refs.length === 0) return []
