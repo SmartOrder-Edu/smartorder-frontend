@@ -1,6 +1,6 @@
 <template>
   <AppLayout>
-    <div class="exam-paper-container">
+    <div class="exam-paper-container practice-quiz-page">
       <!-- 返回导航 -->
       <div class="back-nav" @click="goBack">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" class="back-icon">
@@ -17,262 +17,43 @@
         <!-- 左侧栏：进度卡片 + 题目卡片列表 -->
         <div class="exam-main-content">
           <!-- 测评进度卡片 -->
-          <div class="progress-summary-card">
-            <!-- 左侧：环形进度条 -->
-            <div class="progress-circle-section">
-              <div class="circle-chart" :style="{ '--percent': progressPercentage + '%' }">
-                <svg viewBox="0 0 100 100">
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="#f1f5f9" stroke-width="8"/>
-                  <circle cx="50" cy="50" r="42" fill="none" stroke="url(#progressGrad)" stroke-width="8"
-                          stroke-linecap="round" :stroke-dasharray="`${progressPercentage * 2.64} 264`"
-                          transform="rotate(-90 50 50)"/>
-                  <defs>
-                    <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" style="stop-color: #0bb7aa" />
-                      <stop offset="100%" style="stop-color: #20c997" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div class="circle-inner">
-                  <span class="count-text">{{ answeredCount }}/{{ questions.length }}</span>
-                  <span class="label-text">已完成</span>
-                </div>
-              </div>
-            </div>
-            
-            <!-- 右侧：统计项 -->
-            <div class="progress-stats-section">
-              <div class="stat-box">
-                <div class="stat-label">总题数</div>
-                <div class="stat-value">{{ questions.length }} <span class="unit">题</span></div>
-              </div>
-              <div class="stat-box">
-                <div class="stat-label">
-                  正确率预估
-                  <el-tooltip content="根据当前已作答客观题的正确率或历史数据预估" placement="top">
-                    <el-icon class="info-icon"><InfoFilled /></el-icon>
-                  </el-tooltip>
-                </div>
-                <div class="stat-value">{{ estimatedAccuracy }}%</div>
-              </div>
-              <div class="stat-box">
-                <div class="stat-label">难度分布</div>
-                <div class="stat-value text-desc">{{ difficultyDistributionText }}</div>
-              </div>
-              <div class="stat-box full-width">
-                <div class="stat-label">知识覆盖</div>
-                <div class="knowledge-tags">
-                  <span v-for="tag in knowledgeCoverageTags" :key="tag" class="coverage-tag">{{ tag }}</span>
-                  <span v-if="!knowledgeCoverageTags.length" class="coverage-tag empty">暂无</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <QuizSummaryCard
+            :answeredCount="answeredCount"
+            :totalCount="questions.length"
+            :estimatedAccuracy="estimatedAccuracy"
+            :difficultyText="difficultyDistributionText"
+            :coverageTags="knowledgeCoverageTags"
+          />
           
           <!-- 题目卡片列表 -->
           <div v-for="group in groupedQuestions" :key="group.type" class="question-group">
-            <div 
-              v-for="q in group.questions" 
-              :key="q.id" 
+            <QuestionCard
+              v-for="q in group.questions"
+              :key="q.id"
               :id="'question-card-' + q.globalIndex"
-              class="question-card"
-              :class="{ 
-                active: q.globalIndex === currentActiveIndex,
-                answered: isQuestionAnswered(q)
-              }"
-              @click="setActiveQuestion(q.globalIndex)"
-            >
-              <!-- 题目头部 -->
-              <div class="card-header">
-                <div class="header-left">
-                  <span class="q-number">第 <strong class="num">{{ q.globalIndex }}</strong> 题</span>
-                  <span class="divider">/</span>
-                  <span class="q-type-label">{{ group.typeName }}</span>
-                  
-                  <!-- 标签 -->
-                  <div class="card-tags">
-                    <span v-for="tag in (q.tags || [])" :key="tag" class="tag-badge">{{ tag }}</span>
-                    <span v-for="kp in (q.knowledgePoints || [])" :key="'kp-' + kp" class="tag-badge kp">{{ kp }}</span>
-                  </div>
-                </div>
-                <div class="header-right">
-                  <span class="score-badge">{{ q.score || 0 }} 分</span>
-                </div>
-              </div>
-              
-              <!-- 题干 -->
-              <div class="card-stem" v-html="q.stem"></div>
-              
-              <!-- 作答交互区域 -->
-              <div class="card-interaction">
-                <!-- 选择选项区 -->
-                <div class="q-options" v-if="getOptions(q).length">
-                  <div 
-                    v-for="opt in getOptions(q)" 
-                    :key="opt.label" 
-                    class="q-option"
-                    :class="{ 
-                      selected: isOptionSelected(q, opt.label),
-                      correct: showAnswer && isOptionCorrect(q, opt.label),
-                      wrong: showAnswer && isOptionWrong(q, opt.label)
-                    }"
-                    @click="toggleOption(q, opt.label)"
-                  >
-                    <span class="opt-circle">{{ opt.label }}</span>
-                    <span class="opt-content">{{ opt.content }}</span>
-                  </div>
-                </div>
-                
-                <!-- 判断选项区 -->
-                <div class="q-options" v-else-if="q.questionType === 'judge'">
-                  <div 
-                    class="q-option" 
-                    :class="{ 
-                      selected: answers[q.id as any] === 'true',
-                      correct: showAnswer && isJudgeOptionCorrect(q, 'true'),
-                      wrong: showAnswer && isJudgeOptionWrong(q, 'true')
-                    }" 
-                    @click="toggleJudge(q, 'true')"
-                  >
-                    <span class="opt-circle">A</span>
-                    <span class="opt-content">正确</span>
-                  </div>
-                  <div 
-                    class="q-option" 
-                    :class="{ 
-                      selected: answers[q.id as any] === 'false',
-                      correct: showAnswer && isJudgeOptionCorrect(q, 'false'),
-                      wrong: showAnswer && isJudgeOptionWrong(q, 'false')
-                    }" 
-                    @click="toggleJudge(q, 'false')"
-                  >
-                    <span class="opt-circle">B</span>
-                    <span class="opt-content">错误</span>
-                  </div>
-                </div>
-                
-                <!-- 填空选项区 -->
-                <div class="q-fill" v-else-if="q.questionType === 'fill_blank'">
-                   <div v-for="(val, idx) in getFillBlankValues(q)" :key="idx" class="fill-row">
-                     <span class="fill-label">第{{ idx + 1 }}空：</span>
-                     <input 
-                       type="text" 
-                       :value="val" 
-                       @input="e => updateFillBlankValueIndexed(q, idx, (e.target as HTMLInputElement).value)" 
-                       placeholder="请填写答案" 
-                       :readonly="showAnswer" 
-                       class="custom-input" 
-                     />
-                   </div>
-                </div>
-                
-                <!-- 主观/问答题 -->
-                <div class="q-text-answer" v-else>
-                   <textarea v-model="answers[q.id as any]" :readonly="showAnswer" rows="4" placeholder="请输入答案" class="custom-textarea"></textarea>
-                </div>
-              </div>
-              
-              <!-- 解析与结果区 -->
-              <div v-if="showAnswer" class="result-box" :class="getResultBoxClass(q)">
-                <!-- Session 模式：后端判分结果 -->
-                <template v-if="getQuestionGrading(q) && getQuestionGrading(q)!.status === 'graded'">
-                  <div class="result-row">
-                    <span class="label">判分结果：</span>
-                    <span class="value" :class="getQuestionGrading(q)!.isCorrect ? 'correct-answer' : 'wrong-answer'">
-                      {{ getQuestionGrading(q)!.isCorrect ? '✓ 正确' : '✗ 错误' }}
-                    </span>
-                    <span class="label">得分：</span>
-                    <span class="value">{{ getQuestionGrading(q)!.score }} / {{ q.score }}</span>
-                  </div>
-                </template>
-                <template v-else-if="getQuestionGrading(q) && getQuestionGrading(q)!.status === 'pending_review'">
-                  <div class="result-row">
-                    <span class="value pending-badge">⏳ AI 批阅中...</span>
-                  </div>
-                </template>
-
-                <!-- 旧模式: 客户端判分 -->
-                <template v-else-if="!sessionId && q.questionType !== 'short_answer' && q.questionType !== 'essay'">
-                  <div class="result-row">
-                    <span class="label">我的答案：</span>
-                    <span class="value user-answer" :class="{ correct: isCorrect(q), wrong: !isCorrect(q) }">
-                      {{ formatUserAnswer(q) || '未作答' }}
-                    </span>
-                    <span v-if="isCorrect(q)" class="icon-correct">正确</span>
-                    <span v-else class="icon-wrong">错误</span>
-                  </div>
-                  <div class="result-row">
-                    <span class="label">正确答案：</span>
-                    <span class="value correct-answer">{{ getCorrectAnswer(q) }}</span>
-                  </div>
-                </template>
-
-                <!-- 答案解析 -->
-                <div class="result-row explanation" v-if="q.explanation">
-                  <div class="label">答案解析：</div>
-                  <div class="value">{{ q.explanation }}</div>
-                </div>
-              </div>
-              
-              <!-- 卡片底部操作区 -->
-              <div class="card-footer">
-                <div class="footer-left">
-                  <button 
-                    type="button" 
-                    class="action-btn flag-btn" 
-                    :class="{ active: flaggedQuestions.has(q.globalIndex) }"
-                    @click.stop="toggleFlag(q.globalIndex)"
-                  >
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="icon-svg">
-                      <path d="M12.4 5H18v10h-4.6l-.4-2H8v5H6V4h6.8l.6 1z"/>
-                    </svg>
-                    <span>标记疑问</span>
-                  </button>
-                  
-                  <button 
-                    type="button" 
-                    class="action-btn fav-btn"
-                    :class="{ active: favoritedQuestions.has(q.globalIndex) }"
-                    @click.stop="toggleFavorite(q.globalIndex)"
-                  >
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" class="icon-svg">
-                      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-                    </svg>
-                    <span>收藏</span>
-                  </button>
-                  
-                  <button 
-                    type="button" 
-                    class="action-btn kp-btn"
-                    @click.stop="showKpExplanation(q)"
-                  >
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="icon-svg">
-                      <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                    </svg>
-                    <span>查看知识点</span>
-                  </button>
-                </div>
-                
-                <div class="footer-right">
-                  <button 
-                    type="button" 
-                    class="nav-btn" 
-                    :disabled="q.globalIndex === 1"
-                    @click.stop="goPrevQuestion(q.globalIndex)"
-                  >
-                    上一题
-                  </button>
-                  <button 
-                    type="button" 
-                    class="nav-btn primary-nav" 
-                    :disabled="q.globalIndex === questions.length"
-                    @click.stop="goNextQuestion(q.globalIndex)"
-                  >
-                    下一题
-                  </button>
-                </div>
-              </div>
-            </div>
+              :q="q"
+              :typeName="group.typeName"
+              :active="q.globalIndex === currentActiveIndex"
+              :answers="answers"
+              :showAnswer="showAnswer"
+              :isSubmitting="isSubmitting"
+              :flagged="flaggedQuestions.has(q.globalIndex)"
+              :favorited="favoritedQuestions.has(q.globalIndex)"
+              :sessionId="sessionId"
+              :grading="getQuestionGrading(q)"
+              :totalCount="questions.length"
+              :isAnalysisExpanded="isAnalysisExpanded(q.id)"
+              @select-option="toggleOption"
+              @select-judge="toggleJudge"
+              @update-fill-blank="updateFillBlankValueIndexed"
+              @update-essay="updateEssayValue"
+              @toggle-flag="toggleFlag"
+              @toggle-favorite="toggleFavorite"
+              @show-kp="showKpExplanation"
+              @prev="goPrevQuestion"
+              @next="goNextQuestion"
+              @toggle-analysis="toggleAnalysisExpand"
+            />
           </div>
         </div>
         
@@ -328,7 +109,7 @@
             <div class="sidebar-card ai-tips-section">
               <div class="card-title-row">
                 <span class="icon">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="color: #0bb7aa;">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="color: #14b8a6;">
                     <rect x="3" y="11" width="18" height="10" rx="2"/>
                     <circle cx="12" cy="5" r="2"/>
                     <path d="M12 7v4"/>
@@ -360,7 +141,7 @@
             <div class="sidebar-card kp-explain-section" :class="{ collapsed: isKpCollapsed }">
               <div class="card-title-row clickable" @click="isKpCollapsed = !isKpCollapsed">
                 <span class="icon">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="color: #6366f1;">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" style="color: #5b8def;">
                     <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
                   </svg>
                 </span>
@@ -437,6 +218,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Warning, InfoFilled, QuestionFilled } from '@element-plus/icons-vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+
+// 导入重构的拆分子组件
+import QuizSummaryCard from './components/QuizSummaryCard.vue'
+import QuestionCard from './components/QuestionCard.vue'
+
 import { fetchEvaluationQuestions, type EvaluationQuestion } from '@/api/evaluationQuestion'
 import {
   fetchSessionQuestions,
@@ -796,19 +582,6 @@ const fetchQuestions = async () => {
   }
 }
 
-const getOptions = (q: EvaluationQuestion) => {
-  const opts = normalizeQuestionOptions(q.options)
-  if (opts.length === 0 && (q.questionType === 'single_choice' || q.questionType === 'multiple_choice')) {
-    return [
-      { label: 'A', content: '' },
-      { label: 'B', content: '' },
-      { label: 'C', content: '' },
-      { label: 'D', content: '' }
-    ]
-  }
-  return opts
-}
-
 const toggleOption = (q: EvaluationQuestion, label: string) => {
   if (showAnswer.value) return
   
@@ -832,135 +605,63 @@ const toggleJudge = (q: EvaluationQuestion, val: string) => {
   answers.value[q.id as any] = val
 }
 
-const isOptionSelected = (q: EvaluationQuestion, label: string) => {
-  const ans = answers.value[q.id as any] || ''
-  if (q.questionType === 'single_choice') {
-    return ans === label
-  }
-  return ans.split('、').includes(label)
-}
-
-// 选项提交后正误判断
-const isOptionCorrect = (q: EvaluationQuestion, label: string) => {
-  const correct = getCorrectAnswer(q)
-  if (q.questionType === 'single_choice') {
-    return correct === label
-  }
-  if (q.questionType === 'multiple_choice') {
-    return correct.split('、').map(s => s.trim()).includes(label)
-  }
-  return false
-}
-
-const isOptionWrong = (q: EvaluationQuestion, label: string) => {
-  const selected = isOptionSelected(q, label)
-  const correct = isOptionCorrect(q, label)
-  return selected && !correct
-}
-
-// 判断题提交后正误判断
-const isJudgeOptionCorrect = (q: EvaluationQuestion, val: string) => {
-  const correct = getCorrectAnswer(q)
-  const valText = val === 'true' ? '正确' : '错误'
-  return correct === valText
-}
-
-const isJudgeOptionWrong = (q: EvaluationQuestion, val: string) => {
-  const selected = answers.value[q.id as any] === val
-  const correct = isJudgeOptionCorrect(q, val)
-  return selected && !correct
-}
-
-// 填空多空动态生成支持
-const getBlankCount = (q: EvaluationQuestion) => {
-  const matches = q.stem.match(/_+/g)
-  if (matches && matches.length > 0) {
-    return matches.length
-  }
-  const correctAns = getCorrectAnswer(q)
-  if (correctAns && correctAns !== '无') {
-    return correctAns.split('、').length
-  }
-  return 1
-}
-
-const getFillBlankValues = (q: EvaluationQuestion) => {
-  const ans = answers.value[q.id as any] || ''
-  const parts = ans.split(';;')
-  const count = getBlankCount(q)
-  const result: string[] = []
-  for (let i = 0; i < count; i++) {
-    result.push(parts[i] || '')
-  }
-  return result
-}
-
 const updateFillBlankValueIndexed = (q: EvaluationQuestion, index: number, val: string) => {
   if (showAnswer.value) return
-  const currentValues = getFillBlankValues(q)
+  
+  // 模拟 fill blank 的获取和更新
+  const ans = answers.value[q.id as any] || ''
+  const parts = ans.split(';;')
+  
+  // 获取空位数
+  const matches = q.stem.match(/_+/g)
+  let count = 1
+  if (matches && matches.length > 0) {
+    count = matches.length
+  } else {
+    const text = getQuestionAnswerText(q.correctAnswer) || '无'
+    if (text !== '无') count = text.split('、').length
+  }
+  
+  const currentValues: string[] = []
+  for (let i = 0; i < count; i++) {
+    currentValues.push(parts[i] || '')
+  }
+  
   currentValues[index] = val.trim()
   answers.value[q.id as any] = currentValues.join(';;')
 }
 
-const getCorrectAnswer = (q: EvaluationQuestion) => {
-  const text = getQuestionAnswerText(q.correctAnswer)
-  return text || '无'
+// 支持主观题 input 触发
+const updateEssayValue = (q: EvaluationQuestion, val: string) => {
+  if (showAnswer.value) return
+  answers.value[q.id as any] = val
 }
-
-const formatUserAnswer = (q: EvaluationQuestion) => {
-  let user = answers.value[q.id as any] || ''
-  if (!user) return ''
-  
-  if (q.questionType === 'judge') {
-    return user === 'true' ? '正确' : (user === 'false' ? '错误' : user)
-  }
-  if (q.questionType === 'fill_blank') {
-    return user.replace(/;;/g, ';')
-  }
-  return user
-}
-
-const isCorrect = (q: EvaluationQuestion) => {
-  const correct = getCorrectAnswer(q)
-  const user = formatUserAnswer(q)
-  
-  if (!user) return false
-  
-  if (q.questionType === 'single_choice' || q.questionType === 'judge') {
-    return user === correct
-  }
-  
-  if (q.questionType === 'multiple_choice') {
-    const sortedUser = user.split('、').map(s=>s.trim()).sort().join('、')
-    const sortedCorrect = correct.split('、').map(s=>s.trim()).sort().join('、')
-    return sortedUser === sortedCorrect
-  }
-  
-  if (q.questionType === 'fill_blank') {
-    const uParts = user.split(';').map(s => s.trim())
-    const cParts = correct.split('、').map(s => s.trim()) 
-    if (uParts.length !== cParts.length) return false
-    for(let i=0; i<uParts.length; i++) {
-      if(uParts[i] !== cParts[i]) return false
-    }
-    return true
-  }
-  
-  return false
-}
-
-const showUnfinishedModal = ref(false)
-const unfinishedTypesText = ref('')
 
 const isQuestionAnswered = (q: EvaluationQuestion) => {
   const ans = answers.value[q.id as any]
   if (!ans) return false
   if (q.questionType === 'fill_blank') {
-    const vals = getFillBlankValues(q)
-    return vals.length > 0 && vals.every(v => v.trim() !== '')
+    // 检查是否全填了
+    const parts = ans.split(';;')
+    const matches = q.stem.match(/_+/g)
+    let count = 1
+    if (matches && matches.length > 0) {
+      count = matches.length
+    } else {
+      const text = getQuestionAnswerText(q.correctAnswer) || '无'
+      if (text !== '无') count = text.split('、').length
+    }
+    const currentValues: string[] = []
+    for (let i = 0; i < count; i++) {
+      currentValues.push(parts[i] || '')
+    }
+    return currentValues.length > 0 && currentValues.every(v => v.trim() !== '')
   }
   return ans.trim() !== ''
 }
+
+const showUnfinishedModal = ref(false)
+const unfinishedTypesText = ref('')
 
 const submitExam = () => {
   const unfinishedTypes: string[] = []
@@ -1073,21 +774,6 @@ const getQuestionGrading = (q: EvaluationQuestion): AnswerDetailVO | undefined =
   return gradingResult.value?.detail?.find(d => String(d.questionId) === String(q.id))
 }
 
-// 结果框样式
-const getResultBoxClass = (q: EvaluationQuestion) => {
-  const g = getQuestionGrading(q)
-  if (g && g.status === 'graded') {
-    return g.isCorrect ? 'correct-bg' : 'wrong-bg'
-  }
-  if (g && g.status === 'pending_review') return 'neutral-bg'
-  if (!sessionId.value) {
-    // 旧模式客户端判分
-    if (q.questionType === 'short_answer' || q.questionType === 'essay') return 'neutral-bg'
-    return isCorrect(q) ? 'correct-bg' : 'wrong-bg'
-  }
-  return 'neutral-bg'
-}
-
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('scroll', onWindowScroll)
@@ -1102,39 +788,54 @@ onUnmounted(() => {
     pollingTimer = null
   }
 })
+
+// 控制每道题解析的展开状态
+const expandedAnalyses = ref<Record<string | number, boolean>>({})
+
+// 切换解析展开状态
+const toggleAnalysisExpand = (questionId: string | number) => {
+  expandedAnalyses.value[questionId] = !expandedAnalyses.value[questionId]
+}
+
+// 是否已展开
+const isAnalysisExpanded = (questionId: string | number) => {
+  return !!expandedAnalyses.value[questionId]
+}
 </script>
 
 <style scoped>
-.exam-paper-container {
-  background-color: #f4f6f8;
-  min-height: calc(100vh - 60px);
-  padding: 24px 20px 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #1e293b;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+.exam-paper-container.practice-quiz-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 24px 40px;
+  background: #f6f8fb;
+  min-height: 100vh;
+  transition: background 0.3s ease;
 }
 
-/* 返回导航 */
 .back-nav {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: #64748b;
-  font-size: 13px;
+  gap: 8px;
+  font-size: 14px;
   font-weight: 700;
+  color: #475569;
   cursor: pointer;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
   transition: all 0.2s ease;
   user-select: none;
-  width: 100%;
-  max-width: 1440px;
-  align-self: center;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.01);
 }
 
 .back-nav:hover {
-  color: #0bb7aa;
+  color: #14b8a6;
+  border-color: rgba(20, 184, 166, 0.4);
+  background: #f8fafc;
+  transform: translateX(-1px);
 }
 
 .back-icon {
@@ -1142,1034 +843,639 @@ onUnmounted(() => {
 }
 
 .back-nav:hover .back-icon {
-  transform: translateX(-3px);
+  transform: translateX(-2px);
 }
 
-/* 双栏布局 */
-.exam-session-layout {
+.loading-box,
+.empty-box {
   display: flex;
-  width: 100%;
-  max-width: 1440px;
-  gap: 32px;
-  position: relative;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  background: #ffffff;
+  border: 1.5px solid #e8edf4;
+  border-radius: 28px;
+  font-size: 16px;
+  color: #667085;
+  font-weight: 700;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.03);
+}
+
+/* 左右双栏布局 */
+.exam-session-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 28px;
+  align-items: start;
 }
 
 .exam-main-content {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  min-width: 0;
+  gap: 28px;
 }
 
-/* 进度卡片 */
-.progress-summary-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
-  display: flex;
-  align-items: center;
-  gap: 32px;
-  box-shadow: 0 4px 20px  var(--color-shadow);
-  border: 1px solid #eef2f6;
-}
-
-.progress-circle-section {
-  flex-shrink: 0;
-}
-
-.circle-chart {
-  position: relative;
-  width: 90px;
-  height: 90px;
-}
-
-.circle-chart svg {
-  width: 100%;
-  height: 100%;
-}
-
-.circle-inner {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.circle-inner .count-text {
-  font-size: 16px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.circle-inner .label-text {
-  font-size: 10px;
-  color: #64748b;
-  margin-top: 1px;
-}
-
-.progress-stats-section {
-  flex: 1;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.stat-box {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.stat-box.full-width {
-  grid-column: span 3;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #64748b;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 800;
-  color: #0f172a;
-}
-
-.stat-value .unit {
-  font-size: 12px;
-  font-weight: 500;
-  color: #64748b;
-  margin-left: 2px;
-}
-
-.stat-value.text-desc {
-  font-size: 15px;
-  color: #1e293b;
-  font-weight: 700;
-}
-
-.info-icon {
-  color: #94a3b8;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.knowledge-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-.coverage-tag {
-  background-color: #f1f5f9;
-  color: #475569;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.coverage-tag.empty {
-  color: #94a3b8;
-  font-style: italic;
-}
-
-/* 题目卡片 */
 .question-group {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 28px;
 }
 
-.question-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 4px 20px  var(--color-shadow);
-  border: 2px solid transparent;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  scroll-margin-top: 100px;
-}
-
-.question-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 24px  var(--color-shadow);
-}
-
-.question-card.active {
-  border-color: #0bb7aa;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  border-bottom: 1px solid #f1f5f9;
-  padding-bottom: 12px;
-}
-
-.card-header .header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.q-number {
-  font-size: 14px;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.q-number .num {
-  font-size: 17px;
-  font-weight: 800;
-  color: #0bb7aa;
-  margin: 0 1px;
-}
-
-.divider {
-  color: #cbd5e1;
-}
-
-.q-type-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #475569;
-  background-color: #f1f5f9;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.card-tags {
-  display: flex;
-  gap: 4px;
-  margin-left: 6px;
-}
-
-.tag-badge {
-  font-size: 10px;
-  font-weight: 700;
-  color: #3b82f6;
-  background-color: #eff6ff;
-  padding: 1px 6px;
-  border-radius: 4px;
-}
-
-.tag-badge.kp {
-  color: #8b5cf6;
-  background-color: #f5f3ff;
-}
-
-.score-badge {
-  font-size: 12px;
-  font-weight: 700;
-  color: #0bb7aa;
-  background-color: rgba(11, 183, 170, 0.06);
-  padding: 3px 10px;
-  border-radius: 10px;
-}
-
-.card-stem {
-  font-size: 15px;
-  line-height: 1.6;
-  color: #0f172a;
-  margin-bottom: 20px;
-  font-weight: 600;
-}
-
-/* 选项 */
-.q-options {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.q-option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  cursor: pointer;
-  background: #fff;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #475569;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.q-option:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  transform: translateX(3px);
-}
-
-.opt-circle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 1.5px solid #cbd5e1;
-  background: #fff;
-  color: #64748b;
-  font-size: 13px;
-  font-weight: 700;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.q-option.selected {
-  background: rgba(11, 183, 170, 0.04);
-  border-color: #0bb7aa;
-  color: #0bb7aa;
-  font-weight: 600;
-}
-
-.q-option.selected .opt-circle {
-  background: #0bb7aa;
-  border-color: #0bb7aa;
-  color: #fff;
-}
-
-.q-option.correct {
-  background: #f0fdf4;
-  border-color: #22c55e;
-  color: #15803d;
-  font-weight: 600;
-}
-
-.q-option.correct .opt-circle {
-  background: #22c55e;
-  border-color: #22c55e;
-  color: #fff;
-}
-
-.q-option.wrong {
-  background: #fef2f2;
-  border-color: #ef4444;
-  color: #991b1b;
-  font-weight: 600;
-}
-
-.q-option.wrong .opt-circle {
-  background: #ef4444;
-  border-color: #ef4444;
-  color: #fff;
-}
-
-/* 填空题 */
-.q-fill {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.fill-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.fill-label {
-  font-size: 13px;
-  color: #475569;
-  font-weight: 600;
-  width: 52px;
-  flex-shrink: 0;
-}
-
-.custom-input {
-  flex: 1;
-  height: 38px;
-  padding: 0 12px;
-  border: 1.5px solid #e2e8f0;
-  background-color: #fff;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #1e293b;
-  outline: none;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
-}
-
-.custom-input:focus {
-  border-color: #0bb7aa;
-  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.08);
-}
-
-.custom-input:read-only {
-  background-color: #f8fafc;
-  color: #64748b;
-  cursor: not-allowed;
-}
-
-/* 问答题 */
-.custom-textarea {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1.5px solid #e2e8f0;
-  background-color: #fff;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #1e293b;
-  outline: none;
-  resize: vertical;
-  line-height: 1.6;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
-}
-
-.custom-textarea:focus {
-  border-color: #0bb7aa;
-  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.08);
-}
-
-.custom-textarea:read-only {
-  background-color: #f8fafc;
-  color: #64748b;
-  cursor: not-allowed;
-}
-
-/* 题目卡片底部 */
-.card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 20px;
-  border-top: 1px solid #f1f5f9;
-  padding-top: 14px;
-}
-
-.footer-left {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  color: #64748b;
-  font-size: 12px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  font-weight: 600;
-}
-
-.action-btn:hover {
-  background-color: #f1f5f9;
-  color: #0f172a;
-}
-
-.action-btn.flag-btn.active {
-  color: #f97316;
-  background-color: #fff7ed;
-}
-
-.action-btn.fav-btn.active {
-  color: #eab308;
-  background-color: #fefcbf;
-}
-
-.action-btn.kp-btn:hover {
-  color: #6366f1;
-  background-color: #e0e7ff;
-}
-
-.icon-svg {
-  flex-shrink: 0;
-}
-
-.footer-right {
-  display: flex;
-  gap: 8px;
-}
-
-.nav-btn {
-  height: 34px;
-  padding: 0 16px;
-  border-radius: 17px;
-  border: 1.5px solid #cbd5e1;
-  background: #fff;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.nav-btn:hover:not(:disabled) {
-  background-color: #f8fafc;
-  border-color: #94a3b8;
-  color: #0f172a;
-}
-
-.nav-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.nav-btn.primary-nav {
-  background-color: #0bb7aa;
-  border-color: #0bb7aa;
-  color: #fff;
-}
-
-.nav-btn.primary-nav:hover:not(:disabled) {
-  background-color: #099f94;
-  border-color: #099f94;
-}
-
-/* 右侧侧边栏 */
+/* 右侧栏 Sticky */
 .exam-sidebar {
-  width: 340px;
-  flex-shrink: 0;
+  position: sticky;
+  top: 96px;
+  z-index: 10;
 }
 
 .sidebar-sticky-wrapper {
-  position: sticky;
-  top: 80px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
-  padding-right: 4px;
+  gap: 24px;
 }
 
-.sidebar-sticky-wrapper::-webkit-scrollbar {
-  width: 4px;
-}
-.sidebar-sticky-wrapper::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 2px;
-}
-
+/* 侧边栏卡片基础样式 */
 .sidebar-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 4px 20px  var(--color-shadow);
-  border: 1px solid #eef2f6;
+  background: #ffffff;
+  border: 1px solid #e8edf4;
+  border-radius: 24px;
+  padding: 20px 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.03);
+  transition: all 0.3s ease;
 }
 
-.card-title-row {
+.sidebar-card .card-title-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
-  font-size: 14px;
+  gap: 8px;
+  font-size: 15px;
   font-weight: 800;
-  color: #0f172a;
+  color: #182230;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #edf2f7;
+  transition: color 0.3s ease, border-color 0.3s ease;
 }
 
-.card-title-row.clickable {
-  cursor: pointer;
-  user-select: none;
-  justify-content: space-between;
-}
-
-.card-title-row.clickable .title {
-  flex: 1;
-  margin-left: 6px;
+.sidebar-card .card-title-row .title {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #182230;
 }
 
 /* 答题卡图例 */
 .legend-row {
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px dashed #e2e8f0;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  color: #64748b;
-  font-weight: 600;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
 }
 
 .legend-item .dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  display: inline-block;
-}
-
-.legend-item .dot.answered {
-  background-color: #22c55e;
-  border: none;
-}
-
-.legend-item .dot.active {
-  background-color: #3b82f6;
-  border: none;
-}
-
-.legend-item .dot.unanswered {
-  background-color: #e2e8f0;
-  border: none;
-}
-
-.legend-item .dot.flagged {
-  background-color: #f97316;
-  border: none;
-}
-
-/* 答题网格 */
-.answers-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-}
-
-.grid-number {
-  position: relative;
-  height: 40px;
-  border-radius: 8px;
-  border: 1.5px solid #e2e8f0;
-  background-color: #fff;
-  color: #334155;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.grid-number:hover {
-  border-color: #cbd5e1;
-  background-color: #f8fafc;
-}
-
-.grid-number.active {
-  border-color: #3b82f6;
-  color: #3b82f6;
-  background-color: #fff;
-}
-
-.grid-number.answered {
-  background-color: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #15803d;
-}
-
-.grid-number.flagged {
-  background-color: #fff7ed;
-  border-color: #fed7aa;
-  color: #ea580c;
-}
-
-.mini-check {
-  position: absolute;
-  bottom: 1.5px;
-  right: 1.5px;
-  background-color: #22c55e;
-  color: #fff;
   width: 8px;
   height: 8px;
   border-radius: 50%;
+}
+
+.legend-item .dot.answered {
+  background: #f0fdfa;
+  border: 1.5px solid #14b8a6;
+}
+
+.legend-item .dot.active {
+  background: #14b8a6;
+}
+
+.legend-item .dot.unanswered {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+}
+
+.legend-item .dot.flagged {
+  background: #ef4444;
+}
+
+/* 题目网格 */
+.answers-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.grid-number {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  font-size: 15px;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+}
+
+.grid-number:hover {
+  border-color: #14b8a6;
+  color: #0f9f91;
+  background: #f0fdfa;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(20, 184, 166, 0.1);
+}
+
+/* 答题卡网格状态 */
+.grid-number.active {
+  background: #14b8a6;
+  border-color: #14b8a6;
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(20, 184, 166, 0.25);
+}
+
+.grid-number.answered:not(.active) {
+  background: #f0fdfa;
+  border-color: #14b8a6;
+  color: #0f9f91;
+}
+
+.grid-number.flagged:not(.active) {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+/* 答题卡角标 */
+.mini-check,
+.mini-flag {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-check {
+  color: #14b8a6;
+}
+
+.grid-number.active .mini-check {
+  color: #ffffff;
 }
 
 .mini-flag {
-  position: absolute;
-  bottom: 1.5px;
-  right: 1.5px;
-  color: #f97316;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: #ef4444;
 }
 
-/* AI 学习提示列表 */
-.tips-list {
+.grid-number.active .mini-flag {
+  color: #ffffff;
+}
+
+/* AI 学习提示 */
+.ai-tips-content .tips-list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
-.tips-list li {
+.ai-tips-content .tips-list li {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 12px;
-  line-height: 1.5;
+  gap: 4px;
+  font-size: 13.5px;
+  line-height: 1.55;
 }
 
-.tip-label {
+.ai-tips-content .tip-label {
   font-weight: 800;
   color: #334155;
 }
 
-.tip-value {
-  color: #64748b;
-  background-color: #f8fafc;
-  padding: 5px 8px;
-  border-radius: 6px;
-  border-left: 3px solid #0bb7aa;
+.ai-tips-content .tip-value {
+  color: #475569;
 }
 
-/* 知识点折叠 */
+/* 可折叠知识点解释 */
 .kp-explain-section {
   transition: all 0.25s ease;
 }
 
-.kp-explain-section.collapsed .arrow-svg {
+.kp-explain-section .card-title-row.clickable {
+  cursor: pointer;
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.kp-explain-section:not(.collapsed) .card-title-row.clickable {
+  margin-bottom: 12px;
+  border-bottom: 1px solid #edf2f6;
+  padding-bottom: 12px;
+}
+
+.kp-explain-section .arrow-icon {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  color: #98a2b3;
+  transition: transform 0.25s ease;
+}
+
+.kp-explain-section.collapsed .arrow-icon {
   transform: rotate(180deg);
 }
 
-.arrow-svg {
-  transition: transform 0.2s ease;
-  color: #94a3b8;
-}
-
 .explain-text {
-  font-size: 12px;
+  font-size: 13.5px;
+  line-height: 1.65;
   color: #475569;
-  line-height: 1.5;
-  background-color: #fdfdfd;
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px dashed #cbd5e1;
-  margin: 0;
+  white-space: pre-wrap;
 }
 
-/* 提交按钮区域 */
+/* 提交测评区域 */
 .submit-card-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .btn-sidebar-submit {
-  height: 44px;
   width: 100%;
+  height: 52px;
+  border-radius: 16px;
   border: none;
-  background-color: #0bb7aa;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
-  border-radius: 10px;
+  background: linear-gradient(135deg, #14b8a6, #0ea5a4);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(11, 183, 170, 0.2);
-  transition: all 0.2s ease;
+  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.28);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-sidebar-submit:hover:not(:disabled) {
-  background-color: #099f94;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(11, 183, 170, 0.3);
+  background: linear-gradient(135deg, #18c5b2, #10b4b3);
+  box-shadow: 0 10px 28px rgba(20, 184, 166, 0.35);
+  transform: translateY(-2px);
+}
+
+.btn-sidebar-submit:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btn-sidebar-submit.return-btn {
-  background-color: #64748b;
-  box-shadow: 0 4px 14px rgba(100, 116, 139, 0.2);
+  background: #ffffff;
+  border: 1.5px solid #dbe3ec;
+  color: #344054;
+  box-shadow: none;
 }
 
 .btn-sidebar-submit.return-btn:hover {
-  background-color: #475569;
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #1e293b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.03);
 }
 
 .btn-sidebar-submit:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
-  transform: none !important;
   box-shadow: none !important;
+  transform: none !important;
 }
 
 .shortcut-tip {
-  font-size: 11px;
-  color: #94a3b8;
-  text-align: center;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
+  font-size: 12px;
+  color: #98a2b3;
+  font-weight: 700;
 }
 
 .shortcut-tip strong {
   color: #475569;
-  background: #e2e8f0;
-  padding: 1px 4px;
-  border-radius: 3px;
 }
 
 .shortcut-icon {
-  font-size: 12px;
-  color: #cbd5e1;
+  font-size: 14px;
+  color: #98a2b3;
   cursor: help;
 }
 
-/* 结果判分框 */
-.result-box {
-  margin-top: 16px;
-  padding: 14px 18px;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.result-box.correct-bg {
-  background-color: #f0fdf4;
-  border-color: #bbf7d0;
-}
-
-.result-box.wrong-bg {
-  background-color: #fef2f2;
-  border-color: #fecaca;
-}
-
-.result-box.neutral-bg {
-  background-color: #f8fafc;
-  border-color: #e2e8f0;
-}
-
-.result-row {
-  margin-bottom: 6px;
-}
-
-.result-row:last-child {
-  margin-bottom: 0;
-}
-
-.result-row .label {
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.result-row .value {
-  color: #334155;
-}
-
-.correct-answer {
-  color: #22c55e;
-  font-weight: 700;
-}
-
-.wrong-answer {
-  color: #ef4444;
-  font-weight: 700;
-}
-
-.pending-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: #f76707;
-  font-weight: 600;
-  background: #fff4e6;
-  padding: 2px 10px;
-  border-radius: 10px;
-  font-size: 12px;
-  border: 1px solid #ffe8cc;
-}
-
-.icon-correct {
-  color: #22c55e;
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.icon-wrong {
-  color: #ef4444;
-  font-weight: 700;
-  font-size: 12px;
-}
-
-.explanation {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed #cbd5e1;
-}
-
-.loading-box, .empty-box {
-  text-align: center;
-  padding: 100px 0;
-  color: #94a3b8;
-  font-size: 15px;
-}
-
-/* 提示未完成弹窗 */
+/* 提示弹窗 */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(15, 23, 42, 0.45);
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
+  animation: fade-in 0.2s ease;
 }
 
 .modal-card {
-  background: #fff;
-  width: 90%;
-  max-width: 400px;
-  border-radius: 16px;
-  box-shadow: 0 20px 25px -5px  var(--color-shadow);
-  padding: 24px;
-  box-sizing: border-box;
-  margin-bottom: 80px;
-  animation: modalFadeIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  width: 440px;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.15);
+  overflow: hidden;
+  border: 1px solid #e6ebf2;
+  animation: scale-up 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .modal-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #edf2f6;
 }
 
 .modal-title {
   font-size: 16px;
   font-weight: 800;
-  color: #0f172a;
+  color: #182230;
 }
 
 .modal-close-btn {
-  background: none;
   border: none;
-  color: #94a3b8;
+  background: transparent;
+  color: #98a2b3;
   cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  transition: all 0.15s ease;
 }
 
 .modal-close-btn:hover {
   background: #f1f5f9;
-  color: #475569;
+  color: #475467;
 }
 
 .modal-body {
-  font-size: 13px;
-  color: #475569;
-  line-height: 1.5;
-  margin-bottom: 24px;
-  text-align: left;
+  padding: 24px;
+  font-size: 15px;
+  color: #344054;
+  line-height: 1.6;
+  font-weight: 700;
 }
 
 .highlight-types {
-  color: #f97316;
-  font-weight: 700;
-  background-color: #fff7ed;
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid #ffe8cc;
-  margin: 0 2px;
-  display: inline-block;
-  line-height: 1.2;
+  color: #ef4444;
+  font-weight: 800;
 }
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #edf2f6;
 }
 
 .btn-modal {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 34px;
-  padding: 0 16px;
-  border-radius: 17px;
-  font-size: 12px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
-  box-sizing: border-box;
+  transition: all 0.15s ease;
+  border: none;
 }
 
 .btn-modal.cancel {
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  color: #475569;
+  background: #ffffff;
+  color: #475467;
+  border: 1.5px solid #dbe3ec;
 }
 
 .btn-modal.cancel:hover {
-  background: #f8fafc;
-  color: #1e293b;
+  background: #f1f5f9;
+  color: #182230;
 }
 
 .btn-modal.confirm {
-  border: none;
-  background: #0bb7aa;
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.2);
+  background: linear-gradient(135deg, #14b8a6, #0ea5a4);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.18);
 }
 
 .btn-modal.confirm:hover {
-  background: #099f94;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #18c5b2, #10b4b3);
+  box-shadow: 0 6px 16px rgba(20, 184, 166, 0.25);
 }
 
-@keyframes modalFadeIn {
-  from {
-    transform: scale(0.95) translateY(8px);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1) translateY(0);
-    opacity: 1;
-  }
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* 响应式断点 */
+@keyframes scale-up {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* 响应式适配 */
 @media (max-width: 1024px) {
   .exam-session-layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  
+  .exam-sidebar {
+    position: static;
+  }
+  
+  .sidebar-sticky-wrapper {
     flex-direction: column;
   }
-  .exam-sidebar {
-    width: 100%;
-  }
-  .sidebar-sticky-wrapper {
-    position: static;
-    max-height: none;
-    overflow-y: visible;
-  }
-  .progress-stats-section {
-    grid-template-columns: 1fr;
-  }
-  .stat-box.full-width {
-    grid-column: span 1;
-  }
+}
+
+/* 深色模式适配 */
+html[data-theme='dark'] .exam-paper-container.practice-quiz-page {
+  background: #0f172a;
+}
+
+html[data-theme='dark'] .back-nav {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .back-nav:hover {
+  color: #14b8a6;
+  border-color: rgba(20, 184, 166, 0.5);
+  background: #243049;
+}
+
+html[data-theme='dark'] .loading-box,
+html[data-theme='dark'] .empty-box {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme='dark'] .sidebar-card {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme='dark'] .sidebar-card .card-title-row {
+  border-bottom-color: #334155;
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .sidebar-card .card-title-row .title {
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .legend-item {
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .legend-item .dot.unanswered {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+html[data-theme='dark'] .grid-number {
+  border-color: #334155;
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .grid-number:hover {
+  border-color: #14b8a6;
+  color: #2dd4bf;
+  background: #243049;
+  box-shadow: 0 4px 10px rgba(20, 184, 166, 0.25);
+}
+
+html[data-theme='dark'] .grid-number.answered:not(.active) {
+  background: rgba(20, 184, 166, 0.15);
+  border-color: #14b8a6;
+  color: #2dd4bf;
+}
+
+html[data-theme='dark'] .grid-number.flagged:not(.active) {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+html[data-theme='dark'] .ai-tips-content .tip-label {
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .ai-tips-content .tip-value {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .kp-explain-section:not(.collapsed) .card-title-row.clickable {
+  border-bottom-color: #334155;
+}
+
+html[data-theme='dark'] .explain-text {
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .btn-sidebar-submit {
+  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.15);
+}
+
+html[data-theme='dark'] .btn-sidebar-submit:hover:not(:disabled) {
+  box-shadow: 0 10px 28px rgba(20, 184, 166, 0.25);
+}
+
+html[data-theme='dark'] .btn-sidebar-submit.return-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .btn-sidebar-submit.return-btn:hover {
+  background: #243049;
+  border-color: #475569;
+  color: #f4f7fb;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme='dark'] .shortcut-tip {
+  color: #64748b;
+}
+
+html[data-theme='dark'] .shortcut-tip strong {
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .modal-card {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+}
+
+html[data-theme='dark'] .modal-header {
+  border-bottom-color: #334155;
+}
+
+html[data-theme='dark'] .modal-title {
+  color: #f4f7fb;
+}
+
+html[data-theme='dark'] .modal-close-btn:hover {
+  background: #243049;
+  color: #f4f7fb;
+}
+
+html[data-theme='dark'] .modal-body {
+  color: #cbd5e1;
+}
+
+html[data-theme='dark'] .modal-footer {
+  background: #151e2d;
+  border-top-color: #334155;
+}
+
+html[data-theme='dark'] .btn-modal.cancel {
+  background: #1e293b;
+  color: #cbd5e1;
+  border-color: #334155;
+}
+
+html[data-theme='dark'] .btn-modal.cancel:hover {
+  background: #243049;
+  color: #f4f7fb;
 }
 </style>

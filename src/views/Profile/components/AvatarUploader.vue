@@ -9,7 +9,7 @@
 
     <!-- 相机编辑按钮 -->
     <label class="avatar-edit-button" :class="{ disabled: uploading }">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
         <circle cx="12" cy="13" r="4"/>
       </svg>
@@ -36,8 +36,8 @@ const handleChange = (event: Event) => {
 <style scoped>
 .avatar-wrapper {
   position: relative;
-  width: 96px;
-  height: 96px;
+  width: 76px;
+  height: 76px;
   flex-shrink: 0;
 }
 
@@ -46,10 +46,10 @@ const handleChange = (event: Event) => {
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
-  border: 3px solid #ffffff;
+  border: 2.5px solid #ffffff;
   box-shadow:
-    0 0 0 2px rgba(20, 184, 166, 0.22),
-    0 10px 24px rgba(15, 118, 110, 0.12);
+    0 0 0 1.5px rgba(20, 184, 166, 0.22),
+    0 8px 18px rgba(15, 118, 110, 0.1);
   transition: transform 0.3s ease;
 }
 
@@ -59,7 +59,7 @@ const handleChange = (event: Event) => {
 
 .uploading-overlay {
   position: absolute;
-  inset: 3px;
+  inset: 2.5px;
   background: rgba(0, 0, 0, 0.4);
   border-radius: 50%;
   display: flex;
@@ -69,9 +69,9 @@ const handleChange = (event: Event) => {
 }
 
 .upload-spinner {
-  width: 24px;
-  height: 24px;
-  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: #ffffff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -84,17 +84,17 @@ const handleChange = (event: Event) => {
 .avatar-edit-button {
   position: absolute;
   right: -2px;
-  bottom: 2px;
-  width: 32px;
-  height: 32px;
+  bottom: 0px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   color: #ffffff;
   background: #14b8a6;
-  border: 2.5px solid #ffffff;
-  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.25);
+  border: 2px solid #ffffff;
+  box-shadow: 0 3px 8px rgba(20, 184, 166, 0.25);
   cursor: pointer;
   z-index: 3;
   transition: all 0.2s ease;
@@ -103,7 +103,7 @@ const handleChange = (event: Event) => {
 .avatar-edit-button:hover {
   background: #0d9488;
   transform: scale(1.08);
-  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+  box-shadow: 0 3px 10px rgba(13, 148, 136, 0.35);
 }
 
 .avatar-edit-button.disabled {
@@ -115,12 +115,12 @@ const handleChange = (event: Event) => {
 html[data-theme='dark'] .avatar-wrapper img {
   border-color: var(--account-card-bg, #1a222e);
   box-shadow:
-    0 0 0 2px rgba(20, 184, 166, 0.3),
-    0 10px 24px rgba(0, 0, 0, 0.4);
+    0 0 0 1.5px rgba(20, 184, 166, 0.3),
+    0 8px 18px rgba(0, 0, 0, 0.4);
 }
 
 html[data-theme='dark'] .avatar-edit-button {
   border-color: var(--account-card-bg, #1a222e);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
 }
 </style>

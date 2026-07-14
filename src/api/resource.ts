@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 import type { FileFolderContentVO, CreateFolderDTO } from '@/types/resource'
 
 /** 查询文件夹内容（子文件夹 + 文件列表） */
@@ -160,4 +161,91 @@ export function getPreviewUrl(id: string | undefined): string {
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
   const token = localStorage.getItem('token')
   return `${base}/yun-resource/preview/${id}?token=${token}`
+}
+
+// ======================= 文件夹导出 =======================
+
+export interface ExportProgress {
+  processedFiles: number
+  totalFiles: number
+  processedBytes: number
+  totalBytes: number
+  percent: number
+}
+
+export interface ExportComplete {
+  taskId: string
+  fileName: string
+}
+
+/** 发起文件夹导出任务 */
+export function exportFolder(folderId: string): Promise<{ taskId: string }> {
+  return request.post(`/yun-resource/folders/${folderId}/export`)
+}
+
+/** 取消导出任务 */
+export function cancelExportTask(taskId: string) {
+  return request.delete(`/yun-resource/folders/export/${taskId}`)
+}
+
+/** SSE 订阅导出进度 */
+export function createExportEventSource(
+  taskId: string,
+  callbacks: {
+    onProgress: (data: ExportProgress) => void
+    onComplete: (data: ExportComplete) => void
+    onError: (message: string) => void
+    onCancelled: () => void
+  }
+): { abort: () => void } {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  const token = localStorage.getItem('token')
+  const ctrl = new AbortController()
+
+  fetchEventSource(`${base}/yun-resource/folders/export/${taskId}/progress?token=${token}`, {
+    method: 'GET',
+    signal: ctrl.signal,
+    openWhenHidden: true,
+    onmessage(event) {
+      try {
+        const data = JSON.parse(event.data)
+        switch (event.event) {
+          case 'progress':
+            callbacks.onProgress(data)
+            break
+          case 'complete':
+            callbacks.onComplete(data)
+            break
+          case 'error':
+            callbacks.onError(data?.message || '导出失败')
+            break
+          case 'cancelled':
+            callbacks.onCancelled()
+            break
+        }
+      } catch {
+        // 忽略解析错误
+      }
+    },
+    onerror(err) {
+      console.error('SSE 导出进度连接异常:', err)
+      // 不抛出异常 — fetchEventSource 默认会重试
+    },
+  })
+
+  return { abort: () => ctrl.abort() }
+}
+
+/** 下载导出完成的 zip 文件（<a> 标签下载） */
+export function downloadExportZip(taskId: string, fileName: string) {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  const token = localStorage.getItem('token')
+  const url = `${base}/yun-resource/folders/export/${taskId}/download?token=${token}`
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }

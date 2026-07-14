@@ -2,22 +2,20 @@
   <div class="credential-section">
     <h4 class="section-title">账户凭证</h4>
     <div class="credential-grid">
-      <!-- 系统昵称 (整行) -->
+      <!-- 系统昵称 (半宽) -->
       <CredentialCard
         icon-type="username"
         label="系统昵称"
         :value="userInfo.username"
         :show-copy="true"
-        :full-width="true"
       />
 
-      <!-- 绑定邮箱 (整行) -->
+      <!-- 绑定邮箱 (半宽) -->
       <CredentialCard
         icon-type="email"
         label="绑定邮箱"
         :value="userInfo.email"
         :show-copy="true"
-        :full-width="true"
       />
 
       <!-- 个人简介 (整行) -->

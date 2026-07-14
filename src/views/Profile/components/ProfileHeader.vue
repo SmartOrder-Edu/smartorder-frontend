@@ -79,17 +79,17 @@ const handleAvatarChange = (event: Event) => {
 
 <style scoped>
 .profile-header {
-  min-height: 180px;
+  min-height: 130px;
   display: flex;
   align-items: center;
   position: relative;
-  padding: 24px 44px;
+  padding: 14px 32px;
   overflow: hidden;
   background:
     radial-gradient(
       circle at 88% 45%,
-      rgba(45, 212, 191, 0.16),
-      transparent 28%
+      rgba(45, 212, 191, 0.14),
+      transparent 32%
     ),
     linear-gradient(
       135deg,
@@ -103,7 +103,7 @@ const handleAvatarChange = (event: Event) => {
 .header-content {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 20px;
   position: relative;
   z-index: 2;
   flex: 1;
@@ -112,21 +112,21 @@ const handleAvatarChange = (event: Event) => {
 .user-profile-info {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
 }
 
 .name-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .profile-name {
-  font-size: 26px;
+  font-size: 22px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.2;
   color: #111827;
   margin: 0;
   word-break: break-all;
@@ -135,36 +135,38 @@ const handleAvatarChange = (event: Event) => {
 .identity-tag {
   display: inline-flex;
   align-items: center;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 4px;
   color: #16a34a;
   background: #ecfdf3;
   border: 1px solid #bbf7d0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   flex-shrink: 0;
 }
 
 .meta-row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
 }
 
 .meta-item {
   display: flex;
   align-items: center;
-  font-size: 14px;
+  font-size: 13px;
   color: #374151;
   min-width: 0;
 }
 
 .meta-icon {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   color: #14b8a6;
-  margin-right: 8px;
+  margin-right: 6px;
   flex-shrink: 0;
 }
 
@@ -172,7 +174,7 @@ const handleAvatarChange = (event: Event) => {
   font-weight: 600;
   color: #1f2937;
   flex-shrink: 0;
-  margin-right: 4px;
+  margin-right: 2px;
 }
 
 .meta-value {
@@ -195,37 +197,38 @@ const handleAvatarChange = (event: Event) => {
   right: 8%;
   top: 50%;
   transform: translateY(-50%);
-  width: 130px;
-  height: 130px;
-  color: rgba(20, 184, 166, 0.08);
+  width: 90px;
+  height: 90px;
+  color: rgba(20, 184, 166, 0.06);
 }
 
 .decor-dots {
   position: absolute;
   right: 4%;
   top: 15%;
-  width: 60px;
-  height: 60px;
-  background-image: radial-gradient(rgba(20, 184, 166, 0.2) 1.5px, transparent 1.5px);
-  background-size: 10px 10px;
-  opacity: 0.6;
+  width: 50px;
+  height: 50px;
+  background-image: radial-gradient(rgba(20, 184, 166, 0.15) 1.2px, transparent 1.2px);
+  background-size: 8px 8px;
+  opacity: 0.5;
 }
 
 /* 响应式适配 */
 @media (max-width: 768px) {
   .profile-header {
-    padding: 24px 20px;
+    padding: 20px 20px;
   }
   .header-content {
     flex-direction: column;
     text-align: center;
-    gap: 16px;
+    gap: 12px;
   }
   .name-row {
     justify-content: center;
   }
   .meta-row {
-    align-items: center;
+    justify-content: center;
+    gap: 16px;
   }
   .decor-shield, .decor-dots {
     display: none;
@@ -237,7 +240,7 @@ html[data-theme='dark'] .profile-header {
   background:
     radial-gradient(
       circle at 88% 45%,
-      rgba(20, 184, 166, 0.12),
+      rgba(20, 184, 166, 0.1),
       transparent 32%
     ),
     linear-gradient(
@@ -272,6 +275,6 @@ html[data-theme='dark'] .meta-value {
 }
 
 html[data-theme='dark'] .decor-shield {
-  color: rgba(20, 184, 166, 0.05);
+  color: rgba(20, 184, 166, 0.04);
 }
 </style>

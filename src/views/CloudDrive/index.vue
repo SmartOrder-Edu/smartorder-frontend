@@ -336,6 +336,14 @@
                 </svg>
                 打开
               </button>
+              <button class="context-menu-item" @click="handleExportFolder(contextMenu.item); contextMenu.visible = false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7,10 12,15 17,10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                下载文件夹
+              </button>
             </template>
             <template v-else>
               <button class="context-menu-item" @click="handlePreview(contextMenu.item); contextMenu.visible = false">
@@ -511,6 +519,30 @@
           </button>
         </div>
       </el-dialog>
+      <!-- 导出进度弹窗 -->
+      <ExportProgressDialog
+        :visible="isDialogVisible"
+        :status="exportState.status"
+        :folder-name="exportState.folderName"
+        :percent="exportState.percent"
+        :processed-files="exportState.processedFiles"
+        :total-files="exportState.totalFiles"
+        :processed-bytes="exportState.processedBytes"
+        :total-bytes="exportState.totalBytes"
+        :error-message="exportState.errorMessage"
+        @update:visible="isDialogVisible = $event"
+        @cancel="cancelExport"
+        @minimize="minimize"
+      />
+
+      <!-- 浮动导出气泡 -->
+      <FloatingExportBubble
+        :visible="isMinimized"
+        :status="exportState.status"
+        :folder-name="exportState.folderName"
+        :percent="exportState.percent"
+        @restore="restore"
+      />
     </div>
   </AppLayout>
 </template>
@@ -523,7 +555,10 @@ import SparkMD5 from 'spark-md5'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { getFolderContent, getFolderTree, createFolder as apiCreateFolder, updateFolder as apiUpdateFolder, deleteFolder as apiDeleteFolder, deleteFile as apiDeleteFile, moveFile as apiMoveFile, moveFolder as apiMoveFolder, batchMoveToFolder, apiInitUpload, apiGetSignUrl, apiUploadChunkToOSS, apiChunkDone, apiMergeChunks, apiCancelUpload, downloadFile } from '@/api/resource'
 import { getQuota } from '@/api/quota'
+import { useExportTask } from '@/composables/useExportTask'
 import PublishToSquareDialog from './components/PublishToSquareDialog.vue'
+import ExportProgressDialog from './components/ExportProgressDialog.vue'
+import FloatingExportBubble from './components/FloatingExportBubble.vue'
 
 // 文件类型图标
 import iconFolder from '@/assets/folder/folder.png'
@@ -592,6 +627,27 @@ const moveFullTree = ref<any[]>([])
 const selectedRows = ref<DriveItem[]>([])
 const tableRef = ref()
 
+// 文件夹导出
+const {
+  state: exportState,
+  isDialogVisible,
+  isMinimized,
+  startExport,
+  cancelExport,
+  minimize,
+  restore,
+} = useExportTask()
+
+const handleExportFolder = (item: DriveItem | null) => {
+  if (!item || item.type !== 'folder') return
+  const folderRealId = folderIdMap.get(item.id)
+  if (folderRealId !== undefined) {
+    startExport(folderRealId, item.name)
+  } else {
+    startExport(item.id, item.name)
+  }
+}
+
 // 发布到资源广场
 const showPublishDialog = ref(false)
 const publishFileTarget = ref<DriveItem | null>(null)
@@ -600,8 +656,10 @@ const publishIsBatch = ref(false)
 // 批量操作
 const handleBatchDownload = () => {
   const files = selectedRows.value.filter(r => r.type === 'file')
-  if (!files.length) { ElMessage.warning('请选择至少一个文件'); return }
+  const folders = selectedRows.value.filter(r => r.type === 'folder')
+  if (!files.length && !folders.length) { ElMessage.warning('请选择至少一个文件或文件夹'); return }
   files.forEach(f => handleDownload(f))
+  folders.forEach(f => handleExportFolder(f))
 }
 
 const handleBatchDelete = async () => {

@@ -139,6 +139,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '开始测评 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/exam/demo',
+    name: 'ExamDemoPreview',
+    component: () => import('@/views/Exam/PaperPreview.vue'),
+    meta: { title: 'AI 试卷重构预览 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import('@/views/Profile/index.vue'),

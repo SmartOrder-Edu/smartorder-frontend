@@ -200,6 +200,26 @@
              </div>
           </div>
 
+          <!-- 体验全新重构的 AI 试卷诊断系统 -->
+          <div class="demo-showcase-banner" @click="router.push('/exam/demo')">
+             <div class="banner-glass">
+                <div class="banner-left">
+                   <span class="banner-badge">✨ NEW</span>
+                   <h3 class="banner-main-title">体验全新 AI 诊断报告（重构演示版）</h3>
+                   <p class="banner-sub-desc">融合思维链时间轴推理、选项深度剖析及主观题 Rubric 看板，带给您极佳的测评交互与美学体验！</p>
+                </div>
+                <div class="banner-right">
+                   <div class="cta-arrow">
+                      <span>立即进入体验</span>
+                      <svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="3" fill="none" width="14" height="14">
+                         <line x1="5" y1="12" x2="19" y2="12"/>
+                         <polyline points="12 5 19 12 12 19"/>
+                      </svg>
+                   </div>
+                </div>
+             </div>
+          </div>
+
           <!-- 3. 当前学习任务/测评任务 -->
           <div class="tasks-section">
             <div class="exam-tabs-wrapper">
@@ -1337,6 +1357,96 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 </script>
 
 <style lang="scss" scoped>
+
+.demo-showcase-banner {
+  margin-bottom: 24px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(11, 183, 170, 0.2);
+  box-shadow: 0 4px 20px rgba(11, 183, 170, 0.02);
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.05) 0%, rgba(99, 102, 241, 0.04) 100%);
+  backdrop-filter: blur(8px);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(11, 183, 170, 0.08);
+    border-color: rgba(11, 183, 170, 0.4);
+    background: linear-gradient(135deg, rgba(11, 183, 170, 0.08) 0%, rgba(99, 102, 241, 0.07) 100%);
+  }
+
+  .banner-glass {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .banner-left {
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .banner-badge {
+    background: linear-gradient(135deg, #0bb7aa, #0d9488);
+    color: white;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    display: inline-block;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(11, 183, 170, 0.3);
+  }
+
+  .banner-main-title {
+    margin: 0 0 6px 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .banner-sub-desc {
+    margin: 0;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  .cta-arrow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #0bb7aa;
+    font-weight: 700;
+    font-size: 12px;
+    background: white;
+    padding: 8px 14px;
+    border-radius: 30px;
+    border: 1px solid rgba(11, 183, 170, 0.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.01);
+    transition: all 0.2s;
+
+    svg {
+      transition: transform 0.2s;
+    }
+  }
+
+  &:hover .cta-arrow {
+    background: #0bb7aa;
+    color: white;
+    box-shadow: 0 4px 12px rgba(11, 183, 170, 0.2);
+    border-color: #0bb7aa;
+
+    svg {
+      transform: translateX(3px);
+    }
+  }
+}
 
 /* ==========================================
    全页面基调与驾驶舱布局
