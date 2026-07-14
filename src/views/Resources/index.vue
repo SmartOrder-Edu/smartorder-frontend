@@ -293,7 +293,7 @@ const getResourceIcon = (type: string) => {
 }
 
 const openResource = (resource: ResourceSquareVO) => {
-  router.push(`/resources/${resource.id}`)
+  router.push(`/resource-square/${resource.id}`)
 }
 
 const collectResource = async (resource: ResourceSquareVO) => {
