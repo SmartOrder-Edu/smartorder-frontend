@@ -228,7 +228,7 @@ function onQuizAnswer(_quizId: string, answer: string) {
   justify-content: space-between;
   padding: 14px 22px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(8px);
   flex-wrap: nowrap;
   gap: 12px;

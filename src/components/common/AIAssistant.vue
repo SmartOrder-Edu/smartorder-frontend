@@ -688,7 +688,7 @@ const handleQuickAction = (action: any) => {
   align-items: center;
   justify-content: center;
   background: white;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 4px  var(--color-shadow);
 }
 
 .msg-avatar svg {
@@ -709,7 +709,7 @@ const handleQuickAction = (action: any) => {
   line-height: 1.55;
   color: var(--text-primary);
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px  var(--color-shadow);
   margin: 0;
   word-break: break-word;
 }

@@ -488,7 +488,7 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 24px  var(--color-shadow);
 }
 
 .header-content h2 {
@@ -631,7 +631,7 @@ onMounted(() => {
   width: 70px;
   height: 70px;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px  var(--color-shadow);
   cursor: pointer;
   transition: transform 0.2s;
 }
@@ -689,7 +689,7 @@ onMounted(() => {
 }
 
 .ai-text-reason {
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--color-card-bg-secondary);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 13px;

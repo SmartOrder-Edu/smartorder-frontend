@@ -1170,7 +1170,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 32px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 4px 20px  var(--color-shadow);
   border: 1px solid #eef2f6;
 }
 
@@ -1295,7 +1295,7 @@ onUnmounted(() => {
   background: #fff;
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 4px 20px  var(--color-shadow);
   border: 2px solid transparent;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -1304,7 +1304,7 @@ onUnmounted(() => {
 
 .question-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 8px 24px  var(--color-shadow);
 }
 
 .question-card.active {
@@ -1669,7 +1669,7 @@ onUnmounted(() => {
   background: #fff;
   border-radius: 16px;
   padding: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 4px 20px  var(--color-shadow);
   border: 1px solid #eef2f6;
 }
 
@@ -2040,7 +2040,7 @@ onUnmounted(() => {
   width: 90%;
   max-width: 400px;
   border-radius: 16px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 20px 25px -5px  var(--color-shadow);
   padding: 24px;
   box-sizing: border-box;
   margin-bottom: 80px;

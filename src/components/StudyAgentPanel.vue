@@ -151,7 +151,7 @@ export default { name: 'StudyAgentPanel' }
   height: 100%;
   width: 320px;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(10px);
   border-left: 1px solid rgba(15, 23, 42, 0.06);
   overflow: hidden;

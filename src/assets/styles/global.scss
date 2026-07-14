@@ -3,7 +3,7 @@
  * AI 个性化学习操作系统
  */
 
-/* ==================== CSS 变量定义 ==================== */
+/* ==================== Extended Styles ==================== */
 :root {
   // === 主题色彩 - 治愈薄荷主题 ===
   // 主色调：薄荷绿 - 代表清爽、生机、成长
@@ -1171,4 +1171,89 @@ ol {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* ==================== Extended Theme Overrides ==================== */
+html, body, #app,
+.app-layout, .admin-layout, .sidebar, .main-content,
+.el-card, .el-dialog, .el-drawer, .el-popover, .el-dropdown-menu,
+.el-table, .el-table__row, .el-table th.el-table__cell, .el-table td.el-table__cell,
+.el-menu, .el-menu-item, .el-sub-menu__title,
+.el-input__wrapper, .el-textarea__inner,
+.el-button,
+.bento-card, .glass, .glass-dark, .section, .priority-task-item, .time-chunk {
+  transition: background-color 0.2s ease,
+              border-color 0.2s ease,
+              color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+/* (comment removed - encoding fix) */
+.el-card, .bento-card, .el-button, .hover-lift, .hover-scale {
+  transition: background-color 0.2s ease,
+              border-color 0.2s ease,
+              color 0.2s ease,
+              box-shadow 0.2s ease,
+              transform 0.25s ease;
+}
+
+
+/* ==================== 语义化主题系统 ==================== */
+:root {
+  --page-bg: #f8fafc;
+  --page-bg-secondary: #f1f5f9;
+
+  --panel-bg: #ffffff;
+  --panel-bg-secondary: #fafbfc;
+
+  --input-bg: #ffffff;
+  --item-bg: #ffffff;
+  --item-hover-bg: #f1f5f9;
+  --item-active-bg: #e2e8f0;
+
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-disabled: #cbd5e1;
+
+  --border-color: #e2e8f0;
+  --border-color-strong: #cbd5e1;
+
+  --overlay-bg: rgba(15, 22, 41, 0.6);
+  --shadow-color: rgba(0, 0, 0, 0.05);
+}
+
+html[data-theme='dark'] {
+  --page-bg: #091b1f;
+  --page-bg-secondary: #0d2428;
+
+  --panel-bg: #191d27;
+  --panel-bg-secondary: #20242e;
+
+  --input-bg: #14181f;
+  --item-bg: #181d24;
+  --item-hover-bg: #222833;
+  --item-active-bg: #363b45;
+
+  --text-primary: #f5f7fa;
+  --text-secondary: #b7c0cd;
+  --text-muted: #858f9f;
+  --text-disabled: #626c79;
+
+  --border-color: #303641;
+  --border-color-strong: #414855;
+
+  --overlay-bg: rgba(0, 0, 0, 0.58);
+  --shadow-color: rgba(0, 0, 0, 0.45);
+}
+
+/* 全局根节点应用主题变量 */
+html,
+body,
+#app,
+#root {
+  min-height: 100vh;
+  background-color: var(--page-bg);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }

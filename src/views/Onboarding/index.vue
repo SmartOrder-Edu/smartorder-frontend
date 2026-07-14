@@ -450,7 +450,7 @@ const handleComplete = async () => {
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.05),
     0 10px 15px -3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--color-border);
 }
 
 /* 进度条 */
@@ -592,7 +592,7 @@ const handleComplete = async () => {
 .option-card:hover {
   background: white;
   border-color: var(--border-light);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px  var(--color-shadow);
 }
 
 .option-card.selected {

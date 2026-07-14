@@ -541,7 +541,7 @@ function readPayloadArray(key: string): unknown[] | null {
 .heap-inspector {
   border: 1px solid rgba(203, 213, 225, 0.76);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--color-card-bg-secondary);
 }
 
 .heap-visual-panel {

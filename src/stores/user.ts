@@ -62,8 +62,16 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function githubLogin(code: string, state?: string) {
-    const response = await userApi.githubLogin(code, state)
-    setToken(response)
+    const response: any = await userApi.githubLogin(code, state)
+    // 后端返回 { accessToken, isNewUser }，提取 accessToken 存储
+    setToken(response.accessToken)
+  }
+
+  /** Gitee OAuth 登录，返回 isNewUser 供回调页展示欢迎文案 */
+  async function giteeLogin(code: string, state?: string): Promise<boolean> {
+    const response: any = await userApi.giteeLogin(code, state)
+    setToken(response.accessToken)
+    return !!response.isNewUser
   }
 
   async function register(params: {
@@ -144,6 +152,7 @@ export const useUserStore = defineStore('user', () => {
     setUserInfo,
     login,
     githubLogin,
+    giteeLogin,
     register,
     fetchUserInfo,
     logout,

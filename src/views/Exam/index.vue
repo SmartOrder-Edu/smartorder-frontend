@@ -1405,7 +1405,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   border-color: rgba(15, 23, 42, 0.08);
   padding: 8px 12px;
   height: 38px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 2px 8px  var(--color-shadow);
   transition: all 0.3s;
   
   &:hover, &.is-focus {
@@ -1420,7 +1420,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
   border-radius: 50%;
   background: white;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 2px 8px  var(--color-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1760,7 +1760,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
 .recommend-item {
   flex: 1;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(10px);
   border-radius: 16px;
   padding: 20px;
@@ -1907,7 +1907,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
   &:hover {
     color: #0f172a;
-    background: rgba(255, 255, 255, 0.5);
+    background: var(--color-card-bg-secondary);
   }
 
   &.active {
@@ -2776,7 +2776,7 @@ watch(selectedSpaceId, async (spaceId, oldSpaceId) => {
 
   &:hover {
     border-color: rgba(11, 183, 170, 0.3);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 4px 12px  var(--color-shadow);
   }
 
   &.active {

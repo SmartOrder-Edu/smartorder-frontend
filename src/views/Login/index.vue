@@ -315,6 +315,12 @@
               </svg>
               <span>GitHub登录</span>
             </button>
+            <button type="button" class="social-btn gitee-btn" title="使用Gitee登录" @click="handleGiteeLogin">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.984 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.016 0zm6.09 5.333c.328 0 .593.266.592.593v1.482a.594.594 0 0 1-.593.592H9.777c-.982 0-1.778.796-1.778 1.778v5.63c0 .327.266.592.593.592h5.63c.982 0 1.778-.796 1.778-1.778v-.296a.593.593 0 0 0-.592-.593h-4.15a.592.592 0 0 1-.592-.592v-1.482a.593.593 0 0 1 .593-.592h6.815c.327 0 .593.265.593.592v3.408a4 4 0 0 1-4 4H5.926a.593.593 0 0 1-.593-.593V9.778a4.444 4.444 0 0 1 4.445-4.444h8.296Z"/>
+              </svg>
+              <span>Gitee登录</span>
+            </button>
           </div>
 
           <!-- 注册入口 -->
@@ -448,14 +454,37 @@ const handleLogin = async () => {
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID
 const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/oauth/callback/github`
 
-const handleGithubLogin = () => {
+const handleGithubLogin = async () => {
   if (!GITHUB_CLIENT_ID) {
     ElMessage.error('系统未配置 GitHub 登录参数')
     return
   }
-  // 跳转至真实的 GitHub OAuth 授权页面 (申请 read:user 和 user:email 权限以读取私有主邮箱)
-  const authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=read:user%20user:email`
-  window.location.href = authorizeUrl
+  try {
+    // 先获取 state 防 CSRF 参数，再由后端校验
+    const state = await userApi.getGithubOAuthState()
+    const authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=read:user%20user:email&state=${encodeURIComponent(state)}`
+    window.location.href = authorizeUrl
+  } catch {
+    ElMessage.error('获取登录参数失败，请稍后再试')
+  }
+}
+
+// Gitee 登录相关配置
+const GITEE_CLIENT_ID = import.meta.env.VITE_GITEE_CLIENT_ID
+const GITEE_REDIRECT_URI = import.meta.env.VITE_GITEE_REDIRECT_URI || `${window.location.origin}/oauth/callback/gitee`
+
+const handleGiteeLogin = async () => {
+  if (!GITEE_CLIENT_ID) {
+    ElMessage.error('系统未配置 Gitee 登录参数')
+    return
+  }
+  try {
+    const state = await userApi.getGiteeOAuthState()
+    const authorizeUrl = `https://gitee.com/oauth/authorize?client_id=${GITEE_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITEE_REDIRECT_URI)}&response_type=code&scope=user_info%20emails&state=${encodeURIComponent(state)}`
+    window.location.href = authorizeUrl
+  } catch {
+    ElMessage.error('获取登录参数失败，请稍后再试')
+  }
 }
 </script>
 
@@ -463,10 +492,9 @@ const handleGithubLogin = () => {
 .login-page {
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
 }
 
@@ -559,6 +587,7 @@ const handleGithubLogin = () => {
   position: relative;
   z-index: 1;
   padding: var(--spacing-xl);
+  margin: auto;
 }
 
 @media (max-width: 992px) {
@@ -687,7 +716,7 @@ const handleGithubLogin = () => {
   border-radius: var(--radius-full);
   font-size: 0.8125rem;
   color: var(--text-regular);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px  var(--color-shadow);
   transition: all 0.3s ease;
 }
 
@@ -796,7 +825,7 @@ const handleGithubLogin = () => {
 
 /* 右侧表单区域 */
 .form-section {
-  flex: 0 0 440px;
+  flex: 0 0 460px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -822,7 +851,7 @@ const handleGithubLogin = () => {
     0 4px 6px -1px rgba(0, 0, 0, 0.05),
     0 10px 15px -3px rgba(0, 0, 0, 0.05),
     0 20px 25px -5px rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--color-border);
 }
 
 /* 卡片头部 */
@@ -879,7 +908,7 @@ const handleGithubLogin = () => {
 .tab-btn.active {
   background: white;
   color: var(--primary-color);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 4px  var(--color-shadow);
 }
 
 .tab-btn:hover:not(.active) {
@@ -969,20 +998,23 @@ const handleGithubLogin = () => {
 .social-login {
   display: flex;
   justify-content: center;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 .social-btn {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-lg);
+  justify-content: center;
+  gap: 6px;
+  padding: var(--spacing-sm) 12px;
   background: white;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   font-size: 0.875rem;
   color: var(--text-regular);
   cursor: pointer;
+  white-space: nowrap;
   transition: all var(--transition-base);
 }
 
@@ -995,6 +1027,11 @@ const handleGithubLogin = () => {
   background: var(--background-color-base);
   border-color: var(--primary-light);
   color: var(--primary-color);
+}
+
+.gitee-btn:hover {
+  border-color: #c71d23;
+  color: #c71d23;
 }
 
 /* 注册入口 */
@@ -1035,5 +1072,356 @@ const handleGithubLogin = () => {
 @keyframes nodeGlow {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.3); }
+}
+</style>
+
+<style lang="scss">
+/* =============================================================
+   深色模式覆盖样式 - html[data-theme='dark'] 且仅作用于 .login-page
+   ============================================================= */
+html[data-theme='dark'] {
+  /* 登录页专用 CSS 变量 */
+  --login-page-bg: #0a1e22;
+  --login-panel-bg: #191d27;
+
+  --login-input-bg: #14171d;
+  --login-input-hover-bg: #181c23;
+  --login-input-focus-bg: #171b22;
+
+  --login-text-primary: #f4f6f8;
+  --login-text-secondary: #aab2c0;
+  --login-placeholder: #6f7887;
+
+  --login-border: #303641;
+  --login-border-hover: #424a58;
+  --login-border-focus: #4f7cff;
+
+  --login-icon-color: #8d97a8;
+}
+
+/* 整体登录页背景 - 深蓝青渐变 */
+html[data-theme='dark'] .login-page {
+  background:
+    radial-gradient(
+      circle at 30% 50%,
+      rgba(25, 85, 100, 0.18),
+      transparent 46%
+    ),
+    linear-gradient(
+      135deg,
+      #07171b 0%,
+      #0a2023 52%,
+      #082326 100%
+    ) !important;
+  color: var(--login-text-primary);
+
+  /* 左侧主标题 */
+  .main-title {
+    color: var(--login-text-primary) !important;
+  }
+
+  .main-title .title-line.accent {
+    color: var(--primary-color) !important;
+  }
+
+  /* Logo 副标题 */
+  .logo-subtitle {
+    color: var(--login-text-secondary) !important;
+  }
+
+  /* 四个功能标签 */
+  .feature-tag {
+    background: #171c22 !important;
+    color: #cbd3de !important;
+    border: 1px solid #303742 !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22) !important;
+
+    &:hover {
+      background: #20262f !important;
+      color: #f5f7fa !important;
+      border-color: #414956 !important;
+    }
+  }
+
+  .feature-tag .tag-icon {
+    color: #16c6bd !important;
+  }
+
+  /* 登录卡片 */
+  .login-card {
+    background: #191d27 !important;
+    color: var(--login-text-primary) !important;
+    border: 1px solid #2d3440 !important;
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42) !important;
+  }
+
+  .card-title {
+    color: var(--login-text-primary) !important;
+  }
+
+  .card-subtitle {
+    color: var(--login-text-secondary) !important;
+  }
+
+  /* 记住我 */
+  .el-checkbox {
+    --el-checkbox-text-color: var(--login-text-secondary) !important;
+    --el-checkbox-font-weight: 500 !important;
+
+    &.is-checked {
+      .el-checkbox__label {
+        color: var(--login-border-focus) !important;
+      }
+      .el-checkbox__inner {
+        background-color: var(--login-border-focus) !important;
+        border-color: var(--login-border-focus) !important;
+      }
+    }
+
+    .el-checkbox__inner {
+      background-color: transparent !important;
+      border-color: var(--login-border) !important;
+    }
+  }
+
+  /* 链接 */
+  .forgot-link {
+    color: var(--login-text-secondary) !important;
+    &:hover {
+      color: var(--login-border-focus) !important;
+    }
+  }
+
+  .register-text {
+    color: var(--login-text-secondary) !important;
+  }
+
+  .register-link {
+    color: var(--login-border-focus) !important;
+    &:hover {
+      color: #7fa4ff !important;
+    }
+  }
+
+  /* 登录方式切换区域 */
+  .login-type-tabs {
+    background: var(--login-input-bg) !important;
+  }
+
+  .tab-btn {
+    color: var(--login-text-secondary) !important;
+    &:hover:not(.active) {
+      color: var(--login-text-primary) !important;
+    }
+  }
+
+  .tab-btn.active {
+    background: #20242e !important;
+    color: var(--login-border-focus) !important;
+    box-shadow: none !important;
+  }
+
+  /* 第三方登录按钮 */
+  .social-btn {
+    background: transparent !important;
+    color: var(--login-text-secondary) !important;
+    border: 1px solid var(--login-border) !important;
+
+    &:hover {
+      background: var(--login-input-hover-bg) !important;
+      border-color: var(--login-border-hover) !important;
+      color: var(--login-text-primary) !important;
+    }
+  }
+
+  /* 普通输入框 */
+  .el-input:not(.el-input-group) .el-input__wrapper {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 44px !important;
+    padding: 0 !important;
+
+    background: var(--login-input-bg) !important;
+    border: 1px solid var(--login-border) !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease !important;
+
+    &:hover {
+      background: var(--login-input-hover-bg) !important;
+      border-color: var(--login-border-hover) !important;
+      box-shadow: none !important;
+    }
+
+    &.is-focus {
+      background: var(--login-input-focus-bg) !important;
+      border-color: var(--login-border-focus) !important;
+      box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.14) !important;
+    }
+  }
+
+  .el-input__inner {
+    flex: 1 !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    padding: 0 12px !important;
+
+    background: transparent !important;
+    color: var(--login-text-primary) !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+
+    &::placeholder {
+      color: var(--login-placeholder) !important;
+    }
+  }
+
+  /* 输入框前后缀容器透明化 */
+  .el-input__prefix,
+  .el-input__suffix {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 42px !important;
+    height: 100% !important;
+    flex-shrink: 0 !important;
+    background: transparent !important;
+    color: var(--login-icon-color) !important;
+    border: none !important;
+  }
+
+  .el-input__prefix-inner,
+  .el-input__suffix-inner {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    color: inherit !important;
+  }
+
+  /* 清除按钮及密码切换按钮 */
+  .el-input__suffix-inner button,
+  .el-input__suffix-inner svg {
+    background: transparent !important;
+    color: var(--login-icon-color) !important;
+    border: none !important;
+    box-shadow: none !important;
+
+    &:hover {
+      color: var(--login-text-primary) !important;
+    }
+  }
+
+  .input-icon {
+    color: var(--login-icon-color) !important;
+  }
+
+  /* 验证码输入框 (带 append) */
+  .el-input-group--append {
+    display: inline-flex !important;
+    width: 100% !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--login-border) !important;
+    background: var(--login-input-bg) !important;
+    overflow: hidden !important;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease !important;
+
+    &:hover {
+      background: var(--login-input-hover-bg) !important;
+      border-color: var(--login-border-hover) !important;
+    }
+
+    &:focus-within {
+      background: var(--login-input-focus-bg) !important;
+      border-color: var(--login-border-focus) !important;
+      box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.14) !important;
+    }
+
+    .el-input__wrapper {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      height: 100% !important;
+      border-radius: 0 !important;
+    }
+
+    .el-input-group__append {
+      background: transparent !important;
+      border: none !important;
+      border-left: 1px solid var(--login-border) !important;
+      border-radius: 0 !important;
+      height: 100% !important;
+      padding: 0 var(--spacing-md) !important;
+      display: flex !important;
+      align-items: center !important;
+
+      button.send-code-btn {
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        color: var(--login-border-focus) !important;
+        font-weight: 500 !important;
+
+        &:hover:not(:disabled) {
+          color: #7fa4ff !important;
+        }
+
+        &:disabled {
+          color: var(--login-placeholder) !important;
+        }
+      }
+    }
+  }
+
+  /* 自动填充处理 */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--login-text-primary) !important;
+    caret-color: var(--login-text-primary);
+    -webkit-box-shadow: 0 0 0 1000px var(--login-input-bg) inset !important;
+    box-shadow: 0 0 0 1000px var(--login-input-bg) inset !important;
+    transition: background-color 9999s ease-out 0s;
+  }
+
+  /* Logo 样式适配 */
+  .logo-wrapper {
+    display: flex;
+    align-items: center;
+    background: transparent !important;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .logo-img {
+    display: block;
+    width: auto;
+    height: 66px;
+    object-fit: contain;
+
+    background: transparent !important;
+    border: none;
+    box-shadow: none;
+    filter: none !important;
+    mix-blend-mode: normal;
+  }
 }
 </style>

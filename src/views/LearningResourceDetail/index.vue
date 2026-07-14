@@ -457,7 +457,7 @@ watch(resourceId, () => {
 .loading-panel,
 .content-panel,
 .resource-header {
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--color-card-bg-secondary);
   border: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
 }

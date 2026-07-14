@@ -616,7 +616,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
   margin-bottom: 24px;
 }
 .stat-card {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-card-bg);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 16px;
@@ -624,7 +624,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
   text-align: center;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 4px 12px  var(--color-shadow);
 }
 .stat-card:hover { 
   transform: translateY(-4px); 
@@ -651,9 +651,9 @@ onMounted(() => { spaceStore.fetchSpaces() })
 .search-input { width: 320px; }
 .search-input :deep(.el-input__wrapper) { 
   border-radius: 12px; 
-  box-shadow: 0 2px 8px rgba(0,0,0,0.03); 
+  box-shadow: 0 2px 8px  var(--color-shadow); 
   padding: 4px 12px;
-  background: rgba(255,255,255,0.9);
+  background: var(--color-card-bg);
 }
 .search-input :deep(.el-input__wrapper.is-focus) { 
   box-shadow: 0 0 0 1px #4361ee, 0 4px 12px rgba(67,97,238,0.1); 
@@ -669,7 +669,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
   background: #ffffff;
   border: 1px solid rgba(226, 232, 240, 0.8);
   transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.01);
+  box-shadow: 0 2px 4px  var(--color-shadow);
 }
 .filter-chip:hover { color: #4361ee; border-color: rgba(67, 97, 238, 0.4); background: #f8faff; }
 .filter-chip.active { background: #4361ee; color: #fff; border-color: #4361ee; box-shadow: 0 4px 12px rgba(67, 97, 238, 0.25); }
@@ -824,7 +824,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
   border-radius: 8px;
   font-weight: 700;
   background: #f1f5f9; color: #64748b;
-  border: 1px solid rgba(0,0,0,0.03);
+  border: 1px solid var(--color-border);
 }
 .risk-badge.warning { background: #fef3c7; color: #b45309; border-color: #fde68a; }
 .risk-badge.danger { background: #fee2e2; color: #b91c1c; border-color: #fecaca; }
@@ -940,9 +940,9 @@ onMounted(() => { spaceStore.fetchSpaces() })
   font-size: 0.875rem; font-weight: 700;
   cursor: pointer;
   transition: all 0.25s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px  var(--color-shadow);
 }
-.action-btn:hover { background: #f8fafc; color: #0f172a; border-color: #cbd5e1; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.04); }
+.action-btn:hover { background: #f8fafc; color: #0f172a; border-color: #cbd5e1; transform: translateY(-1px); box-shadow: 0 4px 6px  var(--color-shadow); }
 .action-btn.primary { 
   background: linear-gradient(135deg, #4361ee 0%, #3b5bdb 100%);
   border: none; color: #ffffff; 
@@ -959,8 +959,8 @@ onMounted(() => { spaceStore.fetchSpaces() })
   grid-column: 1 / -1;
   text-align: center;
   padding: 80px 20px;
-  background: rgba(248, 250, 252, 0.6);
-  border: 2px dashed rgba(203, 213, 225, 0.6);
+  background: var(--color-card-bg-secondary);
+  border: 2px dashed rgba(226, 232, 240, 0.8);
   border-radius: 20px;
   margin-top: 10px;
 }

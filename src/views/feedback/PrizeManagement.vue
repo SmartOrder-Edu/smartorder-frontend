@@ -481,7 +481,7 @@ onMounted(() => {
 
 .stats-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 10px 25px  var(--color-shadow);
 }
 
 .card-icon-box {
@@ -532,7 +532,7 @@ onMounted(() => {
   border-radius: 24px;
   background: #ffffff;
   border: none !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 10px 30px  var(--color-shadow);
   padding: 24px;
 }
 

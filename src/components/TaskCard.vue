@@ -89,7 +89,7 @@ export default { name: 'TaskCard' }
   align-items: flex-start;
   gap: 14px;
   padding: 16px 18px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--color-card-bg);
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);

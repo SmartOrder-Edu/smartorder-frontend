@@ -168,7 +168,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 20px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-card-bg);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
   flex-shrink: 0;

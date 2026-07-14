@@ -165,7 +165,16 @@
         <div class="sidebar-footer">
           <!-- 用户区 -->
           <div class="sidebar-user" v-if="!sidebarCollapsed">
-            <div class="sidebar-user-info" @click="showUserMenu = !showUserMenu">
+            <div 
+              class="sidebar-user-info" 
+              tabindex="0"
+              role="button"
+              aria-haspopup="true"
+              :aria-expanded="showUserMenu"
+              @click="showUserMenu = !showUserMenu"
+              @keydown.enter.prevent="showUserMenu = !showUserMenu"
+              @keydown.space.prevent="showUserMenu = !showUserMenu"
+            >
               <div class="sidebar-avatar-wrap">
                 <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="头像" class="sidebar-avatar" />
                 <span v-if="!userStore.profileInitialized" class="profile-dot" title="画像未完善"></span>
@@ -174,8 +183,17 @@
             </div>
           </div>
           <div class="sidebar-user-mini" v-else>
-            <div class="sidebar-avatar-wrap">
-              <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="头像" class="sidebar-avatar-mini" @click="showUserMenu = !showUserMenu" />
+            <div 
+              class="sidebar-avatar-wrap"
+              tabindex="0"
+              role="button"
+              aria-haspopup="true"
+              :aria-expanded="showUserMenu"
+              @click="showUserMenu = !showUserMenu"
+              @keydown.enter.prevent="showUserMenu = !showUserMenu"
+              @keydown.space.prevent="showUserMenu = !showUserMenu"
+            >
+              <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="头像" class="sidebar-avatar-mini" />
               <span v-if="!userStore.profileInitialized" class="profile-dot-mini" title="画像未完善"></span>
             </div>
           </div>
@@ -267,6 +285,9 @@
 
     <!-- AI 助手悬浮框 -->
     <AIAssistant />
+
+    <!-- 系统设置弹窗 -->
+    <SettingsDialog v-model="isSettingsOpen" />
   </div>
 </template>
 
@@ -280,6 +301,7 @@ import { chatWebSocket } from '@/utils/websocket'
 import AIAssistant from '@/components/common/AIAssistant.vue'
 import AnimatedBackground from '@/components/common/AnimatedBackground.vue'
 import AnimatedIcon from '@/components/common/AnimatedIcon.vue'
+import SettingsDialog from '@/components/common/SettingsDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -324,6 +346,7 @@ const handleCollapse = () => {
 
 const showNotifications = ref(false)
 const showUserMenu = ref(false)
+const isSettingsOpen = ref(false)
 const unreadCount = ref(2)
 
 const markAllRead = () => {
@@ -421,7 +444,7 @@ const goProfile = () => {
 }
 const goSettings = () => {
   showUserMenu.value = false
-  ElMessage.info('设置页面开发中')
+  isSettingsOpen.value = true
 }
 const goFeedback = () => {
   showUserMenu.value = false
@@ -1260,7 +1283,7 @@ const handleLogout = async () => {
   width: 42px;
   height: 42px;
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--color-card-bg);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(139, 92, 246, 0.2);
   display: flex;
@@ -1400,7 +1423,7 @@ const handleLogout = async () => {
 
 .notif-panel-item {
   padding: var(--spacing-sm) var(--spacing-md);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid var(--color-border);
   transition: background var(--transition-fast);
 }
 

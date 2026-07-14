@@ -233,7 +233,7 @@ export default { name: 'SpaceAgentPanel' }
 
 .agent-panel {
   width: 340px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-card-bg);
   backdrop-filter: blur(16px);
   border-radius: 18px;
   border: 1px solid rgba(148, 163, 184, 0.18);
@@ -343,7 +343,7 @@ export default { name: 'SpaceAgentPanel' }
   padding: 6px 10px;
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--color-card-bg-secondary);
   font-size: 0.75rem;
   color: #334155;
   cursor: pointer;

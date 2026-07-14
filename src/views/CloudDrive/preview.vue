@@ -2285,7 +2285,7 @@ const handleCopyText = async () => {
   display: flex;
   overflow-y: auto;
   font-family: monospace;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 1px 3px  var(--color-shadow);
   
   .editor-line-numbers {
     padding: 24px 12px;
@@ -2562,7 +2562,7 @@ const handleCopyText = async () => {
   &:hover {
     .hover-trigger-bar {
       opacity: 0.95;
-      background: rgba(255, 255, 255, 0.85);
+      background: var(--color-card-bg-secondary);
       color: #1677ff;
       border-color: rgba(22, 119, 255, 0.2);
       box-shadow: -4px 0 15px rgba(22, 119, 255, 0.15);
@@ -3311,7 +3311,7 @@ const handleCopyText = async () => {
   border-radius: 12px;
   padding: 12px;
   width: 130px;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 15px  var(--color-shadow);
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   
   .qrcode-text { font-size: 0.68rem; color: var(--text-secondary); font-weight: 600; }

@@ -13,6 +13,14 @@ export default defineConfig({
       process.env.client_id ||
       process.env.GITHUB_CLIENT_ID ||
       'MOCK'
+    ),
+    // Gitee OAuth 客户端 ID (支持 Client_ID_gitee / gitee_client_id / GITEE_CLIENT_ID)
+    'import.meta.env.VITE_GITEE_CLIENT_ID': JSON.stringify(
+      process.env.VITE_GITEE_CLIENT_ID ||
+      process.env.Client_ID_gitee ||
+      process.env.gitee_client_id ||
+      process.env.GITEE_CLIENT_ID ||
+      'MOCK'
     )
   },
   resolve: {

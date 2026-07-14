@@ -3362,7 +3362,7 @@ const resetForm = () => {
             background: #ffffff;
             border-radius: 12px;
             border: 2px solid transparent;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            box-shadow: 0 2px 8px  var(--color-shadow);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: grab;
             user-select: none;
@@ -3383,7 +3383,7 @@ const resetForm = () => {
 
           .priority-card:hover {
             transform: translateX(4px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 16px  var(--color-shadow);
           }
 
           .priority-card:active {
@@ -4276,12 +4276,12 @@ const resetForm = () => {
             border-radius: 12px;
             overflow: hidden;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            box-shadow: 0 2px 8px  var(--color-shadow);
           }
 
           .experience-card:hover {
             border-color: #c0c4cc;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 16px  var(--color-shadow);
             transform: translateY(-2px);
           }
 
