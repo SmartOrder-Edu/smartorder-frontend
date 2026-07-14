@@ -2884,4 +2884,205 @@ watch(windowWidth, (newWidth, oldWidth) => {
     transform: translateY(-2px);
   }
 }
+
+/* ==================== 深色主题覆盖（AITutor 页面）==================== */
+:global(html[data-theme='dark']) {
+  /* 聊天主区域 */
+  .chat-area {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  /* 历史会话侧边栏 */
+  .history-sidebar {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  .history-sidebar-header {
+    border-bottom-color: var(--border-color) !important;
+  }
+
+  .history-sidebar-title {
+    color: var(--text-primary) !important;
+  }
+
+  /* 聊天顶部导航栏 */
+  .chat-area-top-bar {
+    background: var(--panel-bg) !important;
+    border-bottom-color: var(--border-color) !important;
+  }
+
+  /* 输入区域 */
+  .chat-input-area,
+  .input-wrapper,
+  .input-footer {
+    background: var(--panel-bg) !important;
+    border-top-color: var(--border-color) !important;
+  }
+
+  .chat-textarea {
+    background: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  /* 消息气泡 */
+  .message-bubble {
+    &.assistant {
+      background: var(--panel-bg-secondary) !important;
+      border-color: var(--border-color) !important;
+      color: var(--text-primary) !important;
+    }
+  }
+
+  /* 资源卡片 */
+  .resource-card-mini {
+    background: var(--panel-bg-secondary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  .res-title {
+    color: var(--text-primary) !important;
+  }
+
+  /* 右侧边栏 */
+  .right-sidebar,
+  .context-sidebar {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* 消息操作按钮 */
+  .msg-action-btn {
+    border-color: var(--border-color) !important;
+    color: var(--text-muted) !important;
+    &:hover {
+      background: var(--item-hover-bg) !important;
+      color: var(--text-secondary) !important;
+    }
+  }
+
+  /* 新增：输入框容器深色 */
+  .input-composer {
+    background: var(--input-bg) !important;
+    border-color: var(--border-color) !important;
+    
+    &:focus-within {
+      border-color: var(--primary-color) !important;
+    }
+  }
+
+  /* 新增：快捷按钮与提问标签 */
+  .feature-item {
+    background: var(--button-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+
+    &:hover {
+      background: var(--button-hover-bg) !important;
+      border-color: var(--border-strong) !important;
+      color: var(--text-primary) !important;
+    }
+  }
+
+  .hint-chip {
+    background: var(--button-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+
+    &:hover {
+      background: var(--button-hover-bg) !important;
+      border-color: var(--border-strong) !important;
+      color: var(--text-primary) !important;
+    }
+  }
+
+  /* 新增：右侧面板与内部工具 */
+  .sidebar-section {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .tool-card {
+    background: var(--panel-bg-secondary) !important;
+    border-color: var(--border-color) !important;
+
+    &:hover {
+      background: var(--button-hover-bg) !important;
+      border-color: var(--border-strong) !important;
+    }
+    
+    .tool-label {
+      color: var(--text-primary) !important;
+    }
+    .tool-desc {
+      color: var(--text-muted) !important;
+    }
+  }
+
+  /* 新增：知识库引用项和清空按钮 */
+  .reference-item {
+    background: var(--panel-bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    
+    &:hover {
+      background: var(--button-hover-bg) !important;
+      border-color: var(--border-strong) !important;
+    }
+    
+    .ref-name {
+      color: var(--text-primary) !important;
+    }
+    .ref-meta {
+      color: var(--text-muted) !important;
+    }
+  }
+
+  .clear-all-btn-bottom {
+    background: var(--button-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+
+    &:hover {
+      border-color: var(--danger-color) !important;
+      color: var(--danger-color) !important;
+      background: rgba(239, 68, 68, 0.1) !important;
+    }
+  }
+
+  /* 新增：附件条 */
+  .attachment-chip {
+    background: var(--panel-bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+  }
+
+  /* 新增：空状态样式 */
+  .empty-text {
+    color: var(--text-primary) !important;
+  }
+  .empty-hint {
+    color: var(--text-muted) !important;
+  }
+
+  /* 新增：历史列表 hover 态 */
+  .history-item:hover {
+    background: var(--item-hover-bg) !important;
+  }
+  .history-title {
+    color: var(--text-primary) !important;
+  }
+
+  /* 新增：placeholder 与 textarea 文字适配 */
+  .composer-body textarea {
+    color: var(--text-primary) !important;
+    
+    &::placeholder {
+      color: var(--text-muted) !important;
+    }
+  }
+}
 </style>

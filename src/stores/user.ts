@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { userApi } from '@/api/user'
-import type { UserInfoResponse, UpdateUserParams } from '@/api/user'
+import type { UserInfoResponse, UpdateUserParams, AuthIdentity } from '@/api/user'
 import { studentProfileApi } from '@/api/studentProfile'
 import { chatWebSocket } from '@/utils/websocket'
 
@@ -24,6 +24,7 @@ export interface UserInfo {
   vipExpireTime?: string
   status?: number
   profileInitialized?: boolean
+  authIdentities?: AuthIdentity[]
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -139,6 +140,20 @@ export const useUserStore = defineStore('user', () => {
     await userApi.changePassword(params)
   }
 
+  async function bindAuth(providerCode: string, code: string, state: string) {
+    await userApi.bindAuth({ providerCode, code, state })
+    await fetchUserInfo()
+  }
+
+  async function unbindAuth(providerCode: string) {
+    await userApi.unbindAuth(providerCode)
+    if (userInfo.value) {
+      userInfo.value.authIdentities = (userInfo.value.authIdentities || []).filter(
+        (i) => i.providerCode !== providerCode
+      )
+    }
+  }
+
   return {
     token,
     shortToken,
@@ -162,6 +177,8 @@ export const useUserStore = defineStore('user', () => {
     updateUserInfo,
     updateProfile,
     uploadAvatar,
-    changePassword
+    changePassword,
+    bindAuth,
+    unbindAuth
   }
 })

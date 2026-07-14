@@ -337,7 +337,7 @@ const doTask = (task: any) => {
 .agent-greeting {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-dark);
+  color: var(--text-primary);
   margin: 0 0 var(--spacing-sm);
 }
 
@@ -387,16 +387,16 @@ const doTask = (task: any) => {
 .hero-time-stat, .hero-space-stat {
   text-align: center;
   padding: var(--spacing-md) var(--spacing-lg);
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
 }
 
 .time-big, .space-count {
   display: block;
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-dark);
+  color: var(--text-primary);
 }
 
 .time-label, .space-label {
@@ -412,10 +412,11 @@ const doTask = (task: any) => {
 }
 
 .section {
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-xl);
   padding: var(--spacing-xl);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .section-header {
@@ -431,7 +432,7 @@ const doTask = (task: any) => {
   gap: var(--spacing-sm);
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-dark);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -515,7 +516,7 @@ const doTask = (task: any) => {
 .task-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-dark);
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
@@ -530,7 +531,7 @@ const doTask = (task: any) => {
   padding: 6px 14px;
   border-radius: var(--radius-full);
   border: 1px solid var(--primary-color);
-  background: white;
+  background: var(--panel-bg);
   color: var(--primary-color);
   font-size: 0.75rem;
   cursor: pointer;
@@ -566,8 +567,8 @@ const doTask = (task: any) => {
 .why-btn {
   padding: 10px 20px;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  background: white;
+  border: 1px solid var(--border-color);
+  background: var(--panel-bg);
   font-size: 0.875rem;
   color: var(--text-secondary);
   cursor: pointer;
@@ -611,7 +612,7 @@ const doTask = (task: any) => {
 .chunk-name {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text-dark);
+  color: var(--text-primary);
 }
 
 .chunk-minutes {
@@ -657,7 +658,7 @@ const doTask = (task: any) => {
 .mini-agent-name {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text-dark);
+  color: var(--text-primary);
   white-space: nowrap;
 }
 
@@ -682,7 +683,7 @@ const doTask = (task: any) => {
     gap: var(--spacing-sm);
     font-size: 0.875rem;
     margin: 0 0 var(--spacing-xs);
-    color: var(--text-dark);
+    color: var(--text-primary);
   }
   p {
     font-size: 0.8125rem;

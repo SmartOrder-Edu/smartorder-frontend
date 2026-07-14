@@ -38,6 +38,22 @@ export interface ChangePasswordParams {
   verificationCode: number
 }
 
+export interface AuthIdentity {
+  providerCode: string
+  providerUsername: string
+  providerEmail: string
+  emailVerified: number
+  status: number
+  firstLoginTime: string
+  lastLoginTime: string
+}
+
+export interface BindAuthParams {
+  providerCode: string
+  code: string
+  state: string
+}
+
 export interface UserInfoResponse {
   id: string
   username: string
@@ -53,6 +69,7 @@ export interface UserInfoResponse {
   vipExpireTime?: string
   status?: number
   profileInitialized?: boolean
+  authIdentities?: AuthIdentity[]
 }
 
 export const userApi = {
@@ -128,6 +145,21 @@ export const userApi = {
   /** 注销账号 */
   cancelAccount(verificationCode: string) {
     return request.post<string>('/users/cancel/', null, { params: { verificationCode } })
+  },
+
+  /** 绑定第三方账号 */
+  bindAuth(params: BindAuthParams) {
+    return request.post<string>('/users/bindings', params)
+  },
+
+  /** 解绑第三方账号 */
+  unbindAuth(providerCode: string) {
+    return request.delete<string>(`/users/bindings/${providerCode}`)
+  },
+
+  /** 获取第三方绑定列表 */
+  getBindings() {
+    return request.get<AuthIdentity[]>('/users/bindings')
   }
 }
 

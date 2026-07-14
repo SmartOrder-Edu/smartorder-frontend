@@ -306,7 +306,7 @@ html[data-theme='dark'] {
   outline: none;
 
   &:hover {
-    background-color: var(--hover-bg);
+    background-color: var(--item-hover-bg);
     color: var(--text-primary);
   }
 

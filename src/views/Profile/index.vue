@@ -91,6 +91,217 @@
         </div>
       </section>
 
+      <!-- 账号详细信息与第三方绑定 -->
+      <section class="section account-security-card" v-if="userStore.userInfo">
+        <div class="card-header-simple">
+          <h3 class="card-title-simple">
+            <span class="section-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </span>
+            账号与安全设置
+          </h3>
+        </div>
+
+        <div class="account-security-content">
+          <!-- 左侧：基础账户信息 -->
+          <div class="account-basic-info">
+            <h4 class="sub-title">账户凭证</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">用户ID</span>
+                <div class="info-value-wrapper">
+                  <span class="info-value id-text">{{ userStore.userInfo.id }}</span>
+                  <el-button type="primary" link size="small" class="copy-btn" @click="copyText(userStore.userInfo.id)">
+                    复制
+                  </el-button>
+                </div>
+              </div>
+              <div class="info-item">
+                <span class="info-label">系统昵称</span>
+                <span class="info-value">{{ userStore.userInfo.username || '未设置' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">绑定邮箱</span>
+                <span class="info-value">{{ userStore.userInfo.email || '未绑定' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">手机号码</span>
+                <span class="info-value">{{ userStore.userInfo.phone || '未绑定' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">性别</span>
+                <span class="info-value">{{ userStore.userInfo.gender === 1 ? '男' : userStore.userInfo.gender === 2 ? '女' : '未设置' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">出生日期</span>
+                <span class="info-value">{{ userStore.userInfo.birthday ? formatTime(userStore.userInfo.birthday) : '未设置' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">系统角色</span>
+                <span class="info-value">
+                  <el-tag :type="userStore.userInfo.role === 1 ? 'warning' : 'info'" size="small" effect="plain">
+                    {{ userStore.userInfo.role === 1 ? '教师' : '学生' }}
+                  </el-tag>
+                </span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">账号状态</span>
+                <span class="info-value">
+                  <el-tag :type="userStore.userInfo.status === 1 ? 'success' : 'danger'" size="small" effect="dark">
+                    {{ userStore.userInfo.status === 1 ? '正常' : '封禁' }}
+                  </el-tag>
+                </span>
+              </div>
+              <div class="info-item full-width">
+                <span class="info-label">个人简介</span>
+                <span class="info-value bio-text">{{ userStore.userInfo.bio || '这个同学很懒，什么都没有写~' }}</span>
+              </div>
+              <div class="info-item full-width vip-item" :class="{ 'is-vip': userStore.userInfo.vipLevel && userStore.userInfo.vipLevel > 0 }">
+                <span class="info-label">会员状态</span>
+                <div class="vip-status-container">
+                  <div class="vip-badge-wrapper" v-if="userStore.userInfo.vipLevel && userStore.userInfo.vipLevel > 0">
+                    <span class="vip-crown-icon">👑</span>
+                    <span class="vip-level-text">VIP {{ userStore.userInfo.vipLevel }}</span>
+                  </div>
+                  <el-tag v-else type="info" size="small">普通用户</el-tag>
+                  <span class="vip-time-range" v-if="userStore.userInfo.vipLevel && userStore.userInfo.vipLevel > 0 && userStore.userInfo.vipStartTime && userStore.userInfo.vipExpireTime">
+                    有效期：{{ formatTime(userStore.userInfo.vipStartTime) }} 至 {{ formatTime(userStore.userInfo.vipExpireTime) }}
+                  </span>
+                  <span class="vip-time-range muted" v-else>
+                    暂无有效VIP会员期
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 右侧：第三方账号绑定 -->
+          <div class="social-bindings">
+            <h4 class="sub-title">快捷登录绑定</h4>
+            <div class="bindings-list">
+              <!-- Gitee -->
+              <div class="binding-card" :class="{ bound: isProviderBound('gitee') }">
+                <div class="provider-info-main">
+                  <div class="provider-icon-wrapper gitee-color">
+                    <svg viewBox="0 0 1024 1024" width="24" height="24">
+                      <path d="M512 0C229.12 0 0 229.12 0 512s229.12 512 512 512 512-229.12 512-512S794.88 0 512 0zm233.6 374.4H448c-17.92 0-32 14.08-32 32v192h192c17.92 0 32 14.08 32 32s-14.08 32-32 32H384c-17.92 0-32-14.08-32-32V406.4c0-52.48 42.88-96 96-96h297.6c17.92 0 32 14.08 32 32s-14.08 32-32 32z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div class="provider-details">
+                    <div class="provider-header-row">
+                      <span class="provider-name">Gitee 码云</span>
+                      <el-tag :type="isProviderBound('gitee') ? 'success' : 'info'" size="small" class="binding-status-tag">
+                        {{ isProviderBound('gitee') ? '已绑定' : '未绑定' }}
+                      </el-tag>
+                    </div>
+                    
+                    <template v-if="isProviderBound('gitee')">
+                      <div class="provider-meta-row">
+                        <span class="meta-label">绑定用户：</span>
+                        <span class="meta-val highlight">{{ getProviderInfo('gitee')?.providerUsername || '未知' }}</span>
+                      </div>
+                      <div class="provider-meta-row" v-if="getProviderInfo('gitee')?.providerEmail">
+                        <span class="meta-label">绑定邮箱：</span>
+                        <span class="meta-val">{{ getProviderInfo('gitee')?.providerEmail }}</span>
+                      </div>
+                      <div class="provider-meta-row">
+                        <span class="meta-label">最近同步：</span>
+                        <span class="meta-val">{{ getProviderInfo('gitee')?.lastLoginTime ? formatTime(getProviderInfo('gitee')?.lastLoginTime) : '暂无数据' }}</span>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <span class="binding-placeholder-desc">绑定后可直接使用 Gitee 账号一键快捷登录</span>
+                    </template>
+                  </div>
+                </div>
+                <div class="provider-actions">
+                  <el-button 
+                    v-if="isProviderBound('gitee')" 
+                    type="danger" 
+                    plain 
+                    size="small" 
+                    class="action-btn"
+                    @click="handleUnbind('gitee')"
+                  >
+                    解除绑定
+                  </el-button>
+                  <el-button 
+                    v-else 
+                    type="primary" 
+                    size="small" 
+                    class="action-btn gitee-btn"
+                    @click="handleBind('gitee')"
+                  >
+                    立即绑定
+                  </el-button>
+                </div>
+              </div>
+
+              <!-- GitHub -->
+              <div class="binding-card" :class="{ bound: isProviderBound('github') }">
+                <div class="provider-info-main">
+                  <div class="provider-icon-wrapper github-color">
+                    <svg viewBox="0 0 1024 1024" width="24" height="24">
+                      <path d="M512 0C229.25 0 0 229.25 0 512c0 226.25 146.69 418.13 350.16 485.83 25.59 4.69 34.94-11.12 34.94-24.69 0-12.19-.47-52.56-.69-95.31-142.44 30.94-172.5-60.44-172.5-60.44-23.31-59.25-56.88-75-56.88-75-46.5-31.81 3.53-31.13 3.53-31.13 51.41 3.63 78.44 52.81 78.44 52.81 45.63 78.19 119.75 55.63 148.94 42.56 4.63-33.06 17.88-55.63 32.44-68.38-113.69-12.94-233.19-56.88-233.19-253.06 0-55.88 20-101.56 52.81-137.44-5.31-12.94-22.88-65.06 5-135.56 0 0 43.06-13.81 141.06 52.56 40.94-11.38 84.88-17.06 128.5-17.25 43.63.19 87.63 5.88 128.63 17.25 97.88-66.38 140.88-52.56 140.88-52.56 27.94 70.5 10.38 122.63 5.06 135.56 32.88 35.88 52.75 81.56 52.75 137.44 0 196.69-119.75 239.94-233.81 252.56 18.38 15.88 34.75 47.13 34.75 94.94 0 68.56-.63 123.75-.63 140.63 0 13.69 9.25 29.63 35.25 24.63C877.44 930 1024 738.13 1024 512 1024 229.25 794.75 0 512 0z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div class="provider-details">
+                    <div class="provider-header-row">
+                      <span class="provider-name">GitHub</span>
+                      <el-tag :type="isProviderBound('github') ? 'success' : 'info'" size="small" class="binding-status-tag">
+                        {{ isProviderBound('github') ? '已绑定' : '未绑定' }}
+                      </el-tag>
+                    </div>
+                    
+                    <template v-if="isProviderBound('github')">
+                      <div class="provider-meta-row">
+                        <span class="meta-label">绑定用户：</span>
+                        <span class="meta-val highlight">{{ getProviderInfo('github')?.providerUsername || '未知' }}</span>
+                      </div>
+                      <div class="provider-meta-row" v-if="getProviderInfo('github')?.providerEmail">
+                        <span class="meta-label">绑定邮箱：</span>
+                        <span class="meta-val">{{ getProviderInfo('github')?.providerEmail }}</span>
+                      </div>
+                      <div class="provider-meta-row">
+                        <span class="meta-label">最近同步：</span>
+                        <span class="meta-val">{{ getProviderInfo('github')?.lastLoginTime ? formatTime(getProviderInfo('github')?.lastLoginTime) : '暂无数据' }}</span>
+                      </div>
+                    </template>
+                    <template v-else>
+                      <span class="binding-placeholder-desc">绑定后可直接使用 GitHub 账号一键快捷登录</span>
+                    </template>
+                  </div>
+                </div>
+                <div class="provider-actions">
+                  <el-button 
+                    v-if="isProviderBound('github')" 
+                    type="danger" 
+                    plain 
+                    size="small" 
+                    class="action-btn"
+                    @click="handleUnbind('github')"
+                  >
+                    解除绑定
+                  </el-button>
+                  <el-button 
+                    v-else 
+                    type="primary" 
+                    size="small" 
+                    class="action-btn github-btn"
+                    @click="handleBind('github')"
+                  >
+                    立即绑定
+                  </el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <div class="profile-grid">
         <!-- 学习偏好 -->
         <section class="section profile-section">
@@ -539,9 +750,10 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useUserStore } from '@/stores/user'
+import { userApi } from '@/api/user'
 import { studentProfileApi } from '@/api/studentProfile'
 import type {
   StudentProfileData,
@@ -890,6 +1102,92 @@ const openEditDialog = () => {
     editData.bio = u.bio || ''
   }
   showEditDialog.value = true
+}
+
+// ====== 账号与第三方绑定计算属性与方法 ======
+const boundIdentities = computed(() => {
+  return userStore.userInfo?.authIdentities || []
+})
+
+const boundProviders = computed(() => {
+  return new Set(boundIdentities.value.map(i => i.providerCode))
+})
+
+const isProviderBound = (providerCode: string) => {
+  return boundProviders.value.has(providerCode)
+}
+
+const getProviderInfo = (providerCode: string) => {
+  return boundIdentities.value.find(i => i.providerCode === providerCode)
+}
+
+// 复制ID
+const copyText = (text: string) => {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      ElMessage.success('用户ID已复制')
+    }).catch(() => {
+      fallbackCopyText(text)
+    })
+  } else {
+    fallbackCopyText(text)
+  }
+}
+
+const fallbackCopyText = (text: string) => {
+  const textArea = document.createElement("textarea")
+  textArea.value = text
+  textArea.style.position = "fixed"
+  document.body.appendChild(textArea)
+  textArea.focus()
+  textArea.select()
+  try {
+    document.execCommand('copy')
+    ElMessage.success('用户ID已复制')
+  } catch (err) {
+    ElMessage.error('复制失败，请手动选择复制')
+  }
+  document.body.removeChild(textArea)
+}
+
+// 第三方账号绑定与解绑
+const handleBind = (providerCode: string) => {
+  if (providerCode === 'github') {
+    userApi.getGithubOAuthState().then((state) => {
+      const redirectUri = encodeURIComponent(`${window.location.origin}/oauth/callback/github`)
+      const clientId = 'Ov23liXm4K4A7VHJmGQi'
+      window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&scope=user:email`
+    }).catch(() => {
+      ElMessage.error('获取绑定状态失败')
+    })
+  } else if (providerCode === 'gitee') {
+    userApi.getGiteeOAuthState().then((state) => {
+      const redirectUri = encodeURIComponent(`${window.location.origin}/oauth/callback/gitee`)
+      const clientId = '71fa73bb6b064414b3cf1c78c5a36d7be15d0c0ecfbc09e6b3b8a6bedff9fcce'
+      window.location.href = `https://gitee.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&state=${state}`
+    }).catch(() => {
+      ElMessage.error('获取绑定状态失败')
+    })
+  }
+}
+
+const handleUnbind = (providerCode: string) => {
+  ElMessageBox.confirm(
+    `确定要解绑 ${providerCode === 'github' ? 'GitHub' : 'Gitee'} 账号吗？解绑后将无法使用该账号快捷登录。`,
+    '提示',
+    {
+      confirmButtonText: '确定解绑',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      await userStore.unbindAuth(providerCode)
+      ElMessage.success(`${providerCode === 'github' ? 'GitHub' : 'Gitee'} 解绑成功`)
+    } catch {
+      ElMessage.error('解绑失败')
+    }
+  }).catch(() => {})
 }
 
 // ====== 初始化 ======
@@ -1715,6 +2013,263 @@ onMounted(async () => {
   }
   .user-meta {
     justify-content: center;
+  }
+}
+
+/* 账号详情与安全样式 */
+.account-security-card {
+  margin-bottom: var(--spacing-xl);
+}
+
+.card-header-simple {
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.card-title-simple {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.account-security-content {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 40px;
+}
+
+.account-basic-info, .social-bindings {
+  display: flex;
+  flex-direction: column;
+}
+
+.sub-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin: 0 0 var(--spacing-md) 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--primary-color);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--background-color-base);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
+.info-item.full-width {
+  grid-column: span 2;
+}
+
+.info-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.info-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+.info-value-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.id-text {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.copy-btn {
+  padding: 0;
+  height: auto;
+}
+
+.bio-text {
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.vip-item.is-vip {
+  background: linear-gradient(135deg, rgba(253, 224, 71, 0.08), rgba(234, 179, 8, 0.08));
+  border-color: rgba(234, 179, 8, 0.2);
+}
+
+.vip-status-container {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.vip-badge-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #fef08a, #facc15);
+  color: #854d0e;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  box-shadow: 0 2px 4px rgba(234, 179, 8, 0.2);
+}
+
+.vip-time-range {
+  font-size: 0.75rem;
+  color: #854d0e;
+  font-weight: 500;
+}
+
+.vip-time-range.muted {
+  color: var(--text-muted);
+}
+
+.bindings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.binding-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--background-color-base);
+  transition: all var(--transition-fast);
+}
+
+.binding-card.bound {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.02), rgba(16, 185, 129, 0.05));
+}
+
+.provider-info-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  flex: 1;
+}
+
+.provider-icon-wrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: white;
+  border: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.provider-icon-wrapper.gitee-color {
+  color: #C71D23;
+}
+
+.provider-icon-wrapper.github-color {
+  color: #24292e;
+}
+
+html[data-theme='dark'] .provider-icon-wrapper {
+  background: var(--background-color-base);
+  border-color: var(--border-light);
+}
+
+.provider-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.provider-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.binding-status-tag {
+  font-size: 0.625rem;
+}
+
+.provider-meta-row {
+  display: flex;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.meta-val.highlight {
+  color: var(--text-dark);
+  font-weight: 600;
+}
+
+.binding-placeholder-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.provider-actions {
+  margin-left: var(--spacing-md);
+}
+
+.action-btn {
+  border-radius: var(--radius-full);
+}
+
+.gitee-btn {
+  background-color: #C71D23;
+  border-color: #C71D23;
+}
+.gitee-btn:hover, .gitee-btn:focus {
+  background-color: #a5181e;
+  border-color: #a5181e;
+}
+
+.github-btn {
+  background-color: #24292e;
+  border-color: #24292e;
+}
+.github-btn:hover, .github-btn:focus {
+  background-color: #121416;
+  border-color: #121416;
+}
+
+@media (max-width: 992px) {
+  .account-security-content {
+    grid-template-columns: 1fr;
+    gap: 30px;
   }
 }
 </style>

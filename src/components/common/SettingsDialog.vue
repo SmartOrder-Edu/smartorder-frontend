@@ -29,31 +29,27 @@
             <span class="item-value">{{ userStore.userInfo?.email || '340*****70@qq.com' }}</span>
           </div>
           
-          <div class="settings-row-item">
-            <span class="item-label">{{ t('gitee') }}</span>
+          <div class="settings-row-item" v-for="provider in OAuthProviders" :key="provider.code">
+            <span class="item-label">{{ provider.label }}</span>
             <div class="item-value action-value">
               <span style="display:inline-flex;align-items:center;gap:6px;">
-                <!-- Gitee SVG -->
-                <svg viewBox="0 0 1024 1024" width="16" height="16" style="vertical-align:middle;">
-                  <path d="M512 0C229.12 0 0 229.12 0 512s229.12 512 512 512 512-229.12 512-512S794.88 0 512 0zm233.6 374.4H448c-17.92 0-32 14.08-32 32v192h192c17.92 0 32 14.08 32 32s-14.08 32-32 32H384c-17.92 0-32-14.08-32-32V406.4c0-52.48 42.88-96 96-96h297.6c17.92 0 32 14.08 32 32s-14.08 32-32 32z" fill="#C71D23"/>
-                </svg>
-                已绑定
+                <span v-html="provider.icon"></span>
+                {{ isProviderBound(provider.code) ? t('bound') + (getProviderUsername(provider.code) ? ': ' + getProviderUsername(provider.code) : '') : t('unbound') }}
               </span>
-              <button class="action-link-btn" @click="handleBindGitee">{{ t('unbind') }}</button>
-            </div>
-          </div>
-          
-          <div class="settings-row-item">
-            <span class="item-label">{{ t('github') }}</span>
-            <div class="item-value action-value">
-              <span style="display:inline-flex;align-items:center;gap:6px;">
-                <!-- GitHub SVG -->
-                <svg viewBox="0 0 1024 1024" width="16" height="16" style="vertical-align:middle;color:#24292e;" class="github-icon">
-                  <path d="M512 0C229.25 0 0 229.25 0 512c0 226.25 146.69 418.13 350.16 485.83 25.59 4.69 34.94-11.12 34.94-24.69 0-12.19-.47-52.56-.69-95.31-142.44 30.94-172.5-60.44-172.5-60.44-23.31-59.25-56.88-75-56.88-75-46.5-31.81 3.53-31.13 3.53-31.13 51.41 3.63 78.44 52.81 78.44 52.81 45.63 78.19 119.75 55.63 148.94 42.56 4.63-33.06 17.88-55.63 32.44-68.38-113.69-12.94-233.19-56.88-233.19-253.06 0-55.88 20-101.56 52.81-137.44-5.31-12.94-22.88-65.06 5-135.56 0 0 43.06-13.81 141.06 52.56 40.94-11.38 84.88-17.06 128.5-17.25 43.63.19 87.63 5.88 128.63 17.25 97.88-66.38 140.88-52.56 140.88-52.56 27.94 70.5 10.38 122.63 5.06 135.56 32.88 35.88 52.75 81.56 52.75 137.44 0 196.69-119.75 239.94-233.81 252.56 18.38 15.88 34.75 47.13 34.75 94.94 0 68.56-.63 123.75-.63 140.63 0 13.69 9.25 29.63 35.25 24.63C877.44 930 1024 738.13 1024 512 1024 229.25 794.75 0 512 0z" fill="currentColor"/>
-                </svg>
-                未绑定
-              </span>
-              <button class="action-link-btn" @click="handleBindGithub">绑定</button>
+              <button
+                v-if="isProviderBound(provider.code)"
+                class="action-link-btn"
+                @click="handleUnbind(provider.code)"
+              >
+                {{ t('unbind') }}
+              </button>
+              <button
+                v-else
+                class="action-link-btn"
+                @click="handleBind(provider.code)"
+              >
+                {{ t('bind') }}
+              </button>
             </div>
           </div>
           
@@ -141,9 +137,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { Download, Refresh } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { userApi } from '@/api/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from '@/composables/useI18n'
 
@@ -179,10 +176,79 @@ const handleMenuSelect = (menu: string) => {
   activeMenu.value = menu
 }
 
-// 模拟事件
+// OAuth 第三方平台定义
+const OAuthProviders = [
+  {
+    code: 'gitee',
+    label: t('gitee'),
+    icon: '<svg viewBox="0 0 1024 1024" width="16" height="16" style="vertical-align:middle;"><path d="M512 0C229.12 0 0 229.12 0 512s229.12 512 512 512 512-229.12 512-512S794.88 0 512 0zm233.6 374.4H448c-17.92 0-32 14.08-32 32v192h192c17.92 0 32 14.08 32 32s-14.08 32-32 32H384c-17.92 0-32-14.08-32-32V406.4c0-52.48 42.88-96 96-96h297.6c17.92 0 32 14.08 32 32s-14.08 32-32 32z" fill="#C71D23"/></svg>'
+  },
+  {
+    code: 'github',
+    label: t('github'),
+    icon: '<svg viewBox="0 0 1024 1024" width="16" height="16" style="vertical-align:middle;color:#24292e;" class="github-icon"><path d="M512 0C229.25 0 0 229.25 0 512c0 226.25 146.69 418.13 350.16 485.83 25.59 4.69 34.94-11.12 34.94-24.69 0-12.19-.47-52.56-.69-95.31-142.44 30.94-172.5-60.44-172.5-60.44-23.31-59.25-56.88-75-56.88-75-46.5-31.81 3.53-31.13 3.53-31.13 51.41 3.63 78.44 52.81 78.44 52.81 45.63 78.19 119.75 55.63 148.94 42.56 4.63-33.06 17.88-55.63 32.44-68.38-113.69-12.94-233.19-56.88-233.19-253.06 0-55.88 20-101.56 52.81-137.44-5.31-12.94-22.88-65.06 5-135.56 0 0 43.06-13.81 141.06 52.56 40.94-11.38 84.88-17.06 128.5-17.25 43.63.19 87.63 5.88 128.63 17.25 97.88-66.38 140.88-52.56 140.88-52.56 27.94 70.5 10.38 122.63 5.06 135.56 32.88 35.88 52.75 81.56 52.75 137.44 0 196.69-119.75 239.94-233.81 252.56 18.38 15.88 34.75 47.13 34.75 94.94 0 68.56-.63 123.75-.63 140.63 0 13.69 9.25 29.63 35.25 24.63C877.44 930 1024 738.13 1024 512 1024 229.25 794.75 0 512 0z" fill="currentColor"/></svg>'
+  }
+]
+
+const boundIdentities = computed(() => {
+  return userStore.userInfo?.authIdentities || []
+})
+
+const boundProviders = computed(() => {
+  return new Set(boundIdentities.value.map(i => i.providerCode))
+})
+
+const isProviderBound = (providerCode: string) => {
+  return boundProviders.value.has(providerCode)
+}
+
+const getProviderUsername = (providerCode: string) => {
+  const identity = boundIdentities.value.find(i => i.providerCode === providerCode)
+  return identity?.providerUsername || ''
+}
+
+// 绑定：跳转到 OAuth 授权页面
+const handleBind = (providerCode: string) => {
+  if (providerCode === 'github') {
+    userApi.getGithubOAuthState().then((state) => {
+      const redirectUri = encodeURIComponent(`${window.location.origin}/oauth/callback/github`)
+      const clientId = 'Ov23liXm4K4A7VHJmGQi' // GitHub OAuth App client_id
+      window.location.href = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&state=${state}&scope=user:email`
+    })
+  } else if (providerCode === 'gitee') {
+    userApi.getGiteeOAuthState().then((state) => {
+      const redirectUri = encodeURIComponent(`${window.location.origin}/oauth/callback/gitee`)
+      const clientId = '71fa73bb6b064414b3cf1c78c5a36d7be15d0c0ecfbc09e6b3b8a6bedff9fcce' // Gitee OAuth App client_id
+      window.location.href = `https://gitee.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&state=${state}`
+    })
+  }
+}
+
+// 解绑：调接口解绑
+const handleUnbind = (providerCode: string) => {
+  ElMessageBox.confirm(
+    locale.value === 'en-US'
+      ? `Are you sure you want to unbind your ${providerCode} account? You will not be able to use ${providerCode} quick login after unbinding.`
+      : `确定要解绑 ${providerCode} 账号吗？解绑后将无法使用 ${providerCode} 快捷登录。`,
+    locale.value === 'en-US' ? 'Prompt' : '提示',
+    {
+      confirmButtonText: locale.value === 'en-US' ? 'Confirm Unbind' : '确定解绑',
+      cancelButtonText: locale.value === 'en-US' ? 'Cancel' : '取消',
+      type: 'warning'
+    }
+  ).then(async () => {
+    try {
+      await userStore.unbindAuth(providerCode)
+      ElMessage.success(locale.value === 'en-US' ? `${providerCode} unbound successfully` : `${providerCode} 解绑成功`)
+    } catch {
+      ElMessage.error(locale.value === 'en-US' ? 'Unbind failed' : '解绑失败')
+    }
+  }).catch(() => {})
+}
+
 const handleDeleteAccount = () => {
   ElMessageBox.confirm(
-    locale.value === 'en-US' 
+    locale.value === 'en-US'
       ? 'Deleting your account will permanently clear your profile, tasks, and chat history. Continue?'
       : '注销账号将永久删除您的个人画像、进度、任务和对话记录，且无法恢复。确定继续吗？',
     locale.value === 'en-US' ? 'Warning - Delete Account' : '警告 - 注销账号',
@@ -238,26 +304,6 @@ const handleClearChats = () => {
       ElMessage.success(locale.value === 'en-US' ? 'Cloud chat history cleared successfully' : '已彻底清空云端对话历史')
     }, 500)
   }).catch(() => {})
-}
-
-const handleBindGitee = () => {
-  ElMessageBox.confirm(
-    locale.value === 'en-US'
-      ? 'Are you sure you want to unbind your Gitee account?'
-      : '确定要解绑 Gitee 账号吗？解绑后将无法使用 Gitee 快捷登录。',
-    locale.value === 'en-US' ? 'Prompt' : '提示',
-    {
-      confirmButtonText: locale.value === 'en-US' ? 'Confirm' : '确定解绑',
-      cancelButtonText: locale.value === 'en-US' ? 'Cancel' : '取消',
-      type: 'warning'
-    }
-  ).then(() => {
-    ElMessage.success(locale.value === 'en-US' ? 'Gitee unbound successfully' : 'Gitee 解绑成功')
-  }).catch(() => {})
-}
-
-const handleBindGithub = () => {
-  ElMessage.info(locale.value === 'en-US' ? 'GitHub binding is not supported currently' : '暂不支持自主绑定 GitHub，请联系管理员')
 }
 
 const handleLogoutDevices = () => {

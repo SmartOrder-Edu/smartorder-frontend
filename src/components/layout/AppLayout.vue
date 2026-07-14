@@ -466,7 +466,7 @@ const handleLogout = async () => {
 <style scoped>
 .app-layout {
   min-height: 100vh;
-  background: var(--bg-primary);
+  background: var(--page-bg);
   position: relative;
 }
 
@@ -506,13 +506,13 @@ const handleLogout = async () => {
   padding: var(--spacing-sm) var(--spacing-lg);
   display: flex;
   flex-direction: column;
-  background: #ffffff;
-  border-right: 1px solid rgba(139, 92, 246, 0.15);
+  background: var(--panel-bg);
+  border-right: 1px solid var(--border-color);
   box-shadow:
     4px 0 30px rgba(139, 92, 246, 0.1),
-    inset -1px 0 0 rgba(255, 255, 255, 0.5);
+    inset -1px 0 0 rgba(255, 255, 255, 0.1);
   overflow: visible;
-  transition: width var(--transition-base), padding var(--transition-base);
+  transition: width var(--transition-base), padding var(--transition-base), background-color 0.2s ease, border-color 0.2s ease;
   z-index: 90;
 }
 
@@ -791,12 +791,10 @@ const handleLogout = async () => {
   flex-direction: column;
   gap: 6px;
   padding: 8px;
-  border: 1px solid rgba(11, 183, 170, 0.14);
+  border: 1px solid var(--border-color);
   border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgba(236, 253, 251, 0.9) 0%, rgba(255, 255, 255, 0.95) 44%),
-    #ffffff;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+  background: var(--panel-bg);
+  box-shadow: 0 6px 16px var(--shadow-color);
 }
 
 .space-workspace-header {
@@ -868,8 +866,8 @@ const handleLogout = async () => {
   justify-content: center;
   border-radius: 9px;
   color: var(--primary-color);
-  background: #ffffff;
-  border: 1px solid rgba(11, 183, 170, 0.18);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
   box-shadow: var(--shadow-xs);
   transition: all var(--transition-fast);
 }
@@ -894,7 +892,7 @@ const handleLogout = async () => {
   min-height: 42px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(248, 250, 252, 0.9);
+  background: var(--item-bg);
   color: var(--text-secondary);
   font-size: 0.75rem;
 }
@@ -1249,7 +1247,7 @@ const handleLogout = async () => {
 .sidebar-username {
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #000000;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1384,10 +1382,10 @@ const handleLogout = async () => {
   top: calc(100% + 10px);
   right: 0;
   width: 360px;
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-lg);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
-  border: 1px solid var(--border-light);
+  box-shadow: 0 10px 40px var(--shadow-color);
+  border: 1px solid var(--border-color);
   overflow: hidden;
   z-index: 300;
 }
@@ -1455,10 +1453,10 @@ const handleLogout = async () => {
   bottom: 100%;
   margin-bottom: 4px;
   width: 100%;
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-lg);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
-  border: 1px solid var(--border-light);
+  box-shadow: 0 10px 40px var(--shadow-color);
+  border: 1px solid var(--border-color);
   overflow: hidden;
   z-index: 300;
 }
@@ -1556,5 +1554,53 @@ const handleLogout = async () => {
   .page-container {
     padding: var(--spacing-lg);
   }
+}
+
+/* ==================== 深色模式局部覆盖 ==================== */
+:global(html[data-theme='dark']) .sidebar-logo-container {
+  border-bottom-color: var(--border-color);
+}
+
+:global(html[data-theme='dark']) .sidebar-footer {
+  border-top-color: var(--border-color);
+  background: transparent;
+}
+
+:global(html[data-theme='dark']) .notif-panel-header {
+  border-bottom-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+:global(html[data-theme='dark']) .notif-panel-item {
+  border-bottom-color: var(--border-color);
+}
+
+:global(html[data-theme='dark']) .notif-panel-item:hover {
+  background: var(--item-hover-bg);
+}
+
+:global(html[data-theme='dark']) .notif-panel-item.unread {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+:global(html[data-theme='dark']) .space-title-link {
+  color: var(--text-primary);
+}
+
+:global(html[data-theme='dark']) .nav-space-card:hover {
+  background: var(--item-hover-bg);
+  border-color: var(--border-color);
+}
+
+:global(html[data-theme='dark']) .nav-space-card.active {
+  background: rgba(11, 183, 170, 0.12);
+  border-color: rgba(11, 183, 170, 0.25);
+}
+
+:global(html[data-theme='dark']) .mark-read-btn {
+  color: var(--primary-color);
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 </style>
