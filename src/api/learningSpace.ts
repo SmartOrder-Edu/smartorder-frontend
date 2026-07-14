@@ -86,6 +86,17 @@ export interface LearningSpaceDisplay extends LearningSpaceVO {
 // ---- API ----
 
 export const learningSpaceApi = {
+  /** 上传学习空间封面 */
+  uploadCover(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return request.post<string>('/learning-spaces/upload/cover', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
   /** 创建学习空间 */
   create(data: LearningSpaceDTO) {
     return request.post<LearningSpaceVO>('/learning-spaces', data)

@@ -1,5 +1,12 @@
 import request from './request'
-import type { SpaceDashboardVO, TaskVO, TaskStatus, ResourcePackageGenerateDTO, ResourcePackageVO } from '@/types/learningSpace'
+import type {
+  SpaceDashboardVO,
+  TaskVO,
+  TaskStatus,
+  ResourcePackageGenerateDTO,
+  ResourcePackageVO,
+  ResourceGenerationJobVO,
+} from '@/types/learningSpace'
 
 // ---- Space Dashboard ----
 
@@ -18,6 +25,14 @@ export const resourcePackageApi = {
 
   async generate(spaceId: string, data: ResourcePackageGenerateDTO): Promise<ResourcePackageVO> {
     return request.post(`/learning-spaces/${spaceId}/resource-package/generate`, data)
+  },
+}
+
+// ---- Resource Generation Jobs ----
+
+export const resourceGenerationJobApi = {
+  async list(spaceId: string, limit = 20): Promise<ResourceGenerationJobVO[]> {
+    return request.get(`/learning-spaces/${spaceId}/resource-package/jobs`, { params: { limit } })
   },
 }
 

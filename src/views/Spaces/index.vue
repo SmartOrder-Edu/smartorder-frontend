@@ -1,6 +1,8 @@
 <template>
   <AppLayout>
     <div class="spaces-page">
+      <ParticleBackground />
+      <div class="spaces-content">
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
@@ -63,24 +65,30 @@
           :class="space.riskStatus"
           :style="{ '--space-bg': space.bgColor }"
         >
+          <!-- Cover -->
+          <div class="card-cover" @click="$router.push(`/space/${space.id}`)">
+            <el-image
+              v-if="space.coverUrl"
+              class="card-cover-img"
+              :src="space.coverUrl"
+              fit="cover"
+            >
+              <template #error>
+                <div class="card-cover-default" :style="coverStyle(space)">
+                  <span>{{ coverInitial(space) }}</span>
+                </div>
+              </template>
+            </el-image>
+            <div v-else class="card-cover-default" :style="coverStyle(space)">
+              <span>{{ coverInitial(space) }}</span>
+            </div>
+            <div class="card-cover-shade"></div>
+            <span class="card-cover-type">{{ typeLabel(space.type) }}</span>
+          </div>
+
           <!-- Card Header -->
           <div class="card-head" @click="$router.push(`/space/${space.id}`)">
             <div class="card-head-left">
-              <el-image 
-                class="card-cover-img" 
-                :src="space.coverUrl" 
-                fit="cover"
-              >
-                <template #error>
-                  <div class="card-cover-placeholder">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                      <circle cx="8.5" cy="8.5" r="1.5"/>
-                      <polyline points="21 15 16 10 5 21"/>
-                    </svg>
-                  </div>
-                </template>
-              </el-image>
               <div class="card-name-group">
                 <h3 class="card-name">{{ space.name }}</h3>
                 <span class="card-type-badge" :style="{ color: space.color, background: space.color + '16' }">
@@ -194,7 +202,7 @@
       <el-dialog
         v-model="dialogVisible"
         title="编辑学习空间"
-        width="520px"
+        width="680px"
         :close-on-click-modal="false"
         destroy-on-close
       >
@@ -219,6 +227,56 @@
           <el-form-item label="描述">
             <el-input v-model="form.description" type="textarea" :rows="2" placeholder="简要描述" maxlength="500" show-word-limit />
           </el-form-item>
+          <el-form-item label="空间封面">
+            <div class="cover-field">
+              <div class="cover-preview">
+                <img v-if="form.coverUrl" :src="form.coverUrl" alt="" />
+                <div v-else class="cover-preview-default" :style="coverStyle(form)">
+                  <span>{{ coverInitial(form) }}</span>
+                </div>
+              </div>
+              <div class="cover-controls">
+                <el-upload
+                  class="cover-uploader"
+                  action="#"
+                  :http-request="handleCoverUpload"
+                  :before-upload="beforeCoverUpload"
+                  :show-file-list="false"
+                  accept="image/*"
+                >
+                  <button type="button" class="cover-upload-btn" :disabled="coverUploading">
+                    <span v-if="coverUploading">上传中...</span>
+                    <span v-else>{{ form.coverUrl ? '更换封面图片' : '上传封面图片' }}</span>
+                  </button>
+                </el-upload>
+                <button v-if="form.coverUrl" type="button" class="cover-clear-btn" @click="form.coverUrl = ''">
+                  使用默认封面
+                </button>
+                <div class="cover-presets">
+                  <button
+                    v-for="preset in coverPresets"
+                    :key="preset.type"
+                    type="button"
+                    class="cover-preset"
+                    :class="{ active: form.type === preset.type && !form.coverUrl }"
+                    :style="{ background: preset.gradient }"
+                    @click="applyDefaultCover(preset.type)"
+                  >
+                    <span>{{ preset.label }}</span>
+                  </button>
+                </div>
+                <el-collapse class="cover-advanced">
+                  <el-collapse-item title="使用图片 URL（高级）" name="url">
+                    <el-input
+                      v-model="form.coverUrl"
+                      placeholder="粘贴图片 URL"
+                      clearable
+                    />
+                  </el-collapse-item>
+                </el-collapse>
+              </div>
+            </div>
+          </el-form-item>
           <el-form-item label="学习目标">
             <el-input v-model="form.goals" type="textarea" :rows="2" placeholder='["掌握洛必达法则", "完成定积分练习"]' />
           </el-form-item>
@@ -240,6 +298,7 @@
           <el-button type="primary" :loading="submitting" @click="handleSubmit">保存修改</el-button>
         </template>
       </el-dialog>
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -249,7 +308,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import ParticleBackground from '@/components/ParticleBackground.vue'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
+import { learningSpaceApi } from '@/api/learningSpace'
 import type { LearningSpaceDisplay, LearningSpaceType } from '@/api/learningSpace'
 import type { FormInstance, FormRules } from 'element-plus'
 
@@ -278,6 +339,19 @@ const typeOptions = [
   { value: 'competition', label: '🏆 竞赛集训' },
 ]
 
+const coverPresets: { type: LearningSpaceType; label: string; gradient: string }[] = [
+  { type: 'course', label: '课程', gradient: 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)' },
+  { type: 'exam', label: '考试', gradient: 'linear-gradient(135deg, #059669 0%, #34d399 100%)' },
+  { type: 'project', label: '项目', gradient: 'linear-gradient(135deg, #d97706 0%, #facc15 100%)' },
+  { type: 'career', label: '职业', gradient: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' },
+  { type: 'competition', label: '竞赛', gradient: 'linear-gradient(135deg, #dc2626 0%, #fb7185 100%)' },
+]
+
+const coverThemeMap = coverPresets.reduce((map, preset) => {
+  map[preset.type] = preset
+  return map
+}, {} as Record<LearningSpaceType, { type: LearningSpaceType; label: string; gradient: string }>)
+
 const typeLabel = (t: LearningSpaceType) => {
   const m: Record<string, string> = { course: '课程', exam: '考试', project: '项目', career: '职业', competition: '竞赛' }
   return m[t] || t
@@ -286,6 +360,26 @@ const typeLabel = (t: LearningSpaceType) => {
 const riskLabel = (h: string) => {
   const m: Record<string, string> = { normal: '正常', warning: '需关注', danger: '危险', good: '良好' }
   return m[h] || h
+}
+
+function coverTheme(item: { type?: LearningSpaceType }) {
+  return coverThemeMap[item.type || 'course'] || coverThemeMap.course
+}
+
+function coverStyle(item: { type?: LearningSpaceType }) {
+  return {
+    '--cover-gradient': coverTheme(item).gradient,
+  }
+}
+
+function coverInitial(item: { type?: LearningSpaceType; name?: string }) {
+  const nameInitial = item.name?.trim()?.slice(0, 1)
+  return nameInitial || coverTheme(item).label.slice(0, 1)
+}
+
+function applyDefaultCover(type: LearningSpaceType) {
+  form.value.type = type
+  form.value.coverUrl = ''
 }
 
 // --- Stats ---
@@ -356,10 +450,11 @@ function goCreateSpace() {
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 const submitting = ref(false)
+const coverUploading = ref(false)
 const formRef = ref<FormInstance>()
 
 const emptyForm = () => ({
-  name: '', type: 'course' as LearningSpaceType, description: '', goals: '', startDate: '', targetEndDate: '', sortOrder: 0,
+  name: '', type: 'course' as LearningSpaceType, description: '', coverUrl: '', goals: '', startDate: '', targetEndDate: '', sortOrder: 0,
 })
 
 const form = ref(emptyForm())
@@ -371,10 +466,35 @@ function openEditDialog(space: LearningSpaceDisplay) {
   editingId.value = space.id
   form.value = {
     name: space.name, type: space.type, description: space.description,
-    goals: space.goals, startDate: space.startDate || '',
+    coverUrl: space.coverUrl || '', goals: space.goals, startDate: space.startDate || '',
     targetEndDate: space.targetEndDate || '', sortOrder: space.sortOrder,
   }
   dialogVisible.value = true
+}
+
+function beforeCoverUpload(file: File) {
+  if (!file.type.startsWith('image/')) {
+    ElMessage.error('只能上传图片文件')
+    return false
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error('封面图片不能超过 5MB')
+    return false
+  }
+  return true
+}
+
+async function handleCoverUpload(options: any) {
+  coverUploading.value = true
+  try {
+    const url = await learningSpaceApi.uploadCover(options.file as File)
+    form.value.coverUrl = url
+    ElMessage.success('封面已上传')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '封面上传失败')
+  } finally {
+    coverUploading.value = false
+  }
 }
 
 async function handleSubmit() {
@@ -439,10 +559,15 @@ onMounted(() => { spaceStore.fetchSpaces() })
 
 <style scoped>
 .spaces-page {
+  position: relative;
   width: 100%;
   max-width: 1500px;
   margin: 0 auto;
   padding: 24px;
+}
+.spaces-content {
+  position: relative;
+  z-index: 1;
 }
 
 /* Header */
@@ -512,8 +637,8 @@ onMounted(() => { spaceStore.fetchSpaces() })
   box-shadow: 0 8px 24px rgba(67, 97, 238, 0.15); 
   transform: translateY(-2px);
 }
-.stat-value { display: block; font-size: 2.2rem; font-weight: 900; color: #0f172a; line-height: 1.1; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
-.stat-label { display: block; font-size: 0.875rem; font-weight: 600; color: #64748b; letter-spacing: 0.02em; }
+.stat-value { display: block; font-size: 1.75rem; font-weight: 700; color: #0f172a; line-height: 1.1; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+.stat-label { display: block; font-size: 0.8125rem; font-weight: 600; color: #94a3b8; letter-spacing: 0.02em; }
 
 /* Filter */
 .filter-bar {
@@ -567,11 +692,17 @@ onMounted(() => { spaceStore.fetchSpaces() })
   flex-direction: column;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 8px rgba(0, 0, 0, 0.04),
+    0 12px 24px rgba(0, 0, 0, 0.06);
 }
 .space-card:hover {
-  transform: translateY(-6px) scale(1.01);
-  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(67, 97, 238, 0.08);
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 2px rgba(11, 183, 170, 0.06),
+    0 8px 16px rgba(0, 0, 0, 0.06),
+    0 20px 40px rgba(11, 183, 170, 0.08);
   border-color: rgba(67, 97, 238, 0.3);
   filter: brightness(0.99);
 }
@@ -581,25 +712,98 @@ onMounted(() => { spaceStore.fetchSpaces() })
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, rgba(67, 97, 238, 0.8), transparent);
-  opacity: 0.3;
-  transition: opacity 0.4s, height 0.4s;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(11, 183, 170, 0.6), transparent);
+  opacity: 0.4;
+  transition: opacity 0.4s, box-shadow 0.4s;
 }
 .space-card:hover::before {
   opacity: 1;
-  height: 4px;
+  box-shadow: 0 0 12px rgba(11, 183, 170, 0.3);
 }
 .space-card.danger::before { background: linear-gradient(90deg, transparent, #ef4444, transparent); opacity: 0.8; }
 .space-card.warning::before { background: linear-gradient(90deg, transparent, #f59e0b, transparent); opacity: 0.8; }
 .space-card.good::before { background: linear-gradient(90deg, transparent, #10b981, transparent); opacity: 0.8; }
 
 /* Card Head */
+.card-cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-height: 150px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f8fafc;
+}
+.card-cover-img,
+.card-cover-default {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.card-cover-default {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.42), transparent 25%),
+    radial-gradient(circle at 84% 18%, rgba(255, 255, 255, 0.24), transparent 24%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(15, 23, 42, 0.15)),
+    var(--cover-gradient);
+  color: #ffffff;
+}
+.card-cover-default::before {
+  content: '';
+  position: absolute;
+  inset: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 16px;
+}
+.card-cover-default::after {
+  content: '';
+  position: absolute;
+  right: -34px;
+  bottom: -38px;
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  border: 22px solid rgba(255, 255, 255, 0.16);
+}
+.card-cover-default span {
+  position: relative;
+  z-index: 1;
+  font-size: 2.35rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+.card-cover-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.02), rgba(15, 23, 42, 0.24));
+  pointer-events: none;
+}
+.card-cover-type {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #0f172a;
+  font-size: 0.75rem;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(10px);
+}
 .card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 20px 14px;
+  padding: 18px 24px 14px;
   cursor: pointer;
 }
 .card-head-left {
@@ -609,8 +813,6 @@ onMounted(() => { spaceStore.fetchSpaces() })
   min-width: 0;
   flex: 1;
 }
-.card-cover-img { width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0; border: 1px solid #f1f5f9; background: #f8fafc; display: flex; }
-  .card-cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f1f5f9; color: #94a3b8; border-radius: 12px; }
 .card-name-group { min-width: 0; }
 .card-name { font-size: 1.125rem; font-weight: 800; color: #0f172a; margin: 0 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.02em;}
 .card-type-badge { font-size: 0.7rem; padding: 3px 10px; border-radius: 8px; font-weight: 600;}
@@ -638,7 +840,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
 
 /* Card Body */
 .card-body {
-  padding: 12px 20px 20px;
+  padding: 0 24px 20px;
   cursor: pointer;
   flex: 1;
 }
@@ -675,10 +877,15 @@ onMounted(() => { spaceStore.fetchSpaces() })
   position: relative;
   box-shadow: 0 0 10px rgba(0,0,0,0.2);
 }
-.progress-fill::after { 
-  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+.progress-fill::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
   background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
-  animation: shimmer 2s infinite linear;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.space-card:hover .progress-fill::after {
+  opacity: 1;
+  animation: shimmer 1.5s ease-in-out 1;
 }
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
@@ -721,7 +928,7 @@ onMounted(() => { spaceStore.fetchSpaces() })
 .card-actions {
   display: flex;
   background: rgba(248, 250, 252, 0.5);
-  padding: 14px 20px;
+  padding: 14px 24px;
   gap: 14px;
   border-top: 1px solid rgba(226, 232, 240, 0.8);
 }
@@ -758,11 +965,11 @@ onMounted(() => { spaceStore.fetchSpaces() })
   margin-top: 10px;
 }
 .empty-state svg {
-  color: #cbd5e1;
+  color: #d1d5db;
   margin-bottom: 8px;
 }
-.empty-state h3 { margin: 16px 0 8px; color: #0f172a; font-size: 1.125rem; font-weight: 700; }
-.empty-state p { color: #64748b; margin: 0 0 24px; font-size: 0.95rem; }
+.empty-state h3 { margin: 16px 0 8px; color: #334155; font-size: 1.125rem; font-weight: 700; }
+.empty-state p { color: #94a3b8; margin: 0 0 24px; font-size: 0.95rem; }
 .empty-state .el-button {
   border-radius: 12px;
   padding: 12px 28px;
@@ -779,6 +986,156 @@ onMounted(() => { spaceStore.fetchSpaces() })
 /* Danger dropdown item */
 :deep(.danger-item) { color: #ef4444 !important; }
 
+/* Cover editor */
+.cover-field {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+.cover-preview {
+  position: relative;
+  width: 240px;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+.cover-preview img,
+.cover-preview-default {
+  width: 100%;
+  height: 100%;
+}
+.cover-preview img {
+  display: block;
+  object-fit: cover;
+}
+.cover-preview-default {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 16%, rgba(255, 255, 255, 0.4), transparent 26%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(15, 23, 42, 0.12)),
+    var(--cover-gradient);
+  color: #ffffff;
+}
+.cover-preview-default::before {
+  content: '';
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 10px;
+}
+.cover-preview-default::after {
+  content: '';
+  position: absolute;
+  right: -22px;
+  bottom: -24px;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 13px solid rgba(255, 255, 255, 0.16);
+}
+.cover-preview-default span {
+  position: relative;
+  z-index: 1;
+  font-size: 2rem;
+  font-weight: 900;
+}
+.cover-controls {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 10px;
+}
+.cover-uploader {
+  width: 100%;
+}
+.cover-upload-btn,
+.cover-clear-btn {
+  width: 100%;
+  min-height: 38px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.cover-upload-btn {
+  border: 0;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(11, 183, 170, 0.2);
+}
+.cover-upload-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(11, 183, 170, 0.26);
+}
+.cover-upload-btn:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+.cover-clear-btn {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: #ffffff;
+  color: #475569;
+}
+.cover-clear-btn:hover {
+  border-color: rgba(11, 183, 170, 0.36);
+  color: #0a9e94;
+}
+.cover-presets {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.cover-preset {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.cover-preset:hover,
+.cover-preset.active {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.cover-preset span {
+  display: block;
+  overflow: hidden;
+  padding: 0 5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.cover-advanced {
+  border-top: 0;
+  border-bottom: 0;
+}
+.cover-advanced :deep(.el-collapse-item__header) {
+  height: 34px;
+  border-bottom: 0;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.cover-advanced :deep(.el-collapse-item__wrap) {
+  border-bottom: 0;
+}
+.cover-advanced :deep(.el-collapse-item__content) {
+  padding-bottom: 0;
+}
+
 /* Responsive */
 @media (max-width: 1200px) { .spaces-grid { grid-template-columns: repeat(2, 1fr); gap: var(--spacing-xl); } }
 @media (max-width: 768px) {
@@ -786,5 +1143,8 @@ onMounted(() => { spaceStore.fetchSpaces() })
   .stats-row { grid-template-columns: repeat(2, 1fr); }
   .search-input { width: 100%; }
   .page-header { flex-direction: column; gap: 12px; }
+  .cover-field { grid-template-columns: 1fr; }
+  .cover-preview { width: 100%; }
+  .cover-presets { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 </style>
