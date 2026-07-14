@@ -21,6 +21,28 @@
         </button>
 
         <div class="detail-card">
+          <!-- 文件预览区域 -->
+          <div class="preview-section" v-if="detail">
+            <div class="preview-container">
+              <iframe
+                :src="previewIframeUrl"
+                class="preview-iframe"
+                frameborder="0"
+                allowfullscreen
+              ></iframe>
+            </div>
+            <div class="preview-actions">
+              <el-button size="small" text @click="openInNewWindow">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right: 4px;">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                  <polyline points="15 3 21 3 21 9"/>
+                  <line x1="10" y1="14" x2="21" y2="3"/>
+                </svg>
+                新窗口预览
+              </el-button>
+            </div>
+          </div>
+
           <!-- 头部 -->
           <div class="detail-header">
             <div class="detail-type-icon" :class="detail.category">
@@ -127,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -143,6 +165,19 @@ const detail = ref<ResourceSquareVO | null>(null)
 const downloadLoading = ref(false)
 const ratingSubmitting = ref(false)
 const myRating = ref(0)
+
+const previewIframeUrl = computed(() => {
+  if (!detail.value) return ''
+  const token = localStorage.getItem('token')
+  return `/preview?squareId=${detail.value.id}&name=${encodeURIComponent(detail.value.title)}&size=${detail.value.fileSize}&token=${token}`
+})
+
+const openInNewWindow = () => {
+  if (!detail.value) return
+  const token = localStorage.getItem('token')
+  const url = `/preview?squareId=${detail.value.id}&name=${encodeURIComponent(detail.value.title)}&size=${detail.value.fileSize}&token=${token}`
+  window.open(url, '_blank')
+}
 
 const categoryNameMap: Record<string, string> = {
   doc: '文档',
@@ -275,6 +310,36 @@ onMounted(() => {
   padding: 32px;
   box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
   border: 1px solid #f1f5f9;
+}
+
+.preview-section {
+  margin-bottom: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.preview-container {
+  width: 100%;
+  height: 60vh;
+  min-height: 400px;
+  position: relative;
+}
+
+.preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #ffffff;
+}
+
+.preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-top: 1px solid #f1f5f9;
 }
 
 .detail-header {
