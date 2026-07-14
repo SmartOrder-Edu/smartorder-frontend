@@ -444,10 +444,9 @@ watch(resourceId, () => {
 .resource-detail-page {
   position: relative;
   width: 100%;
-  max-width: 1320px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 24px;
-  padding-top: 28px;
+  padding: 8px 0 24px;
 }
 
 .resource-detail-content {
