@@ -78,8 +78,8 @@
                 <el-button class="btn-action" plain @click="handleBatchPublish">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"
                     style="margin-right: 4px;">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                   </svg>
                   发布到广场
                 </el-button>
@@ -170,7 +170,8 @@
           </el-button>
         </div>
         <div v-for="item in displayItems" :key="item.id" class="file-card"
-          :class="{ 'is-folder': item.type === 'folder' }" @dblclick="item.type === 'folder' ? enterFolder(item) : handlePreview(item)"
+          :class="{ 'is-folder': item.type === 'folder' }"
+          @dblclick="item.type === 'folder' ? enterFolder(item) : handlePreview(item)"
           @contextmenu.prevent="openContextMenu($event, item)">
           <div class="file-card-icon">
             <span v-if="item.type === 'folder'" class="folder-icon-img">
@@ -344,7 +345,8 @@
                 </svg>
                 预览
               </button>
-              <button class="context-menu-item" @click="handleOpenInNewWindowDirect(contextMenu.item); contextMenu.visible = false">
+              <button class="context-menu-item"
+                @click="handleOpenInNewWindowDirect(contextMenu.item); contextMenu.visible = false">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                   <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                   <polyline points="15 3 21 3 21 9" />
@@ -374,10 +376,11 @@
               </svg>
               移动到
             </button>
-            <button v-if="contextMenu.item?.type === 'file'" class="context-menu-item" @click="handlePublishToSquare(contextMenu.item); contextMenu.visible = false">
+            <button v-if="contextMenu.item?.type === 'file'" class="context-menu-item"
+              @click="handlePublishToSquare(contextMenu.item); contextMenu.visible = false">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
               </svg>
               发布到广场
             </button>
@@ -491,26 +494,14 @@
       </el-dialog>
 
       <!-- 发布到资源广场对话框 -->
-      <PublishToSquareDialog
-        v-model:visible="showPublishDialog"
-        :file="publishFileTarget"
-        @success="onPublishSuccess"
-      />
+      <PublishToSquareDialog v-model:visible="showPublishDialog" :file="publishFileTarget"
+        @success="onPublishSuccess" />
 
       <!-- 文件预览对话框（高保真全屏 iframe 无缝预览） -->
-      <el-dialog 
-        v-model="showPreviewDialog" 
-        width="85vw"
-        class="premium-preview-dialog"
-        :show-close="false"
-        :destroy-on-close="true"
-        @closed="previewIframeUrl = ''"
-      >
+      <el-dialog v-model="showPreviewDialog" width="85vw" class="premium-preview-dialog" :show-close="false"
+        :destroy-on-close="true" @closed="previewIframeUrl = ''">
         <div class="iframe-preview-container" v-if="previewIframeUrl">
-          <iframe 
-            :src="previewIframeUrl" 
-            class="preview-iframe-element"
-          ></iframe>
+          <iframe :src="previewIframeUrl" class="preview-iframe-element"></iframe>
           <!-- 浮动在右上角精致的毛玻璃关闭手柄，高自适应感 -->
           <button class="dialog-floating-close-btn" @click="showPreviewDialog = false" title="关闭预览">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16">
@@ -531,6 +522,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import SparkMD5 from 'spark-md5'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { getFolderContent, getFolderTree, createFolder as apiCreateFolder, updateFolder as apiUpdateFolder, deleteFolder as apiDeleteFolder, deleteFile as apiDeleteFile, moveFile as apiMoveFile, moveFolder as apiMoveFolder, batchMoveToFolder, apiInitUpload, apiGetSignUrl, apiUploadChunkToOSS, apiChunkDone, apiMergeChunks, apiCancelUpload, downloadFile } from '@/api/resource'
+import { getQuota } from '@/api/quota'
 import PublishToSquareDialog from './components/PublishToSquareDialog.vue'
 
 // 文件类型图标
@@ -628,6 +620,7 @@ const handleBatchDelete = async () => {
     ElMessage.success('删除成功')
     const parentRealId = currentFolderId.value ? (folderIdMap.get(currentFolderId.value) ?? '0') : '0'
     await loadFolderFromApi(parentRealId)
+    refreshQuota()
   } catch { /* cancel */ }
 }
 
@@ -719,21 +712,17 @@ const displayItems = computed(() => {
   })
 })
 
-const usedStorage = computed(() => {
-  const calcSize = (items: DriveItem[]): number => {
-    let total = 0
-    for (const item of items) {
-      if (item.type === 'file') {
-        total += item.size
-      } else {
-        const children = folderContents.value[item.id]
-        if (children) total += calcSize(children)
-      }
-    }
-    return total
+// 已用空间：以后端 /quota 接口返回的预聚合值为准（避免懒加载子目录导致漏算）
+const usedStorage = ref(0)
+
+const refreshQuota = async () => {
+  try {
+    const data = await getQuota()
+    usedStorage.value = data ? Number(data.userSpace) || 0 : 0
+  } catch (err) {
+    console.error('refreshQuota failed:', err)
   }
-  return calcSize(rootFiles.value)
-})
+}
 
 const storagePercent = computed(() => {
   return Math.round((usedStorage.value / totalStorage) * 100)
@@ -939,6 +928,7 @@ const handleDelete = (item: DriveItem | null) => {
         : '0'
       await loadFolderFromApi(parentRealId)
       ElMessage.success('已删除')
+      refreshQuota()
     } catch {
       ElMessage.error('删除失败')
     }
@@ -1212,6 +1202,7 @@ const handleHttpRequest = async (options: any) => {
       onSuccess()
       successCount++
       ElMessage.success(`文件 ${file.name} 秒传成功`)
+      refreshQuota()
       checkUploadFinish()
       return
     }
@@ -1302,6 +1293,7 @@ const handleHttpRequest = async (options: any) => {
     onSuccess()
     successCount++
     ElMessage.success(`文件 ${file.name} 上传成功`)
+    refreshQuota()
   } catch (e: any) {
     if (e.message === 'Canceled') {
       item.status = 'canceled'
@@ -1402,6 +1394,7 @@ onMounted(() => {
   document.addEventListener('click', onGlobalClick)
   window.addEventListener('message', handlePreviewMessage)
   loadFolderFromApi('0')
+  refreshQuota()
 })
 
 onBeforeUnmount(() => {
@@ -1967,7 +1960,8 @@ onBeforeUnmount(() => {
 /* 行内操作按钮 - 使用距右边固定距离定位，向右平移并保持紧凑 */
 .row-inline-actions {
   position: absolute;
-  right: 80px; /* 向右平移，放置在更加精致的位置 */
+  right: 80px;
+  /* 向右平移，放置在更加精致的位置 */
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -1992,7 +1986,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 5px 8px; /* 缩小按钮内边距以让按钮间隔更紧凑 */
+  padding: 5px 8px;
+  /* 缩小按钮内边距以让按钮间隔更紧凑 */
   border: none;
   background: transparent;
   border-radius: 6px;
@@ -2412,11 +2407,11 @@ onBeforeUnmount(() => {
   border: none !important;
   box-shadow: none !important;
   margin-top: 6vh !important;
-  
+
   .el-dialog__header {
     display: none !important;
   }
-  
+
   .el-dialog__body {
     padding: 0 !important;
     background: transparent !important;

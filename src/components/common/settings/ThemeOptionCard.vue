@@ -104,31 +104,31 @@ html[data-theme='light'] .theme-option-card {
 
 /* 深色模式下样式适配 */
 html[data-theme='dark'] .theme-option {
-  background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
+  background: var(--settings-card-bg) !important;
+  color: var(--settings-text-secondary) !important;
+  border: 1px solid var(--settings-border) !important;
 
   .theme-icon,
   span {
-    color: var(--text-secondary);
+    color: var(--settings-text-secondary) !important;
   }
 }
 
 html[data-theme='dark'] .theme-option:hover {
-  background: var(--item-hover-bg);
-  color: var(--text-primary);
-  border-color: var(--border-color-strong);
+  background: var(--settings-card-hover) !important;
+  color: var(--settings-text-primary) !important;
+  border-color: var(--settings-border-strong) !important;
 
   .theme-icon,
   span {
-    color: var(--text-primary);
+    color: var(--settings-text-primary) !important;
   }
 }
 
 html[data-theme='dark'] .theme-option.active {
-  background: #464a52 !important;
+  background: var(--settings-active-bg) !important;
   color: #ffffff !important;
-  border-color: #565b65 !important;
+  border-color: var(--settings-border-strong) !important;
 
   .theme-icon,
   span {

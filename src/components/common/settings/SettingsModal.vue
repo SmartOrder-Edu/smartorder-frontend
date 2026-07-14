@@ -230,6 +230,23 @@ html[data-theme='light'] .settings-modal {
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18);
 }
 
+/* 深色主题配色变量 */
+html[data-theme='dark'] {
+  --settings-bg: #25272c;
+  --settings-card-bg: #2d3036;
+  --settings-card-hover: #353941;
+  --settings-input-bg: #1f2228;
+  --settings-active-bg: #41454e;
+
+  --settings-text-primary: #f3f4f6;
+  --settings-text-secondary: #b5bbc5;
+  --settings-text-muted: #7f8793;
+
+  --settings-border: #3b4049;
+  --settings-border-strong: #505762;
+  --settings-shadow: rgba(0, 0, 0, 0.42);
+}
+
 /* 深色主题配色 */
 html[data-theme='dark'] .settings-overlay {
   background: rgba(0, 0, 0, 0.58);
@@ -238,10 +255,45 @@ html[data-theme='dark'] .settings-overlay {
 }
 
 html[data-theme='dark'] .settings-modal {
-  background: #2b2d31;
-  color: var(--text-primary);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.48);
+  background: var(--settings-bg) !important;
+  color: var(--settings-text-primary) !important;
+  border: 1px solid var(--settings-border) !important;
+  box-shadow: 0 28px 72px var(--settings-shadow) !important;
+}
+
+/* 左侧菜单区域必须和弹窗背景保持一致 */
+html[data-theme='dark'] .settings-sidebar {
+  background: transparent !important;
+}
+
+/* 未选中菜单 */
+html[data-theme='dark'] .settings-menu-item {
+  background: transparent !important;
+  color: var(--settings-text-secondary) !important;
+  
+  .el-icon {
+    color: var(--settings-text-secondary) !important;
+  }
+}
+
+/* 悬浮菜单 */
+html[data-theme='dark'] .settings-menu-item:hover {
+  background: var(--settings-card-hover) !important;
+  color: var(--settings-text-primary) !important;
+  
+  .el-icon {
+    color: var(--settings-text-primary) !important;
+  }
+}
+
+/* 选中菜单 */
+html[data-theme='dark'] .settings-menu-item.active {
+  background: var(--settings-active-bg) !important;
+  color: #ffffff !important;
+  
+  .el-icon {
+    color: #ffffff !important;
+  }
 }
 
 /* 图标跟随文字颜色 */
@@ -256,12 +308,9 @@ html[data-theme='dark'] {
   .settings-title,
   .settings-section-title,
   .section-title,
-  .settings-menu-item,
-  .theme-option,
-  .language-select,
   .item-label,
   .danger-title {
-    color: var(--text-primary) !important;
+    color: var(--settings-text-primary) !important;
   }
 
   .settings-menu-item:not(.active),
@@ -271,7 +320,139 @@ html[data-theme='dark'] {
   .danger-box-desc,
   .terms-update-time,
   .terms-paragraph p {
-    color: var(--text-secondary) !important;
+    color: var(--settings-text-secondary) !important;
+  }
+}
+
+/* ======= 全局/Portal挂载组件在深色模式下的样式覆盖 ======= */
+html[data-theme='dark'] {
+  /* Select 下拉菜单 / Dropdown / Popover / Tooltip 等 popper */
+  .el-popper,
+  .el-select__popper,
+  .el-dropdown__popper,
+  .el-popover.el-popper,
+  .el-tooltip__popper {
+    background: var(--settings-card-bg) !important;
+    border: 1px solid var(--settings-border) !important;
+    box-shadow: 0 12px 32px var(--settings-shadow) !important;
+
+    // 下拉菜单项样式
+    .el-select-dropdown__item {
+      color: var(--settings-text-secondary) !important;
+      background: transparent !important;
+      
+      &.is-hovering, &:hover {
+        background-color: var(--settings-card-hover) !important;
+        color: var(--settings-text-primary) !important;
+      }
+      
+      &.is-selected, &.selected {
+        background-color: var(--settings-active-bg) !important;
+        color: #ffffff !important;
+        font-weight: 600;
+      }
+      
+      &.is-disabled {
+        color: var(--settings-text-muted) !important;
+      }
+    }
+
+    // Dropdown 菜单项样式
+    .el-dropdown-menu__item {
+      color: var(--settings-text-secondary) !important;
+      background: transparent !important;
+      
+      &:not(.is-disabled):hover, &:not(.is-disabled):focus {
+        background-color: var(--settings-card-hover) !important;
+        color: var(--settings-text-primary) !important;
+      }
+      
+      &.is-disabled {
+        color: var(--settings-text-muted) !important;
+      }
+    }
+
+    // Popper 上的小小箭头
+    .el-popper__arrow::before {
+      background: var(--settings-card-bg) !important;
+      border: 1px solid var(--settings-border) !important;
+    }
+  }
+
+  /* 确认弹窗 / 消息提示框 ElMessageBox */
+  .el-overlay {
+    background-color: rgba(0, 0, 0, 0.6) !important;
+  }
+  
+  .el-message-box {
+    background: var(--settings-bg) !important;
+    border: 1px solid var(--settings-border) !important;
+    box-shadow: 0 12px 32px var(--settings-shadow) !important;
+    
+    .el-message-box__title {
+      color: var(--settings-text-primary) !important;
+    }
+    
+    .el-message-box__content {
+      color: var(--settings-text-secondary) !important;
+    }
+    
+    // MessageBox 中的按钮
+    .el-button {
+      background: var(--settings-card-bg) !important;
+      color: var(--settings-text-secondary) !important;
+      border: 1px solid var(--settings-border) !important;
+      
+      &:hover {
+        background: var(--settings-card-hover) !important;
+        color: var(--settings-text-primary) !important;
+        border-color: var(--settings-border-strong) !important;
+      }
+      
+      &.el-button--primary {
+        background: var(--settings-active-bg) !important;
+        color: #ffffff !important;
+        border-color: var(--settings-border-strong) !important;
+      }
+      
+      &.el-button--danger {
+        background: rgba(239, 68, 68, 0.08) !important;
+        color: #ff8585 !important;
+        border: 1px solid rgba(239, 68, 68, 0.45) !important;
+        
+        &:hover {
+          background: rgba(239, 68, 68, 0.2) !important;
+          color: #ff9e9e !important;
+          border-color: rgba(239, 68, 68, 0.6) !important;
+        }
+      }
+    }
+  }
+
+  /* 全局消息提示 ElMessage */
+  .el-message {
+    background-color: var(--settings-card-bg) !important;
+    border: 1px solid var(--settings-border) !important;
+    box-shadow: 0 4px 12px var(--settings-shadow) !important;
+    
+    .el-message__content {
+      color: var(--settings-text-primary) !important;
+    }
+  }
+
+  /* 全局通知 ElNotification */
+  .el-notification {
+    background-color: var(--settings-card-bg) !important;
+    border: 1px solid var(--settings-border) !important;
+    box-shadow: 0 12px 32px var(--settings-shadow) !important;
+    
+    .el-notification__title {
+      color: var(--settings-text-primary) !important;
+    }
+    
+    .el-notification__content {
+      color: var(--settings-text-secondary) !important;
+    }
   }
 }
 

@@ -37,228 +37,32 @@
         </div>
       </section>
 
-      <!-- 个人资料与账号安全 (合并展示) -->
-      <section class="section profile-security-card" v-if="userStore.userInfo">
-        <!-- 上部：用户基本信息 -->
-        <div class="user-header">
-          <div class="user-avatar-large">
-            <img :src="userInfo.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="头像" />
-            <label class="avatar-edit" :class="{ uploading }">
-              <svg v-if="!uploading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
-              </svg>
-              <span v-else class="upload-spinner"></span>
-              <input type="file" accept="image/*" hidden @change="handleAvatarChange" />
-            </label>
-          </div>
-          <div class="user-details">
-            <h2 class="user-name">{{ userInfo.name }}</h2>
-            <div class="user-tags">
-              <span class="user-tag" v-if="userInfo.identity">{{ userInfo.identity }}</span>
-              <span class="user-tag" v-if="userInfo.direction">{{ userInfo.direction }}</span>
-              <span class="user-tag level" v-if="userInfo.level">{{ userInfo.level }}</span>
-            </div>
-            <p class="user-goal">
-              <span class="goal-label">学习目标：</span>
-              {{ userInfo.goal }}
-            </p>
-            <div class="user-meta">
-              <span v-if="userInfo.joinDays > 0">加入学习 {{ userInfo.joinDays }} 天</span>
-              <span v-if="userInfo.weeklyMinutes">每周 {{ userInfo.weeklyMinutes }} 分钟</span>
-            </div>
-          </div>
-          <div class="user-score-card" v-if="userInfo.overallMastery > 0">
-            <div class="score-ring">
-              <svg viewBox="0 0 80 80">
-                <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border-light)" stroke-width="6"/>
-                <circle cx="40" cy="40" r="34" fill="none" stroke="url(#profileGrad)" stroke-width="6"
-                  stroke-linecap="round"
-                  :stroke-dasharray="`${userInfo.overallMastery * 2.136} 213.6`"
-                  transform="rotate(-90 40 40)"/>
-                <defs>
-                  <linearGradient id="profileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" style="stop-color:#3b5bdb"/>
-                    <stop offset="100%" style="stop-color:#12b886"/>
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div class="score-text">
-                <span class="score-value">{{ userInfo.overallMastery }}</span>
-                <span class="score-label">能力总分</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <!-- 账户与安全整体区域 -->
+      <section class="section account-security-container" v-if="userStore.userInfo">
+        <!-- 顶部用户信息 Header -->
+        <ProfileHeader
+          :user-info="userInfoHeaderData"
+          :uploading="uploading"
+          @avatar-change="handleAvatarChange"
+        />
 
-        <!-- 内部水平分割线 -->
-        <div class="profile-card-divider"></div>
+        <!-- 账号与安全设置标题 -->
+        <SecuritySectionHeader />
 
-        <!-- 下部：账号详细信息与第三方绑定 -->
-        <div class="security-settings-section">
-          <div class="card-header-simple">
-            <h3 class="card-title-simple">
-              <span class="section-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-              </span>
-              账号与安全设置
-            </h3>
-          </div>
+        <!-- 主体双栏内容 -->
+        <div class="security-content">
+          <!-- 左侧：账户凭证 -->
+          <CredentialSection :user-info="userCredentialData" />
 
-          <div class="account-security-content">
-            <!-- 左侧：基础账户信息 -->
-            <div class="account-basic-info">
-              <h4 class="sub-title">账户凭证</h4>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">用户ID</span>
-                  <div class="info-value-wrapper">
-                    <span class="info-value id-text">{{ userStore.userInfo.id }}</span>
-                    <el-button type="primary" link size="small" class="copy-btn" @click="copyText(userStore.userInfo.id)">
-                      复制
-                    </el-button>
-                  </div>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">系统昵称</span>
-                  <span class="info-value">{{ userStore.userInfo.username || '未设置' }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">绑定邮箱</span>
-                  <span class="info-value">{{ userStore.userInfo.email || '未绑定' }}</span>
-                </div>
-                <div class="info-item full-width">
-                  <span class="info-label">个人简介</span>
-                  <span class="info-value bio-text">{{ userStore.userInfo.bio || '这个同学很懒，什么都没有写~' }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 右侧：第三方账号绑定 -->
-            <div class="social-bindings">
-              <h4 class="sub-title">快捷登录绑定</h4>
-              <div class="bindings-list">
-                <!-- Gitee -->
-                <div class="binding-card" :class="{ bound: isProviderBound('gitee') }">
-                  <div class="provider-info-main">
-                    <div class="provider-icon-wrapper gitee-color">
-                      <svg viewBox="0 0 1024 1024" width="24" height="24">
-                        <path d="M512 0C229.12 0 0 229.12 0 512s229.12 512 512 512 512-229.12 512-512S794.88 0 512 0zm233.6 374.4H448c-17.92 0-32 14.08-32 32v192h192c17.92 0 32 14.08 32 32s-14.08 32-32 32H384c-17.92 0-32-14.08-32-32V406.4c0-52.48 42.88-96 96-96h297.6c17.92 0 32 14.08 32 32s-14.08 32-32 32z" fill="currentColor"/>
-                      </svg>
-                    </div>
-                    <div class="provider-details">
-                      <div class="provider-header-row">
-                        <span class="provider-name">Gitee 码云</span>
-                        <el-tag :type="isProviderBound('gitee') ? 'success' : 'info'" size="small" class="binding-status-tag">
-                          {{ isProviderBound('gitee') ? '已绑定' : '未绑定' }}
-                        </el-tag>
-                      </div>
-                      
-                      <template v-if="isProviderBound('gitee')">
-                        <div class="provider-meta-row">
-                          <span class="meta-label">绑定用户：</span>
-                          <span class="meta-val highlight">{{ getProviderInfo('gitee')?.providerUsername || '未知' }}</span>
-                        </div>
-                        <div class="provider-meta-row" v-if="getProviderInfo('gitee')?.providerEmail">
-                          <span class="meta-label">绑定主邮箱：</span>
-                          <span class="meta-val">{{ getProviderInfo('gitee')?.providerEmail }}</span>
-                        </div>
-                        <div class="provider-meta-row">
-                          <span class="meta-label">最近同步：</span>
-                          <span class="meta-val">{{ getProviderInfo('gitee')?.lastLoginTime ? formatTime(getProviderInfo('gitee')?.lastLoginTime) : '暂无数据' }}</span>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span class="binding-placeholder-desc">绑定后可直接使用 Gitee 账号一键快捷登录</span>
-                      </template>
-                    </div>
-                  </div>
-                  <div class="provider-actions">
-                    <el-button 
-                      v-if="isProviderBound('gitee')" 
-                      type="danger" 
-                      plain 
-                      size="small" 
-                      class="action-btn"
-                      @click="handleUnbind('gitee')"
-                    >
-                      解除绑定
-                    </el-button>
-                    <el-button 
-                      v-else 
-                      type="primary" 
-                      size="small" 
-                      class="action-btn gitee-btn"
-                      @click="handleBind('gitee')"
-                    >
-                      立即绑定
-                    </el-button>
-                  </div>
-                </div>
-
-                <!-- GitHub -->
-                <div class="binding-card" :class="{ bound: isProviderBound('github') }">
-                  <div class="provider-info-main">
-                    <div class="provider-icon-wrapper github-color">
-                      <svg viewBox="0 0 1024 1024" width="24" height="24">
-                        <path d="M512 0C229.25 0 0 229.25 0 512c0 226.25 146.69 418.13 350.16 485.83 25.59 4.69 34.94-11.12 34.94-24.69 0-12.19-.47-52.56-.69-95.31-142.44 30.94-172.5-60.44-172.5-60.44-23.31-59.25-56.88-75-56.88-75-46.5-31.81 3.53-31.13 3.53-31.13 51.41 3.63 78.44 52.81 78.44 52.81 45.63 78.19 119.75 55.63 148.94 42.56 4.63-33.06 17.88-55.63 32.44-68.38-113.69-12.94-233.19-56.88-233.19-253.06 0-55.88 20-101.56 52.81-137.44-5.31-12.94-22.88-65.06 5-135.56 0 0 43.06-13.81 141.06 52.56 40.94-11.38 84.88-17.06 128.5-17.25 43.63.19 87.63 5.88 128.63 17.25 97.88-66.38 140.88-52.56 140.88-52.56 27.94 70.5 10.38 122.63 5.06 135.56 32.88 35.88 52.75 81.56 52.75 137.44 0 196.69-119.75 239.94-233.81 252.56 18.38 15.88 34.75 47.13 34.75 94.94 0 68.56-.63 123.75-.63 140.63 0 13.69 9.25 29.63 35.25 24.63C877.44 930 1024 738.13 1024 512 1024 229.25 794.75 0 512 0z" fill="currentColor"/>
-                      </svg>
-                    </div>
-                    <div class="provider-details">
-                      <div class="provider-header-row">
-                        <span class="provider-name">GitHub</span>
-                        <el-tag :type="isProviderBound('github') ? 'success' : 'info'" size="small" class="binding-status-tag">
-                          {{ isProviderBound('github') ? '已绑定' : '未绑定' }}
-                        </el-tag>
-                      </div>
-                      
-                      <template v-if="isProviderBound('github')">
-                        <div class="provider-meta-row">
-                          <span class="meta-label">绑定用户：</span>
-                          <span class="meta-val highlight">{{ getProviderInfo('github')?.providerUsername || '未知' }}</span>
-                        </div>
-                        <div class="provider-meta-row" v-if="getProviderInfo('github')?.providerEmail">
-                          <span class="meta-label">绑定主邮箱：</span>
-                          <span class="meta-val">{{ getProviderInfo('github')?.providerEmail }}</span>
-                        </div>
-                        <div class="provider-meta-row">
-                          <span class="meta-label">最近同步：</span>
-                          <span class="meta-val">{{ getProviderInfo('github')?.lastLoginTime ? formatTime(getProviderInfo('github')?.lastLoginTime) : '暂无数据' }}</span>
-                        </div>
-                      </template>
-                      <template v-else>
-                        <span class="binding-placeholder-desc">绑定后可直接使用 GitHub 账号一键快捷登录</span>
-                      </template>
-                    </div>
-                  </div>
-                  <div class="provider-actions">
-                    <el-button 
-                      v-if="isProviderBound('github')" 
-                      type="danger" 
-                      plain 
-                      size="small" 
-                      class="action-btn"
-                      @click="handleUnbind('github')"
-                    >
-                      解除绑定
-                    </el-button>
-                    <el-button 
-                      v-else 
-                      type="primary" 
-                      size="small" 
-                      class="action-btn github-btn"
-                      @click="handleBind('github')"
-                    >
-                      立即绑定
-                    </el-button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <!-- 右侧：第三方账号绑定 -->
+          <QuickLoginBindingSection
+            :gitee-bound="isProviderBound('gitee')"
+            :github-bound="isProviderBound('github')"
+            :gitee-info="getProviderInfo('gitee')"
+            :github-info="getProviderInfo('github')"
+            @bind="handleBind"
+            @unbind="handleUnbind"
+          />
         </div>
       </section>
 
@@ -722,6 +526,12 @@ import type {
   SubjectProfile
 } from '@/api/studentProfile'
 
+// 账户与安全子组件
+import ProfileHeader from './components/ProfileHeader.vue'
+import SecuritySectionHeader from './components/SecuritySectionHeader.vue'
+import CredentialSection from './components/CredentialSection.vue'
+import QuickLoginBindingSection from './components/QuickLoginBindingSection.vue'
+
 const userStore = useUserStore()
 const showEditDialog = ref(false)
 const profileLoading = ref(false)
@@ -780,6 +590,28 @@ const userInfo = computed(() => {
     joinDays: 0,
     weeklyMinutes: constraints?.weeklyAvailableMinutes ?? 0,
     overallMastery: ability?.overallScore != null ? Math.round(ability.overallScore) : 0
+  }
+})
+
+// 传给 ProfileHeader 的数据
+const userInfoHeaderData = computed(() => {
+  return {
+    name: userInfo.value.name,
+    avatar: userInfo.value.avatar,
+    identity: userInfo.value.identity,
+    goal: userInfo.value.goal,
+    weeklyMinutes: userInfo.value.weeklyMinutes
+  }
+})
+
+// 传给 CredentialSection 的数据
+const userCredentialData = computed(() => {
+  const u = userStore.userInfo
+  return {
+    id: u ? String(u.id) : '',
+    username: u ? u.username : '',
+    email: u ? u.email : '',
+    bio: u ? u.bio : ''
   }
 })
 
@@ -1244,160 +1076,55 @@ onMounted(async () => {
   color: var(--text-muted);
 }
 
-/* 个人资料与账户安全卡片 */
-.profile-security-card {
+/* ==================== 账户安全页面新样式 ==================== */
+/* ==================== 账户安全页面新样式 ==================== */
+.account-security-container {
+  --account-container-bg: #ffffff;
+  --account-card-bg: #ffffff;
+  --account-card-hover: #ffffff;
+  --account-text-primary: #111827;
+  --account-text-secondary: #667085;
+  --account-text-muted: #98a2b3;
+  --account-border: #dfe7ee;
+
+  padding: 0 !important;
+  overflow: hidden;
+  background: var(--account-container-bg) !important;
+  border-color: var(--account-border) !important;
   margin-bottom: var(--spacing-xl);
 }
 
-.profile-card-divider {
-  height: 1px;
-  background-color: var(--border-light);
-  margin: var(--spacing-xl) 0;
+.security-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  gap: 40px;
+  padding: 24px 44px 44px;
 }
 
-.user-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xl);
+/* 响应式样式适配 */
+@media (max-width: 1100px) {
+  .security-content {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
 }
 
-.user-avatar-large {
-  position: relative;
-  width: 80px;
-  height: 80px;
-  flex-shrink: 0;
+@media (max-width: 768px) {
+  .security-content {
+    padding: 20px 20px 20px;
+    gap: 28px;
+  }
 }
 
-.user-avatar-large img {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 3px solid var(--primary-color);
-}
-
-.avatar-edit {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--primary-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border: 2px solid white;
-}
-
-.avatar-edit.uploading {
-  pointer-events: none;
-  opacity: 0.8;
-}
-
-.avatar-edit svg {
-  width: 14px;
-  height: 14px;
-  color: white;
-}
-
-.upload-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.user-details {
-  flex: 1;
-}
-
-.user-name {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-dark);
-  margin: 0 0 var(--spacing-sm);
-}
-
-.user-tags {
-  display: flex;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-sm);
-}
-
-.user-tag {
-  padding: 2px 10px;
-  background: rgba(11, 183, 170, 0.08);
-  color: var(--primary-color);
-  border-radius: var(--radius-full);
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-.user-tag.level {
-  background: rgba(18, 184, 134, 0.08);
-  color: var(--accent-color);
-}
-
-.user-goal {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0 0 var(--spacing-sm);
-}
-
-.goal-label {
-  font-weight: 600;
-  color: var(--text-dark);
-}
-
-.user-meta {
-  display: flex;
-  gap: var(--spacing-md);
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
-
-.user-score-card {
-  flex-shrink: 0;
-}
-
-.score-ring {
-  width: 100px;
-  height: 100px;
-  position: relative;
-}
-
-.score-ring svg {
-  width: 100%;
-  height: 100%;
-}
-
-.score-text {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.score-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--primary-color);
-  line-height: 1;
-}
-
-.score-label {
-  font-size: 0.625rem;
-  color: var(--text-muted);
+/* 深色模式适配 */
+html[data-theme='dark'] .account-security-container {
+  --account-container-bg: #151b25;
+  --account-card-bg: #1a222e;
+  --account-card-hover: #202a37;
+  --account-text-primary: #f5f7fa;
+  --account-text-secondary: #b4bdca;
+  --account-text-muted: #7f8a99;
+  --account-border: #2c3745;
 }
 
 /* 画像网格 */
@@ -1982,260 +1709,5 @@ onMounted(async () => {
   }
 }
 
-/* 账号详情与安全样式 */
-.security-settings-section {
-  margin-top: 0;
-}
 
-.card-header-simple {
-  margin-bottom: var(--spacing-lg);
-  padding-bottom: var(--spacing-md);
-  border-bottom: 1px solid var(--border-light);
-}
-
-.card-title-simple {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  margin: 0;
-}
-
-.account-security-content {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 40px;
-}
-
-.account-basic-info, .social-bindings {
-  display: flex;
-  flex-direction: column;
-}
-
-.sub-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  margin: 0 0 var(--spacing-md) 0;
-  padding-left: 8px;
-  border-left: 3px solid var(--primary-color);
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-md);
-}
-
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  background: var(--background-color-base);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-light);
-}
-
-.info-item.full-width {
-  grid-column: span 2;
-}
-
-.info-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.info-value {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-dark);
-}
-
-.info-value-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.id-text {
-  font-family: monospace;
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.copy-btn {
-  padding: 0;
-  height: auto;
-}
-
-.bio-text {
-  line-height: 1.5;
-  color: var(--text-secondary);
-}
-
-.vip-item.is-vip {
-  background: linear-gradient(135deg, rgba(253, 224, 71, 0.08), rgba(234, 179, 8, 0.08));
-  border-color: rgba(234, 179, 8, 0.2);
-}
-
-.vip-status-container {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
-}
-
-.vip-badge-wrapper {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  background: linear-gradient(135deg, #fef08a, #facc15);
-  color: #854d0e;
-  border-radius: var(--radius-full);
-  font-size: 0.75rem;
-  font-weight: 700;
-  box-shadow: 0 2px 4px rgba(234, 179, 8, 0.2);
-}
-
-.vip-time-range {
-  font-size: 0.75rem;
-  color: #854d0e;
-  font-weight: 500;
-}
-
-.vip-time-range.muted {
-  color: var(--text-muted);
-}
-
-.bindings-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.binding-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-md);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  background: var(--background-color-base);
-  transition: all var(--transition-fast);
-}
-
-.binding-card.bound {
-  border-color: rgba(16, 185, 129, 0.2);
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.02), rgba(16, 185, 129, 0.05));
-}
-
-.provider-info-main {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-md);
-  flex: 1;
-}
-
-.provider-icon-wrapper {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: white;
-  border: 1px solid var(--border-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-}
-
-.provider-icon-wrapper.gitee-color {
-  color: #C71D23;
-}
-
-.provider-icon-wrapper.github-color {
-  color: #24292e;
-}
-
-html[data-theme='dark'] .provider-icon-wrapper {
-  background: var(--background-color-base);
-  border-color: var(--border-light);
-}
-
-.provider-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.provider-header-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.provider-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-dark);
-}
-
-.binding-status-tag {
-  font-size: 0.625rem;
-}
-
-.provider-meta-row {
-  display: flex;
-  align-items: center;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.meta-val.highlight {
-  color: var(--text-dark);
-  font-weight: 600;
-}
-
-.binding-placeholder-desc {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-
-.provider-actions {
-  margin-left: var(--spacing-md);
-}
-
-.action-btn {
-  border-radius: var(--radius-full);
-}
-
-.gitee-btn {
-  background-color: #C71D23;
-  border-color: #C71D23;
-}
-.gitee-btn:hover, .gitee-btn:focus {
-  background-color: #a5181e;
-  border-color: #a5181e;
-}
-
-.github-btn {
-  background-color: #24292e;
-  border-color: #24292e;
-}
-.github-btn:hover, .github-btn:focus {
-  background-color: #121416;
-  border-color: #121416;
-}
-
-@media (max-width: 992px) {
-  .account-security-content {
-    grid-template-columns: 1fr;
-    gap: 30px;
-  }
-}
 </style>

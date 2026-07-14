@@ -64,24 +64,24 @@ const handleLanguageChange = (val: any) => {
 /* ======= 深色主题 - 触发器 ======= */
 html[data-theme='dark'] .language-select {
   .el-input__wrapper {
-    background-color: var(--item-bg) !important;
-    border: 1px solid var(--border-color) !important;
+    background-color: var(--settings-input-bg) !important;
+    border: 1px solid var(--settings-border) !important;
     box-shadow: none !important;
 
     &:hover {
-      background-color: var(--item-hover-bg) !important;
-      border-color: var(--border-color-strong) !important;
+      background-color: var(--settings-card-hover) !important;
+      border-color: var(--settings-border-strong) !important;
     }
   }
 
   .el-input__inner {
-    color: var(--text-primary) !important;
+    color: var(--settings-text-primary) !important;
   }
 
   /* 下拉箭头图标颜色 */
   .el-select__caret,
   .el-select__icon {
-    color: var(--text-secondary) !important;
+    color: var(--settings-text-secondary) !important;
   }
 }
 
@@ -89,31 +89,32 @@ html[data-theme='dark'] .language-select {
 .language-dropdown {
   &.el-select__popper,
   &.el-popper {
-    background: var(--panel-bg-secondary, #20242e) !important;
-    border: 1px solid var(--border-color, #303641) !important;
-    box-shadow: 0 12px 32px var(--shadow-color, rgba(0, 0, 0, 0.45)) !important;
+    background: var(--settings-card-bg) !important;
+    border: 1px solid var(--settings-border) !important;
+    box-shadow: 0 12px 32px var(--settings-shadow) !important;
   }
 
   .el-select-dropdown__item {
-    color: var(--text-secondary, #b7c0cd) !important;
+    color: var(--settings-text-secondary) !important;
 
     &:hover,
     &.is-hovering {
-      background-color: var(--item-hover-bg, #222833) !important;
-      color: var(--text-primary, #f5f7fa) !important;
+      background-color: var(--settings-card-hover) !important;
+      color: var(--settings-text-primary) !important;
     }
 
     &.is-selected,
     &.selected {
-      color: var(--el-color-primary, #0bb7aa) !important;
+      background-color: var(--settings-active-bg) !important;
+      color: #ffffff !important;
       font-weight: 600;
     }
   }
 
   /* popper 箭头 */
   .el-popper__arrow::before {
-    background: var(--panel-bg-secondary, #20242e) !important;
-    border-color: var(--border-color, #303641) !important;
+    background: var(--settings-card-bg) !important;
+    border-color: var(--settings-border) !important;
   }
 }
 
@@ -121,29 +122,30 @@ html[data-theme='dark'] .language-select {
 html[data-theme='dark'] .language-dropdown {
   &.el-select__popper,
   &.el-popper {
-    background: var(--panel-bg-secondary) !important;
-    border: 1px solid var(--border-color) !important;
-    box-shadow: 0 12px 32px var(--shadow-color) !important;
+    background: var(--settings-card-bg) !important;
+    border: 1px solid var(--settings-border) !important;
+    box-shadow: 0 12px 32px var(--settings-shadow) !important;
   }
 
   .el-select-dropdown__item {
-    color: var(--text-secondary) !important;
+    color: var(--settings-text-secondary) !important;
 
     &:hover,
     &.is-hovering {
-      background-color: var(--item-hover-bg) !important;
-      color: var(--text-primary) !important;
+      background-color: var(--settings-card-hover) !important;
+      color: var(--settings-text-primary) !important;
     }
 
     &.is-selected,
     &.selected {
-      color: var(--el-color-primary) !important;
+      background-color: var(--settings-active-bg) !important;
+      color: #ffffff !important;
     }
   }
 
   .el-popper__arrow::before {
-    background: var(--panel-bg-secondary) !important;
-    border-color: var(--border-color) !important;
+    background: var(--settings-card-bg) !important;
+    border-color: var(--settings-border) !important;
   }
 }
 </style>

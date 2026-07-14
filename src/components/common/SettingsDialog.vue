@@ -611,23 +611,66 @@ html[data-theme='light'] {
   }
 }
 
-/* 深色主题下的卡片面板 */
+/* 深色主题下的卡片面板与按钮适配 */
 html[data-theme='dark'] {
-  .settings-card {
-    background-color: var(--panel-bg-secondary);
-    border: 1px solid var(--border-color);
-    box-shadow: 0 4px 16px var(--shadow-color);
-  }
-  
+  .settings-card,
   .terms-viewer {
-    background-color: var(--panel-bg-secondary);
-    border: 1px solid var(--border-color);
-    box-shadow: 0 4px 16px var(--shadow-color);
+    background-color: var(--settings-card-bg) !important;
+    border: 1px solid var(--settings-border) !important;
+    box-shadow: 0 4px 16px var(--settings-shadow) !important;
   }
 
   .danger-box {
-    border: 1px dashed rgba(245, 108, 108, 0.4);
-    background-color: rgba(245, 108, 108, 0.04);
+    border: 1px dashed rgba(239, 68, 68, 0.4) !important;
+    background-color: rgba(239, 68, 68, 0.04) !important;
+  }
+
+  /* 系统设置页面专属按钮在深色模式下的适配 */
+  .el-button {
+    background-color: var(--settings-card-bg) !important;
+    color: var(--settings-text-secondary) !important;
+    border: 1px solid var(--settings-border) !important;
+
+    &:hover {
+      background-color: var(--settings-card-hover) !important;
+      color: var(--settings-text-primary) !important;
+      border-color: var(--settings-border-strong) !important;
+    }
+
+    &.el-button--primary {
+      background-color: var(--settings-active-bg) !important;
+      color: #ffffff !important;
+      border-color: var(--settings-border-strong) !important;
+    }
+
+    &.el-button--danger {
+      background: rgba(239, 68, 68, 0.08) !important;
+      color: #ff8585 !important;
+      border: 1px solid rgba(239, 68, 68, 0.45) !important;
+
+      &:hover {
+        background: rgba(239, 68, 68, 0.2) !important;
+        color: #ff9e9e !important;
+        border-color: rgba(239, 68, 68, 0.6) !important;
+      }
+    }
+  }
+
+  /* 账号安全设置项中的特定行按钮 */
+  .action-outline-btn.danger {
+    background: rgba(239, 68, 68, 0.08) !important;
+    color: #ff8585 !important;
+    border: 1px solid rgba(239, 68, 68, 0.45) !important;
+
+    &:hover {
+      background: rgba(239, 68, 68, 0.2) !important;
+      color: #ff9e9e !important;
+      border-color: rgba(239, 68, 68, 0.6) !important;
+    }
+  }
+
+  .settings-row-item {
+    border-bottom: 1px solid var(--settings-border) !important;
   }
 }
 </style>
