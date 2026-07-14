@@ -197,7 +197,7 @@ async function onComplete() {
 /* ========== 展开态：完整 footer ========== */
 .study-footer {
   position: relative;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(12px);
   border-top: 1px solid rgba(15, 23, 42, 0.06);
   padding: 14px 24px;
@@ -215,7 +215,7 @@ async function onComplete() {
   border-radius: 8px 8px 0 0;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-bottom: none;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-card-bg);
   color: #94a3b8;
   cursor: pointer;
   transition: color 0.2s;

@@ -2840,7 +2840,7 @@ watch(windowWidth, (newWidth, oldWidth) => {
     height: 44px;
     padding: 8px 12px;
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.94);
+    background: var(--color-card-bg);
     box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
     backdrop-filter: blur(16px);
   }

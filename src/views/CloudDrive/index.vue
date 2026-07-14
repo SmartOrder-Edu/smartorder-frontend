@@ -1452,7 +1452,7 @@ onBeforeUnmount(() => {
 .compact-storage {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-card-bg);
   border: 1px solid rgba(226, 232, 240, 0.8);
   padding: 6px 14px;
   border-radius: 99px;
@@ -2160,7 +2160,7 @@ onBeforeUnmount(() => {
   position: fixed;
   z-index: 1000;
   min-width: 150px;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--color-card-bg);
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
   border: 1px solid rgba(226, 232, 240, 0.8);

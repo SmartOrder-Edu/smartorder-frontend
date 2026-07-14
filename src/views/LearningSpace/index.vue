@@ -1217,7 +1217,7 @@ watch(currentPlanPhaseKey, key => {
 .hero-content {
   position: relative;
   padding: 24px 28px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--color-card-bg);
   backdrop-filter: blur(10px);
   border: 1px solid #f0f0f0;
   border-radius: 16px;
@@ -2004,7 +2004,7 @@ watch(currentPlanPhaseKey, key => {
   background: white;
   cursor: pointer;
   transition: all 0.15s;
-  &:hover { box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06); transform: translateY(-1px); }
+  &:hover { box-shadow: 0 2px 12px  var(--color-shadow); transform: translateY(-1px); }
 
   &.disabled {
     cursor: wait;
@@ -2302,7 +2302,7 @@ watch(currentPlanPhaseKey, key => {
 
 .hero-content {
   padding: 26px;
-  background: rgba(255, 255, 255, 0.74);
+  background: var(--color-card-bg-secondary);
   border-color: rgba(148, 163, 184, 0.22);
   border-radius: 22px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
@@ -2507,7 +2507,7 @@ watch(currentPlanPhaseKey, key => {
   margin-top: 16px;
   padding: 13px 15px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--color-card-bg-secondary);
   border-color: rgba(11, 183, 170, 0.15);
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
 }
@@ -2562,7 +2562,7 @@ watch(currentPlanPhaseKey, key => {
   .csb-time {
     font-size: 12px;
     color: #475569;
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--color-card-bg-secondary);
     padding: 3px 10px;
     border-radius: 999px;
   }
@@ -2636,7 +2636,7 @@ watch(currentPlanPhaseKey, key => {
   padding: 6px;
   margin-bottom: 18px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(14px);
   border-color: rgba(148, 163, 184, 0.18);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
@@ -2674,7 +2674,7 @@ watch(currentPlanPhaseKey, key => {
 .tab-content {
   padding: 20px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.74);
+  background: var(--color-card-bg-secondary);
   border: 1px solid rgba(148, 163, 184, 0.16);
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
 }

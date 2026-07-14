@@ -500,7 +500,7 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 8px;
   padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--color-card-bg);
   backdrop-filter: blur(8px);
   border-top: 1px solid #e5e7eb;
   justify-content: center;

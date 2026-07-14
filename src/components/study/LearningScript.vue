@@ -103,7 +103,7 @@ function phaseLabel(phase: string): string {
   width: 260px;
   flex-shrink: 0;
   position: relative;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(12px);
   border-right: 1px solid rgba(15, 23, 42, 0.06);
   transition: width 0.3s ease;

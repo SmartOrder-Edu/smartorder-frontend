@@ -1260,7 +1260,7 @@ const handleLogout = async () => {
   width: 42px;
   height: 42px;
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--color-card-bg);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(139, 92, 246, 0.2);
   display: flex;
@@ -1400,7 +1400,7 @@ const handleLogout = async () => {
 
 .notif-panel-item {
   padding: var(--spacing-sm) var(--spacing-md);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+  border-bottom: 1px solid var(--color-border);
   transition: background var(--transition-fast);
 }
 

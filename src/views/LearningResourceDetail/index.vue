@@ -344,7 +344,7 @@ watch(resourceId, loadDetail)
 .resource-side,
 .resource-header {
   border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--color-card-bg-secondary);
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
 }
 

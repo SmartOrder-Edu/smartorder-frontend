@@ -1172,3 +1172,27 @@ ol {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ==================== 主题平滑过渡 ==================== */
+html, body, #app,
+.app-layout, .admin-layout, .sidebar, .main-content,
+.el-card, .el-dialog, .el-drawer, .el-popover, .el-dropdown-menu,
+.el-table, .el-table__row, .el-table th.el-table__cell, .el-table td.el-table__cell,
+.el-menu, .el-menu-item, .el-sub-menu__title,
+.el-input__wrapper, .el-textarea__inner,
+.el-button,
+.bento-card, .glass, .glass-dark, .section, .priority-task-item, .time-chunk {
+  transition: background-color 0.2s ease,
+              border-color 0.2s ease,
+              color 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+/* 保持带 hover 效果元素的 transform 动画 */
+.el-card, .bento-card, .el-button, .hover-lift, .hover-scale {
+  transition: background-color 0.2s ease,
+              border-color 0.2s ease,
+              color 0.2s ease,
+              box-shadow 0.2s ease,
+              transform 0.25s ease;
+}

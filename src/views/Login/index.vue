@@ -687,7 +687,7 @@ const handleGithubLogin = () => {
   border-radius: var(--radius-full);
   font-size: 0.8125rem;
   color: var(--text-regular);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px  var(--color-shadow);
   transition: all 0.3s ease;
 }
 
@@ -822,7 +822,7 @@ const handleGithubLogin = () => {
     0 4px 6px -1px rgba(0, 0, 0, 0.05),
     0 10px 15px -3px rgba(0, 0, 0, 0.05),
     0 20px 25px -5px rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--color-border);
 }
 
 /* 卡片头部 */
@@ -879,7 +879,7 @@ const handleGithubLogin = () => {
 .tab-btn.active {
   background: white;
   color: var(--primary-color);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 4px  var(--color-shadow);
 }
 
 .tab-btn:hover:not(.active) {
@@ -1035,5 +1035,306 @@ const handleGithubLogin = () => {
 @keyframes nodeGlow {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.3); }
+}
+</style>
+
+<style lang="scss">
+/* 深色模式下的覆盖样式，限定在 html[data-theme='dark'] 且仅作用于 .login-page 容器 */
+html[data-theme='dark'] {
+  --login-page-bg: #111317;
+  --login-panel-bg: #191d27;
+
+  --login-input-bg: #14171d;
+  --login-input-hover-bg: #181c23;
+  --login-input-focus-bg: #171b22;
+
+  --login-text-primary: #f4f6f8;
+  --login-text-secondary: #aab2c0;
+  --login-placeholder: #6f7887;
+
+  --login-border: #303641;
+  --login-border-hover: #424a58;
+  --login-border-focus: #4f7cff;
+
+  --login-icon-color: #8d97a8;
+}
+
+html[data-theme='dark'] .login-page {
+  background: var(--login-page-bg) !important;
+  
+  .login-card {
+    background: var(--login-panel-bg) !important;
+    border: 1px solid #2b313c !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38) !important;
+  }
+
+  .card-title {
+    color: var(--login-text-primary) !important;
+  }
+
+  .card-subtitle {
+    color: var(--login-text-secondary) !important;
+  }
+
+  // 记住我
+  .el-checkbox {
+    --el-checkbox-text-color: var(--login-text-secondary) !important;
+    --el-checkbox-font-weight: 500 !important;
+    
+    &.is-checked {
+      .el-checkbox__label {
+        color: var(--login-border-focus) !important;
+      }
+      .el-checkbox__inner {
+        background-color: var(--login-border-focus) !important;
+        border-color: var(--login-border-focus) !important;
+      }
+    }
+    
+    .el-checkbox__inner {
+      background-color: transparent !important;
+      border-color: var(--login-border) !important;
+    }
+  }
+
+  // 链接
+  .forgot-link {
+    color: var(--login-text-secondary) !important;
+    &:hover {
+      color: var(--login-border-focus) !important;
+    }
+  }
+
+  .register-text {
+    color: var(--login-text-secondary) !important;
+  }
+
+  .register-link {
+    color: var(--login-border-focus) !important;
+    &:hover {
+      color: #7fa4ff !important;
+    }
+  }
+
+  // 登录方式切换区域
+  .login-type-tabs {
+    background: var(--login-input-bg) !important;
+  }
+
+  .tab-btn {
+    color: var(--login-text-secondary) !important;
+    &:hover:not(.active) {
+      color: var(--login-text-primary) !important;
+    }
+  }
+
+  .tab-btn.active {
+    background: #20242e !important;
+    color: var(--login-border-focus) !important;
+    box-shadow: none !important;
+  }
+
+  // 第三方登录按钮
+  .social-btn {
+    background: transparent !important;
+    color: var(--login-text-secondary) !important;
+    border: 1px solid var(--login-border) !important;
+    
+    &:hover {
+      background: var(--login-input-hover-bg) !important;
+      border-color: var(--login-border-hover) !important;
+      color: var(--login-text-primary) !important;
+    }
+  }
+
+  // 普通输入框
+  .el-input:not(.el-input-group) .el-input__wrapper {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 44px !important;
+    padding: 0 !important;
+
+    background: var(--login-input-bg) !important;
+    border: 1px solid var(--login-border) !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease !important;
+
+    &:hover {
+      background: var(--login-input-hover-bg) !important;
+      border-color: var(--login-border-hover) !important;
+      box-shadow: none !important;
+    }
+
+    &.is-focus {
+      background: var(--login-input-focus-bg) !important;
+      border-color: var(--login-border-focus) !important;
+      box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.14) !important;
+    }
+  }
+
+  .el-input__inner {
+    flex: 1 !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    padding: 0 12px !important;
+
+    background: transparent !important;
+    color: var(--login-text-primary) !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+
+    &::placeholder {
+      color: var(--login-placeholder) !important;
+    }
+  }
+
+  // 输入框前后缀容器透明化
+  .el-input__prefix,
+  .el-input__suffix {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 42px !important;
+    height: 100% !important;
+    flex-shrink: 0 !important;
+    background: transparent !important;
+    color: var(--login-icon-color) !important;
+    border: none !important;
+  }
+
+  .el-input__prefix-inner,
+  .el-input__suffix-inner {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    color: inherit !important;
+  }
+
+  // 清除按钮及密码切换按钮
+  .el-input__suffix-inner button,
+  .el-input__suffix-inner svg {
+    background: transparent !important;
+    color: var(--login-icon-color) !important;
+    border: none !important;
+    box-shadow: none !important;
+    
+    &:hover {
+      color: var(--login-text-primary) !important;
+    }
+  }
+
+  .input-icon {
+    color: var(--login-icon-color) !important;
+  }
+
+  // 验证码输入框 (带 append)
+  .el-input-group--append {
+    display: inline-flex !important;
+    width: 100% !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--login-border) !important;
+    background: var(--login-input-bg) !important;
+    overflow: hidden !important;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease !important;
+
+    &:hover {
+      background: var(--login-input-hover-bg) !important;
+      border-color: var(--login-border-hover) !important;
+    }
+
+    &:focus-within {
+      background: var(--login-input-focus-bg) !important;
+      border-color: var(--login-border-focus) !important;
+      box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.14) !important;
+    }
+
+    .el-input__wrapper {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      height: 100% !important;
+      border-radius: 0 !important;
+    }
+
+    .el-input-group__append {
+      background: transparent !important;
+      border: none !important;
+      border-left: 1px solid var(--login-border) !important;
+      border-radius: 0 !important;
+      height: 100% !important;
+      padding: 0 var(--spacing-md) !important;
+      display: flex !important;
+      align-items: center !important;
+
+      button.send-code-btn {
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        color: var(--login-border-focus) !important;
+        font-weight: 500 !important;
+
+        &:hover:not(:disabled) {
+          color: #7fa4ff !important;
+        }
+
+        &:disabled {
+          color: var(--login-placeholder) !important;
+        }
+      }
+    }
+  }
+
+  // 自动填充处理
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--login-text-primary) !important;
+    caret-color: var(--login-text-primary);
+    -webkit-box-shadow: 0 0 0 1000px var(--login-input-bg) inset !important;
+    box-shadow: 0 0 0 1000px var(--login-input-bg) inset !important;
+    transition: background-color 9999s ease-out 0s;
+  }
+
+  // Logo 样式适配
+  .logo-wrapper {
+    display: flex;
+    align-items: center;
+    background: transparent !important;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .logo-img {
+    display: block;
+    width: auto;
+    height: 66px;
+    object-fit: contain;
+
+    background: transparent !important;
+    border: none;
+    box-shadow: none;
+    filter: none !important;
+    mix-blend-mode: normal;
+  }
 }
 </style>

@@ -424,11 +424,11 @@ function categoryLabel(cat: string): string {
   top: 12px;
   right: 12px;
   z-index: 10;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(8px);
   padding: 4px;
   border-radius: var(--radius-lg, 0.75rem);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px  var(--color-shadow);
   border: 1px solid var(--border-soft, rgba(148, 163, 184, 0.12));
   transition: all 0.2s ease;
 }

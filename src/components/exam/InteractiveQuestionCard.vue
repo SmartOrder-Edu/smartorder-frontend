@@ -221,7 +221,7 @@ function toggleOption(label: string) {
 
 <style scoped>
 .interactive-question-card {
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 16px;

@@ -463,7 +463,7 @@ const doTask = (task: any) => {
   border: 1px solid var(--border-light);
   transition: all var(--transition-fast);
 
-  &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  &:hover { box-shadow: 0 2px 8px  var(--color-shadow); }
 }
 
 .task-rank {
@@ -589,7 +589,7 @@ const doTask = (task: any) => {
 
 .time-chunk {
   padding-bottom: var(--spacing-md);
-  border-bottom: 1px solid rgba(0,0,0,0.04);
+  border-bottom: 1px solid var(--color-border);
 
   &:last-child { border-bottom: none; padding-bottom: 0; }
 }

@@ -594,7 +594,7 @@ onMounted(() => {
   border-radius: var(--radius-xl);
   padding: var(--spacing-xl);
   margin-bottom: var(--spacing-xl);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px  var(--color-shadow);
   border: 1px solid var(--border-light);
 }
 

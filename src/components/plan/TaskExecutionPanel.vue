@@ -171,7 +171,7 @@ function toggleCollapsed() {
   height: 28px;
   border: 1px solid rgba(59, 130, 246, 0.12);
   border-radius: var(--radius-md, 0.5rem);
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--color-card-bg-secondary);
   color: var(--text-secondary, #64748b);
   display: inline-flex;
   align-items: center;
