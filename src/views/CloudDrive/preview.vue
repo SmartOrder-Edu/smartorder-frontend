@@ -582,7 +582,8 @@ const getFetchUrl = () => {
   if (squareId.value) {
     return `/resource-square/${squareId.value}/preview`
   }
-  return getFetchUrl()
+  const token = localStorage.getItem('token')
+  return `/yun-resource/preview/${fileId.value}?token=${token}`
 }
 
 /** 获取在线预览直链 URL（用于 iframe/office viewer 等场景） */
