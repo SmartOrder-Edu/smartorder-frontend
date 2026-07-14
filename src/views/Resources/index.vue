@@ -7,14 +7,6 @@
           <h1 class="page-title">资源中心</h1>
           <p class="page-desc">系统为你推荐和生成的学习资源，AI 会根据你的画像匹配合适的资料</p>
         </div>
-        <div class="header-right">
-          <el-button @click="showGenerateDialog = true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M12 2a10 10 0 1 0 10 10H12V2z"/>
-            </svg>
-            AI 生成资源
-          </el-button>
-        </div>
       </div>
 
       <!-- 筛选与搜索 -->
@@ -46,25 +38,25 @@
       <!-- 推荐资源横幅 -->
       <section class="featured-banner" v-if="featuredResource">
         <div class="featured-content">
-          <div class="featured-badge">本周精选</div>
+          <div class="featured-badge">热门推荐</div>
           <h2 class="featured-title">{{ featuredResource.title }}</h2>
-          <p class="featured-desc">{{ featuredResource.description }}</p>
+          <p class="featured-desc">{{ featuredResource.description || '暂无描述' }}</p>
           <div class="featured-meta">
             <span class="meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
-              {{ featuredResource.minutes }}分钟
+              {{ formatFileSize(featuredResource.fileSize) }}
             </span>
             <span class="meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
-              {{ featuredResource.rating }} 推荐指数
+              {{ featuredResource.ratingAvg }} 推荐指数
             </span>
             <span class="meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-              {{ featuredResource.learners }} 人学习
+              {{ featuredResource.downloadCount }} 人转存
             </span>
           </div>
           <el-button type="primary" @click="openResource(featuredResource)">
-            开始学习
+            查看详情
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <polygon points="5,3 19,12 5,21"/>
             </svg>
@@ -74,19 +66,8 @@
           <div class="visual-card">
             <div class="card-glow"></div>
             <div class="card-content">
-              <div class="card-icon-large">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <circle cx="12" cy="12" r="3"/>
-                  <circle cx="19" cy="5" r="2"/>
-                  <circle cx="5" cy="5" r="2"/>
-                  <circle cx="19" cy="19" r="2"/>
-                  <circle cx="5" cy="19" r="2"/>
-                  <line x1="12" y1="9" x2="12" y2="3"/>
-                  <line x1="14.5" y1="13.5" x2="17.5" y2="17.5"/>
-                  <line x1="9.5" y1="13.5" x2="6.5" y2="17.5"/>
-                </svg>
-              </div>
-              <span class="card-type">思维导图</span>
+              <div class="card-icon-large" v-html="getResourceIcon(featuredResource.category)"></div>
+              <span class="card-type">{{ getCategoryName(featuredResource.category) }}</span>
             </div>
           </div>
         </div>
@@ -95,34 +76,69 @@
       <!-- 资源网格 -->
       <section class="resources-grid-section">
         <div class="grid-header">
-          <h3 class="grid-title">为你推荐的资源</h3>
-          <span class="grid-count">共 {{ filteredResources.length }} 个资源</span>
+          <h3 class="grid-title">广场资源</h3>
+          <span class="grid-count">共 {{ totalCount }} 个资源</span>
         </div>
 
-        <div class="resources-grid">
+        <!-- 加载状态 -->
+        <div v-if="isLoading" class="resources-grid">
+          <div v-for="n in 6" :key="n" class="resource-card skeleton-card">
+            <div class="card-header-section">
+              <div class="skel-icon"></div>
+              <div class="skel-badge"></div>
+            </div>
+            <div class="card-body">
+              <div class="skel-line skel-title"></div>
+              <div class="skel-line skel-desc"></div>
+              <div class="skel-line skel-desc-short"></div>
+              <div class="skel-line skel-publisher"></div>
+              <div class="skel-tags-row">
+                <span class="skel-tag"></span>
+                <span class="skel-tag"></span>
+                <span class="skel-tag skel-tag-sm"></span>
+              </div>
+              <div class="skel-meta-row">
+                <span class="skel-meta"></span>
+                <span class="skel-meta"></span>
+                <span class="skel-meta skel-meta-sm"></span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <span class="skel-btn"></span>
+              <span class="skel-btn skel-btn-sm"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else-if="filteredResources.length === 0" class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 60px 0;">
+          <p class="empty-title" style="font-size: 1rem; color: #64748b;">暂无资源</p>
+          <p class="empty-desc" style="font-size: 0.8125rem; color: #94a3b8;">还没有人发布资源到广场</p>
+        </div>
+
+        <div v-else class="resources-grid">
           <div
             v-for="resource in filteredResources"
             :key="resource.id"
             class="resource-card"
-            :class="`type-${resource.type}`"
+            :class="`type-${resource.category}`"
           >
             <div class="card-header-section">
-              <div class="card-type-icon" :class="resource.type">
-                <span v-html="getResourceIcon(resource.type)"></span>
+              <div class="card-type-icon" :class="resource.category">
+                <span v-html="getResourceIcon(resource.category)"></span>
               </div>
               <div class="card-badges">
-                <span v-if="resource.isAI" class="ai-badge">AI 生成</span>
-                <span class="type-badge">{{ resource.typeName }}</span>
+                <span class="type-badge">{{ getCategoryName(resource.category) }}</span>
               </div>
             </div>
 
             <div class="card-body">
               <h4 class="card-title">{{ resource.title }}</h4>
-              <p class="card-desc">{{ resource.description }}</p>
+              <p class="card-desc">{{ resource.description || '暂无描述' }}</p>
 
               <div class="card-reason">
-                <span class="reason-label">推荐原因：</span>
-                <span class="reason-text">{{ resource.reason }}</span>
+                <span class="reason-label">发布者：</span>
+                <span class="reason-text">{{ resource.publisherName || '未知用户' }}</span>
               </div>
 
               <div class="card-tags">
@@ -132,88 +148,69 @@
               <div class="card-meta">
                 <span class="meta-item">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
-                  {{ resource.minutes }}分钟
+                  {{ formatFileSize(resource.fileSize) }}
                 </span>
                 <span class="meta-item">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                  {{ resource.learners }}
+                  {{ resource.downloadCount }}
                 </span>
                 <span class="meta-item rating">
                   <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
-                  {{ resource.rating }}
+                  {{ resource.ratingAvg }}
                 </span>
               </div>
             </div>
 
             <div class="card-footer">
               <el-button size="small" type="primary" @click="openResource(resource)">
-                打开学习
+                查看详情
               </el-button>
-              <el-button size="small" text @click="collectResource(resource)">
+              <el-button size="small" text @click="collectResource(resource)" :disabled="resource.hasDownloaded">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
                 </svg>
-                收藏
+                {{ resource.hasDownloaded ? '已转存' : '转存' }}
               </el-button>
             </div>
           </div>
         </div>
+
+        <!-- 分页 -->
+        <div v-if="totalCount > pageSize" style="display: flex; justify-content: center; margin-top: 24px;">
+          <el-pagination
+            v-model:current-page="currentPage"
+            :page-size="pageSize"
+            :total="totalCount"
+            layout="prev, pager, next"
+            @current-change="fetchList"
+          />
+        </div>
       </section>
 
-      <!-- AI 生成资源对话框 -->
-      <el-dialog v-model="showGenerateDialog" title="AI 生成学习资源" width="560px">
-        <div class="generate-form">
-          <div class="form-item">
-            <label>资源类型</label>
-            <el-radio-group v-model="generateType">
-              <el-radio label="doc">讲解文档</el-radio>
-              <el-radio label="mindmap">思维导图</el-radio>
-              <el-radio label="video">视频讲义</el-radio>
-              <el-radio label="quiz">练习题集</el-radio>
-            </el-radio-group>
-          </div>
-          <div class="form-item">
-            <label>知识点</label>
-            <el-input v-model="generateTopic" placeholder="例如：进程同步与互斥、PV操作、死锁" />
-          </div>
-          <div class="form-item">
-            <label>风格偏好</label>
-            <el-checkbox-group v-model="generateStyles">
-              <el-checkbox label="visual">可视化（图解、图表）</el-checkbox>
-              <el-checkbox label="simple">简洁易懂</el-checkbox>
-              <el-checkbox label="detail">详细深入</el-checkbox>
-              <el-checkbox label="code">代码示例</el-checkbox>
-            </el-checkbox-group>
-          </div>
-          <div class="form-item">
-            <label>生成说明（可选）</label>
-            <el-input type="textarea" v-model="generateNote" placeholder="描述你希望资源包含的具体内容..." :rows="2" />
-          </div>
-        </div>
-        <template #footer>
-          <el-button @click="showGenerateDialog = false">取消</el-button>
-          <el-button type="primary" :loading="generating" @click="generateResource">
-            {{ generating ? '生成中...' : '开始生成' }}
-          </el-button>
-        </template>
-      </el-dialog>
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { getSquareList, downloadFromSquare } from '@/api/resource-square'
+import type { ResourceSquareVO } from '@/types/resource-square'
+
+const router = useRouter()
 
 const searchKeyword = ref('')
 const activeType = ref('all')
-const sortBy = ref('relevance')
-const showGenerateDialog = ref(false)
-const generating = ref(false)
-const generateType = ref('mindmap')
-const generateTopic = ref('')
-const generateStyles = ref(['visual'])
-const generateNote = ref('')
+const sortBy = ref('newest')
+const isLoading = ref(false)
+
+// 真实数据
+const squareResources = ref<ResourceSquareVO[]>([])
+const totalCount = ref(0)
+const currentPage = ref(1)
+const pageSize = 12
 
 const resourceTypes = [
   { value: 'all', label: '全部', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
@@ -224,98 +221,64 @@ const resourceTypes = [
   { value: 'case', label: '案例', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg>' }
 ]
 
-const featuredResource = ref({
-  id: 0,
-  title: '进程与线程完整知识图谱',
-  description: 'AI 生成的思维导图，覆盖进程、线程、同步互斥的核心知识点，适合期末复习使用',
-  minutes: 25,
-  rating: 4.9,
-  learners: 1234,
-  type: 'mindmap'
+const featuredResource = computed(() => {
+  // 取评分最高或下载最多的资源作为精选
+  return squareResources.value.length > 0 ? squareResources.value[0] : null
 })
 
-const resources = ref([
-  {
-    id: 1, type: 'mindmap', typeName: '思维导图', title: '进程与线程对比图', description: '清晰对比进程与线程的概念、区别、优缺点',
-    minutes: 8, learners: 856, rating: 4.8, isAI: true,
-    reason: '你更偏好可视化学习方式，且当前处于进程与线程学习阶段',
-    tags: ['进程', '线程', '对比', '可视化']
-  },
-  {
-    id: 2, type: 'quiz', typeName: '练习题', title: '同步互斥专项测试（10题）', description: '涵盖 PV 操作、临界区、信号量等核心考点',
-    minutes: 15, learners: 623, rating: 4.7, isAI: true,
-    reason: '测评发现你的 PV 操作正确率偏低，需要专项训练',
-    tags: ['PV操作', '同步', '互斥', '专项']
-  },
-  {
-    id: 3, type: 'video', typeName: '视频讲义', title: '信号量机制动画演示', description: '通过动画直观展示信号量 P/V 操作的执行过程',
-    minutes: 10, learners: 1205, rating: 4.9, isAI: true,
-    reason: '结合你的测验薄弱点，动画讲解更容易理解',
-    tags: ['信号量', '动画', 'PV操作']
-  },
-  {
-    id: 4, type: 'doc', typeName: '文档', title: '进程同步与互斥详解', description: '从理论到实践，系统讲解同步互斥的各种方法',
-    minutes: 20, learners: 432, rating: 4.6, isAI: false,
-    reason: '理论基础需要扎实，建议结合练习题一起学习',
-    tags: ['理论', '同步', '互斥', '经典']
-  },
-  {
-    id: 5, type: 'mindmap', typeName: '思维导图', title: '操作系统内存管理知识图', description: '覆盖分页、分段、虚拟内存等核心概念',
-    minutes: 12, learners: 567, rating: 4.7, isAI: true,
-    reason: '下一章节为内存管理，提前预习有助理解',
-    tags: ['内存', '虚拟内存', '分页', '预习']
-  },
-  {
-    id: 6, type: 'case', typeName: '案例', title: '哲学家就餐问题代码实现', description: 'Python 实现哲学家就餐问题，深入理解死锁',
-    minutes: 30, learners: 345, rating: 4.5, isAI: true,
-    reason: '你偏好代码示例学习，且已学习相关理论',
-    tags: ['死锁', '代码', 'Python', '实践']
-  },
-  {
-    id: 7, type: 'doc', typeName: '文档', title: 'PCB 进程控制块详解', description: '详细介绍 PCB 的组成、作用和操作系统中的实现',
-    minutes: 12, learners: 298, rating: 4.4, isAI: false,
-    reason: '复习任务关联资源，加深理解',
-    tags: ['PCB', '进程', '基础']
-  },
-  {
-    id: 8, type: 'quiz', typeName: '练习题', title: '进程调度算法练习题', description: 'FIFO、SJF、时间片轮转等调度算法练习',
-    minutes: 18, learners: 412, rating: 4.6, isAI: false,
-    reason: '本周学习任务包含调度算法复习',
-    tags: ['调度', '算法', 'FIFO', 'SJF']
-  },
-  {
-    id: 9, type: 'video', typeName: '视频讲义', title: '线程同步与互斥动画讲解', description: '用生活实例和动画讲解互斥锁、条件变量等概念',
-    minutes: 15, learners: 789, rating: 4.8, isAI: true,
-    reason: '你的学习画像显示视频学习效果最好',
-    tags: ['线程', '同步', '动画', '生活实例']
-  }
-])
-
 const filteredResources = computed(() => {
-  let result = resources.value
+  return squareResources.value
+})
 
-  if (activeType.value !== 'all') {
-    result = result.filter(r => r.type === activeType.value)
+const categoryNameMap: Record<string, string> = {
+  doc: '文档',
+  mindmap: '思维导图',
+  video: '视频讲义',
+  quiz: '练习题',
+  case: '案例',
+}
+
+const getCategoryName = (category: string) => categoryNameMap[category] || category
+
+const formatFileSize = (bytes: number | undefined): string => {
+  if (!bytes || bytes === 0) return '--'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let i = 0
+  let size = bytes
+  while (size >= 1024 && i < units.length - 1) {
+    size /= 1024
+    i++
   }
+  return size.toFixed(i === 0 ? 0 : 1) + ' ' + units[i]
+}
 
-  if (searchKeyword.value) {
-    const kw = searchKeyword.value.toLowerCase()
-    result = result.filter(r =>
-      r.title.toLowerCase().includes(kw) ||
-      r.tags.some(t => t.toLowerCase().includes(kw)) ||
-      r.description.toLowerCase().includes(kw)
-    )
+const fetchList = async () => {
+  isLoading.value = true
+  try {
+    const res = await getSquareList({
+      keyword: searchKeyword.value || undefined,
+      category: activeType.value !== 'all' ? activeType.value : undefined,
+      sortBy: sortBy.value as any,
+      pageNum: currentPage.value,
+      pageSize,
+    })
+    squareResources.value = res.records || []
+    totalCount.value = res.total || 0
+  } catch {
+    // 错误由拦截器处理
+  } finally {
+    isLoading.value = false
   }
+}
 
-  if (sortBy.value === 'newest') {
-    result = [...result].sort((a, b) => b.id - a.id)
-  } else if (sortBy.value === 'rating') {
-    result = [...result].sort((a, b) => b.rating - a.rating)
-  } else if (sortBy.value === 'shortest') {
-    result = [...result].sort((a, b) => a.minutes - b.minutes)
-  }
+// 搜索/筛选/排序变化时重新加载
+watch([searchKeyword, activeType, sortBy], () => {
+  currentPage.value = 1
+  fetchList()
+})
 
-  return result
+onMounted(() => {
+  fetchList()
 })
 
 const getResourceIcon = (type: string) => {
@@ -329,20 +292,23 @@ const getResourceIcon = (type: string) => {
   return icons[type] || icons.doc
 }
 
-const openResource = (resource: any) => {
-  console.log('Open resource:', resource.title)
+const openResource = (resource: ResourceSquareVO) => {
+  router.push(`/resources/${resource.id}`)
 }
 
-const collectResource = (resource: any) => {
-  console.log('Collect resource:', resource.title)
-}
-
-const generateResource = () => {
-  generating.value = true
-  setTimeout(() => {
-    generating.value = false
-    showGenerateDialog.value = false
-  }, 2500)
+const collectResource = async (resource: ResourceSquareVO) => {
+  if (resource.hasDownloaded) {
+    ElMessage.info('您已转存过该资源，可在云盘根目录查看')
+    return
+  }
+  try {
+    await downloadFromSquare(resource.id)
+    ElMessage.success('已转存到您的云盘')
+    resource.hasDownloaded = true
+    resource.downloadCount++
+  } catch {
+    // 错误由拦截器处理
+  }
 }
 </script>
 
@@ -732,6 +698,125 @@ const generateResource = () => {
   font-weight: 600;
   color: var(--text-dark);
   margin-bottom: var(--spacing-sm);
+}
+
+/* ==================== 骨架屏加载动画 ==================== */
+.skeleton-card {
+  pointer-events: none;
+  border: 1px solid #f1f5f9 !important;
+  box-shadow: none !important;
+}
+
+.skeleton-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 全局骨架扫光动画 */
+.skeleton-card .skel-icon,
+.skeleton-card .skel-badge,
+.skeleton-card .skel-line,
+.skeleton-card .skel-tag,
+.skeleton-card .skel-meta,
+.skeleton-card .skel-btn {
+  background: linear-gradient(110deg, #eef2f7 30%, #f8fafc 50%, #eef2f7 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* 骨架图标 */
+.skel-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px !important;
+}
+
+.skel-badge {
+  width: 48px;
+  height: 18px;
+  border-radius: 99px !important;
+}
+
+/* 骨架文本行 */
+.skel-line {
+  height: 14px;
+  margin-bottom: 10px;
+}
+
+.skel-title {
+  width: 75%;
+  height: 16px;
+}
+
+.skel-desc {
+  width: 92%;
+}
+
+.skel-desc-short {
+  width: 55%;
+}
+
+.skel-publisher {
+  width: 40%;
+  height: 12px;
+  margin-top: 12px;
+  margin-bottom: 10px;
+  background: #f1f5f9 !important;
+  animation: none !important;
+}
+
+/* 骨架标签行 */
+.skel-tags-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.skel-tag {
+  width: 42px;
+  height: 20px;
+  border-radius: 4px !important;
+}
+
+.skel-tag-sm {
+  width: 30px;
+}
+
+/* 骨架元信息行 */
+.skel-meta-row {
+  display: flex;
+  gap: 16px;
+}
+
+.skel-meta {
+  width: 56px;
+  height: 12px;
+}
+
+.skel-meta-sm {
+  width: 32px;
+}
+
+/* 骨架按钮 */
+.skeleton-card .card-footer {
+  display: flex;
+  justify-content: space-between;
+}
+
+.skel-btn {
+  width: 64px;
+  height: 28px;
+  border-radius: 6px !important;
+}
+
+.skel-btn-sm {
+  width: 48px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 @media (max-width: 1024px) {

@@ -75,6 +75,14 @@
                   </svg>
                   删除
                 </el-button>
+                <el-button class="btn-action" plain @click="handleBatchPublish">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"
+                    style="margin-right: 4px;">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                  </svg>
+                  发布到广场
+                </el-button>
                 <el-button class="btn-action" plain @click="selectedRows = []">
                   取消
                 </el-button>
@@ -366,6 +374,13 @@
               </svg>
               移动到
             </button>
+            <button v-if="contextMenu.item?.type === 'file'" class="context-menu-item" @click="handlePublishToSquare(contextMenu.item); contextMenu.visible = false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              发布到广场
+            </button>
             <div class="context-menu-divider"></div>
             <button class="context-menu-item danger"
               @click="handleDelete(contextMenu.item); contextMenu.visible = false">
@@ -475,6 +490,13 @@
         </template>
       </el-dialog>
 
+      <!-- 发布到资源广场对话框 -->
+      <PublishToSquareDialog
+        v-model:visible="showPublishDialog"
+        :file="publishFileTarget"
+        @success="onPublishSuccess"
+      />
+
       <!-- 文件预览对话框（高保真全屏 iframe 无缝预览） -->
       <el-dialog 
         v-model="showPreviewDialog" 
@@ -509,6 +531,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import SparkMD5 from 'spark-md5'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { getFolderContent, getFolderTree, createFolder as apiCreateFolder, updateFolder as apiUpdateFolder, deleteFolder as apiDeleteFolder, deleteFile as apiDeleteFile, moveFile as apiMoveFile, moveFolder as apiMoveFolder, batchMoveToFolder, apiInitUpload, apiGetSignUrl, apiUploadChunkToOSS, apiChunkDone, apiMergeChunks, apiCancelUpload, downloadFile } from '@/api/resource'
+import PublishToSquareDialog from './components/PublishToSquareDialog.vue'
 
 // 文件类型图标
 import iconFolder from '@/assets/folder/folder.png'
@@ -577,6 +600,11 @@ const moveFullTree = ref<any[]>([])
 const selectedRows = ref<DriveItem[]>([])
 const tableRef = ref()
 
+// 发布到资源广场
+const showPublishDialog = ref(false)
+const publishFileTarget = ref<DriveItem | null>(null)
+const publishIsBatch = ref(false)
+
 // 批量操作
 const handleBatchDownload = () => {
   const files = selectedRows.value.filter(r => r.type === 'file')
@@ -608,6 +636,29 @@ const handleBatchMove = () => {
   isBatchMove.value = true
   moveTarget.value = null
   showMoveDialog.value = true
+}
+
+const handleBatchPublish = () => {
+  const files = selectedRows.value.filter(r => r.type === 'file')
+  if (!files.length) { ElMessage.warning('请选择至少一个文件'); return }
+  if (files.length > 1) { ElMessage.warning('一次只能发布一个文件到广场'); return }
+  publishFileTarget.value = files[0]
+  publishIsBatch.value = true
+  showPublishDialog.value = true
+}
+
+const handlePublishToSquare = (item: DriveItem | null) => {
+  if (!item || item.type !== 'file') return
+  publishFileTarget.value = item
+  publishIsBatch.value = false
+  showPublishDialog.value = true
+}
+
+const onPublishSuccess = () => {
+  showPublishDialog.value = false
+  if (publishIsBatch.value) {
+    selectedRows.value = []
+  }
 }
 
 // 上下文菜单

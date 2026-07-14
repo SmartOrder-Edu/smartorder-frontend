@@ -1223,6 +1223,7 @@ html, body, #app,
   --border-color-strong: #cbd5e1;
   --border-strong: #cbd5e1;
 
+  --color-card-bg-secondary: rgba(255, 255, 255, 0.88);
   --overlay-bg: rgba(15, 22, 41, 0.6);
   --shadow-color: rgba(0, 0, 0, 0.05);
 }
@@ -1252,6 +1253,7 @@ html[data-theme='dark'] {
   --border-color-strong: #3b495b;
   --border-strong: #3b495b;
 
+  --color-card-bg-secondary: rgba(25, 29, 39, 0.88);
   --overlay-bg: rgba(0, 0, 0, 0.58);
   --shadow-color: rgba(0, 0, 0, 0.45);
 }

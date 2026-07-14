@@ -42,8 +42,8 @@
           <span style="margin-left: 8px;">{{ currentTheme === 'light' ? '白天模式' : '夜晚模式' }}</span>
         </el-button>
 
-        <!-- 下载按钮 -->
-        <el-button type="default" size="large" class="toolbar-btn" @click="handleDownload">
+        <!-- 下载按钮（广场预览不显示） -->
+        <el-button v-if="!isSquarePreview" type="default" size="large" class="toolbar-btn" @click="handleDownload">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 6px; vertical-align: middle;">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7,10 12,15 17,10" />
@@ -234,7 +234,7 @@
                 当前处于本地局域网或开发环境，微软 Office 在线预览服务无法直接读取您本地机的文件。
               </p>
               <div class="crystal-btn-container">
-                <button class="crystal-download-btn" @click="handleDownload">
+                <button v-if="!isSquarePreview" class="crystal-download-btn" @click="handleDownload">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18" style="margin-right: 8px;">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7,10 12,15 17,10" />
@@ -275,7 +275,7 @@
             <button class="md-bar-action-btn" title="演示模式">
               <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
             </button>
-            <button class="md-bar-action-btn" @click="handleDownload" title="导出文件">
+            <button v-if="!isSquarePreview" class="md-bar-action-btn" @click="handleDownload" title="导出文件">
               <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             </button>
             <button class="md-bar-action-btn" title="显示大纲" @click="showToc = true" v-if="!showToc && markdownToc.length > 0">
@@ -571,9 +571,29 @@ const handleToggleTheme = () => {
 
 // 路由 Query 信息
 const fileId = ref(String(route.query.id || ''))
+const squareId = ref(String(route.query.squareId || ''))
 const fileName = ref(String(route.query.name || ''))
 const fileSize = ref(Number(route.query.size || 0))
 const fileExt = ref(fileName.value.split('.').pop()?.toLowerCase() || '')
+const isSquarePreview = ref(!!squareId.value)
+
+/** 获取文件内容的 API 路径：广场资源走 /resource-square/{id}/preview，云盘文件走 /yun-resource/preview/{id} */
+const getFetchUrl = () => {
+  if (squareId.value) {
+    return `/resource-square/${squareId.value}/preview`
+  }
+  return getFetchUrl()
+}
+
+/** 获取在线预览直链 URL（用于 iframe/office viewer 等场景） */
+const getSquarePreviewUrl = () => {
+  if (squareId.value) {
+    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    const token = localStorage.getItem('token')
+    return `${base}/resource-square/${squareId.value}/preview?token=${token}`
+  }
+  return getPreviewUrl(fileId.value)
+}
 
 // 状态声明
 const isEmbedded = ref(window.self !== window.top)
@@ -1136,14 +1156,14 @@ onMounted(async () => {
 
   const ext = fileExt.value
   if (!isPreviewablePdf(ext)) {
-    previewUrl.value = getPreviewUrl(fileId.value) + `&t=${Date.now()}`
+    previewUrl.value = getSquarePreviewUrl() + `&t=${Date.now()}`
   } else {
     previewUrl.value = ''
   }
 
   try {
     if (isPreviewableWord(ext)) {
-      const arrayBuffer = await request.get<ArrayBuffer>(`/yun-resource/preview/${fileId.value}`, {
+      const arrayBuffer = await request.get<ArrayBuffer>(getFetchUrl(), {
         responseType: 'arraybuffer'
       })
       const docx = await import('docx-preview')
@@ -1158,14 +1178,14 @@ onMounted(async () => {
         }
       }, 100)
     } else if (isPreviewableMarkdown(ext)) {
-      const text = await request.get<string>(`/yun-resource/preview/${fileId.value}`, {
+      const text = await request.get<string>(getFetchUrl(), {
         responseType: 'text'
       })
       previewMarkdownSource.value = text
       generateMarkdownToc()
       initialized.value = true
     } else if (isPreviewableText(ext)) {
-      let text = await request.get<string>(`/yun-resource/preview/${fileId.value}`, {
+      let text = await request.get<string>(getFetchUrl(), {
         responseType: 'text'
       })
       const MAX_PREVIEW_SIZE = 2 * 1024 * 1024
@@ -1181,7 +1201,7 @@ onMounted(async () => {
         throw new Error('表格文件过大')
       }
 
-      const arrayBuffer = await request.get<ArrayBuffer>(`/yun-resource/preview/${fileId.value}`, {
+      const arrayBuffer = await request.get<ArrayBuffer>(getFetchUrl(), {
         responseType: 'arraybuffer'
       })
       
@@ -1227,12 +1247,12 @@ onMounted(async () => {
       initialized.value = true
     } else if (isPreviewablePpt(ext)) {
       if (!isLocalhostEnv.value) {
-        const absoluteUrl = window.location.origin + getPreviewUrl(fileId.value)
+        const absoluteUrl = window.location.origin + getSquarePreviewUrl()
         previewUrl.value = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(absoluteUrl)}`
       }
       initialized.value = true
     } else if (isPreviewablePdf(ext)) {
-      const blob = await request.get<Blob>(`/yun-resource/preview/${fileId.value}`, {
+      const blob = await request.get<Blob>(getFetchUrl(), {
         responseType: 'blob'
       })
       if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
@@ -1254,6 +1274,7 @@ onMounted(async () => {
 })
 
 const handleDownload = () => {
+  if (isSquarePreview.value) return
   if (!fileId.value) return
   ElMessage.success(`开始下载: ${fileName.value}`)
   downloadFile(fileId.value, fileName.value)
