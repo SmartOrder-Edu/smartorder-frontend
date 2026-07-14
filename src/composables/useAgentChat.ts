@@ -51,6 +51,11 @@ export interface RagSourcePayload {
   degraded: boolean
 }
 
+export interface LearningSpaceCardPayload {
+  cardType: 'learning_space_list' | 'learning_space_resolved' | 'learning_space_dashboard'
+  [key: string]: any
+}
+
 export interface ChatMessage {
   role: 'user' | 'ai'
   content: string
@@ -84,6 +89,8 @@ export interface ChatMessage {
   ragSources?: RagSourcePayload
   /** 思维导图列表（本轮 generateMindMap 工具产出） */
   mindMaps?: MindMapData[]
+  /** 学习空间卡片（本轮学习空间查询工具产出） */
+  learningSpaceCards?: LearningSpaceCardPayload[]
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -166,6 +173,48 @@ function normalizeLearningPlanDraft(raw: any): LearningPlanDraft | null {
   }
 }
 
+function normalizeToolResult(result: any): Record<string, any> | null {
+  if (!result) return null
+  if (typeof result === 'string') {
+    try { return JSON.parse(result) } catch { return null }
+  }
+  if (typeof result === 'object' && !Array.isArray(result)) return result
+  return null
+}
+
+function isLearningSpaceCardPayload(result: Record<string, any> | null): result is LearningSpaceCardPayload {
+  return result?.cardType === 'learning_space_list'
+    || result?.cardType === 'learning_space_resolved'
+    || result?.cardType === 'learning_space_dashboard'
+}
+
+function learningSpaceCardKey(card: LearningSpaceCardPayload): string {
+  const spaceId = card.dashboard?.space?.id || card.space?.id
+  if (spaceId) return `${card.cardType}:${spaceId}`
+  const ids = Array.isArray(card.spaces)
+    ? card.spaces.map((space: any) => space?.id).filter(Boolean).join(',')
+    : ''
+  return `${card.cardType}:${ids || card.summary || ''}`
+}
+
+export function extractLearningSpaceCardsFromToolCalls(
+  toolCalls?: ToolCallState[],
+): LearningSpaceCardPayload[] {
+  if (!toolCalls?.length) return []
+  const seen = new Set<string>()
+  const cards: LearningSpaceCardPayload[] = []
+  for (const toolCall of toolCalls) {
+    if (toolCall.status !== 'completed') continue
+    const result = normalizeToolResult(toolCall.result)
+    if (!isLearningSpaceCardPayload(result)) continue
+    const key = learningSpaceCardKey(result)
+    if (seen.has(key)) continue
+    seen.add(key)
+    cards.push(result)
+  }
+  return cards
+}
+
 function resetPlanningStateForConversation(agentStore: ReturnType<typeof useAgentStore>) {
   agentStore.currentDraftId = ''
   agentStore.currentPlan = null
@@ -223,6 +272,8 @@ export function useAgentChat(scrollCallback?: () => void) {
   let abortController: AbortController | null = null
 
   const getCurrentMindMaps = (): MindMapData[] => agentStore.currentMindMaps || []
+  const getCurrentLearningSpaceCards = (): LearningSpaceCardPayload[] =>
+    extractLearningSpaceCardsFromToolCalls(agentStore.toolCalls)
   const getCurrentRagSources = (): RagSourcePayload | undefined => {
     const sources = agentStore.currentRagSources
     if (!sources?.chunks?.length) return undefined
@@ -258,7 +309,8 @@ export function useAgentChat(scrollCallback?: () => void) {
     }
     // 将当前已累积的文本保存为消息
     const currentMindMaps = getCurrentMindMaps()
-    if (agentStore.answerText || currentMindMaps.length) {
+    const currentLearningSpaceCards = getCurrentLearningSpaceCards()
+    if (agentStore.answerText || currentMindMaps.length || currentLearningSpaceCards.length) {
       messages.value.push({
         role: 'ai',
         content: agentStore.answerText
@@ -277,6 +329,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           ? [...agentStore.currentWebSearchReferences] : undefined,
         ragSources: getCurrentRagSources(),
         mindMaps: currentMindMaps.length ? [...currentMindMaps] : undefined,
+        learningSpaceCards: currentLearningSpaceCards.length ? [...currentLearningSpaceCards] : undefined,
       })
     }
     agentStore.finishTurn()
@@ -378,7 +431,8 @@ export function useAgentChat(scrollCallback?: () => void) {
               && !agentStore.currentTaskList
             const currentMindMaps = getCurrentMindMaps()
             const currentRagSources = getCurrentRagSources()
-            if (agentStore.answerText || hasReActClarification || currentMindMaps.length) {
+            const currentLearningSpaceCards = getCurrentLearningSpaceCards()
+            if (agentStore.answerText || hasReActClarification || currentMindMaps.length || currentLearningSpaceCards.length) {
               messages.value.push({
                 role: 'ai',
                 content: agentStore.answerText || (hasReActClarification
@@ -397,6 +451,7 @@ export function useAgentChat(scrollCallback?: () => void) {
                   ? [...agentStore.currentWebSearchReferences] : undefined,
                 ragSources: currentRagSources,
                 mindMaps: currentMindMaps.length ? [...currentMindMaps] : undefined,
+                learningSpaceCards: currentLearningSpaceCards.length ? [...currentLearningSpaceCards] : undefined,
               })
             }
             agentStore.finishTurn()
@@ -444,7 +499,8 @@ export function useAgentChat(scrollCallback?: () => void) {
           // 保存已累积的内容，避免渲染突然消失（与 stopGeneration 一致）
           const currentMindMaps = getCurrentMindMaps()
           const currentRagSources = getCurrentRagSources()
-          if (agentStore.answerText || currentMindMaps.length) {
+          const currentLearningSpaceCards = getCurrentLearningSpaceCards()
+          if (agentStore.answerText || currentMindMaps.length || currentLearningSpaceCards.length) {
             messages.value.push({
               role: 'ai',
               content: agentStore.answerText
@@ -463,6 +519,7 @@ export function useAgentChat(scrollCallback?: () => void) {
                 ? [...agentStore.currentWebSearchReferences] : undefined,
               ragSources: currentRagSources,
               mindMaps: currentMindMaps.length ? [...currentMindMaps] : undefined,
+              learningSpaceCards: currentLearningSpaceCards.length ? [...currentLearningSpaceCards] : undefined,
             })
           }
           agentStore.finishTurn()
@@ -1054,6 +1111,10 @@ export function useAgentChat(scrollCallback?: () => void) {
 
           if (toolCalls.length > 0) {
             chatMsg.toolCalls = toolCalls
+            const learningSpaceCards = extractLearningSpaceCardsFromToolCalls(toolCalls)
+            if (learningSpaceCards.length > 0) {
+              chatMsg.learningSpaceCards = learningSpaceCards
+            }
           }
           if (traceEvents.length > 0) {
             chatMsg.traceEvents = traceEvents

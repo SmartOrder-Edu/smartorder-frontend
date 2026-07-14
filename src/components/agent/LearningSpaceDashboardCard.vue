@@ -10,7 +10,10 @@
       </span>
     </div>
 
-    <div class="goal-line">{{ space.currentGoal || '暂无明确目标' }}</div>
+    <div class="goal-line">
+      <span>目标</span>
+      <strong>{{ space.currentGoal || '暂无明确目标' }}</strong>
+    </div>
 
     <div class="metrics">
       <div class="metric">
@@ -71,7 +74,8 @@
     </div>
 
     <button class="enter-btn" type="button" @click="goToSpace">
-      进入学习空间
+      <span>进入学习空间</span>
+      <span class="btn-arrow" aria-hidden="true"></span>
     </button>
   </div>
 </template>
@@ -148,10 +152,25 @@ function typeText(type?: string): string {
 
 <style scoped>
 .space-dashboard-card {
-  border: 1px solid rgba(11, 183, 170, 0.14);
+  position: relative;
+  border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 8px;
-  background: #ffffff;
-  padding: 12px;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, rgba(255, 255, 255, 0.98) 42%),
+    #ffffff;
+  padding: 14px;
+  box-shadow:
+    0 16px 36px rgba(15, 23, 42, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.88) inset;
+  overflow: hidden;
+}
+
+.space-dashboard-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #0bb7aa 0%, #3b82f6 52%, #f59e0b 100%);
 }
 
 .dashboard-head {
@@ -166,15 +185,23 @@ function typeText(type?: string): string {
 }
 
 .space-label {
-  color: var(--text-muted, #64748b);
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(11, 183, 170, 0.16);
+  background: rgba(240, 253, 250, 0.72);
+  color: #0f766e;
   font-size: 0.6875rem;
+  font-weight: 700;
   line-height: 1.3;
 }
 
 .space-title {
-  margin-top: 2px;
-  color: var(--text-dark, #1f2937);
-  font-size: 0.9375rem;
+  margin-top: 7px;
+  color: #111827;
+  font-size: 1rem;
   font-weight: 800;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -182,57 +209,77 @@ function typeText(type?: string): string {
 
 .risk-badge {
   flex-shrink: 0;
-  padding: 3px 7px;
-  border-radius: 999px;
+  padding: 3px 8px;
+  border-radius: 7px;
   font-size: 0.625rem;
   font-weight: 700;
+  border: 1px solid currentColor;
 }
 
 .risk-good {
   color: #047857;
-  background: #dcfce7;
+  background: rgba(220, 252, 231, 0.72);
+  border-color: rgba(4, 120, 87, 0.16);
 }
 
 .risk-normal {
   color: #2563eb;
-  background: #dbeafe;
+  background: rgba(219, 234, 254, 0.72);
+  border-color: rgba(37, 99, 235, 0.16);
 }
 
 .risk-warning {
   color: #b45309;
-  background: #fef3c7;
+  background: rgba(254, 243, 199, 0.72);
+  border-color: rgba(180, 83, 9, 0.18);
 }
 
 .risk-danger {
   color: #b91c1c;
-  background: #fee2e2;
+  background: rgba(254, 226, 226, 0.76);
+  border-color: rgba(185, 28, 28, 0.18);
 }
 
 .goal-line {
-  margin-top: 8px;
-  color: var(--text-secondary, #475569);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 10px;
   font-size: 0.75rem;
   line-height: 1.5;
+}
+
+.goal-line span {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.goal-line strong {
+  color: #334155;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 12px;
+  gap: 7px;
+  margin-top: 14px;
 }
 
 .metric {
   min-width: 0;
-  padding: 8px 4px;
+  padding: 9px 5px;
   border-radius: 7px;
-  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(248, 250, 252, 0.86);
   text-align: center;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
 }
 
 .metric-value {
   display: block;
-  color: var(--primary-color, #0bb7aa);
+  color: #0f766e;
   font-size: 0.9375rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -245,19 +292,23 @@ function typeText(type?: string): string {
 .metric-label {
   display: block;
   margin-top: 2px;
-  color: var(--text-muted, #64748b);
+  color: #64748b;
   font-size: 0.625rem;
   line-height: 1.2;
 }
 
 .progress-section {
-  margin-top: 12px;
+  margin-top: 14px;
+  padding: 10px 11px;
+  border-radius: 7px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .section-row {
   display: flex;
   justify-content: space-between;
-  color: var(--text-secondary, #475569);
+  color: #475569;
   font-size: 0.6875rem;
   font-weight: 600;
 }
@@ -266,22 +317,23 @@ function typeText(type?: string): string {
   height: 6px;
   margin-top: 6px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: #e2e8f0;
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: var(--primary-color, #0bb7aa);
+  background: linear-gradient(90deg, #0bb7aa, #3b82f6);
 }
 
 .insight {
-  margin-top: 10px;
-  padding: 8px 10px;
+  margin-top: 12px;
+  padding: 9px 11px;
   border-radius: 7px;
-  background: rgba(11, 183, 170, 0.07);
-  color: var(--text-secondary, #475569);
+  border: 1px solid rgba(11, 183, 170, 0.14);
+  background: rgba(240, 253, 250, 0.64);
+  color: #334155;
   font-size: 0.75rem;
   line-height: 1.5;
 }
@@ -292,7 +344,7 @@ function typeText(type?: string): string {
 }
 
 .task-title {
-  color: var(--text-dark, #1f2937);
+  color: #111827;
   font-size: 0.6875rem;
   font-weight: 800;
   margin-bottom: 6px;
@@ -303,13 +355,19 @@ function typeText(type?: string): string {
   grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: 7px;
-  padding: 5px 0;
-  color: var(--text-secondary, #475569);
+  min-height: 28px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  color: #475569;
   font-size: 0.75rem;
+  background: rgba(248, 250, 252, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.1);
 }
 
 .task-row.overdue {
   color: #b91c1c;
+  background: rgba(254, 242, 242, 0.72);
+  border-color: rgba(185, 28, 28, 0.11);
 }
 
 .task-dot {
@@ -328,7 +386,7 @@ function typeText(type?: string): string {
 }
 
 .task-minutes {
-  color: var(--text-muted, #64748b);
+  color: #64748b;
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
 }
@@ -342,9 +400,10 @@ function typeText(type?: string): string {
 .node-pill {
   max-width: 100%;
   padding: 4px 7px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: var(--text-secondary, #475569);
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(241, 245, 249, 0.82);
+  color: #475569;
   font-size: 0.6875rem;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -356,15 +415,37 @@ function typeText(type?: string): string {
   margin-top: 12px;
   border: none;
   border-radius: 7px;
-  background: var(--primary-color, #0bb7aa);
+  background: linear-gradient(135deg, #0f766e 0%, #0bb7aa 100%);
   color: #ffffff;
-  padding: 8px 10px;
+  padding: 9px 10px;
   font-size: 0.75rem;
   font-weight: 800;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 10px 20px rgba(11, 183, 170, 0.18);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 
 .enter-btn:hover {
-  background: #0aa79c;
+  background: linear-gradient(135deg, #0b6b63 0%, #0aa79c 100%);
+  box-shadow: 0 14px 26px rgba(11, 183, 170, 0.24);
+  transform: translateY(-1px);
+}
+
+.btn-arrow {
+  width: 7px;
+  height: 7px;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+@media (max-width: 520px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>
