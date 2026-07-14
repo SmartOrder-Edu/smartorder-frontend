@@ -233,7 +233,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   }
 
   /** 用户手动选择的运行模式，null 表示走意图路由 */
-  const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>('REACT')
+  const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>(null)
 
   /** 防双击/竞态：确保 confirmPlan 同一时刻只执行一次 */
   const confirmPlanLocked = ref(false)

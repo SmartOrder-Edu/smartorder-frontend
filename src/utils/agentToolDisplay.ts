@@ -24,6 +24,9 @@ const TOOL_META: Record<string, ToolDisplayMeta> = {
   queryKnowledge:         { label: '知识图谱',  icon: 'Connection',  riskLevel: 'read' },
   queryLearningProgress:  { label: '学习进度',  icon: 'TrendCharts', riskLevel: 'read' },
   queryTasks:             { label: '学习任务',  icon: 'List',        riskLevel: 'read' },
+  listLearningSpaces:     { label: '学习空间',  icon: 'Collection',  riskLevel: 'read' },
+  resolveLearningSpace:   { label: '学习空间',  icon: 'Search',      riskLevel: 'read' },
+  getLearningSpaceDashboard: { label: '空间状态', icon: 'DataAnalysis', riskLevel: 'read' },
   manageLearningPlan:     { label: '学习规划',  icon: 'EditPen',     riskLevel: 'write_confirmed' },
   generateResource:       { label: '学习资料',  icon: 'Document',    riskLevel: 'write_confirmed' },
   generateQuiz:           { label: '练习题',    icon: 'Edit',        riskLevel: 'write_confirmed' },
@@ -118,6 +121,19 @@ export function formatRunningText(toolName: string, args?: any): string {
         : '正在查看你的学习任务...'
     }
 
+    case 'listLearningSpaces':
+      return subject
+        ? `正在查找与「${subject}」相关的学习空间...`
+        : '正在读取你的学习空间...'
+
+    case 'resolveLearningSpace':
+      return subject
+        ? `正在匹配「${subject}」对应的学习空间...`
+        : '正在匹配学习空间...'
+
+    case 'getLearningSpaceDashboard':
+      return '正在分析这个学习空间的状态...'
+
     case 'learning_plan_tool':
       return subject
         ? `正在为你草拟关于「${subject}」的学习计划...`
@@ -182,6 +198,19 @@ export function formatCompletedText(toolName: string, args?: any): string {
         ? `查看了你${scope}的学习任务`
         : '查看了你的学习任务'
     }
+
+    case 'listLearningSpaces':
+      return subject
+        ? `查找了与「${subject}」相关的学习空间`
+        : '读取了你的学习空间'
+
+    case 'resolveLearningSpace':
+      return subject
+        ? `匹配了「${subject}」对应的学习空间`
+        : '匹配了学习空间'
+
+    case 'getLearningSpaceDashboard':
+      return '分析了学习空间状态'
 
     case 'learning_plan_tool':
       return subject
@@ -287,6 +316,16 @@ export function formatResultText(toolName: string, result?: any): string | null 
         : `${scopeText}共 ${count} 个任务`
     }
 
+    case 'listLearningSpaces':
+    case 'resolveLearningSpace': {
+      if (obj.summary) return obj.summary
+      const count = obj.total ?? obj.spaces?.length ?? 0
+      return count > 0 ? `找到 ${count} 个学习空间` : '暂未找到匹配的学习空间'
+    }
+
+    case 'getLearningSpaceDashboard':
+      return obj.summary || null
+
     case 'learning_plan_tool': {
       const success = obj.success
       if (success === false) return obj.error ?? '生成失败'
@@ -357,6 +396,12 @@ export function formatFailedText(toolName: string): string {
       return '分析学习进度失败'
     case 'queryTasks':
       return '查询学习任务失败'
+    case 'listLearningSpaces':
+      return '读取学习空间失败'
+    case 'resolveLearningSpace':
+      return '匹配学习空间失败'
+    case 'getLearningSpaceDashboard':
+      return '分析学习空间状态失败'
     case 'learning_plan_tool':
       return '生成学习计划失败'
     case 'generateResource':

@@ -22,8 +22,18 @@
 
     <!-- 结果句 + 草稿说明（展开后 / 失败时默认展开） -->
     <div class="tool-result-area" v-if="shouldShowResultArea">
+      <LearningSpaceDashboardCard
+        v-if="learningSpaceDashboardResult"
+        :result="learningSpaceDashboardResult"
+      />
+
+      <LearningSpaceListCard
+        v-else-if="learningSpaceListResult"
+        :result="learningSpaceListResult"
+      />
+
       <!-- AI 测评快捷答题卡片 -->
-      <div v-if="quizResult" class="quiz-card-inline">
+      <div v-else-if="quizResult" class="quiz-card-inline">
         <div class="quiz-card-left">
           <div class="quiz-card-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -83,6 +93,8 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
+import LearningSpaceDashboardCard from './LearningSpaceDashboardCard.vue'
+import LearningSpaceListCard from './LearningSpaceListCard.vue'
 import {
   formatRunningText,
   formatCompletedText,
@@ -109,6 +121,22 @@ const props = defineProps<{
 const expanded = ref(true)
 const router = useRouter()
 
+const normalizedResult = computed(() => normalizeResult(props.result))
+
+const learningSpaceDashboardResult = computed(() => {
+  const obj = normalizedResult.value
+  if (!obj || props.status !== 'completed') return null
+  return obj.cardType === 'learning_space_dashboard' ? obj : null
+})
+
+const learningSpaceListResult = computed(() => {
+  const obj = normalizedResult.value
+  if (!obj || props.status !== 'completed') return null
+  return obj.cardType === 'learning_space_list' || obj.cardType === 'learning_space_resolved'
+    ? obj
+    : null
+})
+
 const quizResult = computed(() => {
   if (
     (props.toolName !== 'generateQuiz' && props.toolName !== 'assessment_tool') ||
@@ -117,7 +145,7 @@ const quizResult = computed(() => {
   ) {
     return null
   }
-  return normalizeResult(props.result)
+  return normalizedResult.value
 })
 
 const startQuiz = (quiz: any) => {
@@ -142,7 +170,7 @@ function normalizeResult(result: any): Record<string, any> | null {
 
 const searchRefs = computed<SearchReference[]>(() => {
   if (props.toolName !== 'webSearch' || props.status !== 'completed' || !props.result) return []
-  const obj = normalizeResult(props.result)
+  const obj = normalizedResult.value
   if (!obj) return []
   const refs = obj.references ?? obj.webSearchReferences
   if (!Array.isArray(refs) || refs.length === 0) return []
@@ -190,7 +218,7 @@ const draftNote = computed(() => {
 })
 
 const hasResultText = computed(() => {
-  return !!(resultText.value || draftNote.value)
+  return !!(resultText.value || draftNote.value || learningSpaceDashboardResult.value || learningSpaceListResult.value)
 })
 
 const shouldShowResultArea = computed(() => {

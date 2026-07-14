@@ -395,6 +395,23 @@
               <div class="mode-selector">
                 <button
                   class="mode-btn"
+                  :class="{ active: currentMode === 'AUTO' }"
+                  @click="switchMode('AUTO')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <path d="M12 2v4"/>
+                    <path d="M12 18v4"/>
+                    <path d="M4.93 4.93l2.83 2.83"/>
+                    <path d="M16.24 16.24l2.83 2.83"/>
+                    <path d="M2 12h4"/>
+                    <path d="M18 12h4"/>
+                    <path d="M4.93 19.07l2.83-2.83"/>
+                    <path d="M16.24 7.76l2.83-2.83"/>
+                  </svg>
+                  <span>智能路由</span>
+                </button>
+                <button
+                  class="mode-btn"
                   :class="{ active: currentMode === 'REACT' }"
                   @click="switchMode('REACT')"
                 >
@@ -667,12 +684,14 @@ const {
   confirmGateViaSSE,
 } = useAgentChat(scrollToBottom)
 
-// 用户手动选择的对话模式
-const currentMode = ref<'REACT' | 'PLAN_AND_EXECUTE'>('REACT')
+type ChatMode = 'AUTO' | 'REACT' | 'PLAN_AND_EXECUTE'
 
-const switchMode = (mode: 'REACT' | 'PLAN_AND_EXECUTE') => {
+// 默认使用后端意图路由，让系统按用户问题选择工具集
+const currentMode = ref<ChatMode>('AUTO')
+
+const switchMode = (mode: ChatMode) => {
   currentMode.value = mode
-  currentForceMode.value = mode
+  currentForceMode.value = mode === 'AUTO' ? null : mode
 }
 
 // 监听 AI 消息变化，将最新消息传递给数字人
