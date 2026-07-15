@@ -706,7 +706,7 @@ import type { LearningAlgorithmState } from '@/api/algorithm'
 const route = useRoute()
 const router = useRouter()
 const dashStore = useSpaceDashboardStore()
-const { enterStudy } = useStudyEntry()
+const { enterStudy, enterTask } = useStudyEntry()
 
 const activeTab = ref('today')
 const pathViewMode = ref<'mindmap' | 'timeline'>('mindmap')
@@ -1276,7 +1276,7 @@ async function handleGenerateResourcePackage() {
 async function handleStartTask(task: TaskVO) {
   try {
     await dashStore.startTask(task.id)
-    enterStudy(task.id, { spaceId: spaceId.value, source: 'space_task' })
+    enterTask(task, { spaceId: spaceId.value, source: 'space_task' })
   } catch {
     ElMessage.error('开始任务失败')
   }
@@ -1305,11 +1305,11 @@ function handleContinueToday() {
   }
   if (task.status === 'pending') {
     dashStore.startTask(task.id).finally(() => {
-      enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero' })
+      enterTask(task, { spaceId: spaceId.value, source: 'space_hero' })
     })
     return
   }
-  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero' })
+  enterTask(task, { spaceId: spaceId.value, source: 'space_hero' })
 }
 
 /** 继续学习 hero 区块的"开始学习"主按钮 */
@@ -1323,7 +1323,7 @@ function handleStartFromHero() {
   if (task.status === 'pending') {
     dashStore.startTask(task.id).catch(() => {})
   }
-  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero' })
+  enterTask(task, { spaceId: spaceId.value, source: 'space_hero' })
 }
 
 function handleAdjustDuration() {

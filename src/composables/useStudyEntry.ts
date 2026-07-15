@@ -50,6 +50,35 @@ export function useStudyEntry() {
     })
   }
 
+  function enterTask(task: Pick<TaskVO, 'id' | 'spaceId' | 'pathNodeId' | 'actionType' | 'targetType' | 'targetId'> | null | undefined,
+    options: EnterStudyOptions = {}) {
+    if (!task || !task.id) {
+      ElMessage.warning('Agent 暂未为该任务准备好执行入口，请稍后再试')
+      return
+    }
+    if (
+      (task.actionType === 'practice_set' || task.actionType === 'assessment') &&
+      (task.targetType === 'practice_session' || task.targetType === 'assessment_session') &&
+      task.targetId
+    ) {
+      router.push({
+        name: 'ExamSession',
+        query: {
+          sessionId: String(task.targetId),
+          taskId: String(task.id),
+          spaceId: String(task.spaceId),
+          source: options.source || 'task',
+        },
+      })
+      return
+    }
+    enterStudy(task.id, {
+      ...options,
+      spaceId: options.spaceId || task.spaceId,
+      pathNodeId: options.pathNodeId || task.pathNodeId || undefined,
+    })
+  }
+
   /**
    * 进入"今日第一个学习会话"（首页 hero / 每日计划"开始今日总计划"用）
    *
@@ -57,14 +86,14 @@ export function useStudyEntry() {
    * 若没有候选任务，提示用户今日 Agent 暂未排任务。
    */
   function enterTodayFirst(
-    firstTask?: Pick<TaskVO, 'id' | 'spaceId'> | null,
+    firstTask?: Pick<TaskVO, 'id' | 'spaceId' | 'pathNodeId' | 'actionType' | 'targetType' | 'targetId'> | null,
     source: StudyEntrySource = 'dashboard_hero',
   ) {
     if (!firstTask || !firstTask.id) {
       ElMessage.info('今日 Agent 暂未排定学习会话，去 AI 总学习伙伴 问问下一步学什么？')
       return
     }
-    enterStudy(firstTask.id, {
+    enterTask(firstTask, {
       mode: 'learn' as StudyMode,
       spaceId: firstTask.spaceId,
       source,
@@ -73,6 +102,7 @@ export function useStudyEntry() {
 
   return {
     enterStudy,
+    enterTask,
     enterPathNodeStudy,
     enterTodayFirst,
   }

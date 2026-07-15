@@ -38,14 +38,14 @@
         class="task-btn start"
         @click.stop="$emit('start', task)"
       >
-        开始这次学习
+        {{ startButtonLabel }}
       </button>
       <template v-else-if="task.status === 'in_progress' || task.status === 'doing'">
         <button
           class="task-btn continue"
           @click.stop="$emit('start', task)"
         >
-          继续学习
+          {{ continueButtonLabel }}
         </button>
         <button
           class="task-btn complete"
@@ -90,6 +90,20 @@ const actionLabel = computed(() => {
     summary_reflection: '总结复盘',
   }
   return m[props.task.actionType || 'learn_script'] || props.task.actionType || '学习'
+})
+
+const startButtonLabel = computed(() => {
+  if (props.task.actionType === 'practice_set') return '开始练习'
+  if (props.task.actionType === 'assessment') return '开始测评'
+  if (props.task.actionType === 'read_resource') return '阅读资源'
+  if (props.task.actionType === 'watch_video') return '观看讲解'
+  return '开始这次学习'
+})
+
+const continueButtonLabel = computed(() => {
+  if (props.task.actionType === 'practice_set') return '继续练习'
+  if (props.task.actionType === 'assessment') return '继续测评'
+  return '继续学习'
 })
 </script>
 
