@@ -51,7 +51,10 @@
         <!-- 主体双栏内容 -->
         <div class="security-content">
           <!-- 左侧：账户凭证 -->
-          <CredentialSection :user-info="userCredentialData" />
+          <CredentialSection
+            :user-info="userCredentialData"
+            @change-email="showEmailDialog = true"
+          />
 
           <!-- 右侧：第三方账号绑定 -->
           <QuickLoginBindingSection
@@ -499,6 +502,12 @@
           <el-button type="primary" :loading="saving" @click="saveProfile">保存</el-button>
         </template>
       </el-dialog>
+
+      <!-- 修改邮箱对话框 -->
+      <EmailEditDialog
+        v-model="showEmailDialog"
+        :current-email="currentEmail"
+      />
     </div>
   </AppLayout>
 </template>
@@ -521,9 +530,11 @@ import type {
 import ProfileHeader from './components/ProfileHeader.vue'
 import CredentialSection from './components/CredentialSection.vue'
 import QuickLoginBindingSection from './components/QuickLoginBindingSection.vue'
+import EmailEditDialog from './components/EmailEditDialog.vue'
 
 const userStore = useUserStore()
 const showEditDialog = ref(false)
+const showEmailDialog = ref(false)
 const profileLoading = ref(false)
 const profileData = ref<StudentProfileData | null>(null)
 
@@ -593,6 +604,8 @@ const userInfoHeaderData = computed(() => {
     weeklyMinutes: userInfo.value.weeklyMinutes
   }
 })
+
+const currentEmail = computed(() => userStore.userInfo?.email || '')
 
 // 传给 CredentialSection 的数据
 const userCredentialData = computed(() => {
