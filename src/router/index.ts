@@ -82,7 +82,7 @@ const routes: Array<RouteRecordRaw> = [
     path: '/resources',
     name: 'Resources',
     component: () => import('@/views/Resources/index.vue'),
-    meta: { title: '资源中心 - 知序智学', requiresAuth: true }
+    meta: { title: '资源广场 - 知序智学', requiresAuth: true }
   },
   {
     path: '/resources/:resourceId',

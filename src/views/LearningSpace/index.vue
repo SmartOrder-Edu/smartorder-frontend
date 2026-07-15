@@ -60,9 +60,8 @@
               </div>
               <div class="progress-copy">
                 <span class="progress-label">今日焦点</span>
-                <strong>{{ nextTodayTask?.title || '等待 Agent 生成新的学习任务' }}</strong>
-                <p v-if="nextTodayTask?.aiSuggestion">{{ nextTodayTask.aiSuggestion }}</p>
-                <p v-else>保持节奏，按当前学习计划推进即可。</p>
+                <strong>{{ todayFocusTitle }}</strong>
+                <p>{{ todayFocusReason }}</p>
               </div>
             </div>
 
@@ -102,7 +101,7 @@
           </div>
 
           <!-- Agent Insight Banner -->
-          <div class="agent-insight-banner" v-if="dashboard.agentInsight" @click="$refs.agentPanel?.open?.()">
+          <div class="agent-insight-banner" v-if="dashboard.agentInsight" @click="agentPanelRef?.open?.()">
             <div class="insight-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
@@ -111,6 +110,42 @@
             </div>
             <span class="insight-text">{{ dashboard.agentInsight }}</span>
             <span class="insight-link">查看建议 →</span>
+          </div>
+
+          <div
+            v-if="algorithmLoading || algorithmState || algorithmError"
+            class="algorithm-diagnosis-band"
+            :class="{ muted: algorithmError }"
+          >
+            <div class="adb-main">
+              <span class="adb-eyebrow">学习诊断</span>
+              <template v-if="algorithmLoading">
+                <h3>正在读取当前空间的掌握度证据</h3>
+                <p>会优先使用测评结果、题目知识点映射和近期答题证据。</p>
+              </template>
+              <template v-else-if="algorithmError">
+                <h3>诊断暂不可用</h3>
+                <p>{{ algorithmError }}</p>
+              </template>
+              <template v-else>
+                <h3>{{ algorithmNextActionTitle }}</h3>
+                <p>{{ algorithmNextActionReason }}</p>
+              </template>
+            </div>
+            <div class="adb-stats" v-if="algorithmState">
+              <div>
+                <strong>{{ algorithmAssessedCount }}/{{ algorithmKnowledgeCount }}</strong>
+                <span>已评估知识点</span>
+              </div>
+              <div>
+                <strong>{{ algorithmWeakCount }}</strong>
+                <span>薄弱点</span>
+              </div>
+              <div>
+                <strong>{{ algorithmMasteryPercent }}%</strong>
+                <span>平均掌握度</span>
+              </div>
+            </div>
           </div>
 
           <!-- 继续学习 hero 区块：本空间主入口 -->
@@ -129,12 +164,7 @@
             <h2 class="csb-title">
               {{ nextTodayTask ? `继续学习：${nextTodayTask.title}` : '今日 Agent 暂未排定具体任务' }}
             </h2>
-            <p class="csb-judge" v-if="dashboard.agentInsight">
-              Agent 判断：{{ dashboard.agentInsight }}
-            </p>
-            <p class="csb-judge" v-else-if="nextTodayTask?.aiSuggestion">
-              Agent 判断：{{ nextTodayTask.aiSuggestion }}
-            </p>
+            <p class="csb-judge">Agent 判断：{{ todayFocusReason }}</p>
             <div class="csb-actions">
               <button class="csb-btn primary" :disabled="!nextTodayTask" @click="handleStartFromHero">
                 开始学习
@@ -353,16 +383,47 @@
 
           <!-- Tab: Path -->
           <div v-show="activeTab === 'path'" class="tab-content">
-            <div class="section-header">
-              <h3>学习路径</h3>
-              <span class="task-count">{{ dashboard.pathProgress.completedNodes }}/{{ dashboard.pathProgress.totalNodes }} 阶段</span>
+            <div class="section-header path-section-header">
+              <div>
+                <h3>学习路径</h3>
+                <span class="path-section-subtitle">用思维导图总览知识节点，用时间线查看执行细节</span>
+              </div>
+              <div class="path-header-actions">
+                <div class="path-view-switch" role="tablist" aria-label="学习路径视图">
+                  <button
+                    type="button"
+                    :class="{ active: pathViewMode === 'mindmap' }"
+                    @click="pathViewMode = 'mindmap'"
+                  >
+                    思维导图
+                  </button>
+                  <button
+                    type="button"
+                    :class="{ active: pathViewMode === 'timeline' }"
+                    @click="pathViewMode = 'timeline'"
+                  >
+                    时间线
+                  </button>
+                </div>
+                <span class="task-count">{{ dashboard.pathProgress.completedNodes }}/{{ dashboard.pathProgress.totalNodes }} 阶段</span>
+              </div>
             </div>
-            <PathTimeline
-              v-if="dashboard.pathNodes.length"
-              :nodes="dashboard.pathNodes"
-              :tasks="allTasks"
-              :resources="dashboard.resources"
-            />
+            <template v-if="dashboard.pathNodes.length">
+              <LearningPathMindMap
+                v-show="pathViewMode === 'mindmap'"
+                :nodes="dashboard.pathNodes"
+                :tasks="allTasks"
+                :resources="dashboard.resources"
+                :title="dashboard.space.name"
+                :progress="dashboard.progress"
+              />
+              <PathTimeline
+                v-show="pathViewMode === 'timeline'"
+                :nodes="dashboard.pathNodes"
+                :tasks="allTasks"
+                :resources="dashboard.resources"
+              />
+            </template>
             <el-empty v-else description="学习路径即将由 Agent 生成" :image-size="100" />
           </div>
 
@@ -502,19 +563,19 @@
             </div>
             <div class="assessment-summary">
               <div class="assess-stat">
-                <span class="assess-value green">72%</span>
-                <span class="assess-label">近期正确率</span>
+                <span class="assess-value green">{{ algorithmMasteryPercent }}%</span>
+                <span class="assess-label">平均掌握度</span>
               </div>
               <div class="assess-stat">
-                <span class="assess-value blue">12</span>
-                <span class="assess-label">已答题目</span>
+                <span class="assess-value blue">{{ algorithmAssessedCount }}</span>
+                <span class="assess-label">已评估知识点</span>
               </div>
               <div class="assess-stat">
-                <span class="assess-value purple">3</span>
+                <span class="assess-value purple">{{ algorithmWeakCount }}</span>
                 <span class="assess-label">薄弱知识点</span>
               </div>
             </div>
-            <div class="weakness-list">
+            <div class="weakness-list" v-if="weaknesses.length">
               <span class="weakness-tag" v-for="w in weaknesses" :key="w">{{ w }}</span>
             </div>
 
@@ -601,7 +662,7 @@
 
         <!-- Agent Sidebar -->
         <SpaceAgentPanel
-          ref="agentPanel"
+          ref="agentPanelRef"
           :space-name="dashboard.space.name"
           :insight="dashboard.agentInsight"
           :agent-actions="dashboard.recentAgentActions"
@@ -622,12 +683,14 @@ import SpaceStatCard from '@/components/SpaceStatCard.vue'
 import { BarChartIcon, FlameIcon, CalendarIcon, ZapIcon } from '@/assets/icons'
 import TaskCard from '@/components/TaskCard.vue'
 import PathTimeline from '@/components/PathTimeline.vue'
+import LearningPathMindMap from '@/components/LearningPathMindMap.vue'
 import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
 import { resourceGenerationJobApi, resourcePackageApi } from '@/api/spaceDashboard'
 import { learningResourceApi } from '@/api/learningResource'
+import { fetchLearningState } from '@/api/algorithm'
 import type {
   ResourceGenerationJobVO,
   ResourcePackageGenerateDTO,
@@ -638,6 +701,7 @@ import type {
   TaskVO,
 } from '@/types/learningSpace'
 import type { LearningPlanDraft, PhaseInfo, ResourceInfo, KnowledgeNode } from '@/types/planExecute'
+import type { LearningAlgorithmState } from '@/api/algorithm'
 
 const route = useRoute()
 const router = useRouter()
@@ -645,6 +709,7 @@ const dashStore = useSpaceDashboardStore()
 const { enterStudy } = useStudyEntry()
 
 const activeTab = ref('today')
+const pathViewMode = ref<'mindmap' | 'timeline'>('mindmap')
 const showAddTask = ref(false)
 const planDraft = ref<LearningPlanDraft | null>(null)
 const planLoading = ref(false)
@@ -659,6 +724,10 @@ const generatingResourceIds = ref<string[]>([])
 const resourceGenerationJobs = ref<ResourceGenerationJobVO[]>([])
 const resourcePollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const resourcePollingInFlight = ref(false)
+const algorithmState = ref<LearningAlgorithmState | null>(null)
+const algorithmLoading = ref(false)
+const algorithmError = ref('')
+const agentPanelRef = ref<InstanceType<typeof SpaceAgentPanel> | null>(null)
 
 const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
@@ -671,7 +740,35 @@ const tabs = computed(() => [
   { id: 'records', label: '记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>', badge: dashboard.value?.recentRecords.length || 0 },
 ])
 
-const weaknesses = ['洛必达法则适用条件', '无穷小阶数比较', '间断点分类']
+const fallbackWeaknesses = ['洛必达法则适用条件', '无穷小阶数比较', '间断点分类']
+const algorithmWeakPoints = computed(() => algorithmState.value?.weakPoints || [])
+const algorithmWeakCount = computed(() => algorithmWeakPoints.value.length)
+const algorithmKnowledgeCount = computed(() => Number(algorithmState.value?.knowledgeCount || 0))
+const algorithmAssessedCount = computed(() => Number(algorithmState.value?.assessedCount || 0))
+const algorithmAverageMastery = computed(() => {
+  const states = algorithmState.value?.knowledgeStates || []
+  if (!states.length) return null
+  return states.reduce((sum, item) => sum + clampNumber(item.mastery, 0, 1), 0) / states.length
+})
+const algorithmMasteryPercent = computed(() => {
+  const mastery = algorithmAverageMastery.value
+  if (mastery == null) return Math.round(dashboard.value?.progress || 0)
+  return Math.round(mastery * 100)
+})
+const weaknesses = computed(() => {
+  const names = algorithmWeakPoints.value.map(item => item.name).filter(Boolean)
+  return names.length ? names.slice(0, 6) : fallbackWeaknesses
+})
+const algorithmNextAction = computed(() => algorithmState.value?.nextAction || null)
+const algorithmNextActionTitle = computed(() => {
+  const action = algorithmNextAction.value
+  if (!action) return '暂无足够诊断证据'
+  if (action.knowledgeName) return `建议先处理「${action.knowledgeName}」`
+  return actionTypeLabel(action.type)
+})
+const algorithmNextActionReason = computed(() =>
+  algorithmNextAction.value?.reason || '当前证据不足，建议先完成一次诊断测评。'
+)
 const packageTypeOptions: { value: ResourceType; label: string }[] = [
   { value: 'doc', label: '文档' },
   { value: 'html', label: 'HTML' },
@@ -709,6 +806,19 @@ const maxDuration = computed(() => {
 const nextTodayTask = computed(() => {
   const tasks = dashboard.value?.todayTasks || []
   return tasks.find(t => t.status === 'in_progress') || tasks.find(t => t.status === 'pending') || tasks[0]
+})
+
+const todayFocusTitle = computed(() => {
+  if (nextTodayTask.value?.title) return nextTodayTask.value.title
+  if (algorithmNextAction.value?.knowledgeName) return `诊断建议：${algorithmNextAction.value.knowledgeName}`
+  return '等待 Agent 生成新的学习任务'
+})
+
+const todayFocusReason = computed(() => {
+  if (nextTodayTask.value?.aiSuggestion) return nextTodayTask.value.aiSuggestion
+  if (algorithmNextAction.value?.reason) return algorithmNextAction.value.reason
+  if (dashboard.value?.agentInsight) return dashboard.value.agentInsight
+  return '保持节奏，按当前学习计划推进即可。'
 })
 
 const heroProgressStyle = computed(() => {
@@ -826,6 +936,22 @@ const generationJobByResourceId = computed(() => {
 function riskLabel(s: RiskStatus) {
   const m: Record<string, string> = { good: '良好', normal: '正常', warning: '注意', danger: '危险' }
   return m[s] || s
+}
+
+function clampNumber(value: unknown, min: number, max: number) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return min
+  return Math.min(Math.max(num, min), max)
+}
+
+function actionTypeLabel(type?: string) {
+  const map: Record<string, string> = {
+    diagnostic_quiz: '先做诊断题',
+    weakness_practice: '安排补弱练习',
+    verification_quiz: '先做验证题',
+    advance_or_review: '推进新内容或轻量复习',
+  }
+  return map[type || ''] || '下一步学习动作'
 }
 
 function resourceIcon(t: string) {
@@ -1252,6 +1378,21 @@ async function loadLearningPlan(id: string) {
   }
 }
 
+async function loadAlgorithmState(id: string) {
+  if (!id) return
+  algorithmLoading.value = true
+  algorithmError.value = ''
+  try {
+    algorithmState.value = await fetchLearningState(id)
+  } catch (e) {
+    console.warn('Failed to load learning algorithm state:', e)
+    algorithmState.value = null
+    algorithmError.value = '无法读取算法诊断，当前页面会继续使用学习空间已有任务和记录。'
+  } finally {
+    algorithmLoading.value = false
+  }
+}
+
 function loadDashboard() {
   const id = spaceId.value
   if (id) {
@@ -1260,6 +1401,7 @@ function loadDashboard() {
       if (hasActiveResourceGeneration()) startResourceGenerationPolling()
     })
     loadLearningPlan(id)
+    loadAlgorithmState(id)
   }
 }
 
@@ -2676,6 +2818,76 @@ watch(
   font-weight: 700;
 }
 
+.algorithm-diagnosis-band {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  background: linear-gradient(135deg, rgba(240, 249, 255, 0.88), rgba(236, 253, 245, 0.72));
+
+  &.muted {
+    border-color: rgba(148, 163, 184, 0.2);
+    background: #f8fafc;
+  }
+}
+
+.adb-eyebrow {
+  display: inline-flex;
+  margin-bottom: 5px;
+  color: #0284c7;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.adb-main {
+  min-width: 0;
+
+  h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 0.96rem;
+    line-height: 1.4;
+  }
+
+  p {
+    margin: 5px 0 0;
+    color: #475569;
+    font-size: 0.8rem;
+    line-height: 1.55;
+  }
+}
+
+.adb-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(78px, 1fr));
+  gap: 8px;
+
+  div {
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  strong {
+    display: block;
+    color: #0f172a;
+    font-size: 0.95rem;
+    line-height: 1.2;
+  }
+
+  span {
+    color: #64748b;
+    font-size: 0.66rem;
+    font-weight: 700;
+  }
+}
+
 /* 继续学习 hero 区块 */
 .continue-study-block {
   margin-top: 16px;
@@ -2833,6 +3045,58 @@ watch(
   font-size: 1.05rem;
 }
 
+.path-section-header {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.path-section-subtitle {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.path-header-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 10px;
+}
+
+.path-view-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+
+  button {
+    min-height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+
+    &:hover {
+      color: #0f172a;
+    }
+
+    &.active {
+      background: #ffffff;
+      color: #0a9e94;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    }
+  }
+}
+
 .task-count {
   padding: 3px 9px;
   border-radius: 999px;
@@ -2978,6 +3242,24 @@ watch(
     flex: 0 0 auto;
   }
 
+  .path-section-header,
+  .path-header-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .path-header-actions {
+    width: 100%;
+  }
+
+  .path-view-switch {
+    width: 100%;
+
+    button {
+      flex: 1;
+    }
+  }
+
   .phase-resources,
   .resource-grid {
     grid-template-columns: 1fr;
@@ -3046,6 +3328,14 @@ watch(
 
   .progress-panel {
     flex-direction: column;
+  }
+
+  .algorithm-diagnosis-band {
+    grid-template-columns: 1fr;
+  }
+
+  .adb-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 </style>
