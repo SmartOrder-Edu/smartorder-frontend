@@ -4,8 +4,16 @@
       <!-- 页面标题 -->
       <div class="page-header">
         <div class="header-left">
-          <h1 class="page-title">资源中心</h1>
-          <p class="page-desc">系统为你推荐和生成的学习资源，AI 会根据你的画像匹配合适的资料</p>
+          <h1 class="page-title">资源广场</h1>
+          <p class="page-desc">浏览学习资源广场，发布你的资源与同学共享；Agent 会根据你的学习画像为你精选一个推荐资源</p>
+        </div>
+        <div class="header-right">
+          <el-button type="primary" @click="showFilePicker = true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            发布资源到广场
+          </el-button>
         </div>
       </div>
 
@@ -28,17 +36,31 @@
           </div>
         </div>
         <el-select v-model="sortBy" style="width: 140px;">
-          <el-option label="智能排序" value="relevance" />
           <el-option label="最新资源" value="newest" />
-          <el-option label="最短时长" value="shortest" />
+          <el-option label="最多转存" value="download" />
           <el-option label="最高推荐" value="rating" />
         </el-select>
       </div>
 
-      <!-- 推荐资源横幅 -->
-      <section class="featured-banner" v-if="featuredResource">
+      <!-- Agent 精选横幅：loading / 数据就绪 / 空 -->
+      <section v-if="featuredLoading" class="featured-banner featured-skeleton">
         <div class="featured-content">
-          <div class="featured-badge">热门推荐</div>
+          <div class="skel-badge-line"></div>
+          <div class="skel-title-line"></div>
+          <div class="skel-desc-line"></div>
+          <div class="skel-desc-line short"></div>
+          <div class="skel-meta-line"></div>
+        </div>
+        <div class="featured-visual">
+          <div class="visual-card"><div class="card-glow"></div></div>
+        </div>
+      </section>
+
+      <section v-else-if="featuredResource" class="featured-banner">
+        <div class="featured-content">
+          <div class="featured-badge" :class="featuredReason">
+            {{ featuredReason === 'agent' ? 'Agent 精选' : '热门精选' }}
+          </div>
           <h2 class="featured-title">{{ featuredResource.title }}</h2>
           <p class="featured-desc">{{ featuredResource.description || '暂无描述' }}</p>
           <div class="featured-meta">
@@ -49,6 +71,10 @@
             <span class="meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
               {{ featuredResource.ratingAvg }} 推荐指数
+            </span>
+            <span class="meta-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              {{ featuredResource.viewCount ?? 0 }} 浏览
             </span>
             <span class="meta-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
@@ -111,14 +137,14 @@
         </div>
 
         <!-- 空状态 -->
-        <div v-else-if="filteredResources.length === 0" class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 60px 0;">
+        <div v-else-if="squareResources.length === 0" class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 60px 0;">
           <p class="empty-title" style="font-size: 1rem; color: #64748b;">暂无资源</p>
           <p class="empty-desc" style="font-size: 0.8125rem; color: #94a3b8;">还没有人发布资源到广场</p>
         </div>
 
         <div v-else class="resources-grid">
           <div
-            v-for="resource in filteredResources"
+            v-for="resource in squareResources"
             :key="resource.id"
             class="resource-card"
             :class="`type-${resource.category}`"
@@ -136,9 +162,9 @@
               <h4 class="card-title">{{ resource.title }}</h4>
               <p class="card-desc">{{ resource.description || '暂无描述' }}</p>
 
-              <div class="card-reason">
-                <span class="reason-label">发布者：</span>
-                <span class="reason-text">{{ resource.publisherName || '未知用户' }}</span>
+              <div class="card-publisher">
+                <span class="publisher-label">发布者：</span>
+                <span class="publisher-name-text">{{ resource.publisherName || '未知用户' }}</span>
               </div>
 
               <div class="card-tags">
@@ -153,6 +179,10 @@
                 <span class="meta-item">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
                   {{ resource.downloadCount }}
+                </span>
+                <span class="meta-item views">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  {{ resource.viewCount ?? 0 }}
                 </span>
                 <span class="meta-item rating">
                   <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
@@ -176,81 +206,67 @@
         </div>
 
         <!-- 分页 -->
-        <div v-if="totalCount > pageSize" style="display: flex; justify-content: center; margin-top: 24px;">
+        <div v-if="totalCount > 0" class="pagination-wrap">
           <el-pagination
             v-model:current-page="currentPage"
-            :page-size="pageSize"
+            v-model:page-size="pageSize"
+            :page-sizes="[12, 24, 48]"
             :total="totalCount"
-            layout="prev, pager, next"
+            layout="total, sizes, prev, pager, next, jumper"
             @current-change="fetchList"
+            @size-change="onSizeChange"
           />
         </div>
       </section>
 
     </div>
+
+    <!-- 发布流：文件选择 -> 发布表单 -->
+    <CloudFilePickerDialog
+      v-model:visible="showFilePicker"
+      @select="onPickerSelect"
+    />
+    <PublishToSquareDialog
+      v-model:visible="showPublishDialog"
+      :file="publishFileTarget"
+      @success="onPublishSuccess"
+    />
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { getSquareList, downloadFromSquare } from '@/api/resource-square'
-import type { ResourceSquareVO } from '@/types/resource-square'
+import CloudFilePickerDialog, { type PickedFile } from './components/CloudFilePickerDialog.vue'
+import PublishToSquareDialog from '@/views/CloudDrive/components/PublishToSquareDialog.vue'
+import { getSquareList, downloadFromSquare, getFeatured } from '@/api/resource-square'
+import type { ResourceSquareVO, FeaturedResourceVO, SquareSortBy } from '@/types/resource-square'
+import { resourceTypes, getCategoryName, getResourceIcon, formatFileSize } from './constants'
 
 const router = useRouter()
 
 const searchKeyword = ref('')
 const activeType = ref('all')
-const sortBy = ref('newest')
+const sortBy = ref<SquareSortBy>('newest')
 const isLoading = ref(false)
 
-// 真实数据
+// 列表数据
 const squareResources = ref<ResourceSquareVO[]>([])
 const totalCount = ref(0)
 const currentPage = ref(1)
-const pageSize = 12
+const pageSize = ref(12)
 
-const resourceTypes = [
-  { value: 'all', label: '全部', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
-  { value: 'doc', label: '文档', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>' },
-  { value: 'mindmap', label: '导图', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>' },
-  { value: 'video', label: '视频', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23,7 16,12 23,17"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>' },
-  { value: 'quiz', label: '练习', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' },
-  { value: 'case', label: '案例', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg>' }
-]
+// Agent 精选
+const featuredResource = ref<ResourceSquareVO | null>(null)
+const featuredReason = ref<'agent' | 'hot'>('hot')
+const featuredLoading = ref(false)
 
-const featuredResource = computed(() => {
-  // 取评分最高或下载最多的资源作为精选
-  return squareResources.value.length > 0 ? squareResources.value[0] : null
-})
-
-const filteredResources = computed(() => {
-  return squareResources.value
-})
-
-const categoryNameMap: Record<string, string> = {
-  doc: '文档',
-  mindmap: '思维导图',
-  video: '视频讲义',
-  quiz: '练习题',
-  case: '案例',
-}
-
-const getCategoryName = (category: string) => categoryNameMap[category] || category
-
-const formatFileSize = (bytes: number | undefined): string => {
-  if (!bytes || bytes === 0) return '--'
-  const units = ['B', 'KB', 'MB', 'GB']
-  let i = 0
-  let size = bytes
-  while (size >= 1024 && i < units.length - 1) {
-    size /= 1024
-    i++
-  }
-  return size.toFixed(i === 0 ? 0 : 1) + ' ' + units[i]
-}
+// 发布流
+const showFilePicker = ref(false)
+const showPublishDialog = ref(false)
+const publishFileTarget = ref<PickedFile | null>(null)
 
 const fetchList = async () => {
   isLoading.value = true
@@ -258,39 +274,62 @@ const fetchList = async () => {
     const res = await getSquareList({
       keyword: searchKeyword.value || undefined,
       category: activeType.value !== 'all' ? activeType.value : undefined,
-      sortBy: sortBy.value as any,
+      sortBy: sortBy.value,
       pageNum: currentPage.value,
-      pageSize,
+      pageSize: pageSize.value,
     })
     squareResources.value = res.records || []
     totalCount.value = res.total || 0
   } catch {
-    // 错误由拦截器处理
+    // 错误由请求拦截器统一弹 toast
   } finally {
     isLoading.value = false
   }
 }
 
-// 搜索/筛选/排序变化时重新加载
-watch([searchKeyword, activeType, sortBy], () => {
+const fetchFeatured = async () => {
+  featuredLoading.value = true
+  try {
+    const res = await getFeatured()
+    if (res) {
+      featuredResource.value = res.resource
+      featuredReason.value = res.reason
+    } else {
+      featuredResource.value = null
+    }
+  } catch {
+    // 精选加载失败不影响主列表
+    featuredResource.value = null
+  } finally {
+    featuredLoading.value = false
+  }
+}
+
+// 搜索防抖 300ms（与筛选/排序分离，避免每次按键都打后端）
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+watch(searchKeyword, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1
+    fetchList()
+  }, 300)
+})
+
+// 类型/排序变化即时刷新
+watch([activeType, sortBy], () => {
   currentPage.value = 1
   fetchList()
 })
 
+const onSizeChange = () => {
+  currentPage.value = 1
+  fetchList()
+}
+
 onMounted(() => {
   fetchList()
+  fetchFeatured()
 })
-
-const getResourceIcon = (type: string) => {
-  const icons: Record<string, string> = {
-    doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
-    mindmap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="5" cy="19" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
-    video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23,7 16,12 23,17"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>',
-    quiz: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
-    case: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/></svg>'
-  }
-  return icons[type] || icons.doc
-}
 
 const openResource = (resource: ResourceSquareVO) => {
   router.push(`/resource-square/${resource.id}`)
@@ -304,11 +343,26 @@ const collectResource = async (resource: ResourceSquareVO) => {
   try {
     await downloadFromSquare(resource.id)
     ElMessage.success('已转存到您的云盘')
+    // 仅在请求成功后更新本地态；失败时拦截器已弹 toast，此处不变更
     resource.hasDownloaded = true
     resource.downloadCount++
   } catch {
-    // 错误由拦截器处理
+    // 错误由请求拦截器处理，不乐观变更
   }
+}
+
+// 发布流处理
+const onPickerSelect = (file: PickedFile) => {
+  publishFileTarget.value = file
+  showPublishDialog.value = true
+}
+
+const onPublishSuccess = () => {
+  showPublishDialog.value = false
+  publishFileTarget.value = null
+  // 新资源可能入选精选，列表与精选均刷新
+  fetchList()
+  fetchFeatured()
 }
 </script>
 
@@ -418,11 +472,21 @@ const collectResource = async (resource: ResourceSquareVO) => {
   top: var(--spacing-lg);
   left: var(--spacing-lg);
   padding: 4px 12px;
-  background: rgba(18, 184, 134, 0.2);
-  color: #38d9a9;
   border-radius: var(--radius-full);
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+/* hot 回退：暖色调，诚实标识非 Agent 挑选 */
+.featured-badge.hot {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+/* agent 精选：主色 AI 调 */
+.featured-badge.agent {
+  background: rgba(11, 183, 170, 0.25);
+  color: #5eead4;
 }
 
 .featured-content {
@@ -447,6 +511,7 @@ const collectResource = async (resource: ResourceSquareVO) => {
   display: flex;
   gap: var(--spacing-xl);
   margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
 }
 
 .meta-item {
@@ -509,6 +574,27 @@ const collectResource = async (resource: ResourceSquareVO) => {
   0%, 100% { opacity: 0.5; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.1); }
 }
+
+/* 精选横幅 loading 骨架 */
+.featured-skeleton {
+  pointer-events: none;
+}
+
+.featured-skeleton .skel-badge-line,
+.featured-skeleton .skel-title-line,
+.featured-skeleton .skel-desc-line,
+.featured-skeleton .skel-meta-line {
+  background: linear-gradient(110deg, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.08) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+.featured-skeleton .skel-badge-line { width: 80px; height: 22px; border-radius: 99px; margin-bottom: 16px; }
+.featured-skeleton .skel-title-line { width: 60%; height: 26px; margin-bottom: 16px; }
+.featured-skeleton .skel-desc-line { width: 90%; height: 16px; margin-bottom: 10px; }
+.featured-skeleton .skel-desc-line.short { width: 50%; }
+.featured-skeleton .skel-meta-line { width: 70%; height: 14px; margin-top: 8px; }
 
 /* 资源网格 */
 .grid-header {
@@ -582,15 +668,6 @@ const collectResource = async (resource: ResourceSquareVO) => {
   align-items: center;
 }
 
-.ai-badge {
-  padding: 2px 8px;
-  background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
-  color: white;
-  border-radius: var(--radius-full);
-  font-size: 0.5625rem;
-  font-weight: 600;
-}
-
 .type-badge {
   padding: 2px 8px;
   background: rgba(148, 163, 184, 0.1);
@@ -619,7 +696,7 @@ const collectResource = async (resource: ResourceSquareVO) => {
   line-height: 1.5;
 }
 
-.card-reason {
+.card-publisher {
   background: rgba(11, 183, 170, 0.04);
   border-radius: var(--radius-md);
   padding: var(--spacing-sm);
@@ -628,8 +705,8 @@ const collectResource = async (resource: ResourceSquareVO) => {
   line-height: 1.5;
 }
 
-.reason-label { color: var(--primary-color); font-weight: 600; }
-.reason-text { color: var(--text-secondary); }
+.publisher-label { color: var(--primary-color); font-weight: 600; }
+.publisher-name-text { color: var(--text-secondary); }
 
 .card-tags {
   display: flex;
@@ -650,6 +727,7 @@ const collectResource = async (resource: ResourceSquareVO) => {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  flex-wrap: wrap;
 }
 
 .card-meta .meta-item {
@@ -663,6 +741,10 @@ const collectResource = async (resource: ResourceSquareVO) => {
 .card-meta .meta-item svg {
   width: 12px;
   height: 12px;
+}
+
+.card-meta .views {
+  color: var(--text-muted);
 }
 
 .card-meta .rating {
@@ -688,16 +770,10 @@ const collectResource = async (resource: ResourceSquareVO) => {
   gap: 4px;
 }
 
-.generate-form .form-item {
-  margin-bottom: var(--spacing-lg);
-}
-
-.generate-form label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  margin-bottom: var(--spacing-sm);
+.pagination-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
 }
 
 /* ==================== 骨架屏加载动画 ==================== */
