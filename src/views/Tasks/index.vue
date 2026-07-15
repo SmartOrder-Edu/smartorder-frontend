@@ -5,7 +5,7 @@
       <div class="page-header">
         <div class="header-left">
           <h1 class="page-title">任务中心</h1>
-          <p class="page-desc">管理你的所有学习任务，系统会根据画像动态调整</p>
+          <p class="page-desc">管理你的所有学习任务，按学习空间和路径节点推进</p>
         </div>
         <div class="header-right">
           <el-button-group>
@@ -24,7 +24,7 @@
               <path d="M12 2a10 10 0 1 0 10 10H12V2z"/>
               <path d="M12 2a10 10 0 0 1 10 10"/>
             </svg>
-            AI 生成任务
+            生成今日任务
           </el-button>
         </div>
       </div>
@@ -98,17 +98,17 @@
       </div>
 
       <!-- 任务列表 -->
-      <section class="section tasks-list-section">
+      <section class="section tasks-list-section" v-loading="loading">
         <div class="tasks-list">
           <div
             v-for="task in filteredTasks"
             :key="task.id"
             class="task-item"
-            :class="[`type-${task.type}`, { completed: task.status === 'done' }]"
+            :class="[`type-${actionClass(task)}`, { completed: task.status === 'completed' }]"
           >
             <div class="task-check" @click="toggleTask(task)">
-              <div class="check-circle" :class="task.status">
-                <svg v-if="task.status === 'done'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <div class="check-circle" :class="taskStatusClass(task)">
+                <svg v-if="task.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                   <polyline points="20,6 9,17 4,12"/>
                 </svg>
               </div>
@@ -116,51 +116,63 @@
 
             <div class="task-body">
               <div class="task-meta">
-                <span class="type-badge" :class="task.type">{{ task.typeName }}</span>
+                <span class="type-badge" :class="actionClass(task)">{{ actionTypeLabel(task) }}</span>
                 <span class="task-date">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"/>
                     <polyline points="12,6 12,12 16,14"/>
                   </svg>
-                  {{ task.deadline }}
+                  {{ deadlineLabel(task) }}
                 </span>
                 <span class="task-duration">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                   </svg>
-                  {{ task.minutes }}分钟
+                  {{ task.estimatedDurationMinutes || '-' }}分钟
                 </span>
               </div>
 
               <h3 class="task-title">{{ task.title }}</h3>
-              <p class="task-reason">{{ task.reason }}</p>
+              <p class="task-reason">{{ taskReason(task) }}</p>
 
               <div class="task-footer">
                 <div class="task-progress">
                   <div class="progress-bar">
-                    <div class="progress-fill" :style="{ width: task.progress + '%' }"></div>
+                    <div class="progress-fill" :style="{ width: taskProgress(task) + '%' }"></div>
                   </div>
-                  <span class="progress-text">{{ task.progress }}%</span>
+                  <span class="progress-text">{{ taskProgress(task) }}%</span>
                 </div>
                 <div class="task-tags">
-                  <span v-for="tag in task.tags" :key="tag" class="task-tag">{{ tag }}</span>
+                  <span v-for="tag in taskTags(task)" :key="tag" class="task-tag">{{ tag }}</span>
                 </div>
               </div>
             </div>
 
             <div class="task-actions">
               <el-button
-                v-if="task.status !== 'done'"
+                v-if="task.status !== 'completed' && task.status !== 'cancelled'"
                 type="primary"
                 size="small"
-                @click="$router.push('/study/' + task.id)"
+                @click="startTask(task)"
               >
-                {{ task.progress > 0 ? '继续' : '开始' }}
+                {{ startButtonLabel(task) }}
               </el-button>
-              <el-button v-else size="small" @click="$router.push('/study/' + task.id)">
+              <el-button
+                v-if="task.status === 'in_progress' || task.status === 'doing'"
+                size="small"
+                @click="completeTask(task)"
+              >
+                完成
+              </el-button>
+              <el-button v-else-if="task.status === 'completed'" size="small" @click="startTask(task)">
                 回顾
               </el-button>
-              <el-button size="small" text @click="deleteTask(task.id)">
+              <el-button
+                v-if="task.status !== 'completed' && task.status !== 'cancelled'"
+                size="small"
+                text
+                @click="cancelTask(task)"
+              >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                   <polyline points="3,6 5,6 21,6"/>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -179,30 +191,18 @@
             </svg>
           </div>
           <h3>暂无任务</h3>
-          <p>点击"生成任务"让系统为你规划学习任务</p>
+          <p>点击"生成今日任务"，系统会从活跃学习空间中安排下一步</p>
           <el-button type="primary" @click="showGenerateDialog = true">生成任务</el-button>
         </div>
       </section>
 
-      <!-- AI 生成任务对话框 -->
-      <el-dialog v-model="showGenerateDialog" title="AI 生成学习任务" width="520px">
+      <!-- 生成任务对话框 -->
+      <el-dialog v-model="showGenerateDialog" title="生成今日学习任务" width="520px">
         <div class="generate-form">
-          <div class="form-item">
-            <label>任务类型</label>
-            <el-checkbox-group v-model="generateTypes">
-              <el-checkbox label="review">知识复习</el-checkbox>
-              <el-checkbox label="practice">题目练习</el-checkbox>
-              <el-checkbox label="resource">资源学习</el-checkbox>
-              <el-checkbox label="project">项目实践</el-checkbox>
-            </el-checkbox-group>
-          </div>
+          <p class="generate-tip">系统会读取你的活跃学习空间，沿学习路径选择尚未安排的下一节点，生成可直接开始的今日学习任务。</p>
           <div class="form-item">
             <label>任务数量</label>
-            <el-slider v-model="generateCount" :min="1" :max="10" show-stops />
-          </div>
-          <div class="form-item">
-            <label>学习目标</label>
-            <el-input type="textarea" v-model="generateGoal" placeholder="描述你希望强化的知识点或技能..." :rows="3" />
+            <el-slider v-model="generateCount" :min="1" :max="8" show-stops />
           </div>
         </div>
         <template #footer>
@@ -217,118 +217,231 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { taskApi } from '@/api/spaceDashboard'
+import { useStudyEntry } from '@/composables/useStudyEntry'
+import type { TaskActionType, TaskStatus, TaskVO } from '@/types/learningSpace'
 
 const activeTab = ref('today')
 const activeFilter = ref('all')
 const searchKeyword = ref('')
 const showGenerateDialog = ref(false)
 const generating = ref(false)
-const generateTypes = ref(['review', 'practice', 'resource'])
-const generateCount = ref(5)
-const generateGoal = ref('')
+const loading = ref(false)
+const generateCount = ref(3)
+const todayTasks = ref<TaskVO[]>([])
+const pendingTasks = ref<TaskVO[]>([])
+const overdueTasks = ref<TaskVO[]>([])
 
-const taskStats = ref({
-  review: 5,
-  practice: 8,
-  resource: 3,
-  completed: 12
-})
+const { enterTask } = useStudyEntry()
 
 const filters = [
   { label: '全部', value: 'all' },
-  { label: '进行中', value: 'doing' },
-  { label: '待开始', value: 'todo' },
-  { label: '已完成', value: 'done' }
+  { label: '进行中', value: 'in_progress' },
+  { label: '待开始', value: 'pending' },
+  { label: '已完成', value: 'completed' }
 ]
 
-const tasks = ref([
-  {
-    id: 1, type: 'review', typeName: '复习', title: '进程与线程的核心概念', reason: '基于你昨天的测验结果，这个知识点需要巩固',
-    minutes: 15, deadline: '今天', progress: 60, status: 'doing',
-    tags: ['进程', '线程', '概念'], reasonAI: '你在测验中连续2次在此知识点失分'
-  },
-  {
-    id: 2, type: 'practice', typeName: '练习', title: '完成 8 道同步互斥专项练习', reason: '你的 PV 操作正确率上周下降了 15%',
-    minutes: 25, deadline: '今天', progress: 0, status: 'todo',
-    tags: ['PV操作', '同步'], reasonAI: '测评发现你的互斥题正确率偏低'
-  },
-  {
-    id: 3, type: 'resource', typeName: '资源', title: '查看"信号量机制"图解讲解', reason: '根据你的学习偏好，推荐图解+动画形式',
-    minutes: 12, deadline: '今天', progress: 0, status: 'todo',
-    tags: ['信号量', '图解'], reasonAI: '你偏好可视化学习方式'
-  },
-  {
-    id: 4, type: 'review', typeName: '复习', title: '复习进程调度的三种方式', reason: '明天有小测验，提前复习',
-    minutes: 20, deadline: '明天', progress: 0, status: 'todo',
-    tags: ['调度', 'FIFO', 'SJF'], reasonAI: '你的期末目标包含此知识点'
-  },
-  {
-    id: 5, type: 'practice', typeName: '练习', title: '进程状态转换图绘制', reason: '理解五种状态及其转换条件',
-    minutes: 15, deadline: '明天', progress: 0, status: 'todo',
-    tags: ['状态图'], reasonAI: '基于知识图谱依赖分析'
-  },
-  {
-    id: 6, type: 'resource', typeName: '资源', title: '阅读：操作系统的几种常见体系结构', reason: '扩展知识面，理解 OS 设计思想',
-    minutes: 30, deadline: '本周', progress: 0, status: 'todo',
-    tags: ['体系结构', '拓展'], reasonAI: '当前阶段的前置阅读'
-  },
-  {
-    id: 7, type: 'practice', typeName: '练习', title: 'PCB 概念与组成练习题', reason: '巩固进程控制块的核心知识',
-    minutes: 10, deadline: '本周', progress: 100, status: 'done',
-    tags: ['PCB'], reasonAI: ''
-  },
-  {
-    id: 8, type: 'review', typeName: '复习', title: '回顾进程同步与互斥的区别', reason: '系统性梳理重难点',
-    minutes: 10, deadline: '本周', progress: 100, status: 'done',
-    tags: ['同步', '互斥'], reasonAI: ''
-  }
-])
+const allTasks = computed<TaskVO[]>(() => {
+  const taskMap = new Map<string, TaskVO>()
+  ;[...todayTasks.value, ...pendingTasks.value, ...overdueTasks.value].forEach(task => {
+    taskMap.set(String(task.id), task)
+  })
+  return Array.from(taskMap.values())
+})
+
+const taskStats = computed(() => ({
+  review: allTasks.value.filter(task => task.taskType === 'review' || task.actionType === 'mistake_review').length,
+  practice: allTasks.value.filter(task => task.actionType === 'practice_set' || task.actionType === 'assessment').length,
+  resource: allTasks.value.filter(task => task.actionType === 'read_resource' || task.actionType === 'watch_video').length,
+  completed: allTasks.value.filter(task => task.status === 'completed').length,
+}))
 
 const filteredTasks = computed(() => {
-  let result = tasks.value
+  let result = activeTab.value === 'today'
+    ? todayTasks.value
+    : allTasks.value
 
-  if (activeTab.value === 'today') {
-    result = result.filter(t => t.deadline === '今天')
-  } else if (activeTab.value === 'week') {
-    result = result.filter(t => ['今天', '明天', '本周'].includes(t.deadline))
+  if (activeTab.value === 'week') {
+    result = result.filter(task => task.isToday || isWithinWeek(task.dueDate) || task.isOverdue)
   }
 
   if (activeFilter.value !== 'all') {
-    result = result.filter(t => t.status === activeFilter.value)
+    result = result.filter(task => task.status === activeFilter.value)
   }
 
   if (searchKeyword.value) {
-    result = result.filter(t =>
-      t.title.includes(searchKeyword.value) ||
-      t.tags.some(tag => tag.includes(searchKeyword.value))
+    const keyword = searchKeyword.value.trim().toLowerCase()
+    result = result.filter(task =>
+      task.title.toLowerCase().includes(keyword) ||
+      task.description?.toLowerCase().includes(keyword) ||
+      taskTags(task).some(tag => tag.toLowerCase().includes(keyword))
     )
   }
 
   return result
 })
 
-const toggleTask = (task: any) => {
-  if (task.status === 'done') {
-    task.status = 'todo'
-    task.progress = 0
-  } else {
-    task.status = 'done'
-    task.progress = 100
+onMounted(() => {
+  loadTasks()
+})
+
+async function loadTasks() {
+  loading.value = true
+  try {
+    const [today, pending, overdue] = await Promise.all([
+      taskApi.listToday(),
+      taskApi.listPending(),
+      taskApi.listOverdue(),
+    ])
+    todayTasks.value = today
+    pendingTasks.value = pending
+    overdueTasks.value = overdue
+  } finally {
+    loading.value = false
   }
 }
 
-const deleteTask = (id: number) => {
-  tasks.value = tasks.value.filter(t => t.id !== id)
+async function generateTasks() {
+  generating.value = true
+  try {
+    const created = await taskApi.planToday({ maxTasks: generateCount.value })
+    showGenerateDialog.value = false
+    await loadTasks()
+    if (created.length === 0) {
+      ElMessage.info('当前没有可新生成的今日任务，可能已有待完成任务或学习路径暂未生成')
+    } else {
+      ElMessage.success(`已生成 ${created.length} 个今日任务`)
+    }
+  } finally {
+    generating.value = false
+  }
 }
 
-const generateTasks = () => {
-  generating.value = true
-  setTimeout(() => {
-    generating.value = false
-    showGenerateDialog.value = false
-  }, 2000)
+async function startTask(task: TaskVO) {
+  const current = task.status === 'pending'
+    ? await taskApi.updateStatus(String(task.id), 'in_progress')
+    : task
+  if (task.status === 'pending') {
+    await loadTasks()
+  }
+  enterTask(current, {
+    spaceId: current.spaceId,
+    source: 'task_card',
+  })
+}
+
+async function completeTask(task: TaskVO) {
+  await taskApi.complete(String(task.id), {
+    actualDurationMinutes: task.estimatedDurationMinutes || 0,
+  })
+  ElMessage.success('任务已完成')
+  await loadTasks()
+}
+
+async function cancelTask(task: TaskVO) {
+  await taskApi.updateStatus(String(task.id), 'cancelled')
+  ElMessage.success('任务已取消')
+  await loadTasks()
+}
+
+function toggleTask(task: TaskVO) {
+  if (task.status === 'completed' || task.status === 'cancelled') {
+    return
+  }
+  completeTask(task)
+}
+
+function actionClass(task: TaskVO) {
+  const actionType = task.actionType
+  if (actionType === 'practice_set' || actionType === 'assessment') return 'practice'
+  if (actionType === 'read_resource' || actionType === 'watch_video') return 'resource'
+  if (actionType === 'project_practice') return 'project'
+  return 'review'
+}
+
+function taskStatusClass(task: TaskVO) {
+  if (task.status === 'completed') return 'done'
+  if (task.status === 'in_progress' || task.status === 'doing') return 'doing'
+  return 'todo'
+}
+
+function actionTypeLabel(task: TaskVO) {
+  const labels: Record<TaskActionType, string> = {
+    learn_script: '学习',
+    read_resource: '阅读',
+    watch_video: '视频',
+    practice_set: '练习',
+    assessment: '测评',
+    mistake_review: '错题',
+    project_practice: '实践',
+    summary_reflection: '总结',
+  }
+  return labels[task.actionType || 'learn_script']
+}
+
+function deadlineLabel(task: TaskVO) {
+  if (task.isOverdue) return '已逾期'
+  if (task.isToday) return '今天'
+  if (!task.dueDate) return '未排期'
+  const dueDate = new Date(`${task.dueDate}T00:00:00`)
+  const today = startOfToday()
+  const diff = Math.round((dueDate.getTime() - today.getTime()) / 86400000)
+  if (diff === 1) return '明天'
+  if (diff > 1 && diff <= 7) return '本周'
+  return task.dueDate
+}
+
+function taskReason(task: TaskVO) {
+  return task.agentReason || task.aiSuggestion || task.description || '系统根据当前学习计划生成的任务'
+}
+
+function taskProgress(task: TaskVO) {
+  if (task.status === 'completed') return 100
+  if (task.status === 'in_progress' || task.status === 'doing') return 50
+  return 0
+}
+
+function taskTags(task: TaskVO) {
+  const tags = [actionTypeLabel(task), statusLabel(task.status)]
+  if (task.isOverdue) tags.push('逾期')
+  if (task.priority <= 2) tags.push('高优先级')
+  return tags
+}
+
+function startButtonLabel(task: TaskVO) {
+  if (task.status === 'in_progress' || task.status === 'doing') return '继续'
+  if (task.actionType === 'practice_set') return '做题'
+  if (task.actionType === 'assessment') return '测评'
+  return '开始'
+}
+
+function statusLabel(status: TaskStatus) {
+  const labels: Record<TaskStatus, string> = {
+    pending: '待开始',
+    in_progress: '进行中',
+    doing: '进行中',
+    completed: '已完成',
+    overdue: '已逾期',
+    cancelled: '已取消',
+  }
+  return labels[status]
+}
+
+function isWithinWeek(dueDate?: string | null) {
+  if (!dueDate) return false
+  const date = new Date(`${dueDate}T00:00:00`)
+  const today = startOfToday()
+  const diff = Math.round((date.getTime() - today.getTime()) / 86400000)
+  return diff >= 0 && diff <= 7
+}
+
+function startOfToday() {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return today
 }
 </script>
 
@@ -665,6 +778,13 @@ const generateTasks = () => {
 }
 
 /* 生成表单 */
+.generate-tip {
+  margin: 0 0 var(--spacing-lg);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
 .generate-form .form-item {
   margin-bottom: var(--spacing-lg);
 }

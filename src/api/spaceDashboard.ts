@@ -61,9 +61,29 @@ export interface CreateTaskDTO {
   metadata?: string | Record<string, any> | null
 }
 
+export interface PlanTodayTasksDTO {
+  maxTasks?: number
+}
+
 export const taskApi = {
+  async listToday(): Promise<TaskVO[]> {
+    return request.get('/tasks/today')
+  },
+
+  async listPending(): Promise<TaskVO[]> {
+    return request.get('/tasks/pending')
+  },
+
+  async listOverdue(): Promise<TaskVO[]> {
+    return request.get('/tasks/overdue')
+  },
+
   async create(data: CreateTaskDTO): Promise<TaskVO> {
     return request.post('/tasks', data)
+  },
+
+  async planToday(data: PlanTodayTasksDTO = {}): Promise<TaskVO[]> {
+    return request.post('/tasks/plan-today', data)
   },
 
   async updateStatus(taskId: string, status: TaskStatus): Promise<TaskVO> {
