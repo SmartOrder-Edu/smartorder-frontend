@@ -4,7 +4,7 @@
       <svg v-if="task.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16">
         <polyline points="20,6 9,17 4,12"/>
       </svg>
-      <svg v-else-if="task.status === 'in_progress'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+      <svg v-else-if="task.status === 'in_progress' || task.status === 'doing'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
       </svg>
       <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -15,6 +15,7 @@
     <div class="task-body">
       <div class="task-header">
         <span class="task-type-badge" :class="task.taskType">{{ typeLabel }}</span>
+        <span class="task-action-badge" :class="task.actionType || 'learn_script'">{{ actionLabel }}</span>
         <span class="task-priority" v-if="task.priority >= 4">
           <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="12,2 15,11 24,11 17,17 20,24 12,19 4,24 7,17 0,11 9,11"/></svg>
         </span>
@@ -39,7 +40,7 @@
       >
         开始这次学习
       </button>
-      <template v-else-if="task.status === 'in_progress'">
+      <template v-else-if="task.status === 'in_progress' || task.status === 'doing'">
         <button
           class="task-btn continue"
           @click.stop="$emit('start', task)"
@@ -72,9 +73,23 @@ defineEmits<{
 
 const typeLabel = computed(() => {
   const m: Record<string, string> = {
-    daily: '日常', milestone: '里程碑', exam: '测验', review: '复习',
+    daily: '日常', milestone: '里程碑', exam: '测验', review: '复习', remedial: '补救', project: '项目',
   }
   return m[props.task.taskType] || props.task.taskType
+})
+
+const actionLabel = computed(() => {
+  const m: Record<string, string> = {
+    learn_script: '脚本学习',
+    read_resource: '资源阅读',
+    watch_video: '视频讲解',
+    practice_set: '专项练习',
+    assessment: '阶段测评',
+    mistake_review: '错题复盘',
+    project_practice: '项目实践',
+    summary_reflection: '总结复盘',
+  }
+  return m[props.task.actionType || 'learn_script'] || props.task.actionType || '学习'
 })
 </script>
 
@@ -119,7 +134,8 @@ export default { name: 'TaskCard' }
     background: linear-gradient(135deg, #fff, #fff7f7);
   }
 
-  &.status-in_progress::before { background: #0bb7aa; }
+  &.status-in_progress::before,
+  &.status-doing::before { background: #0bb7aa; }
   &.status-completed::before { background: #10b981; }
   &.status-overdue::before { background: #ef4444; }
 }
@@ -139,7 +155,8 @@ export default { name: 'TaskCard' }
     color: #94a3b8;
     background: #f8fafc;
   }
-  &.in_progress {
+  &.in_progress,
+  &.doing {
     background: #ecfdfb;
     border: 2px solid #0bb7aa;
     color: #0a9e94;
@@ -178,6 +195,40 @@ export default { name: 'TaskCard' }
   &.milestone { background: #fef3c7; color: #d97706; }
   &.exam { background: #fce7f3; color: #db2777; }
   &.review { background: #ede9fe; color: #7c3aed; }
+  &.remedial { background: #fee2e2; color: #dc2626; }
+  &.project { background: #ffedd5; color: #ea580c; }
+}
+
+.task-action-badge {
+  font-size: 0.6875rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #475569;
+
+  &.practice_set,
+  &.assessment {
+    background: #e0f2fe;
+    color: #0284c7;
+  }
+
+  &.read_resource,
+  &.watch_video {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  &.mistake_review,
+  &.summary_reflection {
+    background: #fce7f3;
+    color: #be185d;
+  }
+
+  &.project_practice {
+    background: #ede9fe;
+    color: #7c3aed;
+  }
 }
 
 .task-priority {
