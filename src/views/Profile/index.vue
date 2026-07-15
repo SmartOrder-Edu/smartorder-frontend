@@ -61,6 +61,44 @@
         </div>
       </section>
 
+      <section class="section profile-section profile-details-section" v-if="profileData">
+        <div class="section-header">
+          <h3 class="section-title">画像详细信息</h3>
+          <span class="section-subtitle">展开查看已沉淀的完整画像字段</span>
+        </div>
+        <el-collapse v-model="profileDetailPanels" class="profile-detail-collapse">
+          <el-collapse-item v-if="profileData.learningBackground" title="学习背景" name="background">
+            <ProfileDetailValue :value="profileData.learningBackground" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.learningGoals" title="学习目标详情" name="goals">
+            <ProfileDetailValue :value="profileData.learningGoals" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.abilityProfile" title="能力画像详情" name="ability">
+            <ProfileDetailValue :value="profileData.abilityProfile" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.commonMisconceptions" title="常见误区详情" name="misconceptions">
+            <ProfileDetailValue :value="profileData.commonMisconceptions" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.learningPreference" title="学习偏好详情" name="preference">
+            <ProfileDetailValue :value="profileData.learningPreference" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.metacognitiveProfile" title="元认知画像详情" name="metacognitive">
+            <ProfileDetailValue :value="profileData.metacognitiveProfile" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.subjectProfiles" title="学科画像详情" name="subjects">
+            <ProfileDetailValue :value="profileData.subjectProfiles" />
+          </el-collapse-item>
+          <el-collapse-item title="画像更新记录" name="updates">
+            <ProfileDetailValue :value="{
+              profileSummary: profileData.profileSummary,
+              lastUpdateReason: profileData.lastUpdateReason,
+              updatedAt: profileData.updatedAt,
+              dimensionMetadata: profileData.dimensionMetadata
+            }" />
+          </el-collapse-item>
+        </el-collapse>
+      </section>
+
       <div class="profile-grid">
         <!-- 学习偏好 -->
         <section class="section profile-section">
@@ -559,12 +597,14 @@ import ProfileHeader from './components/ProfileHeader.vue'
 import CredentialSection from './components/CredentialSection.vue'
 import QuickLoginBindingSection from './components/QuickLoginBindingSection.vue'
 import EmailEditDialog from './components/EmailEditDialog.vue'
+import ProfileDetailValue from './components/ProfileDetailValue.vue'
 
 const userStore = useUserStore()
 const showEditDialog = ref(false)
 const showEmailDialog = ref(false)
 const profileLoading = ref(false)
 const profileData = ref<StudentProfileData | null>(null)
+const profileDetailPanels = ref<string[]>(['background', 'updates'])
 
 // ====== 标签映射 ======
 const levelLabels: Record<string, string> = {
