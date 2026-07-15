@@ -13,7 +13,7 @@
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
-            编辑画像
+            编辑资料
           </el-button>
         </div>
       </div>
@@ -46,8 +46,7 @@
           @avatar-change="handleAvatarChange"
         />
 
-        <!-- 账号与安全设置标题 -->
-        <SecuritySectionHeader />
+
 
         <!-- 主体双栏内容 -->
         <div class="security-content">
@@ -473,39 +472,31 @@
         <el-empty v-else description="暂无学科画像数据" :image-size="80" />
       </section>
 
-      <!-- 编辑画像对话框 -->
-      <el-dialog v-model="showEditDialog" title="编辑用户资料" width="520px">
-        <div class="edit-form">
-          <div class="form-item">
-            <label>昵称</label>
-            <el-input v-model="editData.username" placeholder="请输入昵称" />
-          </div>
-          <div class="form-item">
-            <label>性别</label>
-            <el-select v-model="editData.gender" style="width: 100%;">
-              <el-option label="未设置" :value="0" />
-              <el-option label="男" :value="1" />
-              <el-option label="女" :value="2" />
-            </el-select>
-          </div>
-          <div class="form-item">
-            <label>生日</label>
-            <el-date-picker
-              v-model="editData.birthday"
-              type="date"
-              placeholder="选择日期"
-              style="width: 100%;"
-              value-format="YYYY-MM-DD"
+      <!-- 编辑资料对话框 -->
+      <el-dialog v-model="showEditDialog" title="编辑资料" width="480px" :close-on-click-modal="false">
+        <el-form :model="editData" label-width="80px" label-position="left">
+          <el-form-item label="昵称" :error="editErrors.username">
+            <el-input
+              v-model="editData.username"
+              placeholder="请输入昵称（最多20字）"
+              maxlength="20"
+              show-word-limit
             />
-          </div>
-          <div class="form-item">
-            <label>个人简介</label>
-            <el-input type="textarea" v-model="editData.bio" :rows="3" placeholder="介绍一下自己..." />
-          </div>
-        </div>
+          </el-form-item>
+          <el-form-item label="个人简介" :error="editErrors.bio">
+            <el-input
+              v-model="editData.bio"
+              type="textarea"
+              :rows="4"
+              placeholder="介绍一下自己（最多500字）"
+              maxlength="500"
+              show-word-limit
+            />
+          </el-form-item>
+        </el-form>
         <template #footer>
           <el-button @click="showEditDialog = false">取消</el-button>
-          <el-button type="primary" :loading="uploading" @click="saveProfile">保存</el-button>
+          <el-button type="primary" :loading="saving" @click="saveProfile">保存</el-button>
         </template>
       </el-dialog>
     </div>
@@ -528,7 +519,6 @@ import type {
 
 // 账户与安全子组件
 import ProfileHeader from './components/ProfileHeader.vue'
-import SecuritySectionHeader from './components/SecuritySectionHeader.vue'
 import CredentialSection from './components/CredentialSection.vue'
 import QuickLoginBindingSection from './components/QuickLoginBindingSection.vue'
 
@@ -838,26 +828,50 @@ const formatTime = (time?: string) => {
 
 // ====== 编辑功能 ======
 const uploading = ref(false)
+const saving = ref(false)
 
 const editData = reactive({
   username: '',
-  gender: 0,
-  birthday: '',
+  bio: ''
+})
+
+const editErrors = reactive({
+  username: '',
   bio: ''
 })
 
 const saveProfile = async () => {
+  editErrors.username = ''
+  editErrors.bio = ''
+
+  const trimmedName = editData.username.trim()
+  if (!trimmedName) {
+    editErrors.username = '昵称不能为空'
+    return
+  }
+  if (trimmedName.length > 20) {
+    editErrors.username = '昵称不能超过20字'
+    return
+  }
+
+  const trimmedBio = editData.bio.trim()
+  if (trimmedBio.length > 500) {
+    editErrors.bio = '个人简介不能超过500字'
+    return
+  }
+
+  saving.value = true
   try {
     await userStore.updateProfile({
-      username: editData.username,
-      gender: editData.gender,
-      birthday: editData.birthday || undefined,
-      bio: editData.bio
+      username: trimmedName || undefined,
+      bio: trimmedBio || undefined
     })
     ElMessage.success('资料更新成功')
     showEditDialog.value = false
   } catch (error: any) {
     ElMessage.error(error?.message || '更新失败')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -889,10 +903,10 @@ const openEditDialog = () => {
   const u = userStore.userInfo
   if (u) {
     editData.username = u.username || ''
-    editData.gender = u.gender ?? 0
-    editData.birthday = u.birthday || ''
     editData.bio = u.bio || ''
   }
+  editErrors.username = ''
+  editErrors.bio = ''
   showEditDialog.value = true
 }
 
@@ -1096,7 +1110,7 @@ onMounted(async () => {
 
 .security-content {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 40px;
   padding: 24px 44px 44px;
 }
