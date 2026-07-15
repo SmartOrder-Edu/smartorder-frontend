@@ -45,6 +45,16 @@
         <span>查找</span>
       </button>
       <button
+        class="ai-action-btn action-ppt"
+        type="button"
+        @click="emit('generate-ppt')"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M4 4h16v11H4z"/><path d="M12 15v5"/><path d="M8 20h8"/><path d="M8 8h8"/><path d="M8 11h5"/>
+        </svg>
+        <span>PPT</span>
+      </button>
+      <button
         class="ai-action-btn chat-btn action-chat"
         type="button"
         @click="toggleChat"
@@ -127,6 +137,10 @@ const props = defineProps<{
   resourceType: string
   knowledgePoint?: string
   content?: string
+}>()
+
+const emit = defineEmits<{
+  (e: 'generate-ppt'): void
 }>()
 
 const expanded = ref(false)
@@ -391,7 +405,16 @@ function stopStreaming() {
     }
   }
 
-  // 问AI — 品牌色
+  &.action-ppt {
+    color: #ef4444;
+
+    &:hover {
+      background: rgba(239, 68, 68, 0.1);
+      color: #dc2626;
+    }
+  }
+
+  // 问AI – 品牌色
   &.action-chat {
     color: #0a9e94;
 

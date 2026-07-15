@@ -145,7 +145,7 @@ export interface ResourceGenerationJobVO {
 export interface ResourceContentVO {
   id: string
   resourceId: string
-  contentType: 'markdown' | 'html' | 'json' | 'external_link'
+  contentType: 'markdown' | 'html' | 'json' | 'external_link' | 'ppt_embed'
   content: string
   version: number
   status: string

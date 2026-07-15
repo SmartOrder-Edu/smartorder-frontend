@@ -52,6 +52,15 @@
               >
                 打开外部资源
               </el-button>
+              <el-button
+                v-if="detail.resource.resourceType !== 'ppt' && resourceStatus === 'generated'"
+                type="primary"
+                :loading="generatingPpt"
+                @click="handleGeneratePpt"
+                class="header-ext-btn"
+              >
+                生成 PPT
+              </el-button>
             </div>
           </header>
 
@@ -94,6 +103,14 @@
                 v-html="detail.content?.content || ''"
               ></div>
 
+              <!-- PPT -->
+              <DocmeePptViewer
+                v-else-if="renderMode === 'ppt'"
+                :resource-id="resourceId"
+                :ppt-id="pptData?.pptId"
+                :file-url="pptData?.fileUrl || detail.resource.url"
+              />
+
               <!-- Quiz -->
               <div v-else-if="renderMode === 'quiz'" class="quiz-content">
                 <div class="quiz-head">
@@ -105,7 +122,7 @@
                   :key="index"
                   class="quiz-card"
                 >
-                  <span class="quiz-index">{{ index + 1 }}</span>
+                  <span class="quiz-index">{{ Number(index) + 1 }}</span>
                   <div class="quiz-main">
                     <h3>{{ question.stem }}</h3>
                     <div v-if="question.options?.length" class="quiz-options">
@@ -200,6 +217,7 @@
               :resource-type="detail.resource.resourceType"
               :knowledge-point="detail.resource.knowledgePoint"
               :content="detail.content?.contentType === 'markdown' ? detail.content?.content || '' : ''"
+              @generate-ppt="handleGeneratePpt"
             />
           </main>
         </template>
@@ -218,7 +236,9 @@ import ParticleBackground from '@/components/ParticleBackground.vue'
 import ReadingProgress from '@/components/ReadingProgress.vue'
 import ResourceTOC from '@/components/ResourceTOC.vue'
 import ResourceAIPanel from '@/components/ResourceAIPanel.vue'
+import DocmeePptViewer from '@/components/DocmeePptViewer.vue'
 import { learningResourceApi } from '@/api/learningResource'
+import { pptApi } from '@/api/ppt'
 import type { ResourceDetailVO, ResourceGenerationJobVO } from '@/types/learningSpace'
 
 const route = useRoute()
@@ -229,6 +249,7 @@ const generationJob = ref<ResourceGenerationJobVO | null>(null)
 const loading = ref(false)
 const error = ref('')
 const retrying = ref(false)
+const generatingPpt = ref(false)
 const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const resourceId = computed(() => String(route.params.resourceId || ''))
@@ -237,6 +258,7 @@ const renderMode = computed(() => {
   const contentType = detail.value?.content?.contentType
   if (contentType === 'html') return 'html'
   if (contentType === 'json' && detail.value?.resource.resourceType === 'quiz') return 'quiz'
+  if (contentType === 'ppt_embed') return 'ppt'
   if (contentType === 'external_link') return 'external'
   if (contentType === 'markdown') return 'markdown'
   return 'empty'
@@ -253,6 +275,7 @@ const generationError = computed(() => generationJob.value?.errorMessage || '')
 
 const quizData = computed<any | null>(() => parseJson(detail.value?.content?.content))
 const externalData = computed<any | null>(() => parseJson(detail.value?.content?.content))
+const pptData = computed<any | null>(() => parseJson(detail.value?.content?.content))
 const externalUrl = computed(() => externalData.value?.url || detail.value?.resource.url || '')
 const isBilibiliRecommendation = computed(() => externalData.value?.type === 'bilibili_recommendation')
 const bilibiliVideos = computed<any[]>(() => {
@@ -411,6 +434,30 @@ async function handleRetryGeneration() {
     ElMessage.error(e?.message || '重试生成失败')
   } finally {
     retrying.value = false
+  }
+}
+
+async function handleGeneratePpt() {
+  if (!resourceId.value || generatingPpt.value || !detail.value) return
+  if (detail.value.resource.resourceType === 'ppt') {
+    ElMessage.info('当前资源已经是 PPT')
+    return
+  }
+
+  generatingPpt.value = true
+  try {
+    const result = await pptApi.generateFromResource(resourceId.value, {
+      topic: detail.value.resource.knowledgePoint || detail.value.resource.title,
+      templateStyle: 'education',
+      targetSlides: 8,
+      userIntent: '基于当前学习资源生成 PPT 课件',
+    })
+    ElMessage.success('PPT 已生成')
+    router.push(`/resources/${result.resourceId}`)
+  } catch (e: any) {
+    ElMessage.error(e?.message || 'PPT 生成失败')
+  } finally {
+    generatingPpt.value = false
   }
 }
 

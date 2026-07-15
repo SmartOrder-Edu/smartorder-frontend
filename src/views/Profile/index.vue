@@ -7,15 +7,7 @@
           <h1 class="page-title">学习画像</h1>
           <p class="page-desc">系统通过学习行为分析，构建你的个性化学习特征</p>
         </div>
-        <div class="header-right">
-          <el-button @click="openEditDialog">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            编辑资料
-          </el-button>
-        </div>
+
       </div>
 
       <!-- 画像完整度概览 -->
@@ -50,11 +42,11 @@
 
         <!-- 主体双栏内容 -->
         <div class="security-content">
-          <!-- 左侧：账户凭证 -->
+          <!-- 左侧：个人凭证 -->
           <CredentialSection
             :user-info="userCredentialData"
-            @edit-profile="openEditDialog"
             @change-email="showEmailDialog = true"
+            @edit="openEditDialog"
           />
 
           <!-- 右侧：第三方账号绑定 -->
@@ -147,16 +139,8 @@
             </h3>
           </div>
 
-          <el-skeleton v-if="profileLoading" :rows="5" animated />
-          <div v-else-if="radarAxes.length > 0" class="ability-radar-content">
-            <div class="radar-summary">
-              <span class="summary-label">综合得分</span>
-              <strong>{{ Math.round(abilityProfile?.overallScore || 0) }}</strong>
-              <span>/ 100</span>
-              <p>{{ abilitySummary }}</p>
-            </div>
-          <div class="radar-chart">
-            <svg viewBox="0 -20 300 340" aria-label="六维综合能力雷达图">
+          <div v-if="radarAxes.length > 0" class="radar-chart">
+            <svg viewBox="0 0 300 300">
               <defs>
                 <linearGradient id="radarFill" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" style="stop-color:#3b5bdb;stop-opacity:0.3"/>
@@ -197,15 +181,14 @@
                 stroke-width="2"
               />
 
-              <!-- 维度名称与分数：置于图形外圈，避免数据点和文字互相遮挡 -->
+              <!-- 标签 -->
               <text v-for="(axis, idx) in radarAxes" :key="'label-' + idx"
                 :x="150 + 140 * Math.cos((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
-                :y="150 + 140 * Math.sin((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2) - 5"
+                :y="150 + 140 * Math.sin((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
                 text-anchor="middle"
                 dominant-baseline="middle"
-                font-size="12"
-                font-weight="600"
-                fill="var(--text-dark)"
+                font-size="11"
+                fill="var(--text-secondary)"
               >
                 {{ axis.name }}
               </text>
@@ -213,18 +196,17 @@
               <!-- 数值 -->
               <text v-for="(axis, idx) in radarAxes" :key="'value-' + idx"
                 :x="150 + 160 * Math.cos((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
-                :y="150 + 140 * Math.sin((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2) + 16"
+                :y="150 + 160 * Math.sin((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
                 text-anchor="middle"
-                font-size="13"
-                fill="#10bdb7"
-                font-weight="700"
+                font-size="10"
+                fill="var(--primary-color)"
+                font-weight="600"
               >
-                {{ axis.evaluated ? axis.value : '待评估' }}
+                {{ axis.value }}
               </text>
             </svg>
           </div>
-          </div>
-          <el-empty v-else description="完成学习任务后，将生成六维综合能力雷达" :image-size="80" />
+          <el-empty v-else description="暂无能力评估数据" :image-size="80" />
         </section>
 
         <!-- 薄弱点分析 -->
@@ -487,17 +469,52 @@
       </section>
 
       <!-- 编辑资料对话框 -->
-      <el-dialog v-model="showEditDialog" title="编辑资料" width="480px" :close-on-click-modal="false">
-        <el-form :model="editData" label-width="80px" label-position="left">
-          <el-form-item label="昵称" :error="editErrors.username">
+      <el-dialog
+        v-model="showEditDialog"
+        width="480px"
+        :close-on-click-modal="false"
+        class="custom-dialog edit-profile-dialog"
+      >
+        <template #header>
+          <div class="dialog-header">
+            <span class="header-icon edit-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="16" height="16">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </span>
+            <span class="header-title">编辑个人资料</span>
+          </div>
+        </template>
+        <el-form :model="editData" label-position="top">
+          <el-form-item :error="editErrors.username">
+            <template #label>
+              <span class="custom-form-label">
+                <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="13" height="13">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                昵称
+              </span>
+            </template>
             <el-input
               v-model="editData.username"
               placeholder="请输入昵称（最多20字）"
               maxlength="20"
               show-word-limit
+              clearable
             />
           </el-form-item>
-          <el-form-item label="个人简介" :error="editErrors.bio">
+          <el-form-item :error="editErrors.bio">
+            <template #label>
+              <span class="custom-form-label">
+                <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="13" height="13">
+                  <path d="M12 20h9"/>
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                </svg>
+                个人简介
+              </span>
+            </template>
             <el-input
               v-model="editData.bio"
               type="textarea"
@@ -510,7 +527,7 @@
         </el-form>
         <template #footer>
           <el-button @click="showEditDialog = false">取消</el-button>
-          <el-button type="primary" :loading="saving" @click="saveProfile">保存</el-button>
+          <el-button type="primary" :loading="saving" @click="saveProfile" class="dialog-save-btn">保存</el-button>
         </template>
       </el-dialog>
 
@@ -680,39 +697,14 @@ const preferences = computed(() => {
 // ====== 计算属性：能力雷达 ======
 const abilityProfile = computed(() => profileData.value?.abilityProfile)
 
-const radarDimensions = [
-  { code: 'KNOWLEDGE_UNDERSTANDING', name: '知识理解力', legacy: ['CONCEPT_UNDERSTANDING'] },
-  { code: 'PROBLEM_ANALYSIS', name: '问题分析力', legacy: ['PROBLEM_DECOMPOSITION', 'COMPLEXITY_ANALYSIS'] },
-  { code: 'SOLUTION_DESIGN', name: '方案设计力', legacy: ['ABSTRACTION_MODELING', 'ALGORITHM_DESIGN'] },
-  { code: 'PRACTICAL_APPLICATION', name: '实践应用力', legacy: ['CODING_IMPLEMENTATION'] },
-  { code: 'ERROR_REFLECTION', name: '纠错反思力', legacy: ['DEBUGGING'] },
-  { code: 'TRANSFER_INNOVATION', name: '迁移创新力', legacy: ['KNOWLEDGE_TRANSFER'] }
-]
-
 const radarAxes = computed(() => {
   const abilities = abilityProfile.value?.abilities
   if (!abilities) return []
-  return radarDimensions.map(dimension => {
-    const current = abilities[dimension.code]
-    const legacyItems = dimension.legacy.map(code => abilities[code]).filter(Boolean)
-    const item = current || legacyItems.sort((a, b) => (a?.score ?? 100) - (b?.score ?? 100))[0]
-    return {
-      code: dimension.code,
-      name: dimension.name,
-      value: item?.score ?? 0,
-      trend: item.trend || '',
-      focus: item?.improvementFocus || '',
-      evaluated: !!item
-    }
-  })
-})
 
-const abilitySummary = computed(() => {
-  const evaluated = radarAxes.value.filter(axis => axis.evaluated)
-  const strongest = evaluated.slice().sort((a, b) => b.value - a.value)[0]
-  const weakest = evaluated.slice().sort((a, b) => a.value - b.value)[0]
-  if (!strongest || !weakest) return '正在收集你的学习表现'
-  return `当前优势：${strongest.name}\n优先提升：${weakest.name}`
+  return Object.values(abilities).map(item => ({
+    name: item.abilityName || item.abilityCode || '',
+    value: item.score ?? 0
+  }))
 })
 
 // ====== 计算属性：常见误区 ======
@@ -1273,14 +1265,10 @@ html[data-theme='dark'] .account-security-container {
 }
 
 /* 雷达图 */
-.radar-chart { display: flex; justify-content: center; min-width: 350px; }
-.ability-radar-content { display: grid; grid-template-columns: 196px minmax(350px, 1fr); align-items: center; gap: 52px; padding: 20px 0 8px; }
-.radar-summary { min-height: 314px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; text-align: left; padding: 24px; border-radius: 15px; color: #334155; background: linear-gradient(145deg, #f2fcfc 0%, #e7f9f8 100%); border: 1px solid #9de4e0; box-shadow: inset 0 1px rgba(255,255,255,.9); }
-.radar-summary .summary-label { font-size: .86rem; font-weight: 700; color: #334155; }
-.radar-summary strong { display: block; font-size: 4rem; letter-spacing: -.055em; line-height: .9; color: #10bbb5; margin-top: 20px; }
-.radar-summary strong + span { margin-top: 8px; font-size: 1.2rem; font-weight: 700; color: #64748b; }
-.radar-summary p { white-space: pre-line; font-size: .82rem; font-weight: 600; line-height: 1.8; margin: 28px 0 0; padding-top: 16px; border-top: 1px solid #b9e9e6; color: #475569; }
-@media (max-width: 760px) { .ability-radar-content { grid-template-columns: 1fr; gap: 16px; }.radar-summary { min-height: auto; text-align: center; padding: 20px; }.radar-chart { min-width: 0; } }
+.radar-chart {
+  display: flex;
+  justify-content: center;
+}
 
 .radar-chart svg {
   max-width: 300px;
@@ -1776,5 +1764,184 @@ html[data-theme='dark'] .account-security-container {
   }
 }
 
+/* 自定义对话框美化 */
+:deep(.custom-dialog) {
+  border-radius: 16px !important;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03) !important;
+}
+
+:deep(.custom-dialog .el-dialog__header) {
+  padding: 20px 24px 14px !important;
+  margin-right: 0 !important;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+:deep(.custom-dialog .el-dialog__body) {
+  padding: 24px 24px 12px !important;
+}
+
+:deep(.custom-dialog .el-dialog__footer) {
+  padding: 12px 24px 20px !important;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* 弹窗头部排版 */
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: #14b8a6;
+  background: rgba(20, 184, 166, 0.08);
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: 650;
+  color: #1f2937;
+}
+
+/* 输入框细节美化 */
+:deep(.custom-dialog .el-form-item) {
+  margin-bottom: 22px;
+}
+
+:deep(.custom-dialog .el-form-item__label) {
+  font-weight: 550;
+  color: #4b5563;
+  padding-bottom: 6px !important;
+}
+
+/* 现代垂直表单的 label 自定义设计 */
+.custom-form-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  transition: all 0.2s ease;
+}
+
+.label-icon {
+  color: #9ca3af;
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+/* 容器获焦时提亮 label，带来更佳互动感 */
+:deep(.el-form-item:focus-within) .custom-form-label {
+  color: #111827;
+}
+
+:deep(.el-form-item:focus-within) .label-icon {
+  color: #14b8a6;
+}
+
+:deep(.custom-dialog .el-input__wrapper) {
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px #e2e8f0 inset !important;
+  padding: 4px 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:deep(.custom-dialog .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #cbd5e1 inset !important;
+}
+
+:deep(.custom-dialog .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #14b8a6 inset, 0 0 0 3px rgba(20, 184, 166, 0.12) !important;
+}
+
+:deep(.custom-dialog .el-textarea__inner) {
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px #e2e8f0 inset !important;
+  padding: 8px 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  resize: vertical;
+}
+
+:deep(.custom-dialog .el-textarea__inner:hover) {
+  box-shadow: 0 0 0 1px #cbd5e1 inset !important;
+}
+
+:deep(.custom-dialog .el-textarea__inner:focus) {
+  outline: none;
+  box-shadow: 0 0 0 1px #14b8a6 inset, 0 0 0 3px rgba(20, 184, 166, 0.12) !important;
+}
+
+/* 按钮尺寸与圆角优化 */
+:deep(.custom-dialog .el-button) {
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  font-weight: 500;
+  height: 34px;
+}
+
+:deep(.custom-dialog .el-button--primary) {
+  background-color: #14b8a6 !important;
+  border-color: #14b8a6 !important;
+  color: #ffffff !important;
+}
+
+:deep(.custom-dialog .el-button--primary:hover) {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+}
+
+/* 深色模式弹窗适配 */
+html[data-theme='dark'] :deep(.custom-dialog) {
+  background-color: #1a222e !important;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-dialog__header),
+html[data-theme='dark'] :deep(.custom-dialog .el-dialog__footer) {
+  border-color: #2c3745 !important;
+}
+
+html[data-theme='dark'] .header-title {
+  color: #f5f7fa;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-form-item__label) {
+  color: #b4bdca;
+}
+
+html[data-theme='dark'] .custom-form-label {
+  color: #b4bdca;
+}
+
+html[data-theme='dark'] :deep(.el-form-item:focus-within) .custom-form-label {
+  color: #f3f4f6;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-input__wrapper) {
+  background-color: #151b25 !important;
+  box-shadow: 0 0 0 1px #2c3745 inset !important;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-input__wrapper .el-input__inner) {
+  color: #f5f7fa !important;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-textarea__inner) {
+  background-color: #151b25 !important;
+  box-shadow: 0 0 0 1px #2c3745 inset !important;
+  color: #f5f7fa !important;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-input__wrapper.is-focus),
+html[data-theme='dark'] :deep(.custom-dialog .el-textarea__inner:focus) {
+  box-shadow: 0 0 0 1px #14b8a6 inset, 0 0 0 3px rgba(20, 184, 166, 0.25) !important;
+}
 
 </style>
