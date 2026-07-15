@@ -199,6 +199,7 @@
       <el-dialog
         v-model="reportDialogVisible"
         width="880px"
+        top="4vh"
         class="practice-report-dialog"
         :close-on-click-modal="true"
         :destroy-on-close="false"
@@ -1054,9 +1055,10 @@ const isAnalysisExpanded = (questionId: string | number) => {
 
 <style scoped>
 .exam-paper-container.practice-quiz-page {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 28px 24px 40px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 24px clamp(24px, 2.2vw, 40px) 40px;
   background: #f6f8fb;
   min-height: 100vh;
   transition: background 0.3s ease;
@@ -1113,42 +1115,54 @@ const isAnalysisExpanded = (questionId: string | number) => {
 /* 左右双栏布局 */
 .exam-session-layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: clamp(16px, 1.4vw, 24px);
   align-items: start;
 }
 
 .exam-main-content {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
+  min-width: 0;
 }
 
 .question-group {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
+}
+
+@media (min-width: 1025px) {
+  .exam-paper-container.practice-quiz-page {
+    width: calc(100% + var(--spacing-2xl));
+    margin-left: calc(-0.5 * var(--spacing-2xl));
+    margin-right: calc(-0.5 * var(--spacing-2xl));
+  }
 }
 
 /* 右侧栏 Sticky */
 .exam-sidebar {
   position: sticky;
-  top: 96px;
+  top: 0;
   z-index: 10;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .sidebar-sticky-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
 }
 
 /* 侧边栏卡片基础样式 */
 .sidebar-card {
   background: #ffffff;
   border: 1px solid #e8edf4;
-  border-radius: 24px;
-  padding: 20px 24px;
+  border-radius: 20px;
+  padding: 16px 18px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.03);
   transition: all 0.3s ease;
 }
@@ -1160,8 +1174,8 @@ const isAnalysisExpanded = (questionId: string | number) => {
   font-size: 15px;
   font-weight: 800;
   color: #182230;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #edf2f7;
   transition: color 0.3s ease, border-color 0.3s ease;
 }
@@ -1178,7 +1192,7 @@ const isAnalysisExpanded = (questionId: string | number) => {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .legend-item {
@@ -1361,13 +1375,13 @@ const isAnalysisExpanded = (questionId: string | number) => {
 .submit-card-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .btn-sidebar-submit {
   width: 100%;
-  height: 52px;
-  border-radius: 16px;
+  height: 46px;
+  border-radius: 14px;
   border: none;
   background: linear-gradient(135deg, #14b8a6, #0ea5a4);
   color: #ffffff;
@@ -1443,6 +1457,9 @@ const isAnalysisExpanded = (questionId: string | number) => {
 :deep(.practice-report-dialog) {
   border-radius: 18px;
   overflow: hidden;
+  max-height: calc(100vh - 8vh);
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
 }
 
@@ -1453,7 +1470,8 @@ const isAnalysisExpanded = (questionId: string | number) => {
 
 :deep(.practice-report-dialog .el-dialog__body) {
   padding: 0 28px 24px;
-  max-height: min(68vh, 680px);
+  max-height: none;
+  flex: 1 1 auto;
   overflow-y: auto;
 }
 
@@ -1626,7 +1644,7 @@ const isAnalysisExpanded = (questionId: string | number) => {
 
 .report-section h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 900;
   color: #182230;
 }
@@ -1895,12 +1913,12 @@ const isAnalysisExpanded = (questionId: string | number) => {
 @media (max-width: 768px) {
   :deep(.practice-report-dialog) {
     width: calc(100vw - 24px) !important;
-    margin: 12px auto;
+    margin-top: 8px !important;
+    max-height: calc(100vh - 16px);
   }
 
   :deep(.practice-report-dialog .el-dialog__body) {
     padding: 0 16px 18px;
-    max-height: 72vh;
   }
 
   :deep(.practice-report-dialog .el-dialog__footer) {
