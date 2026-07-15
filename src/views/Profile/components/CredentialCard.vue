@@ -28,8 +28,8 @@
     <!-- 中间文字区域 -->
     <div class="credential-info">
       <div class="credential-label">{{ label }}</div>
-      <div v-if="iconType === 'bio'" class="credential-value profile-description">
-        {{ value || '这个同学很懒，什么都没有写~' }}
+      <div v-if="iconType === 'bio'" class="credential-value profile-description" :class="{ 'is-empty': !value }">
+        {{ value || '暂无个人简介，点击右上角“编辑画像”即可添加~' }}
       </div>
       <div v-else class="credential-value">
         {{ value || '未设置' }}
@@ -41,6 +41,7 @@
       v-if="showCopy && value"
       :text="value"
       :label="label"
+      class="card-copy-btn"
     />
   </div>
 </template>
@@ -51,7 +52,7 @@ import CopyButton from './CopyButton.vue'
 defineProps<{
   iconType: 'id' | 'username' | 'email' | 'bio'
   label: string
-  value: string
+  value?: string
   showCopy: boolean
   fullWidth?: boolean
 }>()
@@ -64,21 +65,53 @@ defineProps<{
   align-items: center;
   gap: 10px;
   padding: 8px 14px;
-  background: #ffffff;
+  background: linear-gradient(to bottom right, #ffffff, #fafbfe);
   border: 1px solid #dfe7ee;
-  border-radius: 10px;
-  box-shadow: 0 3px 8px rgba(31, 45, 61, 0.03);
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+  border-radius: 12px;
+  box-shadow: 0 3px 8px rgba(31, 45, 61, 0.02);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 全宽卡片（如个人简介）的大格式设计 */
+.credential-card.full-width {
+  min-height: 112px;
+  align-items: flex-start;
+  padding: 16px 20px;
+  gap: 14px;
+}
+
+.credential-card.full-width .credential-icon {
+  margin-top: 2px;
+}
+
+.credential-card.full-width .credential-info {
+  margin-top: 1px;
+}
+
+.credential-card.full-width .credential-label {
+  font-size: 12px;
+  margin-bottom: 6px;
 }
 
 .credential-card:hover {
   border-color: rgba(20, 184, 166, 0.42);
-  box-shadow: 0 6px 16px rgba(20, 184, 166, 0.05);
-  transform: translateY(-0.5px);
+  box-shadow: 0 8px 24px rgba(20, 184, 166, 0.06);
+  transform: translateY(-2px);
+}
+
+/* 复制按钮滑入淡入特效 */
+.card-copy-btn {
+  opacity: 0;
+  transform: translateX(6px);
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.credential-card:hover .card-copy-btn {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .credential-icon {
@@ -138,14 +171,29 @@ defineProps<{
   line-height: 1.7;
   color: #344054;
   font-weight: 400;
-  font-size: 16px;
+  font-size: 15px;
+  margin-top: 4px;
+}
+
+.profile-description.is-empty {
+  font-style: italic;
+  color: #98a2b3;
+  font-size: 14px;
+}
+
+/* 响应式适配移动端复制按钮始终显示 */
+@media (max-width: 768px) {
+  .credential-card .card-copy-btn {
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 /* 深色模式适配 */
 html[data-theme='dark'] .credential-card {
-  background: var(--account-card-bg, #1a222e);
+  background: linear-gradient(to bottom right, var(--account-card-bg, #1a222e), rgba(26, 34, 46, 0.7));
   border-color: var(--account-border, #2c3745);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 html[data-theme='dark'] .credential-card:hover {
@@ -163,6 +211,10 @@ html[data-theme='dark'] .credential-value {
 
 html[data-theme='dark'] .profile-description {
   color: var(--account-text-secondary, #b4bdca);
+}
+
+html[data-theme='dark'] .profile-description.is-empty {
+  color: var(--account-text-muted, #7f8a99);
 }
 
 html[data-theme='dark'] .credential-icon.id {

@@ -14,11 +14,11 @@ defineProps<{
 .binding-status {
   display: inline-flex;
   align-items: center;
-  height: 24px;
-  padding: 0 9px;
-  margin-left: 10px;
+  height: 20px;
+  padding: 0 8px;
+  margin-left: 8px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   flex-shrink: 0;
 }

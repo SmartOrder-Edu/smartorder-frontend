@@ -53,6 +53,7 @@
           <!-- 左侧：账户凭证 -->
           <CredentialSection
             :user-info="userCredentialData"
+            @edit-profile="openEditDialog"
             @change-email="showEmailDialog = true"
           />
 
@@ -146,7 +147,15 @@
             </h3>
           </div>
 
-          <div v-if="radarAxes.length > 0" class="radar-chart">
+          <el-skeleton v-if="profileLoading" :rows="5" animated />
+          <div v-else-if="radarAxes.length > 0" class="ability-radar-content">
+            <div class="radar-summary">
+              <span class="summary-label">综合得分</span>
+              <strong>{{ Math.round(abilityProfile?.overallScore || 0) }}</strong>
+              <span>/ 100</span>
+              <p>{{ abilitySummary }}</p>
+            </div>
+          <div class="radar-chart">
             <svg viewBox="0 0 300 300">
               <defs>
                 <linearGradient id="radarFill" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -213,7 +222,8 @@
               </text>
             </svg>
           </div>
-          <el-empty v-else description="暂无能力评估数据" :image-size="80" />
+          </div>
+          <el-empty v-else description="完成学习任务后，将生成六维综合能力雷达" :image-size="80" />
         </section>
 
         <!-- 薄弱点分析 -->
@@ -669,14 +679,39 @@ const preferences = computed(() => {
 // ====== 计算属性：能力雷达 ======
 const abilityProfile = computed(() => profileData.value?.abilityProfile)
 
+const radarDimensions = [
+  { code: 'KNOWLEDGE_UNDERSTANDING', name: '知识理解力', legacy: ['CONCEPT_UNDERSTANDING'] },
+  { code: 'PROBLEM_ANALYSIS', name: '问题分析力', legacy: ['PROBLEM_DECOMPOSITION', 'COMPLEXITY_ANALYSIS'] },
+  { code: 'SOLUTION_DESIGN', name: '方案设计力', legacy: ['ABSTRACTION_MODELING', 'ALGORITHM_DESIGN'] },
+  { code: 'PRACTICAL_APPLICATION', name: '实践应用力', legacy: ['CODING_IMPLEMENTATION'] },
+  { code: 'ERROR_REFLECTION', name: '纠错反思力', legacy: ['DEBUGGING'] },
+  { code: 'TRANSFER_INNOVATION', name: '迁移创新力', legacy: ['KNOWLEDGE_TRANSFER'] }
+]
+
 const radarAxes = computed(() => {
   const abilities = abilityProfile.value?.abilities
   if (!abilities) return []
+  return radarDimensions.map(dimension => {
+    const current = abilities[dimension.code]
+    const legacyItems = dimension.legacy.map(code => abilities[code]).filter(Boolean)
+    const item = current || legacyItems.sort((a, b) => (a?.score ?? 100) - (b?.score ?? 100))[0]
+    return {
+      code: dimension.code,
+      name: dimension.name,
+      value: item?.score ?? 0,
+      trend: item.trend || '',
+      focus: item?.improvementFocus || '',
+      evaluated: !!item
+    }
+  })
+})
 
-  return Object.values(abilities).map(item => ({
-    name: item.abilityName || item.abilityCode || '',
-    value: item.score ?? 0
-  }))
+const abilitySummary = computed(() => {
+  const evaluated = radarAxes.value.filter(axis => axis.evaluated)
+  const strongest = evaluated.slice().sort((a, b) => b.value - a.value)[0]
+  const weakest = evaluated.slice().sort((a, b) => a.value - b.value)[0]
+  if (!strongest || !weakest) return '正在收集你的学习表现'
+  return `当前优势：${strongest.name}\n优先提升：${weakest.name}`
 })
 
 // ====== 计算属性：常见误区 ======
@@ -1237,10 +1272,14 @@ html[data-theme='dark'] .account-security-container {
 }
 
 /* 雷达图 */
-.radar-chart {
-  display: flex;
-  justify-content: center;
-}
+.radar-chart { display: flex; justify-content: center; min-width: 350px; }
+.ability-radar-content { display: grid; grid-template-columns: 196px minmax(350px, 1fr); align-items: center; gap: 52px; padding: 20px 0 8px; }
+.radar-summary { min-height: 314px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; text-align: left; padding: 24px; border-radius: 15px; color: #334155; background: linear-gradient(145deg, #f2fcfc 0%, #e7f9f8 100%); border: 1px solid #9de4e0; box-shadow: inset 0 1px rgba(255,255,255,.9); }
+.radar-summary .summary-label { font-size: .86rem; font-weight: 700; color: #334155; }
+.radar-summary strong { display: block; font-size: 4rem; letter-spacing: -.055em; line-height: .9; color: #10bbb5; margin-top: 20px; }
+.radar-summary strong + span { margin-top: 8px; font-size: 1.2rem; font-weight: 700; color: #64748b; }
+.radar-summary p { white-space: pre-line; font-size: .82rem; font-weight: 600; line-height: 1.8; margin: 28px 0 0; padding-top: 16px; border-top: 1px solid #b9e9e6; color: #475569; }
+@media (max-width: 760px) { .ability-radar-content { grid-template-columns: 1fr; gap: 16px; }.radar-summary { min-height: auto; text-align: center; padding: 20px; }.radar-chart { min-width: 0; } }
 
 .radar-chart svg {
   max-width: 300px;
