@@ -89,11 +89,11 @@ const handleAction = () => {
 
 <style scoped>
 .binding-card {
-  min-height: 96px;
+  min-height: 80px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 10px;
+  padding: 8px 14px;
   background:
     linear-gradient(
       135deg,
@@ -111,13 +111,13 @@ const handleAction = () => {
 
 .binding-card:hover {
   border-color: rgba(20, 184, 166, 0.48);
-  box-shadow: 0 8px 20px rgba(15, 118, 110, 0.07);
-  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.09);
+  transform: translateY(-2px);
 }
 
 .platform-logo {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -126,6 +126,12 @@ const handleAction = () => {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   box-shadow: 0 3px 8px rgba(31, 45, 61, 0.05);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s ease;
+}
+
+.binding-card:hover .platform-logo {
+  transform: scale(1.06);
+  box-shadow: 0 4px 10px rgba(31, 45, 61, 0.08);
 }
 
 .binding-details {
@@ -141,17 +147,17 @@ const handleAction = () => {
 }
 
 .binding-platform-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 650;
   color: #111827;
 }
 
 .binding-meta {
-  margin-top: 4px;
+  margin-top: 2px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  font-size: 12px;
+  gap: 2px;
+  font-size: 11px;
   color: #8290a5;
 }
 

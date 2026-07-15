@@ -1,11 +1,12 @@
 <template>
   <div class="security-title-container">
     <h3 class="security-title">
-      <!-- 盾牌图标 -->
+      <!-- 个人信息图标 -->
       <svg class="security-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
       </svg>
-      账号与安全设置
+      个人信息
     </h3>
     <div class="security-divider"></div>
   </div>
@@ -33,7 +34,7 @@
 .security-divider {
   height: 1px;
   margin: 0 44px;
-  background: #e9eef3;
+  background: linear-gradient(to right, rgba(20, 184, 166, 0.35), #e9eef3 25%, #e9eef3 80%, rgba(233, 238, 243, 0));
 }
 
 /* 响应式适配 */
@@ -44,6 +45,7 @@
   }
   .security-divider {
     margin: 0 20px;
+    background: linear-gradient(to right, rgba(20, 184, 166, 0.35), #e9eef3 15%, #e9eef3 85%, rgba(233, 238, 243, 0));
   }
 }
 
@@ -53,6 +55,6 @@ html[data-theme='dark'] .security-title {
 }
 
 html[data-theme='dark'] .security-divider {
-  background: var(--account-border, #2c3745);
+  background: linear-gradient(to right, rgba(20, 184, 166, 0.35), var(--account-border, #2c3745) 25%, var(--account-border, #2c3745) 80%, transparent);
 }
 </style>

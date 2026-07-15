@@ -24,12 +24,12 @@ const handleClick = () => {
 
 <style scoped>
 .unbind-button {
-  min-width: 80px;
-  height: 32px;
+  min-width: 72px;
+  height: 28px;
   margin-left: auto;
-  padding: 0 12px;
+  padding: 0 10px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;

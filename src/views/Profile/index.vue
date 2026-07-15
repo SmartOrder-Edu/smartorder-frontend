@@ -7,15 +7,7 @@
           <h1 class="page-title">学习画像</h1>
           <p class="page-desc">系统通过学习行为分析，构建你的个性化学习特征</p>
         </div>
-        <div class="header-right">
-          <el-button @click="openEditDialog">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            编辑画像
-          </el-button>
-        </div>
+
       </div>
 
       <!-- 画像完整度概览 -->
@@ -46,13 +38,16 @@
           @avatar-change="handleAvatarChange"
         />
 
-        <!-- 账号与安全设置标题 -->
-        <SecuritySectionHeader />
+
 
         <!-- 主体双栏内容 -->
         <div class="security-content">
-          <!-- 左侧：账户凭证 -->
-          <CredentialSection :user-info="userCredentialData" />
+          <!-- 左侧：个人凭证 -->
+          <CredentialSection
+            :user-info="userCredentialData"
+            @change-email="showEmailDialog = true"
+            @edit="openEditDialog"
+          />
 
           <!-- 右侧：第三方账号绑定 -->
           <QuickLoginBindingSection
@@ -64,6 +59,44 @@
             @unbind="handleUnbind"
           />
         </div>
+      </section>
+
+      <section class="section profile-section profile-details-section" v-if="profileData">
+        <div class="section-header">
+          <h3 class="section-title">画像详细信息</h3>
+          <span class="section-subtitle">展开查看已沉淀的完整画像字段</span>
+        </div>
+        <el-collapse v-model="profileDetailPanels" class="profile-detail-collapse">
+          <el-collapse-item v-if="profileData.learningBackground" title="学习背景" name="background">
+            <ProfileDetailValue :value="profileData.learningBackground" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.learningGoals" title="学习目标详情" name="goals">
+            <ProfileDetailValue :value="profileData.learningGoals" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.abilityProfile" title="能力画像详情" name="ability">
+            <ProfileDetailValue :value="profileData.abilityProfile" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.commonMisconceptions" title="常见误区详情" name="misconceptions">
+            <ProfileDetailValue :value="profileData.commonMisconceptions" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.learningPreference" title="学习偏好详情" name="preference">
+            <ProfileDetailValue :value="profileData.learningPreference" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.metacognitiveProfile" title="元认知画像详情" name="metacognitive">
+            <ProfileDetailValue :value="profileData.metacognitiveProfile" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.subjectProfiles" title="学科画像详情" name="subjects">
+            <ProfileDetailValue :value="profileData.subjectProfiles" />
+          </el-collapse-item>
+          <el-collapse-item title="画像更新记录" name="updates">
+            <ProfileDetailValue :value="{
+              profileSummary: profileData.profileSummary,
+              lastUpdateReason: profileData.lastUpdateReason,
+              updatedAt: profileData.updatedAt,
+              dimensionMetadata: profileData.dimensionMetadata
+            }" />
+          </el-collapse-item>
+        </el-collapse>
       </section>
 
       <div class="profile-grid">
@@ -473,41 +506,74 @@
         <el-empty v-else description="暂无学科画像数据" :image-size="80" />
       </section>
 
-      <!-- 编辑画像对话框 -->
-      <el-dialog v-model="showEditDialog" title="编辑用户资料" width="520px">
-        <div class="edit-form">
-          <div class="form-item">
-            <label>昵称</label>
-            <el-input v-model="editData.username" placeholder="请输入昵称" />
+      <!-- 编辑资料对话框 -->
+      <el-dialog
+        v-model="showEditDialog"
+        width="480px"
+        :close-on-click-modal="false"
+        class="custom-dialog edit-profile-dialog"
+      >
+        <template #header>
+          <div class="dialog-header">
+            <span class="header-icon edit-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="16" height="16">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </span>
+            <span class="header-title">编辑个人资料</span>
           </div>
-          <div class="form-item">
-            <label>性别</label>
-            <el-select v-model="editData.gender" style="width: 100%;">
-              <el-option label="未设置" :value="0" />
-              <el-option label="男" :value="1" />
-              <el-option label="女" :value="2" />
-            </el-select>
-          </div>
-          <div class="form-item">
-            <label>生日</label>
-            <el-date-picker
-              v-model="editData.birthday"
-              type="date"
-              placeholder="选择日期"
-              style="width: 100%;"
-              value-format="YYYY-MM-DD"
+        </template>
+        <el-form :model="editData" label-position="top">
+          <el-form-item :error="editErrors.username">
+            <template #label>
+              <span class="custom-form-label">
+                <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="13" height="13">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                昵称
+              </span>
+            </template>
+            <el-input
+              v-model="editData.username"
+              placeholder="请输入昵称（最多20字）"
+              maxlength="20"
+              show-word-limit
+              clearable
             />
-          </div>
-          <div class="form-item">
-            <label>个人简介</label>
-            <el-input type="textarea" v-model="editData.bio" :rows="3" placeholder="介绍一下自己..." />
-          </div>
-        </div>
+          </el-form-item>
+          <el-form-item :error="editErrors.bio">
+            <template #label>
+              <span class="custom-form-label">
+                <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="13" height="13">
+                  <path d="M12 20h9"/>
+                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                </svg>
+                个人简介
+              </span>
+            </template>
+            <el-input
+              v-model="editData.bio"
+              type="textarea"
+              :rows="4"
+              placeholder="介绍一下自己（最多500字）"
+              maxlength="500"
+              show-word-limit
+            />
+          </el-form-item>
+        </el-form>
         <template #footer>
           <el-button @click="showEditDialog = false">取消</el-button>
-          <el-button type="primary" :loading="uploading" @click="saveProfile">保存</el-button>
+          <el-button type="primary" :loading="saving" @click="saveProfile" class="dialog-save-btn">保存</el-button>
         </template>
       </el-dialog>
+
+      <!-- 修改邮箱对话框 -->
+      <EmailEditDialog
+        v-model="showEmailDialog"
+        :current-email="currentEmail"
+      />
     </div>
   </AppLayout>
 </template>
@@ -528,14 +594,17 @@ import type {
 
 // 账户与安全子组件
 import ProfileHeader from './components/ProfileHeader.vue'
-import SecuritySectionHeader from './components/SecuritySectionHeader.vue'
 import CredentialSection from './components/CredentialSection.vue'
 import QuickLoginBindingSection from './components/QuickLoginBindingSection.vue'
+import EmailEditDialog from './components/EmailEditDialog.vue'
+import ProfileDetailValue from './components/ProfileDetailValue.vue'
 
 const userStore = useUserStore()
 const showEditDialog = ref(false)
+const showEmailDialog = ref(false)
 const profileLoading = ref(false)
 const profileData = ref<StudentProfileData | null>(null)
+const profileDetailPanels = ref<string[]>(['background', 'updates'])
 
 // ====== 标签映射 ======
 const levelLabels: Record<string, string> = {
@@ -603,6 +672,8 @@ const userInfoHeaderData = computed(() => {
     weeklyMinutes: userInfo.value.weeklyMinutes
   }
 })
+
+const currentEmail = computed(() => userStore.userInfo?.email || '')
 
 // 传给 CredentialSection 的数据
 const userCredentialData = computed(() => {
@@ -838,26 +909,50 @@ const formatTime = (time?: string) => {
 
 // ====== 编辑功能 ======
 const uploading = ref(false)
+const saving = ref(false)
 
 const editData = reactive({
   username: '',
-  gender: 0,
-  birthday: '',
+  bio: ''
+})
+
+const editErrors = reactive({
+  username: '',
   bio: ''
 })
 
 const saveProfile = async () => {
+  editErrors.username = ''
+  editErrors.bio = ''
+
+  const trimmedName = editData.username.trim()
+  if (!trimmedName) {
+    editErrors.username = '昵称不能为空'
+    return
+  }
+  if (trimmedName.length > 20) {
+    editErrors.username = '昵称不能超过20字'
+    return
+  }
+
+  const trimmedBio = editData.bio.trim()
+  if (trimmedBio.length > 500) {
+    editErrors.bio = '个人简介不能超过500字'
+    return
+  }
+
+  saving.value = true
   try {
     await userStore.updateProfile({
-      username: editData.username,
-      gender: editData.gender,
-      birthday: editData.birthday || undefined,
-      bio: editData.bio
+      username: trimmedName || undefined,
+      bio: trimmedBio || undefined
     })
     ElMessage.success('资料更新成功')
     showEditDialog.value = false
   } catch (error: any) {
     ElMessage.error(error?.message || '更新失败')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -889,10 +984,10 @@ const openEditDialog = () => {
   const u = userStore.userInfo
   if (u) {
     editData.username = u.username || ''
-    editData.gender = u.gender ?? 0
-    editData.birthday = u.birthday || ''
     editData.bio = u.bio || ''
   }
+  editErrors.username = ''
+  editErrors.bio = ''
   showEditDialog.value = true
 }
 
@@ -1096,7 +1191,7 @@ onMounted(async () => {
 
 .security-content {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1fr) 340px;
   gap: 40px;
   padding: 24px 44px 44px;
 }
@@ -1709,5 +1804,184 @@ html[data-theme='dark'] .account-security-container {
   }
 }
 
+/* 自定义对话框美化 */
+:deep(.custom-dialog) {
+  border-radius: 16px !important;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03) !important;
+}
+
+:deep(.custom-dialog .el-dialog__header) {
+  padding: 20px 24px 14px !important;
+  margin-right: 0 !important;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+:deep(.custom-dialog .el-dialog__body) {
+  padding: 24px 24px 12px !important;
+}
+
+:deep(.custom-dialog .el-dialog__footer) {
+  padding: 12px 24px 20px !important;
+  border-top: 1px solid #f1f5f9;
+}
+
+/* 弹窗头部排版 */
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: #14b8a6;
+  background: rgba(20, 184, 166, 0.08);
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: 650;
+  color: #1f2937;
+}
+
+/* 输入框细节美化 */
+:deep(.custom-dialog .el-form-item) {
+  margin-bottom: 22px;
+}
+
+:deep(.custom-dialog .el-form-item__label) {
+  font-weight: 550;
+  color: #4b5563;
+  padding-bottom: 6px !important;
+}
+
+/* 现代垂直表单的 label 自定义设计 */
+.custom-form-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  transition: all 0.2s ease;
+}
+
+.label-icon {
+  color: #9ca3af;
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+/* 容器获焦时提亮 label，带来更佳互动感 */
+:deep(.el-form-item:focus-within) .custom-form-label {
+  color: #111827;
+}
+
+:deep(.el-form-item:focus-within) .label-icon {
+  color: #14b8a6;
+}
+
+:deep(.custom-dialog .el-input__wrapper) {
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px #e2e8f0 inset !important;
+  padding: 4px 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:deep(.custom-dialog .el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #cbd5e1 inset !important;
+}
+
+:deep(.custom-dialog .el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #14b8a6 inset, 0 0 0 3px rgba(20, 184, 166, 0.12) !important;
+}
+
+:deep(.custom-dialog .el-textarea__inner) {
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px #e2e8f0 inset !important;
+  padding: 8px 12px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  resize: vertical;
+}
+
+:deep(.custom-dialog .el-textarea__inner:hover) {
+  box-shadow: 0 0 0 1px #cbd5e1 inset !important;
+}
+
+:deep(.custom-dialog .el-textarea__inner:focus) {
+  outline: none;
+  box-shadow: 0 0 0 1px #14b8a6 inset, 0 0 0 3px rgba(20, 184, 166, 0.12) !important;
+}
+
+/* 按钮尺寸与圆角优化 */
+:deep(.custom-dialog .el-button) {
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  font-weight: 500;
+  height: 34px;
+}
+
+:deep(.custom-dialog .el-button--primary) {
+  background-color: #14b8a6 !important;
+  border-color: #14b8a6 !important;
+  color: #ffffff !important;
+}
+
+:deep(.custom-dialog .el-button--primary:hover) {
+  background-color: #0d9488 !important;
+  border-color: #0d9488 !important;
+}
+
+/* 深色模式弹窗适配 */
+html[data-theme='dark'] :deep(.custom-dialog) {
+  background-color: #1a222e !important;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-dialog__header),
+html[data-theme='dark'] :deep(.custom-dialog .el-dialog__footer) {
+  border-color: #2c3745 !important;
+}
+
+html[data-theme='dark'] .header-title {
+  color: #f5f7fa;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-form-item__label) {
+  color: #b4bdca;
+}
+
+html[data-theme='dark'] .custom-form-label {
+  color: #b4bdca;
+}
+
+html[data-theme='dark'] :deep(.el-form-item:focus-within) .custom-form-label {
+  color: #f3f4f6;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-input__wrapper) {
+  background-color: #151b25 !important;
+  box-shadow: 0 0 0 1px #2c3745 inset !important;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-input__wrapper .el-input__inner) {
+  color: #f5f7fa !important;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-textarea__inner) {
+  background-color: #151b25 !important;
+  box-shadow: 0 0 0 1px #2c3745 inset !important;
+  color: #f5f7fa !important;
+}
+
+html[data-theme='dark'] :deep(.custom-dialog .el-input__wrapper.is-focus),
+html[data-theme='dark'] :deep(.custom-dialog .el-textarea__inner:focus) {
+  box-shadow: 0 0 0 1px #14b8a6 inset, 0 0 0 3px rgba(20, 184, 166, 0.25) !important;
+}
 
 </style>
