@@ -156,7 +156,7 @@
               <p>{{ abilitySummary }}</p>
             </div>
           <div class="radar-chart">
-            <svg viewBox="0 0 300 300">
+            <svg viewBox="0 -20 300 340" aria-label="六维综合能力雷达图">
               <defs>
                 <linearGradient id="radarFill" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" style="stop-color:#3b5bdb;stop-opacity:0.3"/>
@@ -197,14 +197,15 @@
                 stroke-width="2"
               />
 
-              <!-- 标签 -->
+              <!-- 维度名称与分数：置于图形外圈，避免数据点和文字互相遮挡 -->
               <text v-for="(axis, idx) in radarAxes" :key="'label-' + idx"
                 :x="150 + 140 * Math.cos((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
-                :y="150 + 140 * Math.sin((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
+                :y="150 + 140 * Math.sin((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2) - 5"
                 text-anchor="middle"
                 dominant-baseline="middle"
-                font-size="11"
-                fill="var(--text-secondary)"
+                font-size="12"
+                font-weight="600"
+                fill="var(--text-dark)"
               >
                 {{ axis.name }}
               </text>
@@ -212,13 +213,13 @@
               <!-- 数值 -->
               <text v-for="(axis, idx) in radarAxes" :key="'value-' + idx"
                 :x="150 + 160 * Math.cos((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
-                :y="150 + 160 * Math.sin((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
+                :y="150 + 140 * Math.sin((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2) + 16"
                 text-anchor="middle"
-                font-size="10"
-                fill="var(--primary-color)"
-                font-weight="600"
+                font-size="13"
+                fill="#10bdb7"
+                font-weight="700"
               >
-                {{ axis.value }}
+                {{ axis.evaluated ? axis.value : '待评估' }}
               </text>
             </svg>
           </div>
