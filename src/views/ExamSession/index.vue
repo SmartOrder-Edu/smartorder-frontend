@@ -68,9 +68,17 @@
               
               <!-- 状态图例 -->
               <div class="legend-row">
-                <div class="legend-item"><span class="dot answered"></span>已答</div>
+                <template v-if="showAnswer">
+                  <div class="legend-item"><span class="dot correct"></span>正确</div>
+                  <div class="legend-item"><span class="dot wrong"></span>错误</div>
+                  <div class="legend-item"><span class="dot pending"></span>待批阅</div>
+                  <div class="legend-item"><span class="dot unanswered"></span>未答</div>
+                </template>
+                <template v-else>
+                  <div class="legend-item"><span class="dot answered"></span>已答</div>
+                  <div class="legend-item"><span class="dot unanswered"></span>未答</div>
+                </template>
                 <div class="legend-item"><span class="dot active"></span>当前</div>
-                <div class="legend-item"><span class="dot unanswered"></span>未答</div>
                 <div class="legend-item"><span class="dot flagged"></span>标记</div>
               </div>
               
@@ -84,6 +92,9 @@
                   :class="{
                     active: idx === currentActiveIndex,
                     answered: isIndexAnswered(idx),
+                    'result-correct': isIndexResultCorrect(idx),
+                    'result-wrong': isIndexResultWrong(idx),
+                    'result-pending': isIndexResultPending(idx),
                     flagged: flaggedQuestions.has(idx)
                   }"
                   @click="scrollToQuestion(idx)"
@@ -401,6 +412,17 @@ const taskId = computed(() => route.query.taskId ? String(route.query.taskId) : 
 const sessionId = computed(() => route.query.sessionId ? String(route.query.sessionId) : undefined)
 const rawStatus = computed(() => route.query.rawStatus ? String(route.query.rawStatus) : undefined)
 const reportSessionId = computed(() => sessionId.value || taskId.value)
+const isFinishedSession = computed(() => {
+  const status = String(rawStatus.value || '').toLowerCase()
+  return ['finished', 'completed', 'complete', 'done', 'graded'].includes(status)
+})
+const gradingDetailMap = computed(() => {
+  const map = new Map<string, AnswerDetailVO>()
+  gradingResult.value?.detail?.forEach(detail => {
+    map.set(String(detail.questionId), detail)
+  })
+  return map
+})
 
 const numberMap = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
 
@@ -464,7 +486,36 @@ const scrollToQuestion = (index: number) => {
 
 const isIndexAnswered = (index: number) => {
   const q = numberedQuestionsList.value.find(item => item.globalIndex === index)
+  if (showAnswer.value && q) {
+    const detail = gradingDetailMap.value.get(String(q.id))
+    if (detail) {
+      return isResultDetailAnswered(q, detail)
+    }
+  }
   return q ? isQuestionAnswered(q) : false
+}
+
+const getIndexResultDetail = (index: number) => {
+  if (!showAnswer.value) return undefined
+  const q = numberedQuestionsList.value.find(item => item.globalIndex === index)
+  return q ? gradingDetailMap.value.get(String(q.id)) : undefined
+}
+
+const isIndexResultCorrect = (index: number) => {
+  const detail = getIndexResultDetail(index)
+  return !!detail && detail.isCorrect === true
+}
+
+const isIndexResultWrong = (index: number) => {
+  const q = numberedQuestionsList.value.find(item => item.globalIndex === index)
+  const detail = getIndexResultDetail(index)
+  return !!q && !!detail && isResultDetailAnswered(q, detail) && detail.isCorrect === false
+}
+
+const isIndexResultPending = (index: number) => {
+  const q = numberedQuestionsList.value.find(item => item.globalIndex === index)
+  const detail = getIndexResultDetail(index)
+  return !!q && !!detail && isResultDetailAnswered(q, detail) && (detail.status === 'pending_review' || detail.isCorrect == null)
 }
 
 const setActiveQuestion = (index: number) => {
@@ -688,7 +739,7 @@ const fetchQuestions = async () => {
       }
 
       // 如果是已完成状态，自动加载结果
-      if (rawStatus.value === 'finished') {
+      if (isFinishedSession.value) {
         showAnswer.value = true
         try {
           const result = await getSessionResult(sessionId.value as any)
@@ -705,6 +756,17 @@ const fetchQuestions = async () => {
         limit: 100,
         taskId: taskId.value || undefined
       })
+
+      if (isFinishedSession.value && taskId.value) {
+        showAnswer.value = true
+        try {
+          const result = await getExamResult(taskId.value as any)
+          gradingResult.value = result as any
+          applyResultUserAnswers(result as any)
+        } catch (e) {
+          console.error('获取历史答题结果失败:', e)
+        }
+      }
     } else {
       ElMessage.warning('缺少学习空间或会话ID，无法开始测评')
     }
@@ -851,31 +913,74 @@ const normalizeBooleanAnswer = (value: unknown): string => {
   return text
 }
 
-const resultUserAnswerToInputValue = (q: EvaluationQuestion, userAnswer?: Record<string, unknown>): string => {
-  if (!userAnswer) return ''
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+const hasMeaningfulAnswerValue = (value: unknown): boolean => {
+  if (value == null) return false
+  if (typeof value === 'string') return value.trim() !== ''
+  if (typeof value === 'number' || typeof value === 'boolean') return true
+  if (Array.isArray(value)) return value.some(item => hasMeaningfulAnswerValue(item))
+  if (isPlainObject(value)) return Object.values(value).some(item => hasMeaningfulAnswerValue(item))
+  return false
+}
+
+const firstAnswerField = (userAnswer: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(userAnswer, key)) {
+      return userAnswer[key]
+    }
+  }
+  return undefined
+}
+
+const answerValueToText = (value: unknown, separator = '、') => {
+  if (Array.isArray(value)) {
+    return value.map(v => String(v ?? '').trim()).filter(Boolean).join(separator)
+  }
+  return value == null ? '' : String(value).trim()
+}
+
+const resultUserAnswerToInputValue = (q: EvaluationQuestion, rawUserAnswer?: unknown): string => {
+  const userAnswer = isPlainObject(rawUserAnswer) ? rawUserAnswer : undefined
+  if (!userAnswer) {
+    if (Array.isArray(rawUserAnswer)) {
+      return answerValueToText(rawUserAnswer, q.questionType === 'fill_blank' ? ';;' : '、')
+    }
+    return rawUserAnswer == null ? '' : String(rawUserAnswer).trim()
+  }
 
   if (q.questionType === 'single_choice' || q.questionType === 'multiple_choice') {
-    const selected = userAnswer.selectedOptions
-    if (Array.isArray(selected)) {
-      return selected.map(v => String(v)).filter(Boolean).join('、')
-    }
-    return selected == null ? '' : String(selected)
+    const selected = firstAnswerField(userAnswer, [
+      'selectedOptions',
+      'selectedOption',
+      'option',
+      'options',
+      'answer',
+      'value'
+    ])
+    return answerValueToText(selected)
   }
 
   if (q.questionType === 'judge') {
-    return normalizeBooleanAnswer(userAnswer.value)
+    const value = firstAnswerField(userAnswer, ['value', 'answer', 'selectedOption', 'text'])
+    return normalizeBooleanAnswer(value)
   }
 
   if (q.questionType === 'fill_blank') {
-    const blanks = userAnswer.blanks
-    if (Array.isArray(blanks)) {
-      return blanks.map(v => String(v ?? '')).join(';;')
-    }
-    return blanks == null ? '' : String(blanks)
+    const blanks = firstAnswerField(userAnswer, ['blanks', 'blankAnswers', 'answers', 'value', 'text'])
+    return answerValueToText(blanks, ';;')
   }
 
-  const text = userAnswer.text ?? userAnswer.code
+  const text = firstAnswerField(userAnswer, ['text', 'code', 'answer', 'value'])
   return text == null ? '' : String(text)
+}
+
+const isResultDetailAnswered = (q: EvaluationQuestion, detail: AnswerDetailVO) => {
+  const value = resultUserAnswerToInputValue(q, detail.userAnswer)
+  if (value.trim()) return true
+  return hasMeaningfulAnswerValue(detail.userAnswer)
 }
 
 const applyResultUserAnswers = (result: SessionResultVO | null | undefined) => {
@@ -1215,6 +1320,18 @@ const isAnalysisExpanded = (questionId: string | number) => {
   border: 1.5px solid #14b8a6;
 }
 
+.legend-item .dot.correct {
+  background: #22c55e;
+}
+
+.legend-item .dot.wrong {
+  background: #ef4444;
+}
+
+.legend-item .dot.pending {
+  background: #f59e0b;
+}
+
 .legend-item .dot.active {
   background: #14b8a6;
 }
@@ -1272,6 +1389,24 @@ const isAnalysisExpanded = (questionId: string | number) => {
   background: #f0fdfa;
   border-color: #14b8a6;
   color: #0f9f91;
+}
+
+.grid-number.result-correct:not(.active) {
+  background: #ecfdf3;
+  border-color: #22c55e;
+  color: #15803d;
+}
+
+.grid-number.result-wrong:not(.active) {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #b91c1c;
+}
+
+.grid-number.result-pending:not(.active) {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #b45309;
 }
 
 .grid-number.flagged:not(.active) {
@@ -2024,6 +2159,24 @@ html[data-theme='dark'] .grid-number.answered:not(.active) {
   background: rgba(20, 184, 166, 0.15);
   border-color: #14b8a6;
   color: #2dd4bf;
+}
+
+html[data-theme='dark'] .grid-number.result-correct:not(.active) {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(74, 222, 128, 0.55);
+  color: #86efac;
+}
+
+html[data-theme='dark'] .grid-number.result-wrong:not(.active) {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fca5a5;
+}
+
+html[data-theme='dark'] .grid-number.result-pending:not(.active) {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fcd34d;
 }
 
 html[data-theme='dark'] .grid-number.flagged:not(.active) {
