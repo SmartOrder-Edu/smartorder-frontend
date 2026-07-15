@@ -38,6 +38,11 @@ export interface ChangePasswordParams {
   verificationCode: number
 }
 
+export interface ChangeEmailParams {
+  newEmail: string
+  verificationCode: string
+}
+
 export interface AuthIdentity {
   providerCode: string
   providerUsername: string
@@ -140,6 +145,11 @@ export const userApi = {
     return request.put<string>('/users/avatar', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
+  },
+
+  /** 修改绑定邮箱（需验证码） */
+  changeEmail(params: ChangeEmailParams) {
+    return request.post<string>('/users/email', params)
   },
 
   /** 注销账号 */
