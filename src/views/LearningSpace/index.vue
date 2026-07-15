@@ -383,16 +383,47 @@
 
           <!-- Tab: Path -->
           <div v-show="activeTab === 'path'" class="tab-content">
-            <div class="section-header">
-              <h3>学习路径</h3>
-              <span class="task-count">{{ dashboard.pathProgress.completedNodes }}/{{ dashboard.pathProgress.totalNodes }} 阶段</span>
+            <div class="section-header path-section-header">
+              <div>
+                <h3>学习路径</h3>
+                <span class="path-section-subtitle">用思维导图总览知识节点，用时间线查看执行细节</span>
+              </div>
+              <div class="path-header-actions">
+                <div class="path-view-switch" role="tablist" aria-label="学习路径视图">
+                  <button
+                    type="button"
+                    :class="{ active: pathViewMode === 'mindmap' }"
+                    @click="pathViewMode = 'mindmap'"
+                  >
+                    思维导图
+                  </button>
+                  <button
+                    type="button"
+                    :class="{ active: pathViewMode === 'timeline' }"
+                    @click="pathViewMode = 'timeline'"
+                  >
+                    时间线
+                  </button>
+                </div>
+                <span class="task-count">{{ dashboard.pathProgress.completedNodes }}/{{ dashboard.pathProgress.totalNodes }} 阶段</span>
+              </div>
             </div>
-            <PathTimeline
-              v-if="dashboard.pathNodes.length"
-              :nodes="dashboard.pathNodes"
-              :tasks="allTasks"
-              :resources="dashboard.resources"
-            />
+            <template v-if="dashboard.pathNodes.length">
+              <LearningPathMindMap
+                v-show="pathViewMode === 'mindmap'"
+                :nodes="dashboard.pathNodes"
+                :tasks="allTasks"
+                :resources="dashboard.resources"
+                :title="dashboard.space.name"
+                :progress="dashboard.progress"
+              />
+              <PathTimeline
+                v-show="pathViewMode === 'timeline'"
+                :nodes="dashboard.pathNodes"
+                :tasks="allTasks"
+                :resources="dashboard.resources"
+              />
+            </template>
             <el-empty v-else description="学习路径即将由 Agent 生成" :image-size="100" />
           </div>
 
@@ -652,6 +683,7 @@ import SpaceStatCard from '@/components/SpaceStatCard.vue'
 import { BarChartIcon, FlameIcon, CalendarIcon, ZapIcon } from '@/assets/icons'
 import TaskCard from '@/components/TaskCard.vue'
 import PathTimeline from '@/components/PathTimeline.vue'
+import LearningPathMindMap from '@/components/LearningPathMindMap.vue'
 import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
@@ -677,6 +709,7 @@ const dashStore = useSpaceDashboardStore()
 const { enterStudy } = useStudyEntry()
 
 const activeTab = ref('today')
+const pathViewMode = ref<'mindmap' | 'timeline'>('mindmap')
 const showAddTask = ref(false)
 const planDraft = ref<LearningPlanDraft | null>(null)
 const planLoading = ref(false)
@@ -3012,6 +3045,58 @@ watch(
   font-size: 1.05rem;
 }
 
+.path-section-header {
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.path-section-subtitle {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.path-header-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 10px;
+}
+
+.path-view-switch {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+
+  button {
+    min-height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+
+    &:hover {
+      color: #0f172a;
+    }
+
+    &.active {
+      background: #ffffff;
+      color: #0a9e94;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    }
+  }
+}
+
 .task-count {
   padding: 3px 9px;
   border-radius: 999px;
@@ -3155,6 +3240,24 @@ watch(
 
   .tab-btn {
     flex: 0 0 auto;
+  }
+
+  .path-section-header,
+  .path-header-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .path-header-actions {
+    width: 100%;
+  }
+
+  .path-view-switch {
+    width: 100%;
+
+    button {
+      flex: 1;
+    }
   }
 
   .phase-resources,
