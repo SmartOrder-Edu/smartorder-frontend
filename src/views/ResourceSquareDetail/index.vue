@@ -228,7 +228,7 @@ const fetchDetail = async () => {
   loading.value = true
   error.value = false
   try {
-    const id = route.params.resourceId as string
+    const id = route.params.id as string
     const res = await getSquareDetail(id)
     detail.value = res
     myRating.value = res.userRating || 0
