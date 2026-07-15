@@ -196,65 +196,125 @@
         </aside>
       </div>
 
-      <el-drawer
-        v-model="reportDrawerVisible"
-        title="练习分析报告"
-        size="560px"
-        class="practice-report-drawer"
+      <el-dialog
+        v-model="reportDialogVisible"
+        width="880px"
+        class="practice-report-dialog"
+        :close-on-click-modal="true"
+        :destroy-on-close="false"
       >
-        <div v-if="selectedReport" class="report-content">
-          <div class="report-score-grid">
-            <div class="report-score-item">
-              <span class="label">得分</span>
-              <strong>{{ formatScore(selectedReport.actualScore) }}/{{ formatScore(selectedReport.totalScore) }}</strong>
+        <template #header>
+          <div class="report-dialog-header">
+            <div class="report-title-block">
+              <div class="report-title-line">
+                <span class="report-title-mark">析</span>
+                <span class="report-title-text">练习分析报告</span>
+                <span class="report-status-badge">
+                  {{ selectedReport?.generatedBy === 'agent' ? 'AI分析完成' : '系统分析完成' }}
+                </span>
+              </div>
+              <p>基于本次作答、知识点掌握情况和判分结果生成</p>
             </div>
-            <div class="report-score-item">
-              <span class="label">正确率</span>
-              <strong>{{ formatPercent(selectedReport.accuracy) }}</strong>
-            </div>
-            <div class="report-score-item">
-              <span class="label">生成方式</span>
-              <strong>{{ selectedReport.generatedBy === 'agent' ? 'AI分析' : '系统分析' }}</strong>
-            </div>
+            <span v-if="selectedReport?.finishedAt" class="report-finished-time">
+              {{ formatDateTime(selectedReport.finishedAt) }}
+            </span>
           </div>
+        </template>
+
+        <div v-if="selectedReport" class="report-content">
+          <section class="report-overview-card">
+            <div class="report-overview-main">
+              <span>本次表现</span>
+              <strong>{{ formatScore(selectedReport.actualScore) }}/{{ formatScore(selectedReport.totalScore) }}</strong>
+              <p>报告会结合正确率、薄弱知识点和后续复习建议，帮助你明确下一步练习方向。</p>
+            </div>
+            <div class="report-score-grid">
+              <div class="report-score-item">
+                <span class="label">正确率</span>
+                <strong>{{ formatPercent(selectedReport.accuracy) }}</strong>
+              </div>
+              <div class="report-score-item">
+                <span class="label">薄弱点</span>
+                <strong>{{ selectedReport.weakPoints?.length || 0 }}</strong>
+              </div>
+              <div class="report-score-item">
+                <span class="label">优势点</span>
+                <strong>{{ selectedReport.strongPoints?.length || 0 }}</strong>
+              </div>
+              <div class="report-score-item">
+                <span class="label">建议数</span>
+                <strong>{{ selectedReport.learningSuggestions?.length || 0 }}</strong>
+              </div>
+            </div>
+          </section>
 
           <section class="report-section" v-if="selectedReport.reportContent">
-            <h3>整体分析</h3>
+            <div class="report-section-title">
+              <span class="section-dot overall"></span>
+              <h3>整体分析</h3>
+            </div>
             <p class="report-text">{{ selectedReport.reportContent }}</p>
           </section>
 
-          <section class="report-section" v-if="selectedReport.weakPoints?.length">
-            <h3>薄弱点</h3>
-            <div class="report-list">
-              <div v-for="(item, idx) in selectedReport.weakPoints" :key="'weak-' + idx" class="report-list-item weak">
-                <strong>{{ reportItemTitle(item, 'knowledgePoint') }}</strong>
-                <span>得分率 {{ formatPercent(item.scoreRate ?? item.accuracy) }}，{{ item.correctCount ?? 0 }}/{{ item.totalCount ?? 0 }} 题正确</span>
+          <div class="report-analysis-grid">
+            <section class="report-section" v-if="selectedReport.weakPoints?.length">
+              <div class="report-section-title">
+                <span class="section-dot weak"></span>
+                <h3>需要加强</h3>
               </div>
-            </div>
-          </section>
+              <div class="report-list">
+                <div v-for="(item, idx) in selectedReport.weakPoints" :key="'weak-' + idx" class="report-list-item weak">
+                  <div class="report-list-rank">{{ idx + 1 }}</div>
+                  <div class="report-list-body">
+                    <strong>{{ reportItemTitle(item, 'knowledgePoint') }}</strong>
+                    <span>得分率 {{ formatPercent(item.scoreRate ?? item.accuracy) }}，{{ item.correctCount ?? 0 }}/{{ item.totalCount ?? 0 }} 题正确</span>
+                  </div>
+                </div>
+              </div>
+            </section>
 
-          <section class="report-section" v-if="selectedReport.strongPoints?.length">
-            <h3>优势点</h3>
-            <div class="report-list">
-              <div v-for="(item, idx) in selectedReport.strongPoints" :key="'strong-' + idx" class="report-list-item strong">
-                <strong>{{ reportItemTitle(item, 'knowledgePoint') }}</strong>
-                <span>得分率 {{ formatPercent(item.scoreRate ?? item.accuracy) }}</span>
+            <section class="report-section" v-if="selectedReport.strongPoints?.length">
+              <div class="report-section-title">
+                <span class="section-dot strong"></span>
+                <h3>掌握较好</h3>
               </div>
-            </div>
-          </section>
+              <div class="report-list">
+                <div v-for="(item, idx) in selectedReport.strongPoints" :key="'strong-' + idx" class="report-list-item strong">
+                  <div class="report-list-rank">{{ idx + 1 }}</div>
+                  <div class="report-list-body">
+                    <strong>{{ reportItemTitle(item, 'knowledgePoint') }}</strong>
+                    <span>得分率 {{ formatPercent(item.scoreRate ?? item.accuracy) }}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
 
           <section class="report-section" v-if="selectedReport.learningSuggestions?.length">
-            <h3>学习建议</h3>
+            <div class="report-section-title">
+              <span class="section-dot suggestion"></span>
+              <h3>后续练习建议</h3>
+            </div>
             <div class="suggestion-list">
               <div v-for="(item, idx) in selectedReport.learningSuggestions" :key="'suggestion-' + idx" class="suggestion-item">
-                <strong>{{ String(item.title || `建议 ${idx + 1}`) }}</strong>
-                <span v-if="item.reason">{{ String(item.reason) }}</span>
-                <p>{{ String(item.action || item.description || '') }}</p>
+                <span class="suggestion-index">{{ idx + 1 }}</span>
+                <div class="suggestion-body">
+                  <strong>{{ String(item.title || `建议 ${idx + 1}`) }}</strong>
+                  <span v-if="item.reason">{{ String(item.reason) }}</span>
+                  <p>{{ String(item.action || item.description || '') }}</p>
+                </div>
               </div>
             </div>
           </section>
         </div>
-      </el-drawer>
+
+        <template #footer>
+          <div class="report-dialog-footer">
+            <el-button @click="reportDialogVisible = false">关闭</el-button>
+            <el-button type="primary" @click="goBack">返回测评中心</el-button>
+          </div>
+        </template>
+      </el-dialog>
 
       <!-- 提示未完成弹窗 -->
       <div class="modal-overlay" v-if="showUnfinishedModal" @click.self="showUnfinishedModal = false">
@@ -331,7 +391,7 @@ const showAnswer = ref(false)
 const gradingResult = ref<SessionResultVO | null>(null)
 const isSubmitting = ref(false)
 const reportLoading = ref(false)
-const reportDrawerVisible = ref(false)
+const reportDialogVisible = ref(false)
 const selectedReport = ref<SessionReportVO | null>(null)
 
 const examTitle = computed(() => String(route.query.title || '章节测验'))
@@ -851,7 +911,7 @@ const handleViewReport = async () => {
     }
 
     selectedReport.value = report
-    reportDrawerVisible.value = true
+    reportDialogVisible.value = true
   } catch (error: any) {
     ElMessage.error(error?.message || '报告查询失败，请稍后重试')
   } finally {
@@ -874,6 +934,19 @@ const formatPercent = (value?: unknown) => {
 
 const reportItemTitle = (item: Record<string, unknown>, primaryKey: string) => {
   return String(item[primaryKey] || item.name || item.label || '未标注知识点')
+}
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 const doSubmitExam = async () => {
@@ -1367,16 +1440,150 @@ const isAnalysisExpanded = (questionId: string | number) => {
   cursor: help;
 }
 
+:deep(.practice-report-dialog) {
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+}
+
+:deep(.practice-report-dialog .el-dialog__header) {
+  margin: 0;
+  padding: 0;
+}
+
+:deep(.practice-report-dialog .el-dialog__body) {
+  padding: 0 28px 24px;
+  max-height: min(68vh, 680px);
+  overflow-y: auto;
+}
+
+:deep(.practice-report-dialog .el-dialog__footer) {
+  padding: 16px 28px 22px;
+  border-top: 1px solid #e6ebf2;
+}
+
+.report-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 26px 28px 20px;
+  background: linear-gradient(135deg, #f8fbff 0%, #eef8f6 100%);
+  border-bottom: 1px solid #e6ebf2;
+}
+
+.report-title-block {
+  min-width: 0;
+}
+
+.report-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-title-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563eb, #14b8a6);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 850;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+}
+
+.report-title-text {
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.report-status-badge {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(20, 184, 166, 0.12);
+  color: #0f766e;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.report-title-block p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.report-finished-time {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .report-content {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 18px;
   color: #334155;
+  padding-top: 22px;
+}
+
+.report-overview-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.05fr) minmax(0, 1.7fr);
+  gap: 18px;
+  border: 1px solid #dce6f2;
+  border-radius: 16px;
+  padding: 18px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+}
+
+.report-overview-main {
+  min-width: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfdf5 100%);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.report-overview-main span {
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.report-overview-main strong {
+  color: #0f172a;
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.report-overview-main p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.65;
 }
 
 .report-score-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1387,38 +1594,79 @@ const isAnalysisExpanded = (questionId: string | number) => {
   padding: 14px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 6px;
 }
 
 .report-score-item .label {
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 800;
   color: #64748b;
 }
 
 .report-score-item strong {
-  font-size: 18px;
+  font-size: 22px;
+  font-weight: 900;
   color: #0f172a;
 }
 
 .report-section {
-  border-top: 1px solid #edf2f7;
-  padding-top: 18px;
+  border: 1px solid #e6ebf2;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.report-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .report-section h3 {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 16px;
-  font-weight: 850;
+  font-weight: 900;
   color: #182230;
+}
+
+.section-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.section-dot.overall {
+  background: #2563eb;
+}
+
+.section-dot.weak {
+  background: #ef4444;
+}
+
+.section-dot.strong {
+  background: #22c55e;
+}
+
+.section-dot.suggestion {
+  background: #14b8a6;
 }
 
 .report-text {
   margin: 0;
   white-space: pre-wrap;
-  line-height: 1.75;
+  line-height: 1.78;
   font-size: 14px;
   color: #475569;
+}
+
+.report-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
 }
 
 .report-list,
@@ -1435,8 +1683,8 @@ const isAnalysisExpanded = (questionId: string | number) => {
   background: #ffffff;
   padding: 12px 14px;
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .report-list-item.weak {
@@ -1449,19 +1697,59 @@ const isAnalysisExpanded = (questionId: string | number) => {
   background: #f8fffb;
 }
 
-.report-list-item strong,
-.suggestion-item strong {
-  color: #1e293b;
-  font-size: 14px;
+.report-list-rank,
+.suggestion-index {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: #eef4ff;
+  color: #2563eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 900;
 }
 
-.report-list-item span,
-.suggestion-item span,
-.suggestion-item p {
+.report-list-item.weak .report-list-rank {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.report-list-item.strong .report-list-rank {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.report-list-body,
+.suggestion-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.report-list-body strong,
+.suggestion-body strong {
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.report-list-body span,
+.suggestion-body span,
+.suggestion-body p {
   color: #64748b;
   font-size: 13px;
   line-height: 1.6;
   margin: 0;
+}
+
+.report-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* 提示弹窗 */
@@ -1604,6 +1892,54 @@ const isAnalysisExpanded = (questionId: string | number) => {
   }
 }
 
+@media (max-width: 768px) {
+  :deep(.practice-report-dialog) {
+    width: calc(100vw - 24px) !important;
+    margin: 12px auto;
+  }
+
+  :deep(.practice-report-dialog .el-dialog__body) {
+    padding: 0 16px 18px;
+    max-height: 72vh;
+  }
+
+  :deep(.practice-report-dialog .el-dialog__footer) {
+    padding: 14px 16px 18px;
+  }
+
+  .report-dialog-header {
+    padding: 20px 16px 16px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .report-title-text {
+    font-size: 19px;
+  }
+
+  .report-overview-card,
+  .report-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-score-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-overview-main strong {
+    font-size: 28px;
+  }
+
+  .report-dialog-footer {
+    flex-direction: column-reverse;
+  }
+
+  .report-dialog-footer .el-button {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* 深色模式适配 */
 html[data-theme='dark'] .exam-paper-container.practice-quiz-page {
   background: #0f172a;
@@ -1715,6 +2051,31 @@ html[data-theme='dark'] .btn-sidebar-submit.return-btn:hover {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
 }
 
+html[data-theme='dark'] :deep(.practice-report-dialog) {
+  background: #182235;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
+html[data-theme='dark'] :deep(.practice-report-dialog .el-dialog__footer) {
+  border-top-color: #334155;
+}
+
+html[data-theme='dark'] .report-dialog-header {
+  background: linear-gradient(135deg, #1e293b 0%, #162f35 100%);
+  border-bottom-color: #334155;
+}
+
+html[data-theme='dark'] .report-title-text {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .report-title-block p,
+html[data-theme='dark'] .report-finished-time {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .report-overview-card,
+html[data-theme='dark'] .report-section,
 html[data-theme='dark'] .report-score-item,
 html[data-theme='dark'] .report-list-item,
 html[data-theme='dark'] .suggestion-item {
@@ -1722,23 +2083,25 @@ html[data-theme='dark'] .suggestion-item {
   border-color: #334155;
 }
 
-html[data-theme='dark'] .report-section {
-  border-top-color: #334155;
+html[data-theme='dark'] .report-overview-main {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(20, 184, 166, 0.14));
 }
 
 html[data-theme='dark'] .report-content,
 html[data-theme='dark'] .report-section h3,
+html[data-theme='dark'] .report-overview-main strong,
 html[data-theme='dark'] .report-score-item strong,
-html[data-theme='dark'] .report-list-item strong,
-html[data-theme='dark'] .suggestion-item strong {
+html[data-theme='dark'] .report-list-body strong,
+html[data-theme='dark'] .suggestion-body strong {
   color: #e2e8f0;
 }
 
 html[data-theme='dark'] .report-text,
+html[data-theme='dark'] .report-overview-main p,
 html[data-theme='dark'] .report-score-item .label,
-html[data-theme='dark'] .report-list-item span,
-html[data-theme='dark'] .suggestion-item span,
-html[data-theme='dark'] .suggestion-item p {
+html[data-theme='dark'] .report-list-body span,
+html[data-theme='dark'] .suggestion-body span,
+html[data-theme='dark'] .suggestion-body p {
   color: #94a3b8;
 }
 
