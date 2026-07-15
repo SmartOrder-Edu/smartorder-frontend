@@ -34,7 +34,7 @@
               <polyline points="12 6 12 12 16 14"/>
             </svg>
             <span class="meta-label">学习时间：</span>
-            <span class="meta-value">每周 {{ userInfo.weeklyMinutes }} 分钟</span>
+            <span class="meta-value">每周 {{ formattedHours }}</span>
           </div>
         </div>
       </div>
@@ -55,9 +55,10 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import AvatarUploader from './AvatarUploader.vue'
 
-defineProps<{
+const props = defineProps<{
   userInfo: {
     name: string
     avatar: string
@@ -67,6 +68,12 @@ defineProps<{
   }
   uploading: boolean
 }>()
+
+const formattedHours = computed(() => {
+  if (!props.userInfo?.weeklyMinutes) return ''
+  const hours = props.userInfo.weeklyMinutes / 60
+  return `${parseFloat(hours.toFixed(1))} 小时`
+})
 
 const emit = defineEmits<{
   (e: 'avatar-change', event: Event): void

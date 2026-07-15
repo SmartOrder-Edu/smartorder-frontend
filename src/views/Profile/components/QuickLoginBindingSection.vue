@@ -51,6 +51,7 @@ const emit = defineEmits<{
 .quick-login-binding-section {
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .section-title {
@@ -83,6 +84,17 @@ const emit = defineEmits<{
   display: flex;
   flex-direction: column;
   gap: 18px;
+  flex: 1;
+}
+
+.binding-list > * {
+  flex: 1;
+}
+
+@media (max-width: 1100px) {
+  .binding-list > * {
+    flex: none;
+  }
 }
 
 /* 深色模式适配 */

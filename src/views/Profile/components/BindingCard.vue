@@ -107,6 +107,7 @@ const handleAction = () => {
     box-shadow 160ms ease,
     transform 160ms ease;
   box-sizing: border-box;
+  height: 100%;
 }
 
 .binding-card:hover {

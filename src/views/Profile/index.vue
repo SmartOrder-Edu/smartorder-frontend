@@ -196,7 +196,7 @@
               </g>
 
               <!-- 轴线 -->
-              <line v-for="(axis, idx) in radarAxes" :key="'axis-' + idx"
+              <line v-for="(_, idx) in radarAxes" :key="'axis-' + idx"
                 :x1="150" :y1="150"
                 :x2="150 + 120 * Math.cos((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
                 :y2="150 + 120 * Math.sin((idx * 2 * Math.PI / radarAxes.length) - Math.PI / 2)"
@@ -421,11 +421,11 @@
             <div class="support-items">
               <div class="support-item" v-if="metacognitiveProfile.recommendedSupport.planningSupportLevel">
                 <span class="support-label">规划支持</span>
-                <span class="support-value">{{ metacognitiveProfile.recommendedSupport.planningSupportLevel }}</span>
+                <span class="support-value">{{ levelLabels[metacognitiveProfile.recommendedSupport.planningSupportLevel] || metacognitiveProfile.recommendedSupport.planningSupportLevel }}</span>
               </div>
               <div class="support-item" v-if="metacognitiveProfile.recommendedSupport.reflectionPromptFrequency">
                 <span class="support-label">反思提示频率</span>
-                <span class="support-value">{{ metacognitiveProfile.recommendedSupport.reflectionPromptFrequency }}</span>
+                <span class="support-value">{{ levelLabels[metacognitiveProfile.recommendedSupport.reflectionPromptFrequency] || metacognitiveProfile.recommendedSupport.reflectionPromptFrequency }}</span>
               </div>
               <div class="support-interventions" v-if="metacognitiveProfile.recommendedSupport.recommendedInterventions?.length">
                 <span class="support-label">推荐干预：</span>
@@ -585,12 +585,8 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import { useUserStore } from '@/stores/user'
 import { userApi } from '@/api/user'
 import { studentProfileApi } from '@/api/studentProfile'
-import type {
-  StudentProfileData,
-  AbilityProfile,
-  MetacognitiveProfile,
-  SubjectProfile
-} from '@/api/studentProfile'
+import type { StudentProfileData } from '@/api/studentProfile'
+import { buildSubjectProfileList } from './subjectProfiles'
 
 // 账户与安全子组件
 import ProfileHeader from './components/ProfileHeader.vue'
@@ -609,7 +605,8 @@ const profileDetailPanels = ref<string[]>(['background', 'updates'])
 // ====== 标签映射 ======
 const levelLabels: Record<string, string> = {
   BEGINNER: '入门', DEVELOPING: '发展中', PROFICIENT: '熟练', ADVANCED: '精通',
-  OVERCONFIDENT: '过度自信', UNDERCONFIDENT: '信心不足', WELL_CALIBRATED: '校准良好'
+  OVERCONFIDENT: '过度自信', UNDERCONFIDENT: '信心不足', WELL_CALIBRATED: '校准良好',
+  HIGH: '高', MEDIUM: '中', LOW: '低'
 }
 
 const severityLabels: Record<string, string> = { HIGH: '高', MEDIUM: '中', LOW: '低' }
@@ -804,61 +801,7 @@ const calibrationStatusClass = computed(() => {
 })
 
 // ====== 计算属性：学科画像 ======
-const spaceColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#ec4899']
-
-const subjectProfileList = computed(() => {
-  const subjects = profileData.value?.subjectProfiles
-  if (!subjects) return []
-
-  return Object.entries(subjects).map(([key, sp], idx) => {
-    const statusMap: Record<string, { cls: string; label: string }> = {
-      ACTIVE: { cls: 'good', label: '学习中' },
-      PAUSED: { cls: 'warning', label: '已暂停' },
-      ARCHIVED: { cls: 'normal', label: '已归档' }
-    }
-    const statusInfo = statusMap[sp.subjectStatus || ''] || { cls: 'normal', label: '未知' }
-
-    // 计算章节平均掌握度
-    const chapters = sp.knowledgeMastery?.chapters
-    let mastery: number | null = null
-    const chapterList: { name: string; mastery: number }[] = []
-    if (chapters) {
-      let total = 0, count = 0
-      for (const [chKey, ch] of Object.entries(chapters)) {
-        const m = ch.overallMastery ?? 0
-        total += m; count++
-        chapterList.push({ name: ch.chapterName || chKey, mastery: Math.round(m) })
-      }
-      if (count > 0) mastery = Math.round(total / count)
-    }
-
-    // 易错点
-    const misconceptions: string[] = []
-    if (sp.subjectMisconceptions?.patterns) {
-      for (const p of Object.values(sp.subjectMisconceptions.patterns)) {
-        if (p.status === 'ACTIVE' && p.title) misconceptions.push(p.title)
-      }
-    }
-
-    // 偏好覆盖
-    const prefOverride = sp.learningPreferenceOverride?.preferredResourceTypes
-      ?.map(t => resourceTypeLabels[t] || t).join('、') || ''
-
-    return {
-      subjectId: key,
-      subjectName: sp.subjectNameCache || key,
-      statusClass: statusInfo.cls,
-      statusLabel: statusInfo.label,
-      mastery,
-      color: spaceColors[idx % spaceColors.length],
-      chapters: chapterList.slice(0, 4),
-      misconceptions: misconceptions.slice(0, 3),
-      preferenceOverride: prefOverride,
-      confidence: sp.metadata?.confidence ?? null,
-      completeness: sp.metadata?.completeness ?? null
-    }
-  })
-})
+const subjectProfileList = computed(() => buildSubjectProfileList(profileData.value, resourceTypeLabels))
 
 // ====== 雷达图工具函数 ======
 const getRadarPolygon = (cx: number, cy: number, r: number) => {
