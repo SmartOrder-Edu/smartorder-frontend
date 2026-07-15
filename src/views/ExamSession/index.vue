@@ -68,9 +68,17 @@
               
               <!-- 状态图例 -->
               <div class="legend-row">
-                <div class="legend-item"><span class="dot answered"></span>已答</div>
+                <template v-if="showAnswer">
+                  <div class="legend-item"><span class="dot correct"></span>正确</div>
+                  <div class="legend-item"><span class="dot wrong"></span>错误</div>
+                  <div class="legend-item"><span class="dot pending"></span>待批阅</div>
+                  <div class="legend-item"><span class="dot unanswered"></span>未答</div>
+                </template>
+                <template v-else>
+                  <div class="legend-item"><span class="dot answered"></span>已答</div>
+                  <div class="legend-item"><span class="dot unanswered"></span>未答</div>
+                </template>
                 <div class="legend-item"><span class="dot active"></span>当前</div>
-                <div class="legend-item"><span class="dot unanswered"></span>未答</div>
                 <div class="legend-item"><span class="dot flagged"></span>标记</div>
               </div>
               
@@ -84,6 +92,9 @@
                   :class="{
                     active: idx === currentActiveIndex,
                     answered: isIndexAnswered(idx),
+                    'result-correct': isIndexResultCorrect(idx),
+                    'result-wrong': isIndexResultWrong(idx),
+                    'result-pending': isIndexResultPending(idx),
                     flagged: flaggedQuestions.has(idx)
                   }"
                   @click="scrollToQuestion(idx)"
@@ -168,14 +179,23 @@
               >
                 {{ isSubmitting ? '提交中...' : '提交测评' }}
               </button>
-              <button 
-                v-else 
-                type="button" 
-                class="btn-sidebar-submit return-btn" 
-                @click="goBack"
-              >
-                返回测评中心
-              </button>
+              <template v-else>
+                <button
+                  type="button"
+                  class="btn-sidebar-submit report-btn"
+                  :disabled="reportLoading"
+                  @click="handleViewReport"
+                >
+                  {{ reportLoading ? '查询中...' : '查看练习分析报告' }}
+                </button>
+                <button 
+                  type="button" 
+                  class="btn-sidebar-submit return-btn" 
+                  @click="goBack"
+                >
+                  返回测评中心
+                </button>
+              </template>
               <div v-if="!showAnswer" class="shortcut-tip">
                 按 <strong>Ctrl + Enter</strong> 提交
                 <el-tooltip content="在任意作答焦点下按 Ctrl + Enter 即可快捷提交试卷" placement="top">
@@ -186,6 +206,127 @@
           </div>
         </aside>
       </div>
+
+      <el-dialog
+        v-model="reportDialogVisible"
+        width="880px"
+        top="4vh"
+        class="practice-report-dialog"
+        :close-on-click-modal="true"
+        :destroy-on-close="false"
+      >
+        <template #header>
+          <div class="report-dialog-header">
+            <div class="report-title-block">
+              <div class="report-title-line">
+                <span class="report-title-mark">析</span>
+                <span class="report-title-text">练习分析报告</span>
+                <span class="report-status-badge">
+                  {{ selectedReport?.generatedBy === 'agent' ? 'AI分析完成' : '系统分析完成' }}
+                </span>
+              </div>
+              <p>基于本次作答、知识点掌握情况和判分结果生成</p>
+            </div>
+            <span v-if="selectedReport?.finishedAt" class="report-finished-time">
+              {{ formatDateTime(selectedReport.finishedAt) }}
+            </span>
+          </div>
+        </template>
+
+        <div v-if="selectedReport" class="report-content">
+          <section class="report-overview-card">
+            <div class="report-overview-main">
+              <span>本次表现</span>
+              <strong>{{ formatScore(selectedReport.actualScore) }}/{{ formatScore(selectedReport.totalScore) }}</strong>
+              <p>报告会结合正确率、薄弱知识点和后续复习建议，帮助你明确下一步练习方向。</p>
+            </div>
+            <div class="report-score-grid">
+              <div class="report-score-item">
+                <span class="label">正确率</span>
+                <strong>{{ formatPercent(selectedReport.accuracy) }}</strong>
+              </div>
+              <div class="report-score-item">
+                <span class="label">薄弱点</span>
+                <strong>{{ selectedReport.weakPoints?.length || 0 }}</strong>
+              </div>
+              <div class="report-score-item">
+                <span class="label">优势点</span>
+                <strong>{{ selectedReport.strongPoints?.length || 0 }}</strong>
+              </div>
+              <div class="report-score-item">
+                <span class="label">建议数</span>
+                <strong>{{ selectedReport.learningSuggestions?.length || 0 }}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="report-section" v-if="selectedReport.reportContent">
+            <div class="report-section-title">
+              <span class="section-dot overall"></span>
+              <h3>整体分析</h3>
+            </div>
+            <p class="report-text">{{ selectedReport.reportContent }}</p>
+          </section>
+
+          <div class="report-analysis-grid">
+            <section class="report-section" v-if="selectedReport.weakPoints?.length">
+              <div class="report-section-title">
+                <span class="section-dot weak"></span>
+                <h3>需要加强</h3>
+              </div>
+              <div class="report-list">
+                <div v-for="(item, idx) in selectedReport.weakPoints" :key="'weak-' + idx" class="report-list-item weak">
+                  <div class="report-list-rank">{{ idx + 1 }}</div>
+                  <div class="report-list-body">
+                    <strong>{{ reportItemTitle(item, 'knowledgePoint') }}</strong>
+                    <span>得分率 {{ formatPercent(item.scoreRate ?? item.accuracy) }}，{{ item.correctCount ?? 0 }}/{{ item.totalCount ?? 0 }} 题正确</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="report-section" v-if="selectedReport.strongPoints?.length">
+              <div class="report-section-title">
+                <span class="section-dot strong"></span>
+                <h3>掌握较好</h3>
+              </div>
+              <div class="report-list">
+                <div v-for="(item, idx) in selectedReport.strongPoints" :key="'strong-' + idx" class="report-list-item strong">
+                  <div class="report-list-rank">{{ idx + 1 }}</div>
+                  <div class="report-list-body">
+                    <strong>{{ reportItemTitle(item, 'knowledgePoint') }}</strong>
+                    <span>得分率 {{ formatPercent(item.scoreRate ?? item.accuracy) }}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <section class="report-section" v-if="selectedReport.learningSuggestions?.length">
+            <div class="report-section-title">
+              <span class="section-dot suggestion"></span>
+              <h3>后续练习建议</h3>
+            </div>
+            <div class="suggestion-list">
+              <div v-for="(item, idx) in selectedReport.learningSuggestions" :key="'suggestion-' + idx" class="suggestion-item">
+                <span class="suggestion-index">{{ idx + 1 }}</span>
+                <div class="suggestion-body">
+                  <strong>{{ String(item.title || `建议 ${idx + 1}`) }}</strong>
+                  <span v-if="item.reason">{{ String(item.reason) }}</span>
+                  <p>{{ String(item.action || item.description || '') }}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <template #footer>
+          <div class="report-dialog-footer">
+            <el-button @click="reportDialogVisible = false">关闭</el-button>
+            <el-button type="primary" @click="goBack">返回测评中心</el-button>
+          </div>
+        </template>
+      </el-dialog>
 
       <!-- 提示未完成弹窗 -->
       <div class="modal-overlay" v-if="showUnfinishedModal" @click.self="showUnfinishedModal = false">
@@ -231,8 +372,10 @@ import {
   getSessionResult,
   submitExamAnswers,
   getExamResult,
+  getSessionReport,
   type SessionResultVO,
-  type AnswerDetailVO
+  type AnswerDetailVO,
+  type SessionReportVO
 } from '@/api/evaluationSession'
 import {
   getQuestionAnswerText,
@@ -259,12 +402,27 @@ const showAnswer = ref(false)
 // 后端判分结果
 const gradingResult = ref<SessionResultVO | null>(null)
 const isSubmitting = ref(false)
+const reportLoading = ref(false)
+const reportDialogVisible = ref(false)
+const selectedReport = ref<SessionReportVO | null>(null)
 
 const examTitle = computed(() => String(route.query.title || '章节测验'))
 const spaceId = computed(() => route.query.spaceId ? String(route.query.spaceId) : undefined)
 const taskId = computed(() => route.query.taskId ? String(route.query.taskId) : undefined)
 const sessionId = computed(() => route.query.sessionId ? String(route.query.sessionId) : undefined)
 const rawStatus = computed(() => route.query.rawStatus ? String(route.query.rawStatus) : undefined)
+const reportSessionId = computed(() => sessionId.value || taskId.value)
+const isFinishedSession = computed(() => {
+  const status = String(rawStatus.value || '').toLowerCase()
+  return ['finished', 'completed', 'complete', 'done', 'graded'].includes(status)
+})
+const gradingDetailMap = computed(() => {
+  const map = new Map<string, AnswerDetailVO>()
+  gradingResult.value?.detail?.forEach(detail => {
+    map.set(String(detail.questionId), detail)
+  })
+  return map
+})
 
 const numberMap = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
 
@@ -328,7 +486,36 @@ const scrollToQuestion = (index: number) => {
 
 const isIndexAnswered = (index: number) => {
   const q = numberedQuestionsList.value.find(item => item.globalIndex === index)
+  if (showAnswer.value && q) {
+    const detail = gradingDetailMap.value.get(String(q.id))
+    if (detail) {
+      return isResultDetailAnswered(q, detail)
+    }
+  }
   return q ? isQuestionAnswered(q) : false
+}
+
+const getIndexResultDetail = (index: number) => {
+  if (!showAnswer.value) return undefined
+  const q = numberedQuestionsList.value.find(item => item.globalIndex === index)
+  return q ? gradingDetailMap.value.get(String(q.id)) : undefined
+}
+
+const isIndexResultCorrect = (index: number) => {
+  const detail = getIndexResultDetail(index)
+  return !!detail && detail.isCorrect === true
+}
+
+const isIndexResultWrong = (index: number) => {
+  const q = numberedQuestionsList.value.find(item => item.globalIndex === index)
+  const detail = getIndexResultDetail(index)
+  return !!q && !!detail && isResultDetailAnswered(q, detail) && detail.isCorrect === false
+}
+
+const isIndexResultPending = (index: number) => {
+  const q = numberedQuestionsList.value.find(item => item.globalIndex === index)
+  const detail = getIndexResultDetail(index)
+  return !!q && !!detail && isResultDetailAnswered(q, detail) && (detail.status === 'pending_review' || detail.isCorrect == null)
 }
 
 const setActiveQuestion = (index: number) => {
@@ -552,11 +739,12 @@ const fetchQuestions = async () => {
       }
 
       // 如果是已完成状态，自动加载结果
-      if (rawStatus.value === 'finished') {
+      if (isFinishedSession.value) {
         showAnswer.value = true
         try {
           const result = await getSessionResult(sessionId.value as any)
           gradingResult.value = result
+          applyResultUserAnswers(result)
         } catch (e) {
           console.error('获取历史答题结果失败:', e)
         }
@@ -568,6 +756,17 @@ const fetchQuestions = async () => {
         limit: 100,
         taskId: taskId.value || undefined
       })
+
+      if (isFinishedSession.value && taskId.value) {
+        showAnswer.value = true
+        try {
+          const result = await getExamResult(taskId.value as any)
+          gradingResult.value = result as any
+          applyResultUserAnswers(result as any)
+        } catch (e) {
+          console.error('获取历史答题结果失败:', e)
+        }
+      }
     } else {
       ElMessage.warning('缺少学习空间或会话ID，无法开始测评')
     }
@@ -703,6 +902,159 @@ const buildUserAnswer = (q: EvaluationQuestion): Record<string, unknown> => {
   }
 }
 
+const normalizeBooleanAnswer = (value: unknown): string => {
+  const text = String(value ?? '').trim()
+  if (text === '正确' || text === '对' || text.toLowerCase() === 'true' || text === '1') {
+    return 'true'
+  }
+  if (text === '错误' || text === '错' || text.toLowerCase() === 'false' || text === '0') {
+    return 'false'
+  }
+  return text
+}
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+const hasMeaningfulAnswerValue = (value: unknown): boolean => {
+  if (value == null) return false
+  if (typeof value === 'string') return value.trim() !== ''
+  if (typeof value === 'number' || typeof value === 'boolean') return true
+  if (Array.isArray(value)) return value.some(item => hasMeaningfulAnswerValue(item))
+  if (isPlainObject(value)) return Object.values(value).some(item => hasMeaningfulAnswerValue(item))
+  return false
+}
+
+const firstAnswerField = (userAnswer: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(userAnswer, key)) {
+      return userAnswer[key]
+    }
+  }
+  return undefined
+}
+
+const answerValueToText = (value: unknown, separator = '、') => {
+  if (Array.isArray(value)) {
+    return value.map(v => String(v ?? '').trim()).filter(Boolean).join(separator)
+  }
+  return value == null ? '' : String(value).trim()
+}
+
+const resultUserAnswerToInputValue = (q: EvaluationQuestion, rawUserAnswer?: unknown): string => {
+  const userAnswer = isPlainObject(rawUserAnswer) ? rawUserAnswer : undefined
+  if (!userAnswer) {
+    if (Array.isArray(rawUserAnswer)) {
+      return answerValueToText(rawUserAnswer, q.questionType === 'fill_blank' ? ';;' : '、')
+    }
+    return rawUserAnswer == null ? '' : String(rawUserAnswer).trim()
+  }
+
+  if (q.questionType === 'single_choice' || q.questionType === 'multiple_choice') {
+    const selected = firstAnswerField(userAnswer, [
+      'selectedOptions',
+      'selectedOption',
+      'option',
+      'options',
+      'answer',
+      'value'
+    ])
+    return answerValueToText(selected)
+  }
+
+  if (q.questionType === 'judge') {
+    const value = firstAnswerField(userAnswer, ['value', 'answer', 'selectedOption', 'text'])
+    return normalizeBooleanAnswer(value)
+  }
+
+  if (q.questionType === 'fill_blank') {
+    const blanks = firstAnswerField(userAnswer, ['blanks', 'blankAnswers', 'answers', 'value', 'text'])
+    return answerValueToText(blanks, ';;')
+  }
+
+  const text = firstAnswerField(userAnswer, ['text', 'code', 'answer', 'value'])
+  return text == null ? '' : String(text)
+}
+
+const isResultDetailAnswered = (q: EvaluationQuestion, detail: AnswerDetailVO) => {
+  const value = resultUserAnswerToInputValue(q, detail.userAnswer)
+  if (value.trim()) return true
+  return hasMeaningfulAnswerValue(detail.userAnswer)
+}
+
+const applyResultUserAnswers = (result: SessionResultVO | null | undefined) => {
+  if (!result?.detail?.length) return
+  const questionMap = new Map(questions.value.map(q => [String(q.id), q]))
+  result.detail.forEach(detail => {
+    const q = questionMap.get(String(detail.questionId))
+    if (!q) return
+    const value = resultUserAnswerToInputValue(q, detail.userAnswer)
+    if (value) {
+      answers.value[q.id as any] = value
+    }
+  })
+}
+
+const handleViewReport = async () => {
+  const id = reportSessionId.value
+  if (!id) {
+    ElMessage.info('当前练习暂未关联可生成报告的测评任务')
+    return
+  }
+
+  reportLoading.value = true
+  try {
+    const report = await getSessionReport(id)
+    if (report.status !== 'ready') {
+      const message = report.message || report.errorMessage || '练习分析报告尚未生成，请稍后再来查看。'
+      if (report.status === 'failed') {
+        ElMessage.warning(message)
+      } else {
+        ElMessage.info(message)
+      }
+      return
+    }
+
+    selectedReport.value = report
+    reportDialogVisible.value = true
+  } catch (error: any) {
+    ElMessage.error(error?.message || '报告查询失败，请稍后重试')
+  } finally {
+    reportLoading.value = false
+  }
+}
+
+const formatScore = (value?: number | string | null) => {
+  const num = Number(value ?? 0)
+  if (!Number.isFinite(num)) return '0'
+  return Number.isInteger(num) ? String(num) : num.toFixed(1)
+}
+
+const formatPercent = (value?: unknown) => {
+  const num = Number(value ?? 0)
+  if (!Number.isFinite(num)) return '0%'
+  const percent = num <= 1 ? num * 100 : num
+  return `${percent.toFixed(1)}%`
+}
+
+const reportItemTitle = (item: Record<string, unknown>, primaryKey: string) => {
+  return String(item[primaryKey] || item.name || item.label || '未标注知识点')
+}
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 const doSubmitExam = async () => {
   isSubmitting.value = true
   try {
@@ -718,11 +1070,13 @@ const doSubmitExam = async () => {
       // 后端 session 模式：调用 submit API
       const result = await submitAnswers(sessionId.value as any, { answers: answerItems })
       gradingResult.value = result
+      applyResultUserAnswers(result)
       ElMessage.success(`提交成功！客观题得分: ${result.objectiveScore}/${result.objectiveTotal}${result.subjectivePending > 0 ? `，${result.subjectivePending}道主观题等待AI批阅` : ''}`)
     } else if (taskId.value) {
       // 任务模式：直接提交到后端判分
       const result = await submitExamAnswers(taskId.value as any, spaceId.value as any, { answers: answerItems })
       gradingResult.value = result as any
+      applyResultUserAnswers(result as any)
       ElMessage.success(`提交成功！客观题得分: ${result.objectiveScore}/${result.objectiveTotal}${result.subjectivePending > 0 ? `，${result.subjectivePending}道主观题等待AI批阅` : ''}`)
     } else {
       // 旧流程：仅 client-side grading
@@ -758,6 +1112,7 @@ const startPollingResult = () => {
         return
       }
       gradingResult.value = result as any
+      applyResultUserAnswers(result as any)
       if (result.subjectivePending === 0) {
         if (pollingTimer) clearInterval(pollingTimer)
         pollingTimer = null
@@ -805,9 +1160,10 @@ const isAnalysisExpanded = (questionId: string | number) => {
 
 <style scoped>
 .exam-paper-container.practice-quiz-page {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 28px 24px 40px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 24px clamp(24px, 2.2vw, 40px) 40px;
   background: #f6f8fb;
   min-height: 100vh;
   transition: background 0.3s ease;
@@ -864,42 +1220,54 @@ const isAnalysisExpanded = (questionId: string | number) => {
 /* 左右双栏布局 */
 .exam-session-layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
-  gap: 28px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: clamp(16px, 1.4vw, 24px);
   align-items: start;
 }
 
 .exam-main-content {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
+  min-width: 0;
 }
 
 .question-group {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
+}
+
+@media (min-width: 1025px) {
+  .exam-paper-container.practice-quiz-page {
+    width: calc(100% + var(--spacing-2xl));
+    margin-left: calc(-0.5 * var(--spacing-2xl));
+    margin-right: calc(-0.5 * var(--spacing-2xl));
+  }
 }
 
 /* 右侧栏 Sticky */
 .exam-sidebar {
   position: sticky;
-  top: 96px;
+  top: 0;
   z-index: 10;
+  max-height: 100vh;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .sidebar-sticky-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
 }
 
 /* 侧边栏卡片基础样式 */
 .sidebar-card {
   background: #ffffff;
   border: 1px solid #e8edf4;
-  border-radius: 24px;
-  padding: 20px 24px;
+  border-radius: 20px;
+  padding: 16px 18px;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.03);
   transition: all 0.3s ease;
 }
@@ -911,8 +1279,8 @@ const isAnalysisExpanded = (questionId: string | number) => {
   font-size: 15px;
   font-weight: 800;
   color: #182230;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #edf2f7;
   transition: color 0.3s ease, border-color 0.3s ease;
 }
@@ -929,7 +1297,7 @@ const isAnalysisExpanded = (questionId: string | number) => {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .legend-item {
@@ -950,6 +1318,18 @@ const isAnalysisExpanded = (questionId: string | number) => {
 .legend-item .dot.answered {
   background: #f0fdfa;
   border: 1.5px solid #14b8a6;
+}
+
+.legend-item .dot.correct {
+  background: #22c55e;
+}
+
+.legend-item .dot.wrong {
+  background: #ef4444;
+}
+
+.legend-item .dot.pending {
+  background: #f59e0b;
 }
 
 .legend-item .dot.active {
@@ -1009,6 +1389,24 @@ const isAnalysisExpanded = (questionId: string | number) => {
   background: #f0fdfa;
   border-color: #14b8a6;
   color: #0f9f91;
+}
+
+.grid-number.result-correct:not(.active) {
+  background: #ecfdf3;
+  border-color: #22c55e;
+  color: #15803d;
+}
+
+.grid-number.result-wrong:not(.active) {
+  background: #fef2f2;
+  border-color: #ef4444;
+  color: #b91c1c;
+}
+
+.grid-number.result-pending:not(.active) {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #b45309;
 }
 
 .grid-number.flagged:not(.active) {
@@ -1112,13 +1510,13 @@ const isAnalysisExpanded = (questionId: string | number) => {
 .submit-card-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .btn-sidebar-submit {
   width: 100%;
-  height: 52px;
-  border-radius: 16px;
+  height: 46px;
+  border-radius: 14px;
   border: none;
   background: linear-gradient(135deg, #14b8a6, #0ea5a4);
   color: #ffffff;
@@ -1154,6 +1552,16 @@ const isAnalysisExpanded = (questionId: string | number) => {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.03);
 }
 
+.btn-sidebar-submit.report-btn {
+  background: linear-gradient(135deg, #2563eb, #14b8a6);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.18);
+}
+
+.btn-sidebar-submit.report-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2f6ff0, #18c5b2);
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.24);
+}
+
 .btn-sidebar-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -1179,6 +1587,322 @@ const isAnalysisExpanded = (questionId: string | number) => {
   font-size: 14px;
   color: #98a2b3;
   cursor: help;
+}
+
+:deep(.practice-report-dialog) {
+  border-radius: 18px;
+  overflow: hidden;
+  max-height: calc(100vh - 8vh);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+}
+
+:deep(.practice-report-dialog .el-dialog__header) {
+  margin: 0;
+  padding: 0;
+}
+
+:deep(.practice-report-dialog .el-dialog__body) {
+  padding: 0 28px 24px;
+  max-height: none;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+:deep(.practice-report-dialog .el-dialog__footer) {
+  padding: 16px 28px 22px;
+  border-top: 1px solid #e6ebf2;
+}
+
+.report-dialog-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 26px 28px 20px;
+  background: linear-gradient(135deg, #f8fbff 0%, #eef8f6 100%);
+  border-bottom: 1px solid #e6ebf2;
+}
+
+.report-title-block {
+  min-width: 0;
+}
+
+.report-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-title-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563eb, #14b8a6);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 850;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+}
+
+.report-title-text {
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.report-status-badge {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(20, 184, 166, 0.12);
+  color: #0f766e;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.report-title-block p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.report-finished-time {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.report-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  color: #334155;
+  padding-top: 22px;
+}
+
+.report-overview-card {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.05fr) minmax(0, 1.7fr);
+  gap: 18px;
+  border: 1px solid #dce6f2;
+  border-radius: 16px;
+  padding: 18px;
+  background: #ffffff;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
+}
+
+.report-overview-main {
+  min-width: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eff6ff 0%, #ecfdf5 100%);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+
+.report-overview-main span {
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.report-overview-main strong {
+  color: #0f172a;
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
+.report-overview-main p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.report-score-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.report-score-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.report-score-item .label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.report-score-item strong {
+  font-size: 22px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.report-section {
+  border: 1px solid #e6ebf2;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 18px;
+}
+
+.report-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.report-section h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+  color: #182230;
+}
+
+.section-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.section-dot.overall {
+  background: #2563eb;
+}
+
+.section-dot.weak {
+  background: #ef4444;
+}
+
+.section-dot.strong {
+  background: #22c55e;
+}
+
+.section-dot.suggestion {
+  background: #14b8a6;
+}
+
+.report-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.78;
+  font-size: 14px;
+  color: #475569;
+}
+
+.report-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.report-list,
+.suggestion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.report-list-item,
+.suggestion-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.report-list-item.weak {
+  border-color: #fecaca;
+  background: #fffafa;
+}
+
+.report-list-item.strong {
+  border-color: #bbf7d0;
+  background: #f8fffb;
+}
+
+.report-list-rank,
+.suggestion-index {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: #eef4ff;
+  color: #2563eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.report-list-item.weak .report-list-rank {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.report-list-item.strong .report-list-rank {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.report-list-body,
+.suggestion-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.report-list-body strong,
+.suggestion-body strong {
+  color: #1e293b;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.report-list-body span,
+.suggestion-body span,
+.suggestion-body p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.report-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* 提示弹窗 */
@@ -1321,6 +2045,54 @@ const isAnalysisExpanded = (questionId: string | number) => {
   }
 }
 
+@media (max-width: 768px) {
+  :deep(.practice-report-dialog) {
+    width: calc(100vw - 24px) !important;
+    margin-top: 8px !important;
+    max-height: calc(100vh - 16px);
+  }
+
+  :deep(.practice-report-dialog .el-dialog__body) {
+    padding: 0 16px 18px;
+  }
+
+  :deep(.practice-report-dialog .el-dialog__footer) {
+    padding: 14px 16px 18px;
+  }
+
+  .report-dialog-header {
+    padding: 20px 16px 16px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .report-title-text {
+    font-size: 19px;
+  }
+
+  .report-overview-card,
+  .report-analysis-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-score-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-overview-main strong {
+    font-size: 28px;
+  }
+
+  .report-dialog-footer {
+    flex-direction: column-reverse;
+  }
+
+  .report-dialog-footer .el-button {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 /* 深色模式适配 */
 html[data-theme='dark'] .exam-paper-container.practice-quiz-page {
   background: #0f172a;
@@ -1389,6 +2161,24 @@ html[data-theme='dark'] .grid-number.answered:not(.active) {
   color: #2dd4bf;
 }
 
+html[data-theme='dark'] .grid-number.result-correct:not(.active) {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(74, 222, 128, 0.55);
+  color: #86efac;
+}
+
+html[data-theme='dark'] .grid-number.result-wrong:not(.active) {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fca5a5;
+}
+
+html[data-theme='dark'] .grid-number.result-pending:not(.active) {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fcd34d;
+}
+
 html[data-theme='dark'] .grid-number.flagged:not(.active) {
   border-color: rgba(239, 68, 68, 0.35);
   background: rgba(239, 68, 68, 0.15);
@@ -1430,6 +2220,70 @@ html[data-theme='dark'] .btn-sidebar-submit.return-btn:hover {
   border-color: #475569;
   color: #f4f7fb;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme='dark'] :deep(.practice-report-dialog) {
+  background: #182235;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+}
+
+html[data-theme='dark'] :deep(.practice-report-dialog .el-dialog__footer) {
+  border-top-color: #334155;
+}
+
+html[data-theme='dark'] .report-dialog-header {
+  background: linear-gradient(135deg, #1e293b 0%, #162f35 100%);
+  border-bottom-color: #334155;
+}
+
+html[data-theme='dark'] .report-title-text {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .report-title-block p,
+html[data-theme='dark'] .report-finished-time {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .report-overview-card,
+html[data-theme='dark'] .report-section,
+html[data-theme='dark'] .report-score-item,
+html[data-theme='dark'] .report-list-item,
+html[data-theme='dark'] .suggestion-item {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+html[data-theme='dark'] .report-overview-main {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(20, 184, 166, 0.14));
+}
+
+html[data-theme='dark'] .report-content,
+html[data-theme='dark'] .report-section h3,
+html[data-theme='dark'] .report-overview-main strong,
+html[data-theme='dark'] .report-score-item strong,
+html[data-theme='dark'] .report-list-body strong,
+html[data-theme='dark'] .suggestion-body strong {
+  color: #e2e8f0;
+}
+
+html[data-theme='dark'] .report-text,
+html[data-theme='dark'] .report-overview-main p,
+html[data-theme='dark'] .report-score-item .label,
+html[data-theme='dark'] .report-list-body span,
+html[data-theme='dark'] .suggestion-body span,
+html[data-theme='dark'] .suggestion-body p {
+  color: #94a3b8;
+}
+
+html[data-theme='dark'] .report-list-item.weak {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+html[data-theme='dark'] .report-list-item.strong {
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(34, 197, 94, 0.08);
 }
 
 html[data-theme='dark'] .shortcut-tip {

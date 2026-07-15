@@ -20,8 +20,25 @@ export interface PathProgress {
 
 // ---- Task ----
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'overdue' | 'cancelled'
-export type TaskType = 'daily' | 'milestone' | 'exam' | 'review'
+export type TaskStatus = 'pending' | 'in_progress' | 'doing' | 'completed' | 'overdue' | 'cancelled'
+export type TaskType = 'daily' | 'milestone' | 'exam' | 'review' | 'remedial' | 'project'
+export type TaskActionType =
+  | 'learn_script'
+  | 'read_resource'
+  | 'watch_video'
+  | 'practice_set'
+  | 'assessment'
+  | 'mistake_review'
+  | 'project_practice'
+  | 'summary_reflection'
+export type TaskTargetType =
+  | 'lesson_bundle'
+  | 'resource'
+  | 'practice_session'
+  | 'assessment_session'
+  | 'knowledge_node'
+  | 'path_node'
+  | string
 
 export interface TaskVO {
   id: string
@@ -30,6 +47,9 @@ export interface TaskVO {
   title: string
   description: string
   taskType: TaskType
+  actionType?: TaskActionType
+  targetType?: TaskTargetType | null
+  targetId?: string | number | null
   priority: number // 1-5
   status: TaskStatus
   dueDate: string
@@ -38,9 +58,10 @@ export interface TaskVO {
   actualDurationMinutes: number | null
   completedAt: string | null
   aiSuggestion: string | null
+  agentReason?: string | null
   isOverdue: boolean
   isToday: boolean
-  metadata: Record<string, any>
+  metadata: string | Record<string, any> | null
 }
 
 // ---- Learning Path ----

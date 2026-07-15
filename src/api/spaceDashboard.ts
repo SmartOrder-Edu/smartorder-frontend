@@ -3,6 +3,9 @@ import type {
   SpaceDashboardVO,
   TaskVO,
   TaskStatus,
+  TaskActionType,
+  TaskTargetType,
+  TaskType,
   ResourcePackageGenerateDTO,
   ResourcePackageVO,
   ResourceGenerationJobVO,
@@ -38,7 +41,31 @@ export const resourceGenerationJobApi = {
 
 // ---- Task ----
 
+export interface CreateTaskDTO {
+  spaceId: string | number
+  pathNodeId?: string | number | null
+  title: string
+  description?: string
+  taskType?: TaskType
+  actionType?: TaskActionType
+  targetType?: TaskTargetType | null
+  targetId?: string | number | null
+  priority?: number
+  status?: TaskStatus
+  dueDate?: string | null
+  dueTime?: string | null
+  estimatedDurationMinutes?: number | null
+  sortOrder?: number
+  aiSuggestion?: string | null
+  agentReason?: string | null
+  metadata?: string | Record<string, any> | null
+}
+
 export const taskApi = {
+  async create(data: CreateTaskDTO): Promise<TaskVO> {
+    return request.post('/tasks', data)
+  },
+
   async updateStatus(taskId: string, status: TaskStatus): Promise<TaskVO> {
     return request.patch(`/tasks/${taskId}/status`, { status })
   },

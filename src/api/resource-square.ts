@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { ResourceSquareVO, PublishResourceDTO, SquareListQueryParams, RateResourceDTO } from '@/types/resource-square'
+import type { ResourceSquareVO, PublishResourceDTO, SquareListQueryParams, RateResourceDTO, FeaturedResourceVO } from '@/types/resource-square'
 
 /** 发布文件到资源广场 */
 export function publishToSquare(data: PublishResourceDTO) {
@@ -32,4 +32,9 @@ export function downloadFromSquare(id: string) {
 /** 给资源评分 */
 export function rateSquareResource(id: string, data: RateResourceDTO) {
   return request.post<string>(`/resource-square/${id}/rate`, data)
+}
+
+/** Agent 精选推荐（基于学生画像从评分 Top20 候选中挑选 1 个） */
+export function getFeatured() {
+  return request.get<FeaturedResourceVO | null>('/resource-square/featured')
 }

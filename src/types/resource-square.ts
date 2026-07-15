@@ -58,3 +58,11 @@ export interface SquarePageResult {
   size: number
   current: number
 }
+
+/** Agent 精选推荐结果 */
+export interface FeaturedResourceVO {
+  /** 精选资源（含当前用户态：hasDownloaded / userRating） */
+  resource: ResourceSquareVO
+  /** 精选来源：agent=LLM基于画像挑选 / hot=热门回退 */
+  reason: 'agent' | 'hot'
+}

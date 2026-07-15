@@ -20,16 +20,18 @@
           <span class="agent-title">总学习 Agent</span>
           <span class="agent-think">
             <span class="think-dot"></span>
-            已检查你的 4 个学习空间
+            已检查你的 {{ checkedSpaceCount }} 个学习空间
           </span>
         </div>
       </div>
       <div class="agent-message">
         <p class="agent-greeting">早上好，{{ userName }}。今天是 {{ todayStr }}，我已经为你整理好今日的跨空间学习计划。</p>
         <p class="agent-insight">
-          今日建议优先处理<strong>高等数学</strong>的极限专项练习（你在这部分连续出错），
-          其次是<strong>软件工程</strong>的需求分析文档（已延期 1 天）。
-          <strong>操作系统</strong>和<strong>英语四级</strong>可以放后面，时间有余再做。
+          <template v-if="primaryDailyTask">
+            今日建议优先处理<strong>{{ primaryDailyTask.spaceName }}</strong>的「{{ primaryDailyTask.title }}」。
+            {{ primaryDailyTask.agentReason }}
+          </template>
+          <template v-else>{{ dailyInsight }}</template>
         </p>
       </div>
     </section>
@@ -38,7 +40,7 @@
     <section class="time-allocation">
       <div class="section-header">
         <h3 class="section-title">今日建议时间分配</h3>
-        <span class="section-badge">总计约 2 小时 20 分钟</span>
+        <span class="section-badge">总计约 {{ totalPlannedMinutes }} 分钟</span>
       </div>
       <div class="time-bars">
         <div class="time-bar-item" v-for="alloc in timeAllocations" :key="alloc.spaceId">
@@ -49,7 +51,7 @@
           <div class="time-bar-track">
             <div
               class="time-bar-fill"
-              :style="{ width: (alloc.minutes / 140) * 100 + '%', background: alloc.color }"
+              :style="{ width: (alloc.minutes / maxTimeAllocation) * 100 + '%', background: alloc.color }"
             ></div>
           </div>
           <span class="time-bar-reason">{{ alloc.reason }}</span>
@@ -181,14 +183,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { useStudyEntry } from '@/composables/useStudyEntry'
+import { learningSpaceApi } from '@/api/learningSpace'
+import { fetchLearningState } from '@/api/algorithm'
+import type { LearningSpaceVO } from '@/api/learningSpace'
+import type { LearningAlgorithmState } from '@/api/algorithm'
 
 const { enterStudy, enterTodayFirst } = useStudyEntry()
+const router = useRouter()
 
 const userName = ref('谢同学')
+const algorithmLoading = ref(false)
+const algorithmPlans = ref<Array<{ space: LearningSpaceVO; state: LearningAlgorithmState }>>([])
 const todayStr = computed(() => {
   const d = new Date()
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
@@ -200,12 +210,23 @@ const showReasonDialog = ref(false)
 const redistributeMinutes = ref(140)
 const redistributeStrategy = ref('deadline_first')
 
+const checkedSpaceCount = computed(() => algorithmPlans.value.length || 4)
+
 const strategyLabel = computed(() => {
   const map = { deadline_first: '截止时间优先', weakness_first: '薄弱点优先', balanced: '均衡分配' }
   return map[strategy.value]
 })
 
 const timeAllocations = computed(() => {
+  if (algorithmPlanTasks.value.length) {
+    return algorithmPlanTasks.value.map(task => ({
+      spaceId: task.spaceId,
+      spaceName: task.spaceName,
+      minutes: task.estimatedMinutes,
+      color: task.color,
+      reason: task.agentReason,
+    }))
+  }
   const base = [
     { spaceId: 'math', spaceName: '高等数学', minutes: 35, color: '#3b82f6', reason: '薄弱点需集中攻克' },
     { spaceId: 'se', spaceName: '软件工程', minutes: 45, color: '#f59e0b', reason: '项目延期，优先补齐' },
@@ -221,6 +242,14 @@ const timeAllocations = computed(() => {
   return base
 })
 
+const totalPlannedMinutes = computed(() =>
+  timeAllocations.value.reduce((sum, item) => sum + Number(item.minutes || 0), 0)
+)
+
+const maxTimeAllocation = computed(() =>
+  Math.max(...timeAllocations.value.map(item => Number(item.minutes || 0)), 1)
+)
+
 interface PlanTask {
   id: string
   spaceId: string
@@ -232,9 +261,40 @@ interface PlanTask {
   estimatedMinutes: number
   agentReason: string
   status: string
+  algorithmGenerated?: boolean
+  actionType?: string
 }
 
+const palette = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#0ea5e9']
+const algorithmPlanTasks = computed<PlanTask[]>(() =>
+  algorithmPlans.value
+    .filter(item => item.state.nextAction)
+    .map((item, index) => {
+      const action = item.state.nextAction
+      const mastery = Number(action.mastery ?? 0.5)
+      const confidence = Number(action.confidence ?? 0)
+      const highPriority = mastery < 0.35 || confidence < 0.35
+      return {
+        id: `alg-${item.space.id}-${action.knowledgeNodeId || index}`,
+        spaceId: String(item.space.id),
+        spaceName: item.space.name,
+        color: palette[index % palette.length],
+        title: action.knowledgeName ? `${actionTypeLabel(action.type)}：${action.knowledgeName}` : actionTypeLabel(action.type),
+        type: actionTaskType(action.type),
+        priority: highPriority ? 'high' : mastery < 0.6 ? 'medium' : 'low',
+        estimatedMinutes: highPriority ? 30 : 20,
+        agentReason: action.reason || '算法证据不足，建议先安排一次验证。',
+        status: 'todo',
+        algorithmGenerated: true,
+        actionType: action.type,
+      }
+    })
+)
+
 const tasks = computed<PlanTask[]>(() => {
+  if (algorithmPlanTasks.value.length) {
+    return sortTasksByStrategy(algorithmPlanTasks.value)
+  }
   const base: PlanTask[] = [
     { id: 't1', spaceId: 'math', spaceName: '高等数学', color: '#3b82f6', title: '极限专项练习', type: 'practice', priority: 'high', estimatedMinutes: 35, agentReason: '在洛必达法则适用条件上连续出错，需针对性练习', status: 'todo' },
     { id: 't2', spaceId: 'math', spaceName: '高等数学', color: '#3b82f6', title: '连续性与间断点复习', type: 'review', priority: 'medium', estimatedMinutes: 20, agentReason: '极限前置基础，巩固后可提升解题速度', status: 'todo' },
@@ -244,10 +304,7 @@ const tasks = computed<PlanTask[]>(() => {
     { id: 't6', spaceId: 'os', spaceName: '操作系统', color: '#8b5cf6', title: '同步互斥 PV 操作复习', type: 'review', priority: 'low', estimatedMinutes: 20, agentReason: '昨日已完成重点复习，今日可选做', status: 'todo' }
   ]
   if (strategy.value === 'weakness_first') {
-    return base.sort((a, b) => {
-      const order = { high: 0, medium: 1, low: 2 }
-      return order[a.priority as keyof typeof order] - order[b.priority as keyof typeof order]
-    })
+    return sortTasksByStrategy(base)
   }
   return base
 })
@@ -263,16 +320,63 @@ const groupedTasks = computed(() => {
   return Object.values(groups)
 })
 
-const rankingReasons = computed(() => [
-  { spaceId: 'math', spaceName: '高等数学', color: '#3b82f6', priorityLevel: 'high', reason: '你在"洛必达法则适用条件"上连续 3 次出错，正确率降至 40%。根据遗忘曲线和学习记录，今天是最佳巩固窗口。' },
-  { spaceId: 'se', spaceName: '软件工程', color: '#f59e0b', priorityLevel: 'high', reason: '需求分析文档已延期 1 天，且后续原型设计依赖此文档完成。任务路径上存在阻塞。' },
-  { spaceId: 'english', spaceName: '英语四级', color: '#10b981', priorityLevel: 'medium', reason: '词汇保持稳定但听力持续偏弱。每天保持一定输入对长期记忆效果最佳。' },
-  { spaceId: 'os', spaceName: '操作系统', color: '#8b5cf6', priorityLevel: 'low', reason: '昨天已完成进程同步与 PV 操作的复习，今日可暂缓。距离截止还有 6 天。' }
-])
+const rankingReasons = computed(() => {
+  if (algorithmPlanTasks.value.length) {
+    return algorithmPlanTasks.value.map(task => ({
+      spaceId: task.spaceId,
+      spaceName: task.spaceName,
+      color: task.color,
+      priorityLevel: task.priority === 'high' ? 'high' : task.priority === 'medium' ? 'medium' : 'low',
+      reason: task.agentReason,
+    }))
+  }
+  return [
+    { spaceId: 'math', spaceName: '高等数学', color: '#3b82f6', priorityLevel: 'high', reason: '你在"洛必达法则适用条件"上连续 3 次出错，正确率降至 40%。根据遗忘曲线和学习记录，今天是最佳巩固窗口。' },
+    { spaceId: 'se', spaceName: '软件工程', color: '#f59e0b', priorityLevel: 'high', reason: '需求分析文档已延期 1 天，且后续原型设计依赖此文档完成。任务路径上存在阻塞。' },
+    { spaceId: 'english', spaceName: '英语四级', color: '#10b981', priorityLevel: 'medium', reason: '词汇保持稳定但听力持续偏弱。每天保持一定输入对长期记忆效果最佳。' },
+    { spaceId: 'os', spaceName: '操作系统', color: '#8b5cf6', priorityLevel: 'low', reason: '昨天已完成进程同步与 PV 操作的复习，今日可暂缓。距离截止还有 6 天。' }
+  ]
+})
+
+const dailyInsight = computed(() => {
+  if (algorithmLoading.value) return '正在读取各学习空间的掌握度和薄弱点。'
+  return '今日建议优先处理高等数学的极限专项练习，其次处理已延期项目。当前没有读取到算法诊断时，页面会保留原有计划。'
+})
+
+const primaryDailyTask = computed(() => algorithmPlanTasks.value[0] || null)
 
 const typeLabel = (type: string) => {
   const map: Record<string, string> = { practice: '练习', review: '复习', project: '项目', learn: '学习', test: '测试', resource: '资源' }
   return map[type] || type
+}
+
+const actionTypeLabel = (type?: string) => {
+  const map: Record<string, string> = {
+    diagnostic_quiz: '诊断测评',
+    weakness_practice: '补弱练习',
+    verification_quiz: '验证测评',
+    advance_or_review: '推进或复习',
+  }
+  return map[type || ''] || '学习动作'
+}
+
+const actionTaskType = (type?: string) => {
+  if (type === 'diagnostic_quiz' || type === 'verification_quiz') return 'test'
+  if (type === 'weakness_practice') return 'practice'
+  return 'review'
+}
+
+const sortTasksByStrategy = (items: PlanTask[]) => {
+  const priorityOrder = { high: 0, medium: 1, low: 2 }
+  if (strategy.value === 'balanced') {
+    return [...items].sort((a, b) => a.spaceName.localeCompare(b.spaceName, 'zh-CN'))
+  }
+  if (strategy.value === 'weakness_first') {
+    return [...items].sort((a, b) =>
+      priorityOrder[a.priority as keyof typeof priorityOrder] - priorityOrder[b.priority as keyof typeof priorityOrder]
+    )
+  }
+  return [...items]
 }
 
 const statusLabel = (status: string) => {
@@ -281,10 +385,24 @@ const statusLabel = (status: string) => {
 }
 
 const startTask = (task: PlanTask) => {
+  if (task.algorithmGenerated) {
+    router.push({
+      path: '/ai-tutor',
+      query: {
+        spaceId: task.spaceId,
+        message: `请根据算法诊断为我创建今日学习动作：${task.title}。依据：${task.agentReason}`,
+      },
+    })
+    return
+  }
   enterStudy(task.id, { spaceId: task.spaceId, source: 'daily_plan_task' })
 }
 
 const startAllTasks = () => {
+  if (tasks.value[0]?.algorithmGenerated) {
+    startTask(tasks.value[0])
+    return
+  }
   enterTodayFirst(tasks.value[0], 'daily_plan_total')
 }
 
@@ -292,6 +410,33 @@ const doRedistribute = () => {
   showRedistributeDialog.value = false
   ElMessage.success('已根据最新设定重新分配今日任务时间')
 }
+
+async function loadAlgorithmPlans() {
+  algorithmLoading.value = true
+  try {
+    const spaces = await learningSpaceApi.list('active')
+    const limited = spaces.slice(0, 6)
+    const results = await Promise.allSettled(
+      limited.map(async space => ({
+        space,
+        state: await fetchLearningState(space.id),
+      }))
+    )
+    algorithmPlans.value = results
+      .filter((item): item is PromiseFulfilledResult<{ space: LearningSpaceVO; state: LearningAlgorithmState }> =>
+        item.status === 'fulfilled'
+      )
+      .map(item => item.value)
+      .filter(item => item.state.assessedCount > 0 || item.state.weakPoints.length > 0)
+  } catch (e) {
+    console.warn('Failed to load daily algorithm plans:', e)
+    algorithmPlans.value = []
+  } finally {
+    algorithmLoading.value = false
+  }
+}
+
+onMounted(loadAlgorithmPlans)
 </script>
 
 <style scoped lang="scss">

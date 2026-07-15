@@ -18,6 +18,7 @@ export interface AnswerDetailVO {
   isCorrect: boolean | null
   score: number
   status: 'graded' | 'pending_review'
+  userAnswer?: Record<string, unknown>
   judgeResult?: Record<string, unknown>
 }
 
@@ -37,16 +38,23 @@ export interface SessionReportVO {
   reportId: number
   title: string
   reportType: string
+  status?: 'not_started' | 'waiting_grading' | 'generating' | 'ready' | 'failed' | string
+  message?: string
+  pendingCount?: number
+  errorMessage?: string
   totalScore: number
   actualScore: number
   accuracy: number
   masterySummary?: Record<string, unknown>
   weakPoints?: Array<Record<string, unknown>>
   strongPoints?: Array<Record<string, unknown>>
+  abilityEvaluation?: Record<string, unknown>
   learningSuggestions?: Array<Record<string, unknown>>
+  nextRecommendationJson?: Record<string, unknown>
   reportContent?: string
   generatedBy?: string
   createdAt?: string
+  finishedAt?: string
 }
 
 /** 获取试卷题目列表 */
