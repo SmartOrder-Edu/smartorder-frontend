@@ -81,7 +81,7 @@
             </svg>
             今日优先任务
           </h2>
-          <button class="section-link" @click="$router.push('/daily-plan')">查看全部 →</button>
+          <button class="section-link" @click="$router.push('/tasks')">查看全部 →</button>
         </div>
 
         <div class="priority-task-list">
@@ -111,7 +111,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
               <polygon points="5,3 19,12 5,21"/>
             </svg>
-            开始今日总计划
+            开始今日任务
           </button>
           <button class="why-btn" @click="showWhyDialog = true">为什么这样安排？</button>
         </div>

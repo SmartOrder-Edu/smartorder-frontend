@@ -4,8 +4,8 @@
       <!-- 页面标题 -->
       <div class="page-header">
         <div class="header-left">
-          <h1 class="page-title">任务中心</h1>
-          <p class="page-desc">管理你的所有学习任务，按学习空间和路径节点推进</p>
+          <h1 class="page-title">任务日程</h1>
+          <p class="page-desc">管理今日计划、本周安排和所有学习任务，按学习空间和路径节点推进</p>
         </div>
         <div class="header-right">
           <el-button-group>

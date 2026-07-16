@@ -17,8 +17,8 @@ export type StudyEntrySource =
   | 'dashboard_hero'      // 首页"开始今日学习"
   | 'dashboard_space'     // 首页空间卡片
   | 'dashboard_priority'  // 首页优先任务
-  | 'daily_plan_task'     // 每日计划任务
-  | 'daily_plan_total'    // 每日计划"开始今日总计划"
+  | 'daily_plan_task'     // 任务日程中的今日任务（兼容旧埋点名）
+  | 'daily_plan_total'    // 任务日程"开始今日任务"（兼容旧埋点名）
   | 'space_hero'          // 空间详情"继续学习"
   | 'space_task'          // 空间详情任务列表
   | 'path_node'           // 学习路径知识点
