@@ -73,6 +73,7 @@ defineProps<{
   box-sizing: border-box;
   position: relative;
   overflow: hidden;
+  height: 100%;
 }
 
 /* 全宽卡片（如个人简介）的大格式设计 */

@@ -2608,4 +2608,263 @@ onBeforeUnmount(() => {
     width: 100%;
   }
 }
+
+/* ==================== 暗色模式适配 ==================== */
+html[data-theme='dark'] {
+  .cloud-drive-page {
+    background: linear-gradient(135deg, var(--panel-bg) 0%, var(--page-bg) 100%);
+    box-shadow: inset 0 0 0 1px var(--border-color);
+  }
+
+  .page-title {
+    color: var(--text-primary);
+  }
+
+  .page-desc {
+    color: var(--text-secondary);
+  }
+
+  .compact-storage {
+    background: var(--panel-bg-secondary);
+    border-color: var(--border-color);
+    box-shadow: none;
+
+    .storage-text {
+      color: var(--text-primary);
+    }
+  }
+
+  .toolbar {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: none;
+  }
+
+  .toolbar-row2 {
+    border-top: 1px solid var(--border-color);
+  }
+
+  .file-count-badge {
+    color: var(--text-secondary);
+    background: var(--panel-bg-secondary);
+  }
+
+  .btn-new-folder {
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+    background-color: var(--button-bg);
+
+    &:hover {
+      background-color: var(--button-hover-bg);
+      color: #ffffff;
+      border-color: var(--border-color-strong);
+    }
+  }
+
+  .btn-action {
+    color: var(--text-secondary);
+
+    &:hover:not(:disabled) {
+      background-color: var(--button-hover-bg);
+      color: var(--text-primary);
+    }
+  }
+
+  .breadcrumb-item {
+    color: var(--text-secondary);
+
+    &:hover {
+      background: var(--panel-bg-secondary);
+      color: #2563eb;
+    }
+
+    &.active {
+      color: var(--text-primary);
+    }
+  }
+
+  :deep(.search-input .el-input__wrapper) {
+    background-color: var(--input-bg) !important;
+    box-shadow: 0 0 0 1px var(--border-color) !important;
+
+    &.is-focus {
+      background-color: var(--input-bg) !important;
+      box-shadow: 0 0 0 1px var(--border-color-strong) !important;
+    }
+  }
+
+  .view-toggle {
+    background-color: var(--panel-bg-secondary);
+  }
+
+  .toggle-btn {
+    color: var(--text-secondary);
+
+    &.active {
+      background: var(--button-bg);
+      color: #2563eb;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    &:hover:not(.active) {
+      color: var(--text-primary);
+    }
+  }
+
+  .file-card {
+    background: var(--panel-bg);
+    border-color: var(--border-color);
+    box-shadow: none;
+
+    &:hover {
+      border-color: var(--border-color-strong);
+      background-color: var(--panel-bg-secondary);
+    }
+
+    .file-card-name {
+      color: var(--text-primary);
+    }
+
+    .file-card-meta {
+      color: var(--text-secondary);
+    }
+
+    .file-action-btn {
+      background: var(--button-bg);
+      border-color: var(--border-color);
+      color: var(--text-secondary);
+
+      &:hover {
+        background: var(--button-hover-bg);
+        color: #2563eb;
+        border-color: var(--border-color-strong);
+      }
+    }
+  }
+
+  .file-list-container {
+    background: var(--panel-bg);
+    border-color: var(--border-color);
+  }
+
+  :deep(.custom-table) {
+    --el-table-header-bg-color: var(--panel-bg-secondary) !important;
+    --el-table-row-hover-bg-color: var(--item-hover-bg) !important;
+    --el-table-bg-color: var(--panel-bg) !important;
+    --el-table-tr-bg-color: var(--panel-bg) !important;
+    --el-table-border-color: var(--border-color) !important;
+  }
+
+  :deep(.el-table) {
+    --el-table-header-bg-color: var(--panel-bg-secondary) !important;
+    --el-table-row-hover-bg-color: var(--item-hover-bg) !important;
+    --el-table-bg-color: var(--panel-bg) !important;
+    --el-table-tr-bg-color: var(--panel-bg) !important;
+    --el-table-border-color: var(--border-color) !important;
+  }
+
+  :deep(.el-table__cell) {
+    border-bottom: 1px solid var(--border-color) !important;
+  }
+
+  .row-name-text {
+    color: var(--text-primary);
+  }
+
+  .row-size-text,
+  .row-type-text,
+  .row-date-text {
+    color: var(--text-secondary);
+  }
+
+  .empty-icon {
+    color: var(--text-secondary);
+    background: var(--panel-bg-secondary);
+  }
+
+  .empty-title {
+    color: var(--text-primary);
+  }
+
+  .empty-desc {
+    color: var(--text-secondary);
+  }
+
+  .context-menu {
+    background: var(--panel-bg);
+    border-color: var(--border-color);
+  }
+
+  .context-menu-item {
+    color: var(--text-primary);
+
+    &:hover {
+      background: var(--item-hover-bg);
+      color: #ffffff;
+    }
+  }
+
+  :deep(.el-dialog) {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color);
+  }
+
+  :deep(.el-dialog__title) {
+    color: var(--text-primary);
+  }
+
+  :deep(.upload-area-el .el-upload-dragger) {
+    border-color: var(--border-color-strong);
+    background: var(--input-bg);
+
+    &:hover,
+    &.is-dragover {
+      border-color: #2563eb;
+      background: var(--panel-bg-secondary);
+    }
+  }
+
+  .upload-queue-item {
+    background: var(--panel-bg-secondary);
+    border-color: var(--border-color);
+  }
+
+  .upload-file-name {
+    color: var(--text-primary);
+  }
+
+  .upload-file-size {
+    color: var(--text-secondary);
+  }
+
+  :deep(.move-tree .el-tree-node__content:hover) {
+    background-color: var(--item-hover-bg);
+  }
+
+  .move-tree-node.selected {
+    background: var(--button-hover-bg);
+  }
+
+  .move-tree-label {
+    color: var(--text-primary);
+  }
+
+  :deep(.el-tree) {
+    background: transparent !important;
+    color: var(--text-primary) !important;
+  }
+
+  .skeleton-card {
+    background: linear-gradient(110deg, var(--panel-bg) 30%, var(--panel-bg-secondary) 50%, var(--panel-bg) 70%);
+  }
+
+  .row-inline-btn {
+    color: var(--text-secondary);
+
+    &:hover {
+      background: rgba(37, 99, 235, 0.15);
+      color: #2563eb;
+    }
+  }
+}
 </style>

@@ -600,9 +600,9 @@ onMounted(loadAlgorithmPlans)
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-md) var(--spacing-lg);
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
 }
 
 .strategy-info {
@@ -623,8 +623,8 @@ onMounted(loadAlgorithmPlans)
 .strategy-btn {
   padding: 4px 14px;
   border-radius: var(--radius-full);
-  border: 1px solid var(--border-light);
-  background: white;
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
   font-size: 0.75rem;
   color: var(--text-secondary);
   cursor: pointer;
@@ -634,6 +634,7 @@ onMounted(loadAlgorithmPlans)
 .strategy-btn:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
+  background: var(--button-hover-bg);
 }
 
 .strategy-btn.active {
@@ -645,10 +646,10 @@ onMounted(loadAlgorithmPlans)
 
 /* 任务列表 */
 .task-list-section {
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-xl);
   padding: var(--spacing-xl);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
 }
 
 .section-actions {
@@ -662,14 +663,14 @@ onMounted(loadAlgorithmPlans)
   gap: 6px;
   padding: 8px 16px;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  background: white;
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
   font-size: 0.8125rem;
-  color: var(--text-regular);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
 
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); background: rgba(11, 183, 170, 0.02); }
+  &:hover { border-color: var(--primary-color); color: var(--primary-color); background: var(--button-hover-bg); }
 
   &.primary {
     background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
@@ -719,8 +720,9 @@ onMounted(loadAlgorithmPlans)
 
 .task-card {
   display: flex;
+  background: var(--item-bg);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
   overflow: hidden;
   transition: all var(--transition-fast);
 
@@ -812,7 +814,7 @@ onMounted(loadAlgorithmPlans)
   padding: 4px 14px;
   border-radius: var(--radius-full);
   border: 1px solid var(--primary-color);
-  background: white;
+  background: transparent;
   color: var(--primary-color);
   font-size: 0.75rem;
   cursor: pointer;

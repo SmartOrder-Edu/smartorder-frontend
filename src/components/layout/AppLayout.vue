@@ -1603,4 +1603,18 @@ const handleLogout = async () => {
   border: none;
   cursor: pointer;
 }
+
+html[data-theme='dark'] .sidebar-user-info:hover,
+:global(html[data-theme='dark']) .sidebar-user-info:hover,
+html.dark .sidebar-user-info:hover,
+:global(html.dark) .sidebar-user-info:hover {
+  background: var(--item-hover-bg) !important;
+}
+
+html[data-theme='dark'] .user-menu-item:hover,
+:global(html[data-theme='dark']) .user-menu-item:hover,
+html.dark .user-menu-item:hover,
+:global(html.dark) .user-menu-item:hover {
+  background: var(--item-hover-bg) !important;
+}
 </style>

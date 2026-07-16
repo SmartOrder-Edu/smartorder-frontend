@@ -81,6 +81,7 @@ const emit = defineEmits<{
 .credential-section {
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .section-header {
@@ -178,7 +179,9 @@ const emit = defineEmits<{
 .credential-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto 1fr;
   gap: 16px;
+  flex: 1;
 }
 
 .full-width {
@@ -189,6 +192,7 @@ const emit = defineEmits<{
 @media (max-width: 700px) {
   .credential-grid {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
   }
 }
 

@@ -4,6 +4,11 @@ export interface AvatarAuthInfo {
   wssUrl: string
   appId: string
   sceneId: string
+  uid?: string
+  scene?: string
+  interactMode?: string
+  avatarId?: string
+  voice?: string
 }
 
 export function getAvatarAuthInfo() {

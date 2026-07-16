@@ -574,7 +574,8 @@ const fileId = ref(String(route.query.id || ''))
 const squareId = ref(String(route.query.squareId || ''))
 const fileName = ref(String(route.query.name || ''))
 const fileSize = ref(Number(route.query.size || 0))
-const fileExt = ref(fileName.value.split('.').pop()?.toLowerCase() || '')
+const fileType = String(route.query.type || '').trim().replace(/^\./, '').toLowerCase()
+const fileExt = ref(fileType || fileName.value.split('.').pop()?.toLowerCase() || '')
 const isSquarePreview = ref(!!squareId.value)
 
 /** 获取文件内容的 API 路径：广场资源走 /resource-square/{id}/preview，云盘文件走 /yun-resource/preview/{id} */
@@ -1149,7 +1150,7 @@ onMounted(async () => {
     return
   }
 
-  if (!fileId.value) {
+  if (!fileId.value && !squareId.value) {
     ElMessage.error('无效的文件预览参数')
     loading.value = false
     return

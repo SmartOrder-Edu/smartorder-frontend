@@ -637,6 +637,16 @@ onMounted(() => { spaceStore.fetchSpaces() })
   box-shadow: 0 8px 24px rgba(67, 97, 238, 0.15); 
   transform: translateY(-2px);
 }
+html[data-theme='dark'] .stat-card {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+html[data-theme='dark'] .stat-card.active {
+  background: var(--panel-bg, rgba(26, 26, 46, 0.8));
+  border-color: #4361ee;
+}
+html[data-theme='dark'] .stat-value {
+  color: #f4f7fb;
+}
 .stat-value { display: block; font-size: 1.75rem; font-weight: 700; color: #0f172a; line-height: 1.1; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
 .stat-label { display: block; font-size: 0.8125rem; font-weight: 600; color: #94a3b8; letter-spacing: 0.02em; }
 

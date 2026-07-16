@@ -129,6 +129,12 @@
   --el-color-primary-light-8: #b8eeea;
   --el-color-primary-light-9: #ecfdfb;
   --el-color-primary-dark-2: #0a9e94;
+
+  // === 骨架屏变量 ===
+  --skeleton-bg-start: #eef2f7;
+  --skeleton-bg-middle: #f8fafc;
+  --skeleton-bg-end: #eef2f7;
+  --skeleton-publisher-bg: #f1f5f9;
 }
 
 /* ==================== 基础重置 ==================== */
@@ -1256,6 +1262,26 @@ html[data-theme='dark'] {
   --color-card-bg-secondary: rgba(25, 29, 39, 0.88);
   --overlay-bg: rgba(0, 0, 0, 0.58);
   --shadow-color: rgba(0, 0, 0, 0.45);
+  --background-color-base: #1d2633;
+
+  // 兼容老背景色与边框色变量在深色模式下的适配
+  --bg-primary: var(--page-bg);
+  --bg-secondary: var(--page-bg-secondary);
+  --bg-card: var(--panel-bg);
+  --bg-card-hover: var(--panel-bg-secondary);
+  --bg-glass: rgba(23, 30, 42, 0.85);
+
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-light: rgba(255, 255, 255, 0.12);
+  --border-default: var(--border-color);
+
+  --text-regular: var(--text-secondary);
+
+  // 骨架屏暗色变量
+  --skeleton-bg-start: #1d2633;
+  --skeleton-bg-middle: #2b3645;
+  --skeleton-bg-end: #1d2633;
+  --skeleton-publisher-bg: #1d2633;
 }
 
 /* 全局根节点应用主题变量 */

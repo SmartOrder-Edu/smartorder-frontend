@@ -965,7 +965,7 @@ const onPublishSuccess = () => {
 }
 
 .resource-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-light);
   overflow: hidden;
@@ -1121,7 +1121,7 @@ const onPublishSuccess = () => {
 /* ==================== 骨架屏加载动画 ==================== */
 .skeleton-card {
   pointer-events: none;
-  border: 1px solid #f1f5f9 !important;
+  border: 1px solid var(--border-light) !important;
   box-shadow: none !important;
 }
 
@@ -1137,7 +1137,7 @@ const onPublishSuccess = () => {
 .skeleton-card .skel-tag,
 .skeleton-card .skel-meta,
 .skeleton-card .skel-btn {
-  background: linear-gradient(110deg, #eef2f7 30%, #f8fafc 50%, #eef2f7 70%);
+  background: linear-gradient(110deg, var(--skeleton-bg-start) 30%, var(--skeleton-bg-middle) 50%, var(--skeleton-bg-end) 70%);
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
   border-radius: 6px;
@@ -1180,7 +1180,7 @@ const onPublishSuccess = () => {
   height: 12px;
   margin-top: 12px;
   margin-bottom: 10px;
-  background: #f1f5f9 !important;
+  background: var(--skeleton-publisher-bg) !important;
   animation: none !important;
 }
 
