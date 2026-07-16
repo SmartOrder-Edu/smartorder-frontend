@@ -522,6 +522,13 @@
                       >
                         {{ resourceGenerationHint(r) }}
                       </p>
+                      <div v-if="streamingResourceContent(r)" class="res-stream-preview">
+                        <div class="stream-preview-head">
+                          <span class="stream-dot"></span>
+                          <span>{{ displayResourceStatus(r) === 'generated' ? '生成完成' : '实时生成中' }}</span>
+                        </div>
+                        <pre>{{ streamingResourceContent(r) }}</pre>
+                      </div>
                       <div class="res-tags">
                         <span v-if="r.knowledgePoint">{{ r.knowledgePoint }}</span>
                         <span v-if="r.studyScenario">{{ r.studyScenario }}</span>
@@ -688,7 +695,13 @@ import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
-import { resourceGenerationJobApi, resourcePackageApi } from '@/api/spaceDashboard'
+import {
+  resourceGenerationJobApi,
+  resourcePackageApi,
+  streamGenerateResourcePackage,
+  type ResourcePackageStreamEvent,
+  type ResourcePackageStreamEventName,
+} from '@/api/spaceDashboard'
 import { learningResourceApi } from '@/api/learningResource'
 import { fetchLearningState } from '@/api/algorithm'
 import type {
@@ -721,6 +734,15 @@ const packageGenerating = ref(false)
 const packageRunningSteps = ref<{ reason: string; status: string }[]>([])
 const selectedPackageTypes = ref<ResourceType[]>(['doc', 'html', 'mind_map', 'quiz', 'link'])
 const generatingResourceIds = ref<string[]>([])
+const packageStreamAbortController = ref<AbortController | null>(null)
+const streamingResources = ref<Record<string, {
+  status: 'generating' | 'generated' | 'failed'
+  content: string
+  title: string
+  resourceType: ResourceType
+  message?: string
+}>>({})
+const optimisticPackageResources = ref<ResourceVO[]>([])
 const resourceGenerationJobs = ref<ResourceGenerationJobVO[]>([])
 const resourcePollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const resourcePollingInFlight = ref(false)
@@ -906,9 +928,20 @@ const resourcePackageTarget = computed(() => {
   }
 })
 
+const visibleResources = computed(() => {
+  const resources = [...(dashboard.value?.resources || [])]
+  const seen = new Set(resources.map(resource => resource.id).filter(Boolean))
+  optimisticPackageResources.value.forEach(resource => {
+    if (!resource.id || seen.has(resource.id)) return
+    resources.unshift(resource)
+    seen.add(resource.id)
+  })
+  return resources
+})
+
 const groupedResources = computed(() => {
   const groups = new Map<string, { key: string; title: string; label: string; items: ResourceVO[] }>()
-  ;(dashboard.value?.resources || []).forEach(resource => {
+  ;(visibleResources.value || []).forEach(resource => {
     const key = resource.taskId ? `task-${resource.taskId}` : resource.knowledgePoint ? `kp-${resource.knowledgePoint}` : 'space'
     if (!groups.has(key)) {
       groups.set(key, {
@@ -1002,6 +1035,8 @@ function formatDuration(seconds: number | string | undefined) {
 }
 
 function displayResourceStatus(resource: ResourceVO) {
+  const streaming = resource.id ? streamingResources.value[resource.id] : undefined
+  if (streaming?.status) return streaming.status
   if (generatingResourceIds.value.includes(resource.id)) return 'generating'
   const job = latestGenerationJob(resource)
   if (job?.status === 'pending' || job?.status === 'generating') return 'generating'
@@ -1015,6 +1050,9 @@ function latestGenerationJob(resource: ResourceVO) {
 
 function resourceGenerationHint(resource: ResourceVO) {
   const status = displayResourceStatus(resource)
+  const streaming = resource.id ? streamingResources.value[resource.id] : undefined
+  if (streaming?.message) return streaming.message
+  if (streaming?.content && status === 'generating') return '内容正在实时返回，生成完成后会自动保存。'
   const job = latestGenerationJob(resource)
   if (status === 'generating') return '后台正在生成内容，完成后会自动刷新。'
   if (status === 'failed') {
@@ -1036,6 +1074,12 @@ function goResourceDetail(resource: ResourceVO) {
 function canGenerateResource(resource: ResourceVO) {
   const status = displayResourceStatus(resource)
   return status === 'planned' || status === 'failed'
+}
+
+function streamingResourceContent(resource: ResourceVO) {
+  if (!resource.id) return ''
+  const content = streamingResources.value[resource.id]?.content || ''
+  return content.length > 900 ? `${content.slice(-900)}` : content
 }
 
 function isResourceBusy(resource: ResourceVO) {
@@ -1245,30 +1289,161 @@ async function handlePreviewResourcePackage() {
   }
 }
 
+function abortPackageStream() {
+  if (!packageStreamAbortController.value) return
+  packageStreamAbortController.value.abort()
+  packageStreamAbortController.value = null
+}
+
+function upsertOptimisticResource(resource: ResourceVO) {
+  if (!resource?.id) return
+  const exists = optimisticPackageResources.value.some(item => item.id === resource.id)
+  if (exists) {
+    optimisticPackageResources.value = optimisticPackageResources.value.map(item =>
+      item.id === resource.id ? { ...item, ...resource } : item
+    )
+    return
+  }
+  optimisticPackageResources.value = [{ ...resource, status: resource.status || 'generating' }, ...optimisticPackageResources.value]
+}
+
+function updateOptimisticResourceStatus(resourceId: string | undefined, status: ResourceVO['status']) {
+  if (!resourceId) return
+  optimisticPackageResources.value = optimisticPackageResources.value.map(resource =>
+    resource.id === resourceId ? { ...resource, status } : resource
+  )
+}
+
+function setStreamingState(resource: ResourceVO, status: 'generating' | 'generated' | 'failed', message?: string) {
+  if (!resource.id) return
+  streamingResources.value = {
+    ...streamingResources.value,
+    [resource.id]: {
+      status,
+      content: streamingResources.value[resource.id]?.content || '',
+      title: resource.title,
+      resourceType: resource.resourceType,
+      message,
+    },
+  }
+}
+
+function appendStreamingContent(resourceId: string | undefined, chunk: string | undefined) {
+  if (!resourceId || !chunk) return
+  const current = streamingResources.value[resourceId] || {
+    status: 'generating' as const,
+    content: '',
+    title: '',
+    resourceType: 'doc' as ResourceType,
+  }
+  streamingResources.value = {
+    ...streamingResources.value,
+    [resourceId]: {
+      ...current,
+      status: current.status === 'failed' ? 'failed' : 'generating',
+      content: `${current.content}${chunk}`,
+    },
+  }
+}
+
+function handleResourcePackageStreamEvent(eventName: ResourcePackageStreamEventName, payload: ResourcePackageStreamEvent) {
+  if (eventName === 'package-start' && payload.package) {
+    resourcePackagePreview.value = payload.package
+    optimisticPackageResources.value = payload.package.resources || []
+    packageRunningSteps.value = payload.package.agentActions?.map(action => ({
+      reason: action.reason,
+      status: action.status,
+    })) || packageRunningSteps.value
+    optimisticPackageResources.value.forEach(resource => setStreamingState(resource, 'generating'))
+    return
+  }
+
+  if (eventName === 'resource-start' && payload.resource) {
+    upsertOptimisticResource(payload.resource)
+    setStreamingState(payload.resource, 'generating', '内容正在实时返回，生成完成后会自动保存。')
+    return
+  }
+
+  if (eventName === 'resource-token') {
+    appendStreamingContent(payload.resourceId, payload.chunk)
+    return
+  }
+
+  if (eventName === 'resource-done') {
+    if (!payload.resourceId) return
+    const current = streamingResources.value[payload.resourceId]
+    if (current) {
+      streamingResources.value = {
+        ...streamingResources.value,
+        [payload.resourceId]: { ...current, status: 'generated', message: '生成完成，内容已保存。' },
+      }
+    }
+    updateOptimisticResourceStatus(payload.resourceId, 'generated')
+    return
+  }
+
+  if (eventName === 'resource-failed') {
+    if (!payload.resourceId) return
+    const current = streamingResources.value[payload.resourceId] || {
+      status: 'failed' as const,
+      content: '',
+      title: payload.title || '',
+      resourceType: (payload.resourceType as ResourceType) || 'doc',
+    }
+    streamingResources.value = {
+      ...streamingResources.value,
+      [payload.resourceId]: {
+        ...current,
+        status: 'failed',
+        message: payload.message || '生成失败，可稍后重试。',
+      },
+    }
+    updateOptimisticResourceStatus(payload.resourceId, 'failed')
+    return
+  }
+
+  if (eventName === 'package-done') {
+    packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'success' }))
+    return
+  }
+
+  if (eventName === 'package-failed') {
+    packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'failed' }))
+  }
+}
+
 async function handleGenerateResourcePackage() {
   if (!spaceId.value) return
+  abortPackageStream()
+  const controller = new AbortController()
+  packageStreamAbortController.value = controller
   packageGenerating.value = true
+  packagePreviewVisible.value = false
+  streamingResources.value = {}
+  optimisticPackageResources.value = []
   packageRunningSteps.value = [
     { reason: '资源 Agent 正在分析当前任务和知识点', status: 'running' },
-    { reason: '正在生成资料包资源记录并绑定任务', status: 'running' },
+    { reason: '正在生成资料内容并实时返回片段', status: 'running' },
     { reason: 'Supervisor Agent 正在检查资料来源和使用场景', status: 'running' },
   ]
   try {
-    const result = await resourcePackageApi.generate(spaceId.value, buildPackagePayload())
-    packageRunningSteps.value = result.agentActions.map(action => ({
-      reason: action.reason,
-      status: action.status,
-    }))
-    packagePreviewVisible.value = false
-    resourcePackagePreview.value = result
+    await streamGenerateResourcePackage(spaceId.value, buildPackagePayload(), {
+      signal: controller.signal,
+      onEvent: handleResourcePackageStreamEvent,
+    })
     await dashStore.fetchDashboard(spaceId.value)
     await refreshResourceGenerationJobs()
-    startResourceGenerationPolling()
-    ElMessage.success('资料包已提交生成，完成后会自动刷新')
+    optimisticPackageResources.value = []
+    if (hasActiveResourceGeneration()) startResourceGenerationPolling()
+    ElMessage.success('资料包已生成并保存')
   } catch (e: any) {
+    if (controller.signal.aborted) return
     packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'failed' }))
     ElMessage.error(e?.message || '资料包生成失败')
   } finally {
+    if (packageStreamAbortController.value === controller) {
+      packageStreamAbortController.value = null
+    }
     packageGenerating.value = false
   }
 }
@@ -1416,10 +1591,16 @@ onMounted(() => {
   syncActiveTabFromRoute()
   loadDashboard()
 })
-onUnmounted(stopResourceGenerationPolling)
+onUnmounted(() => {
+  abortPackageStream()
+  stopResourceGenerationPolling()
+})
 watch(() => route.params.spaceId, () => {
+  abortPackageStream()
   stopResourceGenerationPolling()
   resourceGenerationJobs.value = []
+  streamingResources.value = {}
+  optimisticPackageResources.value = []
   loadDashboard()
   syncActiveTabFromRoute()
   if (!route.query.tab) activeTab.value = 'today'
@@ -2351,6 +2532,44 @@ watch(
 
   &.generating { color: #2563eb; }
   &.failed { color: #dc2626; }
+}
+
+.res-stream-preview {
+  margin-top: 9px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+}
+
+.stream-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: #2563eb;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.stream-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.res-stream-preview pre {
+  max-height: 150px;
+  margin: 0;
+  overflow: auto;
+  color: #334155;
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .res-tags {
