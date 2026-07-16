@@ -649,6 +649,7 @@ const handleGiteeLogin = async () => {
 .brand-content {
   width: 100%;
   max-width: 520px;
+  transform: translateY(clamp(1rem, 2vh, 1.75rem));
 }
 
 /* Logo */
@@ -733,22 +734,26 @@ const handleGiteeLogin = async () => {
 
 /* 卖点标签 */
 .feature-tags {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing-sm);
+  width: min(100%, 430px);
   margin-bottom: clamp(1.5rem, 3vw, 2.75rem);
 }
 
 .feature-tag {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
+  min-width: 0;
   background: white;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-full);
   font-size: 0.8125rem;
   color: var(--text-regular);
+  white-space: nowrap;
   box-shadow: 0 2px 8px  var(--color-shadow);
   transition: all 0.3s ease;
 }
@@ -998,6 +1003,7 @@ const handleGiteeLogin = async () => {
 
   .brand-content {
     max-width: 500px;
+    transform: translateY(0.75rem);
   }
 
   .logo-wrapper,
