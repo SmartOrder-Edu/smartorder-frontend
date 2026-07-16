@@ -728,7 +728,12 @@ const preloadAvatarAuthInfo = async () => {
       avatarAuthInfo.value = {
         wssUrl: authInfo.wssUrl,
         appId: authInfo.appId || '',
-        sceneId: authInfo.sceneId || ''
+        sceneId: authInfo.sceneId || '',
+        uid: authInfo.uid || '',
+        scene: authInfo.scene || '',
+        interactMode: authInfo.interactMode || '',
+        avatarId: authInfo.avatarId || '',
+        voice: authInfo.voice || ''
       }
     }
   } catch (error) {
