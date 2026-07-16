@@ -474,6 +474,44 @@
               </div>
             </div>
 
+            <div v-if="visibleResources.length" class="resource-management-toolbar">
+              <div class="resource-search-box">
+                <el-input
+                  v-model="resourceSearchKeyword"
+                  placeholder="搜索资料、知识点或描述"
+                  clearable
+                />
+              </div>
+              <div class="resource-filter-controls">
+                <el-select v-model="resourceTypeFilter" placeholder="资源类型" class="resource-filter-select">
+                  <el-option label="全部类型" value="all" />
+                  <el-option
+                    v-for="type in packageTypeOptions"
+                    :key="type.value"
+                    :label="type.label"
+                    :value="type.value"
+                  />
+                </el-select>
+                <el-select v-model="resourceStatusFilter" placeholder="生成状态" class="resource-filter-select">
+                  <el-option label="全部状态" value="all" />
+                  <el-option label="待生成" value="planned" />
+                  <el-option label="生成中" value="generating" />
+                  <el-option label="已生成" value="generated" />
+                  <el-option label="失败" value="failed" />
+                </el-select>
+                <el-select v-model="resourceSortMode" placeholder="排序" class="resource-filter-select">
+                  <el-option label="任务顺序" value="default" />
+                  <el-option label="按生成状态" value="status" />
+                  <el-option label="按资源类型" value="type" />
+                  <el-option label="按标题" value="title" />
+                </el-select>
+              </div>
+              <div class="resource-result-summary">
+                <strong>{{ filteredResources.length }}</strong>
+                <span>/ {{ visibleResources.length }} 项</span>
+              </div>
+            </div>
+
             <div v-if="groupedResources.length" class="resource-package-list">
               <section
                 v-for="group in groupedResources"
@@ -485,12 +523,22 @@
                     <span class="resource-package-eyebrow">{{ group.label }}</span>
                     <h4>{{ group.title }}</h4>
                   </div>
-                  <span class="task-count">{{ group.items.length }} 项</span>
+                  <div class="resource-package-actions">
+                    <span class="task-count">{{ group.items.length }} 项</span>
+                    <button
+                      v-if="hiddenResourceCount(group) > 0"
+                      class="resource-group-toggle"
+                      type="button"
+                      @click="toggleResourceGroup(group.key)"
+                    >
+                      {{ isResourceGroupExpanded(group.key) ? '收起' : `展开 ${hiddenResourceCount(group)} 项` }}
+                    </button>
+                  </div>
                 </div>
 
                 <div class="resource-grid">
                   <div
-                    v-for="r in group.items"
+                    v-for="r in visibleGroupResources(group)"
                     :key="r.id"
                     class="resource-card"
                     :class="{ disabled: isResourceBusy(r) }"
@@ -514,7 +562,12 @@
                           {{ resourceStatusLabel(displayResourceStatus(r)) }}
                         </span>
                       </div>
-                      <p v-if="r.agentReason" class="res-reason">Agent 判断：{{ r.agentReason }}</p>
+                      <p
+                        v-if="r.agentReason && ['generating', 'failed'].includes(displayResourceStatus(r))"
+                        class="res-reason"
+                      >
+                        Agent 判断：{{ r.agentReason }}
+                      </p>
                       <p
                         v-if="resourceGenerationHint(r)"
                         class="res-generation-hint"
@@ -562,7 +615,13 @@
                 </div>
               </section>
             </div>
-            <el-empty v-else description="暂无资源，等待 Agent 为任务生成资料包" :image-size="100" />
+            <el-empty
+              v-else
+              :description="visibleResources.length ? '没有符合筛选条件的资料' : '暂无资源，等待 Agent 为任务生成资料包'"
+              :image-size="100"
+            >
+              <el-button v-if="visibleResources.length" @click="resetResourceFilters">清空筛选</el-button>
+            </el-empty>
 
             <!-- Assessment Summary -->
             <div class="section-header mt-32">
@@ -708,6 +767,7 @@ import type {
   ResourceGenerationJobVO,
   ResourcePackageGenerateDTO,
   ResourcePackageVO,
+  ResourceStatus,
   ResourceType,
   ResourceVO,
   RiskStatus,
@@ -733,6 +793,11 @@ const packagePreviewLoading = ref(false)
 const packageGenerating = ref(false)
 const packageRunningSteps = ref<{ reason: string; status: string }[]>([])
 const selectedPackageTypes = ref<ResourceType[]>(['doc', 'html', 'mind_map', 'quiz', 'link'])
+const resourceSearchKeyword = ref('')
+const resourceTypeFilter = ref<'all' | ResourceType>('all')
+const resourceStatusFilter = ref<'all' | ResourceStatus>('all')
+const resourceSortMode = ref<'default' | 'status' | 'type' | 'title'>('default')
+const expandedResourceGroupKeys = ref<string[]>([])
 const generatingResourceIds = ref<string[]>([])
 const packageStreamAbortController = ref<AbortController | null>(null)
 const streamingResources = ref<Record<string, {
@@ -799,6 +864,13 @@ const packageTypeOptions: { value: ResourceType; label: string }[] = [
   { value: 'image', label: '图解' },
   { value: 'link', label: 'B站推荐' },
 ]
+const resourceGroupPreviewLimit = 6
+const resourceStatusSortOrder: Record<ResourceStatus, number> = {
+  generating: 0,
+  failed: 1,
+  planned: 2,
+  generated: 3,
+}
 
 const spaceCoverThemes: Record<string, string> = {
   course: 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
@@ -939,9 +1011,45 @@ const visibleResources = computed(() => {
   return resources
 })
 
+const filteredResources = computed(() => {
+  const keyword = normalizeText(resourceSearchKeyword.value)
+  const resources = visibleResources.value.filter(resource => {
+    if (resourceTypeFilter.value !== 'all' && resource.resourceType !== resourceTypeFilter.value) return false
+    if (resourceStatusFilter.value !== 'all' && displayResourceStatus(resource) !== resourceStatusFilter.value) return false
+    if (!keyword) return true
+    const searchable = [
+      resource.title,
+      resource.description,
+      resource.knowledgePoint,
+      resource.studyScenario,
+      resource.agentReason,
+      resourceTypeLabel(resource.resourceType),
+      resourceSourceLabel(resource),
+      bilibiliPreview(resource)?.title,
+      bilibiliPreview(resource)?.upName,
+    ].filter(Boolean).join(' ')
+    return normalizeText(searchable).includes(keyword)
+  })
+
+  return [...resources].sort((a, b) => {
+    if (resourceSortMode.value === 'status') {
+      const statusDiff = resourceStatusSortOrder[displayResourceStatus(a)] - resourceStatusSortOrder[displayResourceStatus(b)]
+      if (statusDiff !== 0) return statusDiff
+    }
+    if (resourceSortMode.value === 'type') {
+      const typeDiff = resourceTypeLabel(a.resourceType).localeCompare(resourceTypeLabel(b.resourceType), 'zh-CN')
+      if (typeDiff !== 0) return typeDiff
+    }
+    if (resourceSortMode.value === 'title') {
+      return a.title.localeCompare(b.title, 'zh-CN')
+    }
+    return 0
+  })
+})
+
 const groupedResources = computed(() => {
   const groups = new Map<string, { key: string; title: string; label: string; items: ResourceVO[] }>()
-  ;(visibleResources.value || []).forEach(resource => {
+  ;(filteredResources.value || []).forEach(resource => {
     const key = resource.taskId ? `task-${resource.taskId}` : resource.knowledgePoint ? `kp-${resource.knowledgePoint}` : 'space'
     if (!groups.has(key)) {
       groups.set(key, {
@@ -998,6 +1106,35 @@ function resourceIconClass(resource: ResourceVO) {
 
 function resourceIconName(resource: ResourceVO) {
   return resourceIcon(bilibiliPreview(resource) ? 'link' : resource.resourceType)
+}
+
+function isResourceGroupExpanded(groupKey: string) {
+  return expandedResourceGroupKeys.value.includes(groupKey)
+}
+
+function visibleGroupResources(group: { key: string; items: ResourceVO[] }) {
+  if (isResourceGroupExpanded(group.key)) return group.items
+  return group.items.slice(0, resourceGroupPreviewLimit)
+}
+
+function hiddenResourceCount(group: { key: string; items: ResourceVO[] }) {
+  return Math.max(group.items.length - resourceGroupPreviewLimit, 0)
+}
+
+function toggleResourceGroup(groupKey: string) {
+  if (isResourceGroupExpanded(groupKey)) {
+    expandedResourceGroupKeys.value = expandedResourceGroupKeys.value.filter(key => key !== groupKey)
+    return
+  }
+  expandedResourceGroupKeys.value = [...expandedResourceGroupKeys.value, groupKey]
+}
+
+function resetResourceFilters() {
+  resourceSearchKeyword.value = ''
+  resourceTypeFilter.value = 'all'
+  resourceStatusFilter.value = 'all'
+  resourceSortMode.value = 'default'
+  expandedResourceGroupKeys.value = []
 }
 
 function resourceTypeLabel(t: string) {
@@ -1601,6 +1738,7 @@ watch(() => route.params.spaceId, () => {
   resourceGenerationJobs.value = []
   streamingResources.value = {}
   optimisticPackageResources.value = []
+  resetResourceFilters()
   loadDashboard()
   syncActiveTabFromRoute()
   if (!route.query.tab) activeTab.value = 'today'
@@ -1615,6 +1753,12 @@ watch(
   () => dashboard.value?.resources?.map(resource => `${resource.id}:${resource.status}`).join('|') || '',
   () => {
     if (hasActiveResourceGeneration()) startResourceGenerationPolling()
+  }
+)
+watch(
+  [resourceSearchKeyword, resourceTypeFilter, resourceStatusFilter, resourceSortMode],
+  () => {
+    expandedResourceGroupKeys.value = []
   }
 )
 </script>
@@ -2415,6 +2559,48 @@ watch(
   box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
 }
 
+.resource-management-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 18px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: #f8fafc;
+}
+
+.resource-search-box {
+  min-width: 0;
+}
+
+.resource-filter-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.resource-filter-select {
+  width: 118px;
+}
+
+.resource-result-summary {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  min-width: 72px;
+  color: #64748b;
+  font-size: 0.75rem;
+  white-space: nowrap;
+
+  strong {
+    color: #0f172a;
+    font-size: 1rem;
+  }
+}
+
 .resource-package-list {
   display: grid;
   gap: 18px;
@@ -2436,6 +2622,24 @@ watch(
     color: #0f172a;
     font-size: 0.95rem;
   }
+}
+
+.resource-package-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.resource-group-toggle {
+  border: 0;
+  background: transparent;
+  color: #0a9e94;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 4px 0;
+  white-space: nowrap;
 }
 
 .resource-grid {
@@ -2497,7 +2701,16 @@ watch(
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.res-desc { font-size: 0.75rem; color: #6b7280; margin: 0 0 6px; line-height: 1.4; }
+.res-desc {
+  color: #6b7280;
+  display: -webkit-box;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  margin: 0 0 6px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .res-meta { display: flex; gap: 8px; flex-wrap: wrap; }
 .res-type { font-size: 0.6875rem; color: #9ca3af; }
 .res-source {
@@ -2577,6 +2790,8 @@ watch(
   gap: 6px;
   flex-wrap: wrap;
   margin-top: 8px;
+  max-height: 24px;
+  overflow: hidden;
 
   span {
     padding: 2px 7px;
@@ -3484,6 +3699,24 @@ watch(
     grid-template-columns: 1fr;
   }
 
+  .resource-management-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .resource-filter-controls {
+    justify-content: stretch;
+  }
+
+  .resource-filter-select {
+    flex: 1 1 120px;
+    width: auto;
+  }
+
+  .resource-result-summary {
+    justify-content: flex-start;
+  }
+
   .plan-overview,
   .plan-phase-head {
     grid-template-columns: 1fr;
@@ -3555,6 +3788,19 @@ watch(
 
   .adb-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .resource-filter-controls {
+    flex-direction: column;
+  }
+
+  .resource-filter-select {
+    width: 100%;
+  }
+
+  .resource-package-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>
