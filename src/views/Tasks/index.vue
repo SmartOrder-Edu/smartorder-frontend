@@ -29,6 +29,38 @@
         </div>
       </div>
 
+      <section class="weekly-report-card">
+        <div class="report-card-main">
+          <div class="report-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 3v18h18" />
+              <path d="m7 14 4-4 3 3 5-7" />
+              <circle cx="7" cy="14" r="1" />
+              <circle cx="11" cy="10" r="1" />
+              <circle cx="14" cy="13" r="1" />
+              <circle cx="19" cy="6" r="1" />
+            </svg>
+          </div>
+          <div class="report-card-copy">
+            <div class="report-card-title-row">
+              <span class="report-card-label">AI 学习周报已生成</span>
+              <span class="report-card-range">07/10 - 07/16</span>
+            </div>
+            <h2>最近 7 天你完成 18 个任务，链表基础掌握明显提升</h2>
+            <p>递归调用栈仍存在步骤缺失问题，系统已为下周前两天安排补弱与验证练习。</p>
+          </div>
+        </div>
+        <div class="report-card-actions">
+          <button class="report-primary-btn" @click="openWeeklyReport">
+            查看学习周报
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9,18 15,12 9,6" />
+            </svg>
+          </button>
+          <button class="report-secondary-btn" @click="activeTab = 'week'">查看本周任务</button>
+        </div>
+      </section>
+
       <!-- 任务统计 -->
       <section class="section stats-row">
         <div class="stat-card">
@@ -218,6 +250,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { taskApi } from '@/api/spaceDashboard'
@@ -236,6 +269,7 @@ const pendingTasks = ref<TaskVO[]>([])
 const overdueTasks = ref<TaskVO[]>([])
 
 const { enterTask } = useStudyEntry()
+const router = useRouter()
 
 const filters = [
   { label: '全部', value: 'all' },
@@ -443,6 +477,10 @@ function startOfToday() {
   today.setHours(0, 0, 0, 0)
   return today
 }
+
+function openWeeklyReport() {
+  router.push('/learning-report/weekly')
+}
 </script>
 
 <style scoped>
@@ -484,6 +522,137 @@ function startOfToday() {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
+}
+
+.weekly-report-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+  border: 1px solid rgba(11, 183, 170, 0.14);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(11, 183, 170, 0.1), rgba(59, 130, 246, 0.06)),
+    var(--panel-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.report-card-main {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  min-width: 0;
+}
+
+.report-card-icon {
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  background: #0bb7aa;
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(11, 183, 170, 0.24);
+}
+
+.report-card-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.report-card-copy {
+  min-width: 0;
+}
+
+.report-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-xs);
+}
+
+.report-card-label {
+  color: var(--primary-color);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.report-card-range {
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.report-card-copy h2 {
+  margin: 0 0 var(--spacing-xs);
+  color: var(--text-dark);
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+
+.report-card-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+
+.report-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.report-primary-btn,
+.report-secondary-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  padding: 0 16px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.report-primary-btn {
+  border: 0;
+  background: var(--primary-color);
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(11, 183, 170, 0.2);
+}
+
+.report-primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px rgba(11, 183, 170, 0.24);
+}
+
+.report-primary-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.report-secondary-btn {
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
+  color: var(--text-secondary);
+}
+
+.report-secondary-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: var(--button-hover-bg);
 }
 
 /* 统计行 */
@@ -800,6 +969,13 @@ function startOfToday() {
 @media (max-width: 768px) {
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .weekly-report-card,
+  .report-card-main,
+  .report-card-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 </style>
