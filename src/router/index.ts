@@ -44,9 +44,7 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/daily-plan',
-    name: 'DailyPlan',
-    component: () => import('@/views/DailyPlan/index.vue'),
-    meta: { title: '今日总计划 - 知序智学', requiresAuth: true }
+    redirect: '/tasks'
   },
   {
     path: '/space/:spaceId',
@@ -70,7 +68,7 @@ const routes: Array<RouteRecordRaw> = [
     path: '/tasks',
     name: 'Tasks',
     component: () => import('@/views/Tasks/index.vue'),
-    meta: { title: '任务中心 - 知序智学', requiresAuth: true }
+    meta: { title: '任务日程 - 知序智学', requiresAuth: true }
   },
   {
     path: '/study/:taskId',

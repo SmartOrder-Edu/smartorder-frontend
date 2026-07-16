@@ -1,7 +1,19 @@
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import type { TaskVO } from '@/types/learningSpace'
 import type { EnterStudyOptions, StudyEntrySource, StudyMode } from '@/types/study'
+
+type StudyEntryTask = {
+  id: string | number
+  spaceId?: string | number | null
+  pathNodeId?: string | number | null
+  actionType?: string | null
+  targetType?: string | null
+  targetId?: string | number | null
+}
+
+function stringifyOptional(value: string | number | null | undefined) {
+  return value === undefined || value === null || value === '' ? undefined : String(value)
+}
 
 /**
  * 统一学习入口 composable
@@ -50,29 +62,59 @@ export function useStudyEntry() {
     })
   }
 
+  function enterTask(task: StudyEntryTask | null | undefined,
+    options: EnterStudyOptions = {}) {
+    if (!task || !task.id) {
+      ElMessage.warning('Agent 暂未为该任务准备好执行入口，请稍后再试')
+      return
+    }
+    if (
+      (task.actionType === 'practice_set' || task.actionType === 'assessment') &&
+      (task.targetType === 'practice_session' || task.targetType === 'assessment_session') &&
+      task.targetId
+    ) {
+      router.push({
+        name: 'ExamSession',
+        query: {
+          sessionId: String(task.targetId),
+          taskId: String(task.id),
+          spaceId: stringifyOptional(task.spaceId),
+          source: options.source || 'task',
+        },
+      })
+      return
+    }
+    enterStudy(task.id, {
+      ...options,
+      spaceId: options.spaceId || stringifyOptional(task.spaceId),
+      pathNodeId: options.pathNodeId || stringifyOptional(task.pathNodeId),
+    })
+  }
+
   /**
-   * 进入"今日第一个学习会话"（首页 hero / 每日计划"开始今日总计划"用）
+   * 进入"今日第一个学习会话"（首页 hero / 任务日程"开始今日任务"用）
    *
-   * 调用方传入候选任务（来自 Dashboard / DailyPlanStore 的第一个今日任务）。
+   * 调用方传入候选任务（来自 Dashboard / 任务日程的第一个今日任务）。
    * 若没有候选任务，提示用户今日 Agent 暂未排任务。
    */
   function enterTodayFirst(
-    firstTask?: Pick<TaskVO, 'id' | 'spaceId'> | null,
+    firstTask?: StudyEntryTask | null,
     source: StudyEntrySource = 'dashboard_hero',
   ) {
     if (!firstTask || !firstTask.id) {
       ElMessage.info('今日 Agent 暂未排定学习会话，去 AI 总学习伙伴 问问下一步学什么？')
       return
     }
-    enterStudy(firstTask.id, {
+    enterTask(firstTask, {
       mode: 'learn' as StudyMode,
-      spaceId: firstTask.spaceId,
+      spaceId: stringifyOptional(firstTask.spaceId),
       source,
     })
   }
 
   return {
     enterStudy,
+    enterTask,
     enterPathNodeStudy,
     enterTodayFirst,
   }

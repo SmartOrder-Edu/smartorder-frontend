@@ -1,4 +1,6 @@
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 import request from './request'
+import { refreshAccessToken } from './request'
 import type {
   SpaceDashboardVO,
   TaskVO,
@@ -9,6 +11,7 @@ import type {
   ResourcePackageGenerateDTO,
   ResourcePackageVO,
   ResourceGenerationJobVO,
+  ResourceVO,
 } from '@/types/learningSpace'
 
 // ---- Space Dashboard ----
@@ -29,6 +32,77 @@ export const resourcePackageApi = {
   async generate(spaceId: string, data: ResourcePackageGenerateDTO): Promise<ResourcePackageVO> {
     return request.post(`/learning-spaces/${spaceId}/resource-package/generate`, data)
   },
+}
+
+export type ResourcePackageStreamEventName =
+  | 'package-start'
+  | 'resource-start'
+  | 'resource-token'
+  | 'resource-done'
+  | 'resource-failed'
+  | 'package-done'
+  | 'package-failed'
+
+export interface ResourcePackageStreamEvent {
+  packageId?: string
+  package?: ResourcePackageVO
+  jobId?: string
+  resourceId?: string
+  resource?: ResourceVO
+  resourceType?: string
+  title?: string
+  chunk?: string
+  contentId?: string
+  contentType?: string
+  status?: string
+  message?: string
+}
+
+export interface StreamResourcePackageHandlers {
+  signal?: AbortSignal
+  onEvent?: (eventName: ResourcePackageStreamEventName, payload: ResourcePackageStreamEvent) => void
+}
+
+function parseStreamPayload(data: string): ResourcePackageStreamEvent | null {
+  try {
+    return JSON.parse(data) as ResourcePackageStreamEvent
+  } catch {
+    return null
+  }
+}
+
+export async function streamGenerateResourcePackage(
+  spaceId: string,
+  data: ResourcePackageGenerateDTO,
+  handlers: StreamResourcePackageHandlers = {}
+) {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api'
+  const token = await refreshAccessToken()
+
+  await fetchEventSource(`${base}/learning-spaces/${spaceId}/resource-package/generate/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+    openWhenHidden: true,
+    signal: handlers.signal,
+
+    onopen(response) {
+      if (!response.ok) {
+        throw new Error(`资料包生成请求失败：${response.status}`)
+      }
+      return Promise.resolve()
+    },
+
+    onmessage(event) {
+      if (!event.data) return
+      const payload = parseStreamPayload(event.data)
+      if (!payload) return
+      handlers.onEvent?.((event.event || 'resource-token') as ResourcePackageStreamEventName, payload)
+    },
+  })
 }
 
 // ---- Resource Generation Jobs ----
@@ -61,9 +135,29 @@ export interface CreateTaskDTO {
   metadata?: string | Record<string, any> | null
 }
 
+export interface PlanTodayTasksDTO {
+  maxTasks?: number
+}
+
 export const taskApi = {
+  async listToday(): Promise<TaskVO[]> {
+    return request.get('/tasks/today')
+  },
+
+  async listPending(): Promise<TaskVO[]> {
+    return request.get('/tasks/pending')
+  },
+
+  async listOverdue(): Promise<TaskVO[]> {
+    return request.get('/tasks/overdue')
+  },
+
   async create(data: CreateTaskDTO): Promise<TaskVO> {
     return request.post('/tasks', data)
+  },
+
+  async planToday(data: PlanTodayTasksDTO = {}): Promise<TaskVO[]> {
+    return request.post('/tasks/plan-today', data)
   },
 
   async updateStatus(taskId: string, status: TaskStatus): Promise<TaskVO> {

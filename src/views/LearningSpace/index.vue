@@ -40,138 +40,138 @@
                 <span class="hero-badge-dot"></span>
                 {{ riskLabel(dashboard.riskStatus) }}
               </div>
-              <button class="hero-primary-action" @click="handleContinueToday">
-                <span>{{ nextTodayTask ? '继续今日学习' : '规划今日任务' }}</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                  <polyline points="12,5 19,12 12,19"/>
-                </svg>
-              </button>
             </div>
           </div>
 
-          <div class="hero-dashboard">
-            <div class="progress-panel">
-              <div class="progress-ring" :style="heroProgressStyle">
-                <div class="progress-ring-inner">
-                  <strong>{{ Math.round(dashboard.progress) }}%</strong>
-                  <span>总进度</span>
+          <div class="hero-main-grid">
+            <!-- 继续学习 hero 区块：本空间主入口 -->
+            <div class="continue-study-block">
+              <div class="csb-head">
+                <span class="csb-eyebrow">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                    <polygon points="5,3 19,12 5,21"/>
+                  </svg>
+                  继续本空间学习
+                </span>
+                <span class="csb-time" v-if="nextTodayTask?.estimatedDurationMinutes">
+                  预计 {{ nextTodayTask.estimatedDurationMinutes }} 分钟
+                </span>
+              </div>
+              <h2 class="csb-title">
+                {{ nextTodayTask ? `继续学习：${nextTodayTask.title}` : '今日 Agent 暂未排定具体任务' }}
+              </h2>
+              <p class="csb-judge">Agent 判断：{{ todayFocusReason }}</p>
+              <div class="csb-actions">
+                <button class="csb-btn primary" @click="nextTodayTask ? handleStartFromHero() : handleContinueToday()">
+                  {{ nextTodayTask ? '开始学习' : '规划今日任务' }}
+                </button>
+                <button class="csb-btn" @click="handleAdjustDuration">调整时长</button>
+                <button class="csb-btn" @click="handleSimplerExplain">换个更基础的讲解</button>
+                <button class="csb-btn" @click="handleAssessFirst">先测一下</button>
+              </div>
+            </div>
+
+            <div class="hero-dashboard">
+              <div class="progress-panel">
+                <div class="progress-ring" :style="heroProgressStyle">
+                  <div class="progress-ring-inner">
+                    <strong>{{ Math.round(dashboard.progress) }}%</strong>
+                    <span>总进度</span>
+                  </div>
+                </div>
+                <div class="progress-copy">
+                  <span class="progress-label">今日焦点</span>
+                  <strong>{{ todayFocusTitle }}</strong>
+                  <p>{{ todayFocusReason }}</p>
                 </div>
               </div>
-              <div class="progress-copy">
-                <span class="progress-label">今日焦点</span>
-                <strong>{{ todayFocusTitle }}</strong>
-                <p>{{ todayFocusReason }}</p>
+
+              <!-- Stats Row -->
+              <div class="stats-row">
+                <SpaceStatCard
+                  :value="dashboard.progress"
+                  label="完成进度"
+                  :icon="BarChartIcon"
+                  bg-color="#e0f2fe"
+                  value-color="#0284c7"
+                />
+                <SpaceStatCard
+                  :value="dashboard.streakDays"
+                  label="连续学习"
+                  suffix=" 天"
+                  :icon="FlameIcon"
+                  bg-color="#fff7ed"
+                  value-color="#ea580c"
+                />
+                <SpaceStatCard
+                  :value="dashboard.daysRemaining"
+                  label="剩余天数"
+                  suffix=" 天"
+                  :icon="CalendarIcon"
+                  bg-color="#ecfdf5"
+                  value-color="#059669"
+                />
+                <SpaceStatCard
+                  :value="riskLabel(dashboard.riskStatus)"
+                  label="风险状态"
+                  :icon="ZapIcon"
+                  bg-color="#f5f3ff"
+                  value-color="#7c3aed"
+                />
               </div>
             </div>
-
-            <!-- Stats Row -->
-            <div class="stats-row">
-              <SpaceStatCard
-                :value="dashboard.progress"
-                label="完成进度"
-                :icon="BarChartIcon"
-                bg-color="#e0f2fe"
-                value-color="#0284c7"
-              />
-              <SpaceStatCard
-                :value="dashboard.streakDays"
-                label="连续学习"
-                suffix=" 天"
-                :icon="FlameIcon"
-                bg-color="#fff7ed"
-                value-color="#ea580c"
-              />
-              <SpaceStatCard
-                :value="dashboard.daysRemaining"
-                label="剩余天数"
-                suffix=" 天"
-                :icon="CalendarIcon"
-                bg-color="#ecfdf5"
-                value-color="#059669"
-              />
-              <SpaceStatCard
-                :value="riskLabel(dashboard.riskStatus)"
-                label="风险状态"
-                :icon="ZapIcon"
-                bg-color="#f5f3ff"
-                value-color="#7c3aed"
-              />
-            </div>
-          </div>
-
-          <!-- Agent Insight Banner -->
-          <div class="agent-insight-banner" v-if="dashboard.agentInsight" @click="agentPanelRef?.open?.()">
-            <div class="insight-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
-                <line x1="12" y1="8" x2="12.01" y2="8"/>
-              </svg>
-            </div>
-            <span class="insight-text">{{ dashboard.agentInsight }}</span>
-            <span class="insight-link">查看建议 →</span>
           </div>
 
           <div
-            v-if="algorithmLoading || algorithmState || algorithmError"
-            class="algorithm-diagnosis-band"
-            :class="{ muted: algorithmError }"
+            v-if="dashboard.agentInsight || algorithmLoading || algorithmState || algorithmError"
+            class="hero-support-row"
           >
-            <div class="adb-main">
-              <span class="adb-eyebrow">学习诊断</span>
-              <template v-if="algorithmLoading">
-                <h3>正在读取当前空间的掌握度证据</h3>
-                <p>会优先使用测评结果、题目知识点映射和近期答题证据。</p>
-              </template>
-              <template v-else-if="algorithmError">
-                <h3>诊断暂不可用</h3>
-                <p>{{ algorithmError }}</p>
-              </template>
-              <template v-else>
-                <h3>{{ algorithmNextActionTitle }}</h3>
-                <p>{{ algorithmNextActionReason }}</p>
-              </template>
-            </div>
-            <div class="adb-stats" v-if="algorithmState">
-              <div>
-                <strong>{{ algorithmAssessedCount }}/{{ algorithmKnowledgeCount }}</strong>
-                <span>已评估知识点</span>
-              </div>
-              <div>
-                <strong>{{ algorithmWeakCount }}</strong>
-                <span>薄弱点</span>
-              </div>
-              <div>
-                <strong>{{ algorithmMasteryPercent }}%</strong>
-                <span>平均掌握度</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 继续学习 hero 区块：本空间主入口 -->
-          <div class="continue-study-block">
-            <div class="csb-head">
-              <span class="csb-eyebrow">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
-                  <polygon points="5,3 19,12 5,21"/>
+            <!-- Agent Insight Banner -->
+            <div class="agent-insight-banner" v-if="dashboard.agentInsight" @click="agentPanelRef?.open?.()">
+              <div class="insight-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
                 </svg>
-                继续本空间学习
-              </span>
-              <span class="csb-time" v-if="nextTodayTask?.estimatedDurationMinutes">
-                预计 {{ nextTodayTask.estimatedDurationMinutes }} 分钟
-              </span>
+              </div>
+              <span class="insight-text">{{ dashboard.agentInsight }}</span>
+              <span class="insight-link">查看建议 →</span>
             </div>
-            <h2 class="csb-title">
-              {{ nextTodayTask ? `继续学习：${nextTodayTask.title}` : '今日 Agent 暂未排定具体任务' }}
-            </h2>
-            <p class="csb-judge">Agent 判断：{{ todayFocusReason }}</p>
-            <div class="csb-actions">
-              <button class="csb-btn primary" :disabled="!nextTodayTask" @click="handleStartFromHero">
-                开始学习
-              </button>
-              <button class="csb-btn" @click="handleAdjustDuration">调整时长</button>
-              <button class="csb-btn" @click="handleSimplerExplain">换个更基础的讲解</button>
-              <button class="csb-btn" @click="handleAssessFirst">先测一下</button>
+
+            <div
+              v-if="algorithmLoading || algorithmState || algorithmError"
+              class="algorithm-diagnosis-band"
+              :class="{ muted: algorithmError }"
+            >
+              <div class="adb-main">
+                <span class="adb-eyebrow">学习诊断</span>
+                <template v-if="algorithmLoading">
+                  <h3>正在读取当前空间的掌握度证据</h3>
+                  <p>会优先使用测评结果、题目知识点映射和近期答题证据。</p>
+                </template>
+                <template v-else-if="algorithmError">
+                  <h3>诊断暂不可用</h3>
+                  <p>{{ algorithmError }}</p>
+                </template>
+                <template v-else>
+                  <h3>{{ algorithmNextActionTitle }}</h3>
+                  <p>{{ algorithmNextActionReason }}</p>
+                </template>
+              </div>
+              <div class="adb-stats" v-if="algorithmState">
+                <div>
+                  <strong>{{ algorithmAssessedCount }}/{{ algorithmKnowledgeCount }}</strong>
+                  <span>已评估知识点</span>
+                </div>
+                <div>
+                  <strong>{{ algorithmWeakCount }}</strong>
+                  <span>薄弱点</span>
+                </div>
+                <div>
+                  <strong>{{ algorithmMasteryPercent }}%</strong>
+                  <span>平均掌握度</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -474,6 +474,44 @@
               </div>
             </div>
 
+            <div v-if="visibleResources.length" class="resource-management-toolbar">
+              <div class="resource-search-box">
+                <el-input
+                  v-model="resourceSearchKeyword"
+                  placeholder="搜索资料、知识点或描述"
+                  clearable
+                />
+              </div>
+              <div class="resource-filter-controls">
+                <el-select v-model="resourceTypeFilter" placeholder="资源类型" class="resource-filter-select">
+                  <el-option label="全部类型" value="all" />
+                  <el-option
+                    v-for="type in packageTypeOptions"
+                    :key="type.value"
+                    :label="type.label"
+                    :value="type.value"
+                  />
+                </el-select>
+                <el-select v-model="resourceStatusFilter" placeholder="生成状态" class="resource-filter-select">
+                  <el-option label="全部状态" value="all" />
+                  <el-option label="待生成" value="planned" />
+                  <el-option label="生成中" value="generating" />
+                  <el-option label="已生成" value="generated" />
+                  <el-option label="失败" value="failed" />
+                </el-select>
+                <el-select v-model="resourceSortMode" placeholder="排序" class="resource-filter-select">
+                  <el-option label="任务顺序" value="default" />
+                  <el-option label="按生成状态" value="status" />
+                  <el-option label="按资源类型" value="type" />
+                  <el-option label="按标题" value="title" />
+                </el-select>
+              </div>
+              <div class="resource-result-summary">
+                <strong>{{ filteredResources.length }}</strong>
+                <span>/ {{ visibleResources.length }} 项</span>
+              </div>
+            </div>
+
             <div v-if="groupedResources.length" class="resource-package-list">
               <section
                 v-for="group in groupedResources"
@@ -485,12 +523,22 @@
                     <span class="resource-package-eyebrow">{{ group.label }}</span>
                     <h4>{{ group.title }}</h4>
                   </div>
-                  <span class="task-count">{{ group.items.length }} 项</span>
+                  <div class="resource-package-actions">
+                    <span class="task-count">{{ group.items.length }} 项</span>
+                    <button
+                      v-if="hiddenResourceCount(group) > 0"
+                      class="resource-group-toggle"
+                      type="button"
+                      @click="toggleResourceGroup(group.key)"
+                    >
+                      {{ isResourceGroupExpanded(group.key) ? '收起' : `展开 ${hiddenResourceCount(group)} 项` }}
+                    </button>
+                  </div>
                 </div>
 
                 <div class="resource-grid">
                   <div
-                    v-for="r in group.items"
+                    v-for="r in visibleGroupResources(group)"
                     :key="r.id"
                     class="resource-card"
                     :class="{ disabled: isResourceBusy(r) }"
@@ -514,7 +562,12 @@
                           {{ resourceStatusLabel(displayResourceStatus(r)) }}
                         </span>
                       </div>
-                      <p v-if="r.agentReason" class="res-reason">Agent 判断：{{ r.agentReason }}</p>
+                      <p
+                        v-if="r.agentReason && ['generating', 'failed'].includes(displayResourceStatus(r))"
+                        class="res-reason"
+                      >
+                        Agent 判断：{{ r.agentReason }}
+                      </p>
                       <p
                         v-if="resourceGenerationHint(r)"
                         class="res-generation-hint"
@@ -522,6 +575,13 @@
                       >
                         {{ resourceGenerationHint(r) }}
                       </p>
+                      <div v-if="streamingResourceContent(r)" class="res-stream-preview">
+                        <div class="stream-preview-head">
+                          <span class="stream-dot"></span>
+                          <span>{{ displayResourceStatus(r) === 'generated' ? '生成完成' : '实时生成中' }}</span>
+                        </div>
+                        <pre>{{ streamingResourceContent(r) }}</pre>
+                      </div>
                       <div class="res-tags">
                         <span v-if="r.knowledgePoint">{{ r.knowledgePoint }}</span>
                         <span v-if="r.studyScenario">{{ r.studyScenario }}</span>
@@ -555,7 +615,13 @@
                 </div>
               </section>
             </div>
-            <el-empty v-else description="暂无资源，等待 Agent 为任务生成资料包" :image-size="100" />
+            <el-empty
+              v-else
+              :description="visibleResources.length ? '没有符合筛选条件的资料' : '暂无资源，等待 Agent 为任务生成资料包'"
+              :image-size="100"
+            >
+              <el-button v-if="visibleResources.length" @click="resetResourceFilters">清空筛选</el-button>
+            </el-empty>
 
             <!-- Assessment Summary -->
             <div class="section-header mt-32">
@@ -688,13 +754,20 @@ import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
-import { resourceGenerationJobApi, resourcePackageApi } from '@/api/spaceDashboard'
+import {
+  resourceGenerationJobApi,
+  resourcePackageApi,
+  streamGenerateResourcePackage,
+  type ResourcePackageStreamEvent,
+  type ResourcePackageStreamEventName,
+} from '@/api/spaceDashboard'
 import { learningResourceApi } from '@/api/learningResource'
 import { fetchLearningState } from '@/api/algorithm'
 import type {
   ResourceGenerationJobVO,
   ResourcePackageGenerateDTO,
   ResourcePackageVO,
+  ResourceStatus,
   ResourceType,
   ResourceVO,
   RiskStatus,
@@ -706,7 +779,7 @@ import type { LearningAlgorithmState } from '@/api/algorithm'
 const route = useRoute()
 const router = useRouter()
 const dashStore = useSpaceDashboardStore()
-const { enterStudy } = useStudyEntry()
+const { enterStudy, enterTask } = useStudyEntry()
 
 const activeTab = ref('today')
 const pathViewMode = ref<'mindmap' | 'timeline'>('mindmap')
@@ -720,7 +793,21 @@ const packagePreviewLoading = ref(false)
 const packageGenerating = ref(false)
 const packageRunningSteps = ref<{ reason: string; status: string }[]>([])
 const selectedPackageTypes = ref<ResourceType[]>(['doc', 'html', 'mind_map', 'quiz', 'link'])
+const resourceSearchKeyword = ref('')
+const resourceTypeFilter = ref<'all' | ResourceType>('all')
+const resourceStatusFilter = ref<'all' | ResourceStatus>('all')
+const resourceSortMode = ref<'default' | 'status' | 'type' | 'title'>('default')
+const expandedResourceGroupKeys = ref<string[]>([])
 const generatingResourceIds = ref<string[]>([])
+const packageStreamAbortController = ref<AbortController | null>(null)
+const streamingResources = ref<Record<string, {
+  status: 'generating' | 'generated' | 'failed'
+  content: string
+  title: string
+  resourceType: ResourceType
+  message?: string
+}>>({})
+const optimisticPackageResources = ref<ResourceVO[]>([])
 const resourceGenerationJobs = ref<ResourceGenerationJobVO[]>([])
 const resourcePollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const resourcePollingInFlight = ref(false)
@@ -777,6 +864,13 @@ const packageTypeOptions: { value: ResourceType; label: string }[] = [
   { value: 'image', label: '图解' },
   { value: 'link', label: 'B站推荐' },
 ]
+const resourceGroupPreviewLimit = 6
+const resourceStatusSortOrder: Record<ResourceStatus, number> = {
+  generating: 0,
+  failed: 1,
+  planned: 2,
+  generated: 3,
+}
 
 const spaceCoverThemes: Record<string, string> = {
   course: 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
@@ -906,9 +1000,56 @@ const resourcePackageTarget = computed(() => {
   }
 })
 
+const visibleResources = computed(() => {
+  const resources = [...(dashboard.value?.resources || [])]
+  const seen = new Set(resources.map(resource => resource.id).filter(Boolean))
+  optimisticPackageResources.value.forEach(resource => {
+    if (!resource.id || seen.has(resource.id)) return
+    resources.unshift(resource)
+    seen.add(resource.id)
+  })
+  return resources
+})
+
+const filteredResources = computed(() => {
+  const keyword = normalizeText(resourceSearchKeyword.value)
+  const resources = visibleResources.value.filter(resource => {
+    if (resourceTypeFilter.value !== 'all' && resource.resourceType !== resourceTypeFilter.value) return false
+    if (resourceStatusFilter.value !== 'all' && displayResourceStatus(resource) !== resourceStatusFilter.value) return false
+    if (!keyword) return true
+    const searchable = [
+      resource.title,
+      resource.description,
+      resource.knowledgePoint,
+      resource.studyScenario,
+      resource.agentReason,
+      resourceTypeLabel(resource.resourceType),
+      resourceSourceLabel(resource),
+      bilibiliPreview(resource)?.title,
+      bilibiliPreview(resource)?.upName,
+    ].filter(Boolean).join(' ')
+    return normalizeText(searchable).includes(keyword)
+  })
+
+  return [...resources].sort((a, b) => {
+    if (resourceSortMode.value === 'status') {
+      const statusDiff = resourceStatusSortOrder[displayResourceStatus(a)] - resourceStatusSortOrder[displayResourceStatus(b)]
+      if (statusDiff !== 0) return statusDiff
+    }
+    if (resourceSortMode.value === 'type') {
+      const typeDiff = resourceTypeLabel(a.resourceType).localeCompare(resourceTypeLabel(b.resourceType), 'zh-CN')
+      if (typeDiff !== 0) return typeDiff
+    }
+    if (resourceSortMode.value === 'title') {
+      return a.title.localeCompare(b.title, 'zh-CN')
+    }
+    return 0
+  })
+})
+
 const groupedResources = computed(() => {
   const groups = new Map<string, { key: string; title: string; label: string; items: ResourceVO[] }>()
-  ;(dashboard.value?.resources || []).forEach(resource => {
+  ;(filteredResources.value || []).forEach(resource => {
     const key = resource.taskId ? `task-${resource.taskId}` : resource.knowledgePoint ? `kp-${resource.knowledgePoint}` : 'space'
     if (!groups.has(key)) {
       groups.set(key, {
@@ -955,7 +1096,7 @@ function actionTypeLabel(type?: string) {
 }
 
 function resourceIcon(t: string) {
-  const m: Record<string, string> = { doc: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M537.152 414.72h-288.64a29.44 29.44 0 0 1-26.24-30.72 29.44 29.44 0 0 1 26.24-32h288.64a29.44 29.44 0 0 1 26.24 32 29.44 29.44 0 0 1-26.24 30.72z m209.92 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z m0 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z" fill="#333333"></path><path d="M192.832 0a128 128 0 0 0-128 128v768a128 128 0 0 0 128 128h640a128 128 0 0 0 128-128l7.04-670.72L748.992 0h-556.16z m512 64l192 192h-160.64a31.36 31.36 0 0 1-31.36-31.36V64z m128 896h-640a64 64 0 0 1-64-64V128a64 64 0 0 1 64-64h448v192a64 64 0 0 0 64 64h192v576a64 64 0 0 1-64 64z" fill="#333333"></path></svg>', html: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M112 16h736v992H112z" fill="#AED796"></path><path d="M392.176 846.08c8.032 4.544 18.208 2.032 22.704-5.616l159.344-256.496c4.496-7.648 1.648-17.504-6.384-22.048s-18.208-2.032-22.704 5.616l-159.344 256.496c-4.512 7.632-1.648 17.504 6.384 22.048z m204.416-50.672a15.84 15.84 0 0 0 22.464 0l79.344-79.344c0.336-0.288 0.752-0.384 1.056-0.704a15.776 15.776 0 0 0 4.592-11.52 15.808 15.808 0 0 0-4.656-11.264c-0.224-0.224-0.512-0.304-0.752-0.496l-79.552-79.552a15.872 15.872 0 1 0-22.464 22.464l68.944 68.944-68.992 68.992a15.888 15.888 0 0 0 0.016 22.48zM261.6 716.064l79.328 79.344a15.84 15.84 0 0 0 22.464 0 15.84 15.84 0 0 0 0-22.464L294.4 703.952l68.944-68.944a15.872 15.872 0 1 0-22.464-22.464l-79.552 79.552c-0.224 0.208-0.528 0.288-0.736 0.496a15.744 15.744 0 0 0-4.656 11.264 15.808 15.808 0 0 0 4.592 11.52c0.32 0.288 0.736 0.4 1.072 0.688zM896 128h-32V32a32 32 0 0 0-32-32H128a32 32 0 0 0-32 32v960a32 32 0 0 0 32 32h704a32 32 0 0 0 32-32V416h32a32 32 0 0 0 32-32V160a32 32 0 0 0-32-32z m-64 0H352a32 32 0 0 0-32 32v224a32 32 0 0 0 32 32h480v576H128V32h704v96z" fill="#2B3139"></path><path d="M352 160h544v224H352z" fill="#FFFFFF"></path><path d="M387.696 213.824h35.184v39.664h32.944v-39.664h35.184V328h-35.184v-45.264H422.88V328h-35.184v-114.176zM535.856 243.088h-31.984v-29.264h99.136v29.264h-31.984V328h-35.168v-84.912zM615.872 213.824h50.048l16.32 67.168h0.32l16.32-67.168h50.064V328H715.68v-73.248h-0.336l-19.84 73.248H669.28l-19.824-73.248h-0.336V328h-33.248v-114.176zM767.056 213.824h35.184v84.912h50.528V328h-85.712v-114.176z" fill="#2B3139"></path></svg>', video: '🎵', mind_map: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g stroke="#701A75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="25" y="42" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><path d="M41 50 H52 V32 H62 M52 50 V68 H62" stroke-width="5"/><rect x="62" y="24" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><rect x="62" y="60" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/></g></svg>', quiz: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M320.618717 709.570751l311.023685-316.464605-159.049412-162.715919-320.259024 320.694953-3.094478 19.460214L312.765865 710.198038l7.852852-0.627287z m365.842198-372.018875l110.612237-112.471584 7.225565-44.74918L685.639201 62.11571l-47.529503 2.531659-116.408244 116.51569 164.759461 156.388817zM100.216981 789.613762l138.302903-59.706847-112.839975-92.719728-46.859237 112.450095-14.23419 51.919487 35.630499-11.943007z m9.216919 79.440283c-24.663726 0.084934-44.587498 20.031219-44.608987 44.694945 0.021489 24.659633 19.946284 44.649919 44.608987 44.75839h806.904567c24.661679 0 44.651966-19.990287 44.651965-44.649919v-0.108471c0-24.663726-19.990287-44.654013-44.61001-44.694945H109.4339z m806.450219-111.931278c24.856108 0 45.105291-20.206204 45.10529-45.128827s-20.249183-45.083801-45.10529-45.083801H468.374922c-24.90011 0-45.083801 20.24816-45.083801 45.299719 0 24.74866 20.183691 44.912909 45.083801 44.912909h447.509197z" fill="#59C666"></path></svg>', case_study: '📋', flashcard_set: '🃏', image: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M853.161077 892.549156 362.595248 892.549156l-209.432916-0.413416c-0.605797-0.001023-1.210571-0.031722-1.813299-0.092098-24.848944-2.484587-47.825238-14.060227-64.696488-32.594349-16.990976-18.665105-26.349111-42.85504-26.349111-68.112284L60.303434 264.62596c0-55.80805 45.403073-101.211123 101.211123-101.211123l691.645496 0c55.80805 0 101.2101 45.403073 101.2101 101.211123l0 225.51315c0 0.275269-0.00614 0.551562-0.01842 0.825808-0.021489 0.494257-1.971911 51.723012 15.481599 85.46244 4.716418 9.118682 1.14815 20.335141-7.970532 25.052582-9.116635 4.714372-20.335141 1.149173-25.052582-7.970532-21.300119-41.176818-19.844977-97.642854-19.618826-103.738689L917.191392 264.62596c0-35.307134-28.724205-64.031339-64.031339-64.031339L161.51558 200.594621c-35.307134 0-64.031339 28.724205-64.031339 64.031339l0 526.71105c0 32.755008 24.320918 59.957557 56.717769 63.61997l208.4311 0.412392 490.528989 0c35.307134 0 64.031339-28.725228 64.031339-64.032362l-0.382717-93.676519c-0.104377-1.749854-1.587148-19.548218-19.549242-42.499953-0.050142-0.063445-0.098237-0.125867-0.147356-0.190335L875.401614 626.481358 758.174726 471.362464c-0.415462-0.550539-38.995129-50.852178-86.271876-45.534056-38.335097 4.314259-75.954903 45.163619-108.789729 118.131491-17.615193 39.141462-34.650171 68.26885-52.082192 89.046059-17.607006 20.985964-35.679617 33.519418-55.251372 38.316677-43.422975 10.638291-81.049944-18.99461-120.886231-50.372248l-5.057179-3.980661c-46.555315-36.57808-68.750827-28.223808-158.330028 59.60247-7.330966 7.187703-19.101033 7.071046-26.288736-0.25992-7.187703-7.330966-7.071046-19.101033 0.25992-26.287713 46.658669-45.74588 77.544097-72.726372 107.085924-84.282568 33.357735-13.048177 64.274886-6.266727 100.242052 21.99392l5.092995 4.00829c33.9226 26.719548 63.219857 49.795103 89.028663 43.466977 25.618471-6.279007 53.30095-42.114167 82.279958-106.508779 39.139415-86.97591 85.837994-134.027529 138.79716-139.849118 68.454068-7.515161 117.823476 57.404408 119.891578 60.171428l117.122511 154.980747 21.599947 28.343535c26.276457 33.630958 27.333532 61.638849 27.367301 64.72514 0.001023 0.042979 0.001023 0.084934 0.001023 0.127913l0.38374 94.059236C954.371176 847.146083 908.969127 892.549156 853.161077 892.549156z" fill="#FF9000"></path><path d="M312.328401 446.967868c-42.324968 0-76.759221-34.434254-76.759221-76.759221s34.434254-76.759221 76.759221-76.759221 76.759221 34.434254 76.759221 76.759221S354.654392 446.967868 312.328401 446.967868zM312.328401 330.628186c-21.824051 0-39.579437 17.755386-39.579437 39.579437s17.755386 39.579437 39.579437 39.579437 39.579437-17.755386 39.579437-39.579437S334.153476 330.628186 312.328401 330.628186z" fill="#FF9000"></path></svg>', audio: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M113.7664 540.4672c0-219.9552 178.2784-398.2336 398.2336-398.2336S910.2336 320.512 910.2336 540.4672v284.4672c0 31.4368-25.4976 56.9344-56.9344 56.9344h-56.9344c-31.4368 0-56.9344-25.4976-56.9344-56.9344V597.2992c0-31.4368 25.4976-56.9344 56.9344-56.9344h56.9344c0-188.5184-152.7808-341.2992-341.2992-341.2992S170.7008 351.9488 170.7008 540.4672h56.9344c31.4368 0 56.9344 25.4976 56.9344 56.9344v227.5328c0 31.4368-25.4976 56.9344-56.9344 56.9344h-56.9344c-31.4368 0-56.9344-25.4976-56.9344-56.9344V540.4672z" fill="#323233"></path></svg>', link: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M209.8 496.7c17.1 0 31.1-13.9 31.1-31.1 0-17.1-13.9-31-31.1-31s-31 13.9-31 31c-0.1 17.2 13.8 31.1 31 31.1zM345.1 750.2h-66c-37.3 0-45.9-8.6-45.9-45.9V534l-0.2-2.2h-0.2c-1.6-12.7-12.2-22.3-25.1-22.3-12.9 0-23.5 9.6-25.1 22.3h-0.4v172.4c0 66 30.8 96.8 96.8 96.8h66c14 0 25.4-11.4 25.4-25.4 0.1-14.1-11.3-25.4-25.3-25.4z" fill="#6B400D"></path><path d="M959.3 251.8c0-71.9-58.5-130.4-130.4-130.4H194.7c-71.9 0-130.4 58.5-130.4 130.4v523.3c0 71.9 58.5 130.4 130.4 130.4h634.2c71.9 0 130.4-58.5 130.4-130.4V251.8z m-50.6 523.3c0 44-35.8 79.8-79.8 79.8H194.7c-44 0-79.8-35.8-79.8-79.8V251.8c0-44 35.8-79.8 79.8-79.8h634.2c44 0 79.8 35.8 79.8 79.8v523.3z" fill="#6B400D"></path><path d="M684.1 469.8L486.1 343c-8.6-4.8-17.8-7-29.7-7-34 0-56 17.4-56 44.3v266.2c0 26.9 22 44.3 56 44.3 6.4 0 18.8-0.9 29.9-7.1l197.4-126.5c17.7-9 28.2-25.5 28.2-43.9 0-18.3-10.5-34.7-27.8-43.5z m-27.5 55.7L472 643.7c-3.2 1.5-4.9 1.5-8.1 1.5-8.1 0-16.2-6-16.2-15.1V396.7c0-9 8.1-15.1 16.2-15.1 3.2 0 6.5 0 8.1 1.5l184.6 118.2c6.5 4.5 8.1 10.5 8.1 12 0 3.2 0 9.2-8.1 12.2z" fill="#6B400D"></path><path d="M656.6 501.4L472 383.2c-1.6-1.5-4.9-1.5-8.1-1.5-8.1 0-16.2 6-16.2 15.1v233.4c0 9 8.1 15.1 16.2 15.1 3.2 0 4.9 0 8.1-1.5l184.6-118.2c8.1-3 8.1-9 8.1-12 0-1.6-1.7-7.7-8.1-12.2z" fill="#FFD524"></path></svg>', ppt: '📊' }
+  const m: Record<string, string> = { doc: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M537.152 414.72h-288.64a29.44 29.44 0 0 1-26.24-30.72 29.44 29.44 0 0 1 26.24-32h288.64a29.44 29.44 0 0 1 26.24 32 29.44 29.44 0 0 1-26.24 30.72z m209.92 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z m0 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z" fill="#333333"></path><path d="M192.832 0a128 128 0 0 0-128 128v768a128 128 0 0 0 128 128h640a128 128 0 0 0 128-128l7.04-670.72L748.992 0h-556.16z m512 64l192 192h-160.64a31.36 31.36 0 0 1-31.36-31.36V64z m128 896h-640a64 64 0 0 1-64-64V128a64 64 0 0 1 64-64h448v192a64 64 0 0 0 64 64h192v576a64 64 0 0 1-64 64z" fill="#333333"></path></svg>', html: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M112 16h736v992H112z" fill="#AED796"></path><path d="M392.176 846.08c8.032 4.544 18.208 2.032 22.704-5.616l159.344-256.496c4.496-7.648 1.648-17.504-6.384-22.048s-18.208-2.032-22.704 5.616l-159.344 256.496c-4.512 7.632-1.648 17.504 6.384 22.048z m204.416-50.672a15.84 15.84 0 0 0 22.464 0l79.344-79.344c0.336-0.288 0.752-0.384 1.056-0.704a15.776 15.776 0 0 0 4.592-11.52 15.808 15.808 0 0 0-4.656-11.264c-0.224-0.224-0.512-0.304-0.752-0.496l-79.552-79.552a15.872 15.872 0 1 0-22.464 22.464l68.944 68.944-68.992 68.992a15.888 15.888 0 0 0 0.016 22.48zM261.6 716.064l79.328 79.344a15.84 15.84 0 0 0 22.464 0 15.84 15.84 0 0 0 0-22.464L294.4 703.952l68.944-68.944a15.872 15.872 0 1 0-22.464-22.464l-79.552 79.552c-0.224 0.208-0.528 0.288-0.736 0.496a15.744 15.744 0 0 0-4.656 11.264 15.808 15.808 0 0 0 4.592 11.52c0.32 0.288 0.736 0.4 1.072 0.688zM896 128h-32V32a32 32 0 0 0-32-32H128a32 32 0 0 0-32 32v960a32 32 0 0 0 32 32h704a32 32 0 0 0 32-32V416h32a32 32 0 0 0 32-32V160a32 32 0 0 0-32-32z m-64 0H352a32 32 0 0 0-32 32v224a32 32 0 0 0 32 32h480v576H128V32h704v96z" fill="#2B3139"></path><path d="M352 160h544v224H352z" fill="#FFFFFF"></path><path d="M387.696 213.824h35.184v39.664h32.944v-39.664h35.184V328h-35.184v-45.264H422.88V328h-35.184v-114.176zM535.856 243.088h-31.984v-29.264h99.136v29.264h-31.984V328h-35.168v-84.912zM615.872 213.824h50.048l16.32 67.168h0.32l16.32-67.168h50.064V328H715.68v-73.248h-0.336l-19.84 73.248H669.28l-19.824-73.248h-0.336V328h-33.248v-114.176zM767.056 213.824h35.184v84.912h50.528V328h-85.712v-114.176z" fill="#2B3139"></path></svg>', video: '🎵', mind_map: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g stroke="#701A75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="25" y="42" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><path d="M41 50 H52 V32 H62 M52 50 V68 H62" stroke-width="5"/><rect x="62" y="24" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><rect x="62" y="60" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/></g></svg>', quiz: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M320.618717 709.570751l311.023685-316.464605-159.049412-162.715919-320.259024 320.694953-3.094478 19.460214L312.765865 710.198038l7.852852-0.627287z m365.842198-372.018875l110.612237-112.471584 7.225565-44.74918L685.639201 62.11571l-47.529503 2.531659-116.408244 116.51569 164.759461 156.388817zM100.216981 789.613762l138.302903-59.706847-112.839975-92.719728-46.859237 112.450095-14.23419 51.919487 35.630499-11.943007z m9.216919 79.440283c-24.663726 0.084934-44.587498 20.031219-44.608987 44.694945 0.021489 24.659633 19.946284 44.649919 44.608987 44.75839h806.904567c24.661679 0 44.651966-19.990287 44.651965-44.649919v-0.108471c0-24.663726-19.990287-44.654013-44.61001-44.694945H109.4339z m806.450219-111.931278c24.856108 0 45.105291-20.206204 45.10529-45.128827s-20.249183-45.083801-45.10529-45.083801H468.374922c-24.90011 0-45.083801 20.24816-45.083801 45.299719 0 24.74866 20.183691 44.912909 45.083801 44.912909h447.509197z" fill="#59C666"></path></svg>', case_study: '📋', flashcard_set: '🃏', image: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M853.161077 892.549156 362.595248 892.549156l-209.432916-0.413416c-0.605797-0.001023-1.210571-0.031722-1.813299-0.092098-24.848944-2.484587-47.825238-14.060227-64.696488-32.594349-16.990976-18.665105-26.349111-42.85504-26.349111-68.112284L60.303434 264.62596c0-55.80805 45.403073-101.211123 101.211123-101.211123l691.645496 0c55.80805 0 101.2101 45.403073 101.2101 101.211123l0 225.51315c0 0.275269-0.00614 0.551562-0.01842 0.825808-0.021489 0.494257-1.971911 51.723012 15.481599 85.46244 4.716418 9.118682 1.14815 20.335141-7.970532 25.052582-9.116635 4.714372-20.335141 1.149173-25.052582-7.970532-21.300119-41.176818-19.844977-97.642854-19.618826-103.738689L917.191392 264.62596c0-35.307134-28.724205-64.031339-64.031339-64.031339L161.51558 200.594621c-35.307134 0-64.031339 28.724205-64.031339 64.031339l0 526.71105c0 32.755008 24.320918 59.957557 56.717769 63.61997l208.4311 0.412392 490.528989 0c35.307134 0 64.031339-28.725228 64.031339-64.032362l-0.382717-93.676519c-0.104377-1.749854-1.587148-19.548218-19.549242-42.499953-0.050142-0.063445-0.098237-0.125867-0.147356-0.190335L875.401614 626.481358 758.174726 471.362464c-0.415462-0.550539-38.995129-50.852178-86.271876-45.534056-38.335097 4.314259-75.954903 45.163619-108.789729 118.131491-17.615193 39.141462-34.650171 68.26885-52.082192 89.046059-17.607006 20.985964-35.679617 33.519418-55.251372 38.316677-43.422975 10.638291-81.049944-18.99461-120.886231-50.372248l-5.057179-3.980661c-46.555315-36.57808-68.750827-28.223808-158.330028 59.60247-7.330966 7.187703-19.101033 7.071046-26.288736-0.25992-7.187703-7.330966-7.071046-19.101033 0.25992-26.287713 46.658669-45.74588 77.544097-72.726372 107.085924-84.282568 33.357735-13.048177 64.274886-6.266727 100.242052 21.99392l5.092995 4.00829c33.9226 26.719548 63.219857 49.795103 89.028663 43.466977 25.618471-6.279007 53.30095-42.114167 82.279958-106.508779 39.139415-86.97591 85.837994-134.027529 138.79716-139.849118 68.454068-7.515161 117.823476 57.404408 119.891578 60.171428l117.122511 154.980747 21.599947 28.343535c26.276457 33.630958 27.333532 61.638849 27.367301 64.72514 0.001023 0.042979 0.001023 0.084934 0.001023 0.127913l0.38374 94.059236C954.371176 847.146083 908.969127 892.549156 853.161077 892.549156z" fill="#FF9000"></path><path d="M312.328401 446.967868c-42.324968 0-76.759221-34.434254-76.759221-76.759221s34.434254-76.759221 76.759221-76.759221 76.759221 34.434254 76.759221 76.759221S354.654392 446.967868 312.328401 446.967868zM312.328401 330.628186c-21.824051 0-39.579437 17.755386-39.579437 39.579437s17.755386 39.579437 39.579437 39.579437 39.579437-17.755386 39.579437-39.579437S334.153476 330.628186 312.328401 330.628186z" fill="#FF9000"></path></svg>', audio: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M113.7664 540.4672c0-219.9552 178.2784-398.2336 398.2336-398.2336S910.2336 320.512 910.2336 540.4672v284.4672c0 31.4368-25.4976 56.9344-56.9344 56.9344h-56.9344c-31.4368 0-56.9344-25.4976-56.9344-56.9344V597.2992c0-31.4368 25.4976-56.9344 56.9344-56.9344h56.9344c0-188.5184-152.7808-341.2992-341.2992-341.2992S170.7008 351.9488 170.7008 540.4672h56.9344c31.4368 0 56.9344 25.4976 56.9344 56.9344v227.5328c0 31.4368-25.4976 56.9344-56.9344 56.9344h-56.9344c-31.4368 0-56.9344-25.4976-56.9344-56.9344V540.4672z" fill="#323233"></path></svg>', link: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M209.8 496.7c17.1 0 31.1-13.9 31.1-31.1 0-17.1-13.9-31-31.1-31s-31 13.9-31 31c-0.1 17.2 13.8 31.1 31 31.1zM345.1 750.2h-66c-37.3 0-45.9-8.6-45.9-45.9V534l-0.2-2.2h-0.2c-1.6-12.7-12.2-22.3-25.1-22.3-12.9 0-23.5 9.6-25.1 22.3h-0.4v172.4c0 66 30.8 96.8 96.8 96.8h66c14 0 25.4-11.4 25.4-25.4 0.1-14.1-11.3-25.4-25.3-25.4z" fill="#6B400D"></path><path d="M959.3 251.8c0-71.9-58.5-130.4-130.4-130.4H194.7c-71.9 0-130.4 58.5-130.4 130.4v523.3c0 71.9 58.5 130.4 130.4 130.4h634.2c71.9 0 130.4-58.5 130.4-130.4V251.8z m-50.6 523.3c0 44-35.8 79.8-79.8 79.8H194.7c-44 0-79.8-35.8-79.8-79.8V251.8c0-44 35.8-79.8 79.8-79.8h634.2c44 0 79.8 35.8 79.8 79.8v523.3z" fill="#6B400D"></path><path d="M684.1 469.8L486.1 343c-8.6-4.8-17.8-7-29.7-7-34 0-56 17.4-56 44.3v266.2c0 26.9 22 44.3 56 44.3 6.4 0 18.8-0.9 29.9-7.1l197.4-126.5c17.7-9 28.2-25.5 28.2-43.9 0-18.3-10.5-34.7-27.8-43.5z m-27.5 55.7L472 643.7c-3.2 1.5-4.9 1.5-8.1 1.5-8.1 0-16.2-6-16.2-15.1V396.7c0-9 8.1-15.1 16.2-15.1 3.2 0 6.5 0 8.1 1.5l184.6 118.2c6.5 4.5 8.1 10.5 8.1 12 0 3.2 0 9.2-8.1 12.2z" fill="#6B400D"></path><path d="M656.6 501.4L472 383.2c-1.6-1.5-4.9-1.5-8.1-1.5-8.1 0-16.2 6-16.2 15.1v233.4c0 9 8.1 15.1 16.2 15.1 3.2 0 4.9 0 8.1-1.5l184.6-118.2c8.1-3 8.1-9 8.1-12 0-1.6-1.7-7.7-8.1-12.2z" fill="#FFD524"></path></svg>', ppt: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M219.424 18.304h530.272l201.152 219.424v768H219.424V18.304z" fill="#FFFFFF"></path><path d="M733.696 253.728V50.304H251.424v923.424h667.424v-720h-185.152z m217.152-16v768H219.424V18.304h530.272l201.152 219.424z m-58.08-16l-127.04-138.624v138.624h127.04z" fill="#465F78"></path><path d="M64 256m32 0l448 0q32 0 32 32l0 448q0 32-32 32l-448 0q-32 0-32-32l0-448q0-32 32-32Z" fill="#FF501A"></path><path d="M640 416h224v37.344h-224V416zM640 509.344h224v37.312h-224v-37.312zM640 602.656h224V640h-224v-37.344z" fill="#FF501A"></path><path d="M224 658.88V384h89.056c33.76 0 55.744 1.376 66.016 4.128 15.744 4.128 28.928 13.12 39.552 27.008 10.624 13.76 15.936 31.552 15.936 53.44 0 16.864-3.072 31.04-9.184 42.56-6.112 11.488-13.952 20.544-23.424 27.2a80.352 80.352 0 0 1-28.704 12.928c-13.248 2.624-32.448 3.936-57.568 3.936h-36.16v103.68H224z m55.488-228.384v78.016h30.4c21.856 0 36.48-1.44 43.84-4.32a36.576 36.576 0 0 0 23.616-34.88c0.032-10.016-2.88-18.24-8.768-24.736a38.4 38.4 0 0 0-22.336-12.192c-6.624-1.28-19.936-1.888-39.936-1.888h-26.816z" fill="#FFFFFF"></path></svg>' }
   return m[t] || '📄'
 }
 
@@ -965,6 +1106,35 @@ function resourceIconClass(resource: ResourceVO) {
 
 function resourceIconName(resource: ResourceVO) {
   return resourceIcon(bilibiliPreview(resource) ? 'link' : resource.resourceType)
+}
+
+function isResourceGroupExpanded(groupKey: string) {
+  return expandedResourceGroupKeys.value.includes(groupKey)
+}
+
+function visibleGroupResources(group: { key: string; items: ResourceVO[] }) {
+  if (isResourceGroupExpanded(group.key)) return group.items
+  return group.items.slice(0, resourceGroupPreviewLimit)
+}
+
+function hiddenResourceCount(group: { key: string; items: ResourceVO[] }) {
+  return Math.max(group.items.length - resourceGroupPreviewLimit, 0)
+}
+
+function toggleResourceGroup(groupKey: string) {
+  if (isResourceGroupExpanded(groupKey)) {
+    expandedResourceGroupKeys.value = expandedResourceGroupKeys.value.filter(key => key !== groupKey)
+    return
+  }
+  expandedResourceGroupKeys.value = [...expandedResourceGroupKeys.value, groupKey]
+}
+
+function resetResourceFilters() {
+  resourceSearchKeyword.value = ''
+  resourceTypeFilter.value = 'all'
+  resourceStatusFilter.value = 'all'
+  resourceSortMode.value = 'default'
+  expandedResourceGroupKeys.value = []
 }
 
 function resourceTypeLabel(t: string) {
@@ -1002,6 +1172,8 @@ function formatDuration(seconds: number | string | undefined) {
 }
 
 function displayResourceStatus(resource: ResourceVO) {
+  const streaming = resource.id ? streamingResources.value[resource.id] : undefined
+  if (streaming?.status) return streaming.status
   if (generatingResourceIds.value.includes(resource.id)) return 'generating'
   const job = latestGenerationJob(resource)
   if (job?.status === 'pending' || job?.status === 'generating') return 'generating'
@@ -1015,6 +1187,9 @@ function latestGenerationJob(resource: ResourceVO) {
 
 function resourceGenerationHint(resource: ResourceVO) {
   const status = displayResourceStatus(resource)
+  const streaming = resource.id ? streamingResources.value[resource.id] : undefined
+  if (streaming?.message) return streaming.message
+  if (streaming?.content && status === 'generating') return '内容正在实时返回，生成完成后会自动保存。'
   const job = latestGenerationJob(resource)
   if (status === 'generating') return '后台正在生成内容，完成后会自动刷新。'
   if (status === 'failed') {
@@ -1036,6 +1211,12 @@ function goResourceDetail(resource: ResourceVO) {
 function canGenerateResource(resource: ResourceVO) {
   const status = displayResourceStatus(resource)
   return status === 'planned' || status === 'failed'
+}
+
+function streamingResourceContent(resource: ResourceVO) {
+  if (!resource.id) return ''
+  const content = streamingResources.value[resource.id]?.content || ''
+  return content.length > 900 ? `${content.slice(-900)}` : content
 }
 
 function isResourceBusy(resource: ResourceVO) {
@@ -1245,30 +1426,161 @@ async function handlePreviewResourcePackage() {
   }
 }
 
+function abortPackageStream() {
+  if (!packageStreamAbortController.value) return
+  packageStreamAbortController.value.abort()
+  packageStreamAbortController.value = null
+}
+
+function upsertOptimisticResource(resource: ResourceVO) {
+  if (!resource?.id) return
+  const exists = optimisticPackageResources.value.some(item => item.id === resource.id)
+  if (exists) {
+    optimisticPackageResources.value = optimisticPackageResources.value.map(item =>
+      item.id === resource.id ? { ...item, ...resource } : item
+    )
+    return
+  }
+  optimisticPackageResources.value = [{ ...resource, status: resource.status || 'generating' }, ...optimisticPackageResources.value]
+}
+
+function updateOptimisticResourceStatus(resourceId: string | undefined, status: ResourceVO['status']) {
+  if (!resourceId) return
+  optimisticPackageResources.value = optimisticPackageResources.value.map(resource =>
+    resource.id === resourceId ? { ...resource, status } : resource
+  )
+}
+
+function setStreamingState(resource: ResourceVO, status: 'generating' | 'generated' | 'failed', message?: string) {
+  if (!resource.id) return
+  streamingResources.value = {
+    ...streamingResources.value,
+    [resource.id]: {
+      status,
+      content: streamingResources.value[resource.id]?.content || '',
+      title: resource.title,
+      resourceType: resource.resourceType,
+      message,
+    },
+  }
+}
+
+function appendStreamingContent(resourceId: string | undefined, chunk: string | undefined) {
+  if (!resourceId || !chunk) return
+  const current = streamingResources.value[resourceId] || {
+    status: 'generating' as const,
+    content: '',
+    title: '',
+    resourceType: 'doc' as ResourceType,
+  }
+  streamingResources.value = {
+    ...streamingResources.value,
+    [resourceId]: {
+      ...current,
+      status: current.status === 'failed' ? 'failed' : 'generating',
+      content: `${current.content}${chunk}`,
+    },
+  }
+}
+
+function handleResourcePackageStreamEvent(eventName: ResourcePackageStreamEventName, payload: ResourcePackageStreamEvent) {
+  if (eventName === 'package-start' && payload.package) {
+    resourcePackagePreview.value = payload.package
+    optimisticPackageResources.value = payload.package.resources || []
+    packageRunningSteps.value = payload.package.agentActions?.map(action => ({
+      reason: action.reason,
+      status: action.status,
+    })) || packageRunningSteps.value
+    optimisticPackageResources.value.forEach(resource => setStreamingState(resource, 'generating'))
+    return
+  }
+
+  if (eventName === 'resource-start' && payload.resource) {
+    upsertOptimisticResource(payload.resource)
+    setStreamingState(payload.resource, 'generating', '内容正在实时返回，生成完成后会自动保存。')
+    return
+  }
+
+  if (eventName === 'resource-token') {
+    appendStreamingContent(payload.resourceId, payload.chunk)
+    return
+  }
+
+  if (eventName === 'resource-done') {
+    if (!payload.resourceId) return
+    const current = streamingResources.value[payload.resourceId]
+    if (current) {
+      streamingResources.value = {
+        ...streamingResources.value,
+        [payload.resourceId]: { ...current, status: 'generated', message: '生成完成，内容已保存。' },
+      }
+    }
+    updateOptimisticResourceStatus(payload.resourceId, 'generated')
+    return
+  }
+
+  if (eventName === 'resource-failed') {
+    if (!payload.resourceId) return
+    const current = streamingResources.value[payload.resourceId] || {
+      status: 'failed' as const,
+      content: '',
+      title: payload.title || '',
+      resourceType: (payload.resourceType as ResourceType) || 'doc',
+    }
+    streamingResources.value = {
+      ...streamingResources.value,
+      [payload.resourceId]: {
+        ...current,
+        status: 'failed',
+        message: payload.message || '生成失败，可稍后重试。',
+      },
+    }
+    updateOptimisticResourceStatus(payload.resourceId, 'failed')
+    return
+  }
+
+  if (eventName === 'package-done') {
+    packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'success' }))
+    return
+  }
+
+  if (eventName === 'package-failed') {
+    packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'failed' }))
+  }
+}
+
 async function handleGenerateResourcePackage() {
   if (!spaceId.value) return
+  abortPackageStream()
+  const controller = new AbortController()
+  packageStreamAbortController.value = controller
   packageGenerating.value = true
+  packagePreviewVisible.value = false
+  streamingResources.value = {}
+  optimisticPackageResources.value = []
   packageRunningSteps.value = [
     { reason: '资源 Agent 正在分析当前任务和知识点', status: 'running' },
-    { reason: '正在生成资料包资源记录并绑定任务', status: 'running' },
+    { reason: '正在生成资料内容并实时返回片段', status: 'running' },
     { reason: 'Supervisor Agent 正在检查资料来源和使用场景', status: 'running' },
   ]
   try {
-    const result = await resourcePackageApi.generate(spaceId.value, buildPackagePayload())
-    packageRunningSteps.value = result.agentActions.map(action => ({
-      reason: action.reason,
-      status: action.status,
-    }))
-    packagePreviewVisible.value = false
-    resourcePackagePreview.value = result
+    await streamGenerateResourcePackage(spaceId.value, buildPackagePayload(), {
+      signal: controller.signal,
+      onEvent: handleResourcePackageStreamEvent,
+    })
     await dashStore.fetchDashboard(spaceId.value)
     await refreshResourceGenerationJobs()
-    startResourceGenerationPolling()
-    ElMessage.success('资料包已提交生成，完成后会自动刷新')
+    optimisticPackageResources.value = []
+    if (hasActiveResourceGeneration()) startResourceGenerationPolling()
+    ElMessage.success('资料包已生成并保存')
   } catch (e: any) {
+    if (controller.signal.aborted) return
     packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'failed' }))
     ElMessage.error(e?.message || '资料包生成失败')
   } finally {
+    if (packageStreamAbortController.value === controller) {
+      packageStreamAbortController.value = null
+    }
     packageGenerating.value = false
   }
 }
@@ -1276,7 +1588,7 @@ async function handleGenerateResourcePackage() {
 async function handleStartTask(task: TaskVO) {
   try {
     await dashStore.startTask(task.id)
-    enterStudy(task.id, { spaceId: spaceId.value, source: 'space_task' })
+    enterTask(task, { spaceId: spaceId.value, source: 'space_task' })
   } catch {
     ElMessage.error('开始任务失败')
   }
@@ -1305,11 +1617,11 @@ function handleContinueToday() {
   }
   if (task.status === 'pending') {
     dashStore.startTask(task.id).finally(() => {
-      enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero' })
+      enterTask(task, { spaceId: spaceId.value, source: 'space_hero' })
     })
     return
   }
-  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero' })
+  enterTask(task, { spaceId: spaceId.value, source: 'space_hero' })
 }
 
 /** 继续学习 hero 区块的"开始学习"主按钮 */
@@ -1323,7 +1635,7 @@ function handleStartFromHero() {
   if (task.status === 'pending') {
     dashStore.startTask(task.id).catch(() => {})
   }
-  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero' })
+  enterTask(task, { spaceId: spaceId.value, source: 'space_hero' })
 }
 
 function handleAdjustDuration() {
@@ -1416,10 +1728,17 @@ onMounted(() => {
   syncActiveTabFromRoute()
   loadDashboard()
 })
-onUnmounted(stopResourceGenerationPolling)
+onUnmounted(() => {
+  abortPackageStream()
+  stopResourceGenerationPolling()
+})
 watch(() => route.params.spaceId, () => {
+  abortPackageStream()
   stopResourceGenerationPolling()
   resourceGenerationJobs.value = []
+  streamingResources.value = {}
+  optimisticPackageResources.value = []
+  resetResourceFilters()
   loadDashboard()
   syncActiveTabFromRoute()
   if (!route.query.tab) activeTab.value = 'today'
@@ -1434,6 +1753,12 @@ watch(
   () => dashboard.value?.resources?.map(resource => `${resource.id}:${resource.status}`).join('|') || '',
   () => {
     if (hasActiveResourceGeneration()) startResourceGenerationPolling()
+  }
+)
+watch(
+  [resourceSearchKeyword, resourceTypeFilter, resourceStatusFilter, resourceSortMode],
+  () => {
+    expandedResourceGroupKeys.value = []
   }
 )
 </script>
@@ -2234,6 +2559,48 @@ watch(
   box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
 }
 
+.resource-management-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 18px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: #f8fafc;
+}
+
+.resource-search-box {
+  min-width: 0;
+}
+
+.resource-filter-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.resource-filter-select {
+  width: 118px;
+}
+
+.resource-result-summary {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  min-width: 72px;
+  color: #64748b;
+  font-size: 0.75rem;
+  white-space: nowrap;
+
+  strong {
+    color: #0f172a;
+    font-size: 1rem;
+  }
+}
+
 .resource-package-list {
   display: grid;
   gap: 18px;
@@ -2255,6 +2622,24 @@ watch(
     color: #0f172a;
     font-size: 0.95rem;
   }
+}
+
+.resource-package-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.resource-group-toggle {
+  border: 0;
+  background: transparent;
+  color: #0a9e94;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 4px 0;
+  white-space: nowrap;
 }
 
 .resource-grid {
@@ -2316,7 +2701,16 @@ watch(
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.res-desc { font-size: 0.75rem; color: #6b7280; margin: 0 0 6px; line-height: 1.4; }
+.res-desc {
+  color: #6b7280;
+  display: -webkit-box;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  margin: 0 0 6px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .res-meta { display: flex; gap: 8px; flex-wrap: wrap; }
 .res-type { font-size: 0.6875rem; color: #9ca3af; }
 .res-source {
@@ -2353,11 +2747,51 @@ watch(
   &.failed { color: #dc2626; }
 }
 
+.res-stream-preview {
+  margin-top: 9px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+}
+
+.stream-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: #2563eb;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.stream-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.res-stream-preview pre {
+  max-height: 150px;
+  margin: 0;
+  overflow: auto;
+  color: #334155;
+  font-family: inherit;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .res-tags {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
   margin-top: 8px;
+  max-height: 24px;
+  overflow: hidden;
 
   span {
     padding: 2px 7px;
@@ -2561,15 +2995,15 @@ watch(
 }
 
 .space-hero {
-  border-radius: 22px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
 }
 
 .space-hero::before {
   content: '';
   position: absolute;
   inset: 1px;
-  border-radius: 21px;
+  border-radius: 17px;
   background:
     radial-gradient(circle at 14% 18%, rgba(11, 183, 170, 0.18), transparent 30%),
     radial-gradient(circle at 88% 18%, rgba(59, 130, 246, 0.15), transparent 28%),
@@ -2588,22 +3022,22 @@ watch(
 }
 
 .hero-content {
-  padding: 26px;
+  padding: 24px;
   background: var(--color-card-bg-secondary);
   border-color: rgba(148, 163, 184, 0.22);
-  border-radius: 22px;
+  border-radius: 18px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .hero-top {
-  align-items: flex-start;
-  margin-bottom: 22px;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
 .back-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   border-color: rgba(148, 163, 184, 0.24);
   color: #475569;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
@@ -2626,17 +3060,22 @@ watch(
 }
 
 .hero-title {
-  font-size: clamp(1.55rem, 2vw, 2.15rem);
+  font-size: clamp(1.35rem, 1.6vw, 1.82rem);
   color: #0f172a;
   letter-spacing: 0;
+  line-height: 1.2;
 }
 
 .hero-goal {
   max-width: 720px;
-  margin-top: 7px;
+  margin-top: 5px;
   color: #64748b;
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .hero-actions {
@@ -2650,8 +3089,8 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 34px;
-  padding: 7px 12px;
+  min-height: 30px;
+  padding: 5px 11px;
   border-radius: 999px;
   border: 1px solid transparent;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -2705,31 +3144,38 @@ watch(
   box-shadow: 0 18px 34px rgba(11, 183, 170, 0.28);
 }
 
-.hero-dashboard {
+.hero-main-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 0.88fr) minmax(420px, 1.12fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.9fr);
+  gap: 20px;
   align-items: stretch;
+}
+
+.hero-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
 }
 
 .progress-panel {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   min-width: 0;
-  padding: 18px;
-  border-radius: 18px;
+  padding: 16px;
+  border-radius: 15px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(236, 253, 251, 0.78));
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(236, 253, 251, 0.72));
   border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.035);
 }
 
 .progress-ring {
-  width: 116px;
-  height: 116px;
+  width: 78px;
+  height: 78px;
   border-radius: 50%;
-  padding: 10px;
+  padding: 7px;
   flex-shrink: 0;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
 }
@@ -2743,18 +3189,18 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.05);
 }
 
 .progress-ring-inner strong {
   color: #0f172a;
-  font-size: 1.45rem;
+  font-size: 1.12rem;
   line-height: 1.1;
 }
 
 .progress-ring-inner span {
   color: #94a3b8;
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 700;
 }
 
@@ -2770,17 +3216,21 @@ watch(
 
 .progress-copy strong {
   display: block;
-  margin-top: 5px;
+  margin-top: 3px;
   color: #1e293b;
-  font-size: 1rem;
-  line-height: 1.45;
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .progress-copy p {
-  margin: 7px 0 0;
+  margin: 5px 0 0;
   color: #64748b;
-  font-size: 0.8125rem;
-  line-height: 1.55;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .stats-row {
@@ -2790,13 +3240,32 @@ watch(
   margin-bottom: 0;
 }
 
+.stats-row :deep(.stat-card) {
+  min-height: 74px;
+  gap: 11px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.035);
+}
+
+.stats-row :deep(.stat-icon) {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.stats-row :deep(.stat-value) {
+  font-size: 1rem;
+}
+
 .agent-insight-banner {
-  margin-top: 16px;
-  padding: 13px 15px;
+  min-height: 100%;
+  margin-top: 0;
+  padding: 13px 14px;
   border-radius: 14px;
   background: var(--color-card-bg-secondary);
   border-color: rgba(11, 183, 170, 0.15);
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.03);
 }
 
 .agent-insight-banner:hover {
@@ -2821,11 +3290,11 @@ watch(
 .algorithm-diagnosis-band {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 16px;
   align-items: center;
-  margin-top: 16px;
-  padding: 16px 18px;
-  border-radius: 16px;
+  margin-top: 0;
+  padding: 13px 14px;
+  border-radius: 14px;
   border: 1px solid rgba(14, 165, 233, 0.2);
   background: linear-gradient(135deg, rgba(240, 249, 255, 0.88), rgba(236, 253, 245, 0.72));
 
@@ -2837,10 +3306,21 @@ watch(
 
 .adb-eyebrow {
   display: inline-flex;
-  margin-bottom: 5px;
+  margin-bottom: 3px;
   color: #0284c7;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
+}
+
+.hero-support-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.hero-support-row > :only-child {
+  grid-column: 1 / -1;
 }
 
 .adb-main {
@@ -2849,27 +3329,31 @@ watch(
   h3 {
     margin: 0;
     color: #0f172a;
-    font-size: 0.96rem;
-    line-height: 1.4;
+    font-size: 0.88rem;
+    line-height: 1.32;
   }
 
   p {
-    margin: 5px 0 0;
+    margin: 3px 0 0;
     color: #475569;
-    font-size: 0.8rem;
-    line-height: 1.55;
+    font-size: 0.76rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
   }
 }
 
 .adb-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(78px, 1fr));
-  gap: 8px;
+  gap: 6px;
 
   div {
     min-width: 0;
-    padding: 10px 12px;
-    border-radius: 12px;
+    padding: 7px 9px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.78);
     border: 1px solid rgba(148, 163, 184, 0.14);
   }
@@ -2877,7 +3361,7 @@ watch(
   strong {
     display: block;
     color: #0f172a;
-    font-size: 0.95rem;
+    font-size: 0.86rem;
     line-height: 1.2;
   }
 
@@ -2890,18 +3374,26 @@ watch(
 
 /* 继续学习 hero 区块 */
 .continue-study-block {
-  margin-top: 16px;
-  padding: 20px 22px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(11, 183, 170, 0.1), rgba(2, 132, 199, 0.08));
-  border: 1px solid rgba(11, 183, 170, 0.25);
-  box-shadow: 0 10px 26px rgba(11, 183, 170, 0.12);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100%;
+  margin-top: 0;
+  padding: 22px;
+  border-radius: 17px;
+  background:
+    linear-gradient(135deg, rgba(11, 183, 170, 0.16), rgba(2, 132, 199, 0.1)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(236, 253, 251, 0.76));
+  border: 1px solid rgba(11, 183, 170, 0.28);
+  box-shadow: 0 12px 28px rgba(11, 183, 170, 0.12);
 
   .csb-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
   }
 
   .csb-eyebrow {
@@ -2920,34 +3412,47 @@ watch(
     font-size: 12px;
     color: #475569;
     background: var(--color-card-bg-secondary);
-    padding: 3px 10px;
+    padding: 2px 9px;
     border-radius: 999px;
   }
 
   .csb-title {
-    margin: 6px 0 6px;
-    font-size: 19px;
+    margin: 0;
+    font-size: clamp(1.1rem, 1.45vw, 1.45rem);
     font-weight: 700;
     color: #0f172a;
-    line-height: 1.35;
+    line-height: 1.32;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .csb-judge {
-    margin: 0 0 14px;
+    margin: 12px 0 0;
     font-size: 13px;
     color: #334155;
-    line-height: 1.55;
+    line-height: 1.5;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .csb-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 10px;
+    max-width: none;
+    margin-top: auto;
+    padding-top: 20px;
   }
 
   .csb-btn {
-    padding: 8px 16px;
-    border-radius: 10px;
+    min-height: 36px;
+    padding: 8px 15px;
+    border-radius: 11px;
     border: 1px solid rgba(15, 23, 42, 0.1);
     background: #fff;
     color: #475569;
@@ -2966,7 +3471,7 @@ watch(
       color: #fff;
       border-color: transparent;
       font-weight: 600;
-      box-shadow: 0 6px 16px rgba(11, 183, 170, 0.32);
+      box-shadow: 0 5px 14px rgba(11, 183, 170, 0.28);
       &:hover:not(:disabled) { color: #fff; opacity: 0.92; }
     }
   }
@@ -3183,8 +3688,17 @@ watch(
 }
 
 @media (max-width: 980px) {
-  .hero-dashboard {
+  .hero-main-grid,
+  .hero-support-row {
     grid-template-columns: 1fr;
+  }
+
+  .hero-main-grid {
+    gap: 16px;
+  }
+
+  .stats-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .hero-actions {
@@ -3200,7 +3714,7 @@ watch(
 
   .hero-content,
   .tab-content {
-    padding: 16px;
+    padding: 18px;
     border-radius: 18px;
   }
 
@@ -3226,12 +3740,22 @@ watch(
   }
 
   .progress-ring {
-    width: 94px;
-    height: 94px;
+    width: 72px;
+    height: 72px;
   }
 
   .stats-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-support-row {
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .continue-study-block .csb-actions {
+    justify-content: flex-start;
+    max-width: none;
   }
 
   .tab-nav {
@@ -3263,6 +3787,24 @@ watch(
   .phase-resources,
   .resource-grid {
     grid-template-columns: 1fr;
+  }
+
+  .resource-management-toolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .resource-filter-controls {
+    justify-content: stretch;
+  }
+
+  .resource-filter-select {
+    flex: 1 1 120px;
+    width: auto;
+  }
+
+  .resource-result-summary {
+    justify-content: flex-start;
   }
 
   .plan-overview,
@@ -3330,12 +3872,29 @@ watch(
     flex-direction: column;
   }
 
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+
   .algorithm-diagnosis-band {
     grid-template-columns: 1fr;
   }
 
   .adb-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .resource-filter-controls {
+    flex-direction: column;
+  }
+
+  .resource-filter-select {
+    width: 100%;
+  }
+
+  .resource-package-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

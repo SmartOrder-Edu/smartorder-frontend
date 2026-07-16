@@ -88,6 +88,11 @@
                   <stop offset="0%" style="stop-color:#12b886"/>
                   <stop offset="100%" style="stop-color:#38d9a9"/>
                 </linearGradient>
+                <radialGradient id="ambientGlow" cx="50%" cy="48%" r="62%">
+                  <stop offset="0%" style="stop-color:#5c7cfa;stop-opacity:0.18"/>
+                  <stop offset="48%" style="stop-color:#12b886;stop-opacity:0.08"/>
+                  <stop offset="100%" style="stop-color:#12b886;stop-opacity:0"/>
+                </radialGradient>
                 <filter id="graphGlow" x="-50%" y="-50%" width="200%" height="200%">
                   <feGaussianBlur stdDeviation="4" result="blur"/>
                   <feMerge>
@@ -104,9 +109,12 @@
                 </filter>
               </defs>
 
+              <ellipse cx="200" cy="102" rx="160" ry="82" fill="url(#ambientGlow)" class="ambient-glow"/>
+
               <!-- 外层光环 -->
               <circle cx="200" cy="100" r="90" fill="none" stroke="url(#lineGradient)" stroke-width="1" opacity="0.15" class="orbit-ring"/>
               <circle cx="200" cy="100" r="70" fill="none" stroke="url(#lineGradient)" stroke-width="1" opacity="0.2" class="orbit-ring" style="animation-delay: -5s"/>
+              <circle cx="200" cy="100" r="50" fill="none" stroke="url(#lineGradient)" stroke-width="0.8" opacity="0.12" class="orbit-ring orbit-ring-soft" style="animation-delay: -9s"/>
 
               <!-- 连接线（带动画） -->
               <g class="connections" stroke="url(#lineGradient)" fill="none" stroke-width="2" stroke-linecap="round">
@@ -114,30 +122,36 @@
                 <path d="M200,100 Q250,55 305,45" class="connection-path" opacity="0.7" style="animation-delay: 0.3s"/>
                 <path d="M200,100 Q150,145 95,155" class="connection-path" opacity="0.7" style="animation-delay: 0.6s"/>
                 <path d="M200,100 Q250,145 305,155" class="connection-path" opacity="0.7" style="animation-delay: 0.9s"/>
-                <path d="M200,100 L200,175" class="connection-path connection-vertical" opacity="0.7" style="animation-delay: 1.2s"/>
               </g>
 
               <!-- 数据流动点 -->
               <g class="flow-dots">
-                <circle r="3" fill="#3b5bdb" class="flow-dot" style="animation-delay: 0s">
-                  <animateMotion dur="3s" repeatCount="indefinite" path="M200,100 Q150,55 95,45"/>
+                <circle r="3" fill="#3b5bdb" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.9;0" dur="5.8s" begin="0s" repeatCount="indefinite"/>
+                  <animateMotion dur="5.8s" begin="0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,100 Q150,55 95,45"/>
                 </circle>
-                <circle r="3" fill="#12b886" class="flow-dot" style="animation-delay: 1.5s">
-                  <animateMotion dur="3s" repeatCount="indefinite" path="M200,100 Q250,55 305,45"/>
+                <circle r="3" fill="#12b886" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.9;0" dur="6.1s" begin="1.15s" repeatCount="indefinite"/>
+                  <animateMotion dur="6.1s" begin="1.15s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,100 Q250,55 305,45"/>
                 </circle>
-                <circle r="3" fill="#12b886" class="flow-dot" style="animation-delay: 0.5s">
-                  <animateMotion dur="3s" repeatCount="indefinite" path="M200,100 Q150,145 95,155"/>
+                <circle r="3" fill="#12b886" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.82;0" dur="6.4s" begin="0.55s" repeatCount="indefinite"/>
+                  <animateMotion dur="6.4s" begin="0.55s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,100 Q150,145 95,155"/>
                 </circle>
-                <circle r="3" fill="#3b5bdb" class="flow-dot" style="animation-delay: 2s">
-                  <animateMotion dur="3s" repeatCount="indefinite" path="M200,100 Q250,145 305,155"/>
+                <circle r="3" fill="#3b5bdb" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.82;0" dur="6s" begin="1.75s" repeatCount="indefinite"/>
+                  <animateMotion dur="6s" begin="1.75s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,100 Q250,145 305,155"/>
                 </circle>
-                <circle r="3" fill="#5c7cfa" class="flow-dot" style="animation-delay: 1s">
-                  <animateMotion dur="2.5s" repeatCount="indefinite" path="M200,100 L200,175"/>
+                <circle r="2.6" fill="#5c7cfa" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.78;0" dur="5.5s" begin="0.95s" repeatCount="indefinite"/>
+                  <animateMotion dur="5.5s" begin="0.95s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,132 L200,176"/>
                 </circle>
               </g>
 
               <!-- 中心节点 -->
               <g class="center-node" filter="url(#nodeGlow)">
+                <circle cx="200" cy="100" r="46" fill="#5c7cfa" opacity="0.1" class="center-aura"/>
+                <circle cx="200" cy="100" r="37" fill="#12b886" opacity="0.12" class="center-aura center-aura-inner"/>
                 <circle cx="200" cy="100" r="32" fill="url(#nodeGradientBlue)"/>
                 <circle cx="200" cy="100" r="32" fill="none" stroke="white" stroke-width="2" opacity="0.3"/>
                 <text x="200" y="106" text-anchor="middle" fill="white" font-size="14" font-weight="700" font-family="system-ui">AI</text>
@@ -146,31 +160,38 @@
               <!-- 外围节点 -->
               <g class="outer-nodes">
                 <g class="node-group" style="animation-delay: 0s">
+                  <circle cx="95" cy="45" r="30" fill="#5c7cfa" opacity="0.08" class="node-aura"/>
                   <circle cx="95" cy="45" r="22" fill="url(#nodeGradientBlue)" filter="url(#graphGlow)"/>
                   <circle cx="95" cy="45" r="22" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
                   <text x="95" y="49" text-anchor="middle" fill="white" font-size="11" font-weight="600">画像</text>
                 </g>
                 <g class="node-group" style="animation-delay: 0.4s">
+                  <circle cx="305" cy="45" r="30" fill="#38d9a9" opacity="0.08" class="node-aura"/>
                   <circle cx="305" cy="45" r="22" fill="url(#nodeGradientGreen)" filter="url(#graphGlow)"/>
                   <circle cx="305" cy="45" r="22" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
                   <text x="305" y="49" text-anchor="middle" fill="white" font-size="11" font-weight="600">计划</text>
                 </g>
                 <g class="node-group" style="animation-delay: 0.8s">
+                  <circle cx="95" cy="155" r="30" fill="#38d9a9" opacity="0.08" class="node-aura"/>
                   <circle cx="95" cy="155" r="22" fill="url(#nodeGradientGreen)" filter="url(#graphGlow)"/>
                   <circle cx="95" cy="155" r="22" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
                   <text x="95" y="159" text-anchor="middle" fill="white" font-size="11" font-weight="600">任务</text>
                 </g>
                 <g class="node-group" style="animation-delay: 1.2s">
+                  <circle cx="305" cy="155" r="30" fill="#5c7cfa" opacity="0.08" class="node-aura"/>
                   <circle cx="305" cy="155" r="22" fill="url(#nodeGradientBlue)" filter="url(#graphGlow)"/>
                   <circle cx="305" cy="155" r="22" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
                   <text x="305" y="159" text-anchor="middle" fill="white" font-size="11" font-weight="600">资源</text>
                 </g>
                 <g class="node-group" style="animation-delay: 1.6s">
-                  <circle cx="200" cy="175" r="18" fill="url(#nodeGradientGreen)" filter="url(#graphGlow)"/>
-                  <circle cx="200" cy="175" r="18" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
-                  <text x="200" y="179" text-anchor="middle" fill="white" font-size="10" font-weight="600">评估</text>
+                  <circle cx="200" cy="194" r="25" fill="#38d9a9" opacity="0.08" class="node-aura"/>
+                  <circle cx="200" cy="194" r="18" fill="url(#nodeGradientGreen)" filter="url(#graphGlow)"/>
+                  <circle cx="200" cy="194" r="18" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
+                  <text x="200" y="198" text-anchor="middle" fill="white" font-size="10" font-weight="600">评估</text>
                 </g>
               </g>
+
+              <path d="M200,132 L200,176" class="evaluation-link" stroke="url(#lineGradient)" fill="none" stroke-width="2.4" stroke-linecap="round"/>
 
               <!-- 漂浮粒子 -->
               <g class="floating-particles">
@@ -491,7 +512,10 @@ const handleGiteeLogin = async () => {
 <style scoped>
 .login-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
+  align-items: center;
+  justify-content: center;
   position: relative;
   overflow-x: hidden;
   overflow-y: auto;
@@ -582,30 +606,38 @@ const handleGiteeLogin = async () => {
 .login-container {
   display: flex;
   width: 100%;
-  max-width: 1100px;
-  min-height: 100vh;
+  max-width: 1240px;
+  min-height: min(100vh, 840px);
+  min-height: min(100dvh, 840px);
   position: relative;
   z-index: 1;
-  padding: var(--spacing-xl);
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(2rem, 5vw, 5rem);
+  padding: clamp(1.5rem, 4vw, 4rem);
   margin: auto;
 }
 
 @media (max-width: 992px) {
   .login-container {
     flex-direction: column;
-    padding: var(--spacing-lg);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(1rem, 5vw, 2rem);
     align-items: center;
     justify-content: center;
+    gap: 0;
   }
 }
 
 /* 左侧品牌区域 */
 .brand-section {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: var(--spacing-2xl);
+  justify-content: flex-start;
+  padding: clamp(1rem, 3vw, 3rem) 0;
 }
 
 @media (max-width: 992px) {
@@ -615,7 +647,9 @@ const handleGiteeLogin = async () => {
 }
 
 .brand-content {
-  max-width: 420px;
+  width: 100%;
+  max-width: 520px;
+  transform: translateY(clamp(1rem, 2vh, 1.75rem));
 }
 
 /* Logo */
@@ -623,7 +657,7 @@ const handleGiteeLogin = async () => {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: clamp(1.25rem, 2.4vw, 2rem);
 }
 
 .logo-img {
@@ -682,11 +716,11 @@ const handleGiteeLogin = async () => {
 
 /* 主标题 */
 .main-title {
-  font-size: 1.375rem;
+  font-size: clamp(1.25rem, 1.4vw, 1.5rem);
   font-weight: 500;
-  line-height: 1.7;
+  line-height: 1.68;
   color: var(--text-dark);
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: clamp(1.25rem, 2.2vw, 2rem);
 }
 
 .main-title .title-line {
@@ -700,22 +734,26 @@ const handleGiteeLogin = async () => {
 
 /* 卖点标签 */
 .feature-tags {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-2xl);
+  width: min(100%, 430px);
+  margin-bottom: clamp(1.5rem, 3vw, 2.75rem);
 }
 
 .feature-tag {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
+  min-width: 0;
   background: white;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-full);
   font-size: 0.8125rem;
   color: var(--text-regular);
+  white-space: nowrap;
   box-shadow: 0 2px 8px  var(--color-shadow);
   transition: all 0.3s ease;
 }
@@ -740,19 +778,45 @@ const handleGiteeLogin = async () => {
 /* 知识图谱 */
 .knowledge-graph {
   width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
+  max-width: 430px;
+  margin: 0;
 }
 
 .knowledge-graph .graph-svg {
   width: 100%;
   height: auto;
+  overflow: visible;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: graphBreath 8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
+
+.knowledge-graph .ambient-glow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ambientBreath 7.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+@keyframes graphBreath {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.012); }
+}
+
+@keyframes ambientBreath {
+  0%, 100% { opacity: 0.72; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1.04); }
 }
 
 /* 外层轨道环 */
 .knowledge-graph .orbit-ring {
-  animation: orbitRotate 30s linear infinite;
+  animation: orbitRotate 46s linear infinite, orbitBreath 7s ease-in-out infinite;
+  transform-box: fill-box;
   transform-origin: center;
+}
+
+.knowledge-graph .orbit-ring-soft {
+  animation-duration: 58s, 8.5s;
 }
 
 @keyframes orbitRotate {
@@ -760,44 +824,92 @@ const handleGiteeLogin = async () => {
   to { transform: rotate(360deg); }
 }
 
+@keyframes orbitBreath {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.28; }
+}
+
 /* 连接线动画 */
 .knowledge-graph .connection-path {
-  stroke-dasharray: 8 4;
-  animation: dashMove 2s linear infinite;
+  stroke-dasharray: 10 8;
+  animation: dashMove 5.6s linear infinite, lineBreath 4.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 2px rgba(59, 91, 219, 0.22));
 }
 
 .knowledge-graph .connection-vertical {
-  stroke-dasharray: 6 4;
-  animation: dashMoveVertical 1.8s linear infinite;
+  stroke-dasharray: 5 5;
+  animation: dashMoveVertical 4.8s linear infinite, lineBreath 4.8s ease-in-out infinite;
+}
+
+.knowledge-graph .evaluation-link {
+  opacity: 0.78;
+  filter: drop-shadow(0 0 5px rgba(18, 184, 134, 0.35));
+  animation: evaluationLinkBreath 4.8s ease-in-out infinite;
 }
 
 @keyframes dashMove {
-  to { stroke-dashoffset: -24; }
+  to { stroke-dashoffset: -36; }
 }
 
 @keyframes dashMoveVertical {
   to { stroke-dashoffset: -20; }
 }
 
+@keyframes lineBreath {
+  0%, 100% { opacity: 0.42; }
+  50% { opacity: 0.82; }
+}
+
+@keyframes evaluationLinkBreath {
+  0%, 100% { opacity: 0.56; stroke-width: 2.1; }
+  50% { opacity: 0.9; stroke-width: 2.6; }
+}
+
 /* 数据流动点 */
 .knowledge-graph .flow-dot {
-  filter: drop-shadow(0 0 4px currentColor);
+  filter: drop-shadow(0 0 6px currentColor);
 }
 
 /* 中心节点 */
 .knowledge-graph .center-node {
-  animation: centerPulse 3s ease-in-out infinite;
+  animation: centerPulse 5.8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.knowledge-graph .center-aura {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: auraBreath 5.8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+.knowledge-graph .center-aura-inner {
+  animation-delay: -2.2s;
 }
 
 @keyframes centerPulse {
-  0%, 100% { transform: scale(1); filter: url(#nodeGlow); }
-  50% { transform: scale(1.08); filter: url(#nodeGlow); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+
+@keyframes auraBreath {
+  0%, 100% { opacity: 0.06; transform: scale(0.92); }
+  50% { opacity: 0.18; transform: scale(1.08); }
 }
 
 /* 外围节点 */
 .knowledge-graph .node-group {
-  animation: nodePulse 3s ease-in-out infinite;
+  animation: nodePulse 5.2s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  transform-box: fill-box;
   transform-origin: center;
+  will-change: transform;
+}
+
+.knowledge-graph .node-aura {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nodeAuraBreath 5.2s cubic-bezier(0.45, 0, 0.2, 1) infinite;
 }
 
 .knowledge-graph .node-group:nth-child(1) { animation-delay: 0s; }
@@ -807,44 +919,66 @@ const handleGiteeLogin = async () => {
 .knowledge-graph .node-group:nth-child(5) { animation-delay: 1.6s; }
 
 @keyframes nodePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1px) scale(1.045); }
+}
+
+@keyframes nodeAuraBreath {
+  0%, 100% { opacity: 0.04; transform: scale(0.9); }
+  50% { opacity: 0.16; transform: scale(1.12); }
 }
 
 /* 漂浮粒子 */
 .knowledge-graph .float-particle {
-  animation: floatParticle 6s ease-in-out infinite;
+  animation: floatParticle 9s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 @keyframes floatParticle {
-  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
-  25% { transform: translateY(-8px) translateX(4px); opacity: 0.6; }
-  50% { transform: translateY(-4px) translateX(-4px); opacity: 0.4; }
-  75% { transform: translateY(-12px) translateX(2px); opacity: 0.5; }
+  0%, 100% { transform: translateY(0) translateX(0) scale(0.9); opacity: 0.18; }
+  35% { transform: translateY(-7px) translateX(4px) scale(1.08); opacity: 0.56; }
+  70% { transform: translateY(-3px) translateX(-4px) scale(1); opacity: 0.34; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knowledge-graph .graph-svg,
+  .knowledge-graph .ambient-glow,
+  .knowledge-graph .orbit-ring,
+  .knowledge-graph .connection-path,
+  .knowledge-graph .evaluation-link,
+  .knowledge-graph .center-node,
+  .knowledge-graph .center-aura,
+  .knowledge-graph .node-group,
+  .knowledge-graph .node-aura,
+  .knowledge-graph .float-particle {
+    animation: none;
+  }
 }
 
 /* 右侧表单区域 */
 .form-section {
-  flex: 0 0 460px;
+  flex: 0 0 clamp(420px, 36vw, 480px);
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-xl);
+  padding: 0;
 }
 
 @media (max-width: 992px) {
   .form-section {
     flex: none;
     width: 100%;
-    max-width: 420px;
-    padding: var(--spacing-lg) 0;
+    max-width: 440px;
+    padding: 0;
   }
 }
 
 /* 登录卡片 */
 .login-card {
   width: 100%;
-  padding: var(--spacing-2xl);
+  padding: clamp(2rem, 3vw, 3rem);
   background: white;
   border-radius: var(--radius-2xl);
   box-shadow:
@@ -852,6 +986,39 @@ const handleGiteeLogin = async () => {
     0 10px 15px -3px rgba(0, 0, 0, 0.05),
     0 20px 25px -5px rgba(0, 0, 0, 0.03);
   border: 1px solid var(--color-border);
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-xl);
+  }
+}
+
+@media (max-height: 780px) and (min-width: 993px) {
+  .login-container {
+    padding-top: var(--spacing-xl);
+    padding-bottom: var(--spacing-xl);
+  }
+
+  .brand-content {
+    max-width: 500px;
+    transform: translateY(0.75rem);
+  }
+
+  .logo-wrapper,
+  .main-title,
+  .feature-tags {
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .knowledge-graph {
+    max-width: 370px;
+  }
+
+  .login-card {
+    padding: var(--spacing-xl);
+  }
 }
 
 /* 卡片头部 */
