@@ -40,138 +40,138 @@
                 <span class="hero-badge-dot"></span>
                 {{ riskLabel(dashboard.riskStatus) }}
               </div>
-              <button class="hero-primary-action" @click="handleContinueToday">
-                <span>{{ nextTodayTask ? '继续今日学习' : '规划今日任务' }}</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                  <line x1="5" y1="12" x2="19" y2="12"/>
-                  <polyline points="12,5 19,12 12,19"/>
-                </svg>
-              </button>
             </div>
           </div>
 
-          <div class="hero-dashboard">
-            <div class="progress-panel">
-              <div class="progress-ring" :style="heroProgressStyle">
-                <div class="progress-ring-inner">
-                  <strong>{{ Math.round(dashboard.progress) }}%</strong>
-                  <span>总进度</span>
+          <div class="hero-main-grid">
+            <!-- 继续学习 hero 区块：本空间主入口 -->
+            <div class="continue-study-block">
+              <div class="csb-head">
+                <span class="csb-eyebrow">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                    <polygon points="5,3 19,12 5,21"/>
+                  </svg>
+                  继续本空间学习
+                </span>
+                <span class="csb-time" v-if="nextTodayTask?.estimatedDurationMinutes">
+                  预计 {{ nextTodayTask.estimatedDurationMinutes }} 分钟
+                </span>
+              </div>
+              <h2 class="csb-title">
+                {{ nextTodayTask ? `继续学习：${nextTodayTask.title}` : '今日 Agent 暂未排定具体任务' }}
+              </h2>
+              <p class="csb-judge">Agent 判断：{{ todayFocusReason }}</p>
+              <div class="csb-actions">
+                <button class="csb-btn primary" @click="nextTodayTask ? handleStartFromHero() : handleContinueToday()">
+                  {{ nextTodayTask ? '开始学习' : '规划今日任务' }}
+                </button>
+                <button class="csb-btn" @click="handleAdjustDuration">调整时长</button>
+                <button class="csb-btn" @click="handleSimplerExplain">换个更基础的讲解</button>
+                <button class="csb-btn" @click="handleAssessFirst">先测一下</button>
+              </div>
+            </div>
+
+            <div class="hero-dashboard">
+              <div class="progress-panel">
+                <div class="progress-ring" :style="heroProgressStyle">
+                  <div class="progress-ring-inner">
+                    <strong>{{ Math.round(dashboard.progress) }}%</strong>
+                    <span>总进度</span>
+                  </div>
+                </div>
+                <div class="progress-copy">
+                  <span class="progress-label">今日焦点</span>
+                  <strong>{{ todayFocusTitle }}</strong>
+                  <p>{{ todayFocusReason }}</p>
                 </div>
               </div>
-              <div class="progress-copy">
-                <span class="progress-label">今日焦点</span>
-                <strong>{{ todayFocusTitle }}</strong>
-                <p>{{ todayFocusReason }}</p>
+
+              <!-- Stats Row -->
+              <div class="stats-row">
+                <SpaceStatCard
+                  :value="dashboard.progress"
+                  label="完成进度"
+                  :icon="BarChartIcon"
+                  bg-color="#e0f2fe"
+                  value-color="#0284c7"
+                />
+                <SpaceStatCard
+                  :value="dashboard.streakDays"
+                  label="连续学习"
+                  suffix=" 天"
+                  :icon="FlameIcon"
+                  bg-color="#fff7ed"
+                  value-color="#ea580c"
+                />
+                <SpaceStatCard
+                  :value="dashboard.daysRemaining"
+                  label="剩余天数"
+                  suffix=" 天"
+                  :icon="CalendarIcon"
+                  bg-color="#ecfdf5"
+                  value-color="#059669"
+                />
+                <SpaceStatCard
+                  :value="riskLabel(dashboard.riskStatus)"
+                  label="风险状态"
+                  :icon="ZapIcon"
+                  bg-color="#f5f3ff"
+                  value-color="#7c3aed"
+                />
               </div>
             </div>
-
-            <!-- Stats Row -->
-            <div class="stats-row">
-              <SpaceStatCard
-                :value="dashboard.progress"
-                label="完成进度"
-                :icon="BarChartIcon"
-                bg-color="#e0f2fe"
-                value-color="#0284c7"
-              />
-              <SpaceStatCard
-                :value="dashboard.streakDays"
-                label="连续学习"
-                suffix=" 天"
-                :icon="FlameIcon"
-                bg-color="#fff7ed"
-                value-color="#ea580c"
-              />
-              <SpaceStatCard
-                :value="dashboard.daysRemaining"
-                label="剩余天数"
-                suffix=" 天"
-                :icon="CalendarIcon"
-                bg-color="#ecfdf5"
-                value-color="#059669"
-              />
-              <SpaceStatCard
-                :value="riskLabel(dashboard.riskStatus)"
-                label="风险状态"
-                :icon="ZapIcon"
-                bg-color="#f5f3ff"
-                value-color="#7c3aed"
-              />
-            </div>
-          </div>
-
-          <!-- Agent Insight Banner -->
-          <div class="agent-insight-banner" v-if="dashboard.agentInsight" @click="agentPanelRef?.open?.()">
-            <div class="insight-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
-                <line x1="12" y1="8" x2="12.01" y2="8"/>
-              </svg>
-            </div>
-            <span class="insight-text">{{ dashboard.agentInsight }}</span>
-            <span class="insight-link">查看建议 →</span>
           </div>
 
           <div
-            v-if="algorithmLoading || algorithmState || algorithmError"
-            class="algorithm-diagnosis-band"
-            :class="{ muted: algorithmError }"
+            v-if="dashboard.agentInsight || algorithmLoading || algorithmState || algorithmError"
+            class="hero-support-row"
           >
-            <div class="adb-main">
-              <span class="adb-eyebrow">学习诊断</span>
-              <template v-if="algorithmLoading">
-                <h3>正在读取当前空间的掌握度证据</h3>
-                <p>会优先使用测评结果、题目知识点映射和近期答题证据。</p>
-              </template>
-              <template v-else-if="algorithmError">
-                <h3>诊断暂不可用</h3>
-                <p>{{ algorithmError }}</p>
-              </template>
-              <template v-else>
-                <h3>{{ algorithmNextActionTitle }}</h3>
-                <p>{{ algorithmNextActionReason }}</p>
-              </template>
-            </div>
-            <div class="adb-stats" v-if="algorithmState">
-              <div>
-                <strong>{{ algorithmAssessedCount }}/{{ algorithmKnowledgeCount }}</strong>
-                <span>已评估知识点</span>
-              </div>
-              <div>
-                <strong>{{ algorithmWeakCount }}</strong>
-                <span>薄弱点</span>
-              </div>
-              <div>
-                <strong>{{ algorithmMasteryPercent }}%</strong>
-                <span>平均掌握度</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 继续学习 hero 区块：本空间主入口 -->
-          <div class="continue-study-block">
-            <div class="csb-head">
-              <span class="csb-eyebrow">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
-                  <polygon points="5,3 19,12 5,21"/>
+            <!-- Agent Insight Banner -->
+            <div class="agent-insight-banner" v-if="dashboard.agentInsight" @click="agentPanelRef?.open?.()">
+              <div class="insight-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
                 </svg>
-                继续本空间学习
-              </span>
-              <span class="csb-time" v-if="nextTodayTask?.estimatedDurationMinutes">
-                预计 {{ nextTodayTask.estimatedDurationMinutes }} 分钟
-              </span>
+              </div>
+              <span class="insight-text">{{ dashboard.agentInsight }}</span>
+              <span class="insight-link">查看建议 →</span>
             </div>
-            <h2 class="csb-title">
-              {{ nextTodayTask ? `继续学习：${nextTodayTask.title}` : '今日 Agent 暂未排定具体任务' }}
-            </h2>
-            <p class="csb-judge">Agent 判断：{{ todayFocusReason }}</p>
-            <div class="csb-actions">
-              <button class="csb-btn primary" :disabled="!nextTodayTask" @click="handleStartFromHero">
-                开始学习
-              </button>
-              <button class="csb-btn" @click="handleAdjustDuration">调整时长</button>
-              <button class="csb-btn" @click="handleSimplerExplain">换个更基础的讲解</button>
-              <button class="csb-btn" @click="handleAssessFirst">先测一下</button>
+
+            <div
+              v-if="algorithmLoading || algorithmState || algorithmError"
+              class="algorithm-diagnosis-band"
+              :class="{ muted: algorithmError }"
+            >
+              <div class="adb-main">
+                <span class="adb-eyebrow">学习诊断</span>
+                <template v-if="algorithmLoading">
+                  <h3>正在读取当前空间的掌握度证据</h3>
+                  <p>会优先使用测评结果、题目知识点映射和近期答题证据。</p>
+                </template>
+                <template v-else-if="algorithmError">
+                  <h3>诊断暂不可用</h3>
+                  <p>{{ algorithmError }}</p>
+                </template>
+                <template v-else>
+                  <h3>{{ algorithmNextActionTitle }}</h3>
+                  <p>{{ algorithmNextActionReason }}</p>
+                </template>
+              </div>
+              <div class="adb-stats" v-if="algorithmState">
+                <div>
+                  <strong>{{ algorithmAssessedCount }}/{{ algorithmKnowledgeCount }}</strong>
+                  <span>已评估知识点</span>
+                </div>
+                <div>
+                  <strong>{{ algorithmWeakCount }}</strong>
+                  <span>薄弱点</span>
+                </div>
+                <div>
+                  <strong>{{ algorithmMasteryPercent }}%</strong>
+                  <span>平均掌握度</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2995,15 +2995,15 @@ watch(
 }
 
 .space-hero {
-  border-radius: 22px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.06);
 }
 
 .space-hero::before {
   content: '';
   position: absolute;
   inset: 1px;
-  border-radius: 21px;
+  border-radius: 17px;
   background:
     radial-gradient(circle at 14% 18%, rgba(11, 183, 170, 0.18), transparent 30%),
     radial-gradient(circle at 88% 18%, rgba(59, 130, 246, 0.15), transparent 28%),
@@ -3022,22 +3022,22 @@ watch(
 }
 
 .hero-content {
-  padding: 26px;
+  padding: 24px;
   background: var(--color-card-bg-secondary);
   border-color: rgba(148, 163, 184, 0.22);
-  border-radius: 22px;
+  border-radius: 18px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .hero-top {
-  align-items: flex-start;
-  margin-bottom: 22px;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
 .back-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   border-color: rgba(148, 163, 184, 0.24);
   color: #475569;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
@@ -3060,17 +3060,22 @@ watch(
 }
 
 .hero-title {
-  font-size: clamp(1.55rem, 2vw, 2.15rem);
+  font-size: clamp(1.35rem, 1.6vw, 1.82rem);
   color: #0f172a;
   letter-spacing: 0;
+  line-height: 1.2;
 }
 
 .hero-goal {
   max-width: 720px;
-  margin-top: 7px;
+  margin-top: 5px;
   color: #64748b;
-  font-size: 0.9rem;
-  line-height: 1.6;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .hero-actions {
@@ -3084,8 +3089,8 @@ watch(
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 34px;
-  padding: 7px 12px;
+  min-height: 30px;
+  padding: 5px 11px;
   border-radius: 999px;
   border: 1px solid transparent;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -3139,31 +3144,38 @@ watch(
   box-shadow: 0 18px 34px rgba(11, 183, 170, 0.28);
 }
 
-.hero-dashboard {
+.hero-main-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 0.88fr) minmax(420px, 1.12fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.9fr);
+  gap: 20px;
   align-items: stretch;
+}
+
+.hero-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
 }
 
 .progress-panel {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   min-width: 0;
-  padding: 18px;
-  border-radius: 18px;
+  padding: 16px;
+  border-radius: 15px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(236, 253, 251, 0.78));
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(236, 253, 251, 0.72));
   border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.035);
 }
 
 .progress-ring {
-  width: 116px;
-  height: 116px;
+  width: 78px;
+  height: 78px;
   border-radius: 50%;
-  padding: 10px;
+  padding: 7px;
   flex-shrink: 0;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
 }
@@ -3177,18 +3189,18 @@ watch(
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.05);
 }
 
 .progress-ring-inner strong {
   color: #0f172a;
-  font-size: 1.45rem;
+  font-size: 1.12rem;
   line-height: 1.1;
 }
 
 .progress-ring-inner span {
   color: #94a3b8;
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 700;
 }
 
@@ -3204,17 +3216,21 @@ watch(
 
 .progress-copy strong {
   display: block;
-  margin-top: 5px;
+  margin-top: 3px;
   color: #1e293b;
-  font-size: 1rem;
-  line-height: 1.45;
+  font-size: 0.95rem;
+  line-height: 1.35;
 }
 
 .progress-copy p {
-  margin: 7px 0 0;
+  margin: 5px 0 0;
   color: #64748b;
-  font-size: 0.8125rem;
-  line-height: 1.55;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .stats-row {
@@ -3224,13 +3240,32 @@ watch(
   margin-bottom: 0;
 }
 
+.stats-row :deep(.stat-card) {
+  min-height: 74px;
+  gap: 11px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.035);
+}
+
+.stats-row :deep(.stat-icon) {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.stats-row :deep(.stat-value) {
+  font-size: 1rem;
+}
+
 .agent-insight-banner {
-  margin-top: 16px;
-  padding: 13px 15px;
+  min-height: 100%;
+  margin-top: 0;
+  padding: 13px 14px;
   border-radius: 14px;
   background: var(--color-card-bg-secondary);
   border-color: rgba(11, 183, 170, 0.15);
-  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.03);
 }
 
 .agent-insight-banner:hover {
@@ -3255,11 +3290,11 @@ watch(
 .algorithm-diagnosis-band {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 16px;
   align-items: center;
-  margin-top: 16px;
-  padding: 16px 18px;
-  border-radius: 16px;
+  margin-top: 0;
+  padding: 13px 14px;
+  border-radius: 14px;
   border: 1px solid rgba(14, 165, 233, 0.2);
   background: linear-gradient(135deg, rgba(240, 249, 255, 0.88), rgba(236, 253, 245, 0.72));
 
@@ -3271,10 +3306,21 @@ watch(
 
 .adb-eyebrow {
   display: inline-flex;
-  margin-bottom: 5px;
+  margin-bottom: 3px;
   color: #0284c7;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 800;
+}
+
+.hero-support-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.hero-support-row > :only-child {
+  grid-column: 1 / -1;
 }
 
 .adb-main {
@@ -3283,27 +3329,31 @@ watch(
   h3 {
     margin: 0;
     color: #0f172a;
-    font-size: 0.96rem;
-    line-height: 1.4;
+    font-size: 0.88rem;
+    line-height: 1.32;
   }
 
   p {
-    margin: 5px 0 0;
+    margin: 3px 0 0;
     color: #475569;
-    font-size: 0.8rem;
-    line-height: 1.55;
+    font-size: 0.76rem;
+    line-height: 1.4;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
   }
 }
 
 .adb-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(78px, 1fr));
-  gap: 8px;
+  gap: 6px;
 
   div {
     min-width: 0;
-    padding: 10px 12px;
-    border-radius: 12px;
+    padding: 7px 9px;
+    border-radius: 10px;
     background: rgba(255, 255, 255, 0.78);
     border: 1px solid rgba(148, 163, 184, 0.14);
   }
@@ -3311,7 +3361,7 @@ watch(
   strong {
     display: block;
     color: #0f172a;
-    font-size: 0.95rem;
+    font-size: 0.86rem;
     line-height: 1.2;
   }
 
@@ -3324,18 +3374,26 @@ watch(
 
 /* 继续学习 hero 区块 */
 .continue-study-block {
-  margin-top: 16px;
-  padding: 20px 22px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(11, 183, 170, 0.1), rgba(2, 132, 199, 0.08));
-  border: 1px solid rgba(11, 183, 170, 0.25);
-  box-shadow: 0 10px 26px rgba(11, 183, 170, 0.12);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 100%;
+  margin-top: 0;
+  padding: 22px;
+  border-radius: 17px;
+  background:
+    linear-gradient(135deg, rgba(11, 183, 170, 0.16), rgba(2, 132, 199, 0.1)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(236, 253, 251, 0.76));
+  border: 1px solid rgba(11, 183, 170, 0.28);
+  box-shadow: 0 12px 28px rgba(11, 183, 170, 0.12);
 
   .csb-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 12px;
   }
 
   .csb-eyebrow {
@@ -3354,34 +3412,47 @@ watch(
     font-size: 12px;
     color: #475569;
     background: var(--color-card-bg-secondary);
-    padding: 3px 10px;
+    padding: 2px 9px;
     border-radius: 999px;
   }
 
   .csb-title {
-    margin: 6px 0 6px;
-    font-size: 19px;
+    margin: 0;
+    font-size: clamp(1.1rem, 1.45vw, 1.45rem);
     font-weight: 700;
     color: #0f172a;
-    line-height: 1.35;
+    line-height: 1.32;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .csb-judge {
-    margin: 0 0 14px;
+    margin: 12px 0 0;
     font-size: 13px;
     color: #334155;
-    line-height: 1.55;
+    line-height: 1.5;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .csb-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 10px;
+    max-width: none;
+    margin-top: auto;
+    padding-top: 20px;
   }
 
   .csb-btn {
-    padding: 8px 16px;
-    border-radius: 10px;
+    min-height: 36px;
+    padding: 8px 15px;
+    border-radius: 11px;
     border: 1px solid rgba(15, 23, 42, 0.1);
     background: #fff;
     color: #475569;
@@ -3400,7 +3471,7 @@ watch(
       color: #fff;
       border-color: transparent;
       font-weight: 600;
-      box-shadow: 0 6px 16px rgba(11, 183, 170, 0.32);
+      box-shadow: 0 5px 14px rgba(11, 183, 170, 0.28);
       &:hover:not(:disabled) { color: #fff; opacity: 0.92; }
     }
   }
@@ -3617,8 +3688,17 @@ watch(
 }
 
 @media (max-width: 980px) {
-  .hero-dashboard {
+  .hero-main-grid,
+  .hero-support-row {
     grid-template-columns: 1fr;
+  }
+
+  .hero-main-grid {
+    gap: 16px;
+  }
+
+  .stats-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .hero-actions {
@@ -3634,7 +3714,7 @@ watch(
 
   .hero-content,
   .tab-content {
-    padding: 16px;
+    padding: 18px;
     border-radius: 18px;
   }
 
@@ -3660,12 +3740,22 @@ watch(
   }
 
   .progress-ring {
-    width: 94px;
-    height: 94px;
+    width: 72px;
+    height: 72px;
   }
 
   .stats-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hero-support-row {
+    gap: 12px;
+    margin-top: 14px;
+  }
+
+  .continue-study-block .csb-actions {
+    justify-content: flex-start;
+    max-width: none;
   }
 
   .tab-nav {
@@ -3780,6 +3870,10 @@ watch(
 
   .progress-panel {
     flex-direction: column;
+  }
+
+  .stats-row {
+    grid-template-columns: 1fr;
   }
 
   .algorithm-diagnosis-band {
