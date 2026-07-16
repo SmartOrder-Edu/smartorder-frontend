@@ -61,43 +61,7 @@
         </div>
       </section>
 
-      <section class="section profile-section profile-details-section" v-if="profileData">
-        <div class="section-header">
-          <h3 class="section-title">画像详细信息</h3>
-          <span class="section-subtitle">展开查看已沉淀的完整画像字段</span>
-        </div>
-        <el-collapse v-model="profileDetailPanels" class="profile-detail-collapse">
-          <el-collapse-item v-if="profileData.learningBackground" title="学习背景" name="background">
-            <ProfileDetailValue :value="profileData.learningBackground" />
-          </el-collapse-item>
-          <el-collapse-item v-if="profileData.learningGoals" title="学习目标详情" name="goals">
-            <ProfileDetailValue :value="profileData.learningGoals" />
-          </el-collapse-item>
-          <el-collapse-item v-if="profileData.abilityProfile" title="能力画像详情" name="ability">
-            <ProfileDetailValue :value="profileData.abilityProfile" />
-          </el-collapse-item>
-          <el-collapse-item v-if="profileData.commonMisconceptions" title="常见误区详情" name="misconceptions">
-            <ProfileDetailValue :value="profileData.commonMisconceptions" />
-          </el-collapse-item>
-          <el-collapse-item v-if="profileData.learningPreference" title="学习偏好详情" name="preference">
-            <ProfileDetailValue :value="profileData.learningPreference" />
-          </el-collapse-item>
-          <el-collapse-item v-if="profileData.metacognitiveProfile" title="元认知画像详情" name="metacognitive">
-            <ProfileDetailValue :value="profileData.metacognitiveProfile" />
-          </el-collapse-item>
-          <el-collapse-item v-if="profileData.subjectProfiles" title="学科画像详情" name="subjects">
-            <ProfileDetailValue :value="profileData.subjectProfiles" />
-          </el-collapse-item>
-          <el-collapse-item title="画像更新记录" name="updates">
-            <ProfileDetailValue :value="{
-              profileSummary: profileData.profileSummary,
-              lastUpdateReason: profileData.lastUpdateReason,
-              updatedAt: profileData.updatedAt,
-              dimensionMetadata: profileData.dimensionMetadata
-            }" />
-          </el-collapse-item>
-        </el-collapse>
-      </section>
+
 
       <div class="profile-grid">
         <!-- 学习偏好 -->
@@ -214,9 +178,7 @@
               <!-- 数据点 -->
               <circle v-for="(point, idx) in getRadarDataPointsArray()" :key="'point-' + idx"
                 :cx="point.x" :cy="point.y" r="5"
-                fill="#3b5bdb"
-                stroke="white"
-                stroke-width="2"
+                class="radar-point"
               />
 
               <!-- 标签 -->
@@ -504,6 +466,45 @@
           </div>
         </div>
         <el-empty v-else description="暂无学科画像数据" :image-size="80" />
+      </section>
+
+      <!-- 画像详细信息 -->
+      <section class="section profile-section profile-details-section" v-if="profileData">
+        <div class="section-header">
+          <h3 class="section-title">画像详细信息</h3>
+          <span class="section-subtitle">展开查看已沉淀的完整画像字段</span>
+        </div>
+        <el-collapse v-model="profileDetailPanels" class="profile-detail-collapse">
+          <el-collapse-item v-if="profileData.learningBackground" title="学习背景" name="background">
+            <ProfileDetailValue :value="profileData.learningBackground" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.learningGoals" title="学习目标详情" name="goals">
+            <ProfileDetailValue :value="profileData.learningGoals" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.abilityProfile" title="能力画像详情" name="ability">
+            <ProfileDetailValue :value="profileData.abilityProfile" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.commonMisconceptions" title="常见误区详情" name="misconceptions">
+            <ProfileDetailValue :value="profileData.commonMisconceptions" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.learningPreference" title="学习偏好详情" name="preference">
+            <ProfileDetailValue :value="profileData.learningPreference" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.metacognitiveProfile" title="元认知画像详情" name="metacognitive">
+            <ProfileDetailValue :value="profileData.metacognitiveProfile" />
+          </el-collapse-item>
+          <el-collapse-item v-if="profileData.subjectProfiles" title="学科画像详情" name="subjects">
+            <ProfileDetailValue :value="profileData.subjectProfiles" />
+          </el-collapse-item>
+          <el-collapse-item title="画像更新记录" name="updates">
+            <ProfileDetailValue :value="{
+              profileSummary: profileData.profileSummary,
+              lastUpdateReason: profileData.lastUpdateReason,
+              updatedAt: profileData.updatedAt,
+              dimensionMetadata: profileData.dimensionMetadata
+            }" />
+          </el-collapse-item>
+        </el-collapse>
       </section>
 
       <!-- 编辑资料对话框 -->
@@ -1925,6 +1926,57 @@ html[data-theme='dark'] :deep(.custom-dialog .el-textarea__inner) {
 html[data-theme='dark'] :deep(.custom-dialog .el-input__wrapper.is-focus),
 html[data-theme='dark'] :deep(.custom-dialog .el-textarea__inner:focus) {
   box-shadow: 0 0 0 1px #14b8a6 inset, 0 0 0 3px rgba(20, 184, 166, 0.25) !important;
+}
+
+/* ==================== 个人画像页面其他区域深色模式适配 ==================== */
+html[data-theme='dark'] .section {
+  background: var(--panel-bg, #171e2a);
+  border-color: var(--border-color, #2b3645);
+}
+
+html[data-theme='dark'] .section-header {
+  border-bottom-color: var(--border-color, #2b3645);
+}
+
+html[data-theme='dark'] .weak-item,
+html[data-theme='dark'] .goal-item,
+html[data-theme='dark'] .calibration-card,
+html[data-theme='dark'] .support-card {
+  background: var(--panel-bg-secondary, #1d2633) !important;
+}
+
+html[data-theme='dark'] .space-profile-card {
+  background: var(--panel-bg-secondary, #1d2633);
+  border-color: var(--border-color, #2b3645);
+}
+
+.radar-point {
+  fill: #3b5bdb;
+  stroke: white;
+  stroke-width: 2;
+  transition: stroke 0.2s ease;
+}
+
+html[data-theme='dark'] .radar-point {
+  stroke: var(--panel-bg, #171e2a);
+}
+
+html[data-theme='dark'] .profile-detail-collapse,
+html[data-theme='dark'] :deep(.el-collapse),
+html[data-theme='dark'] :deep(.el-collapse-item__header),
+html[data-theme='dark'] :deep(.el-collapse-item__wrap) {
+  background-color: transparent !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color, #2b3645) !important;
+}
+
+html[data-theme='dark'] :deep(.el-collapse-item__content) {
+  background-color: transparent !important;
+  color: var(--text-secondary) !important;
+}
+
+html[data-theme='dark'] :deep(.el-empty__description p) {
+  color: var(--text-muted) !important;
 }
 
 </style>

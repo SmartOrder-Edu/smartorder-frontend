@@ -169,13 +169,13 @@ const myRating = ref(0)
 const previewIframeUrl = computed(() => {
   if (!detail.value) return ''
   const token = localStorage.getItem('token')
-  return `/preview?squareId=${detail.value.id}&name=${encodeURIComponent(detail.value.title)}&size=${detail.value.fileSize}&token=${token}`
+  return `/preview?squareId=${detail.value.id}&name=${encodeURIComponent(detail.value.title)}&size=${detail.value.fileSize}&type=${encodeURIComponent(detail.value.fileType || '')}&token=${token}`
 })
 
 const openInNewWindow = () => {
   if (!detail.value) return
   const token = localStorage.getItem('token')
-  const url = `/preview?squareId=${detail.value.id}&name=${encodeURIComponent(detail.value.title)}&size=${detail.value.fileSize}&token=${token}`
+  const url = `/preview?squareId=${detail.value.id}&name=${encodeURIComponent(detail.value.title)}&size=${detail.value.fileSize}&type=${encodeURIComponent(detail.value.fileType || '')}&token=${token}`
   window.open(url, '_blank')
 }
 
