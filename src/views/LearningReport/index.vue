@@ -212,3 +212,304 @@ html[data-theme='dark'] .learning-report-page {
   }
 }
 </style>
+
+<style lang="scss">
+.learning-report-page {
+  .report-section:not(.is-active) {
+    .overview-companion,
+    .overview-copy > *,
+    .metric-hero,
+    .agent-chip,
+    .section-copy > *,
+    .header-companion,
+    .section-panel,
+    .chart-header,
+    .trend-chart,
+    .knowledge-card,
+    .weakness-card,
+    .cause-board,
+    .cause-row,
+    .timeline-panel,
+    .timeline-item,
+    .inline-explainer,
+    .risk-table,
+    .risk-row:not(.risk-head),
+    .next-plan,
+    .next-plan-content > *,
+    .summary-companion,
+    .summary-panel,
+    .summary-panel > *,
+    .grade-card,
+    .summary-actions {
+      opacity: 0;
+      transform: translateY(26px);
+      animation: none !important;
+    }
+
+    .trend-line {
+      stroke-dashoffset: 1200;
+      animation: none !important;
+    }
+
+    .trend-point {
+      opacity: 0;
+      animation: none !important;
+    }
+  }
+
+  .report-section.is-active {
+    .overview-companion,
+    .overview-copy > *,
+    .metric-hero,
+    .agent-chip,
+    .section-copy > *,
+    .header-companion,
+    .section-panel,
+    .chart-header,
+    .trend-chart,
+    .knowledge-card,
+    .weakness-card,
+    .cause-board,
+    .cause-row,
+    .timeline-panel,
+    .timeline-item,
+    .inline-explainer,
+    .risk-table,
+    .risk-row:not(.risk-head),
+    .next-plan,
+    .next-plan-content > *,
+    .summary-companion,
+    .summary-panel,
+    .summary-panel > *,
+    .grade-card,
+    .summary-actions {
+      animation: report-section-reveal 0.72s var(--transition-spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both !important;
+    }
+
+    .overview-companion,
+    .header-companion,
+    .summary-companion {
+      animation-delay: 0.12s !important;
+    }
+
+    .overview-copy .eyebrow,
+    .section-copy .eyebrow,
+    .summary-panel .eyebrow {
+      animation-delay: 0.24s !important;
+    }
+
+    .overview-copy h2,
+    .section-copy h2,
+    .summary-panel h2 {
+      animation-delay: 0.42s !important;
+    }
+
+    .overview-conclusion,
+    .section-copy > p,
+    .agent-summary {
+      animation-delay: 0.62s !important;
+    }
+
+    .context-chips,
+    .evidence-link,
+    .grade-row {
+      animation-delay: 0.82s !important;
+    }
+
+    .algorithm-explainer,
+    .inline-explainer {
+      animation-delay: 1.02s !important;
+    }
+
+    .metric-hero:nth-child(1),
+    .knowledge-card:nth-child(1),
+    .weakness-card:nth-child(1),
+    .grade-card:nth-child(1) {
+      animation-delay: 0.9s !important;
+    }
+
+    .metric-hero:nth-child(2),
+    .knowledge-card:nth-child(2),
+    .weakness-card:nth-child(2),
+    .grade-card:nth-child(2) {
+      animation-delay: 1.05s !important;
+    }
+
+    .metric-hero:nth-child(3),
+    .knowledge-card:nth-child(3),
+    .weakness-card:nth-child(3),
+    .grade-card:nth-child(3) {
+      animation-delay: 1.2s !important;
+    }
+
+    .agent-chip,
+    .summary-actions {
+      animation-delay: 1.38s !important;
+    }
+
+    .section-panel,
+    .timeline-panel,
+    .risk-table,
+    .next-plan,
+    .summary-panel {
+      animation-delay: 0.7s !important;
+    }
+
+    .chart-header,
+    .trend-chart {
+      animation-delay: 0.95s !important;
+    }
+
+    .trend-line {
+      stroke-dasharray: 1200;
+      stroke-dashoffset: 1200;
+      animation: report-draw-line 1.2s ease-out 1.12s forwards !important;
+    }
+
+    .trend-point {
+      animation: report-point-in 0.4s ease-out forwards !important;
+    }
+
+    .trend-chart > g:nth-of-type(2) .trend-point {
+      animation-delay: 1.55s !important;
+    }
+
+    .trend-chart > g:nth-of-type(3) .trend-point {
+      animation-delay: 1.65s !important;
+    }
+
+    .trend-chart > g:nth-of-type(4) .trend-point {
+      animation-delay: 1.75s !important;
+    }
+
+    .trend-chart > g:nth-of-type(5) .trend-point {
+      animation-delay: 1.85s !important;
+    }
+
+    .trend-chart > g:nth-of-type(6) .trend-point {
+      animation-delay: 1.95s !important;
+    }
+
+    .trend-chart > g:nth-of-type(7) .trend-point {
+      animation-delay: 2.05s !important;
+    }
+
+    .trend-chart > g:nth-of-type(8) .trend-point {
+      animation-delay: 2.15s !important;
+    }
+
+    .cause-board {
+      animation-delay: 1.14s !important;
+    }
+
+    .cause-row:nth-child(2),
+    .risk-row:nth-child(2),
+    .timeline-item:nth-child(1),
+    .next-plan-content > *:nth-child(1) {
+      animation-delay: 1.08s !important;
+    }
+
+    .cause-row:nth-child(3),
+    .risk-row:nth-child(3),
+    .timeline-item:nth-child(2),
+    .next-plan-content > *:nth-child(2) {
+      animation-delay: 1.22s !important;
+    }
+
+    .cause-row:nth-child(4),
+    .risk-row:nth-child(4),
+    .timeline-item:nth-child(3),
+    .next-plan-content > *:nth-child(3) {
+      animation-delay: 1.36s !important;
+    }
+
+    .cause-row:nth-child(5),
+    .risk-row:nth-child(5),
+    .timeline-item:nth-child(4),
+    .next-plan-content > *:nth-child(4) {
+      animation-delay: 1.5s !important;
+    }
+  }
+}
+
+@keyframes report-section-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.985);
+    filter: blur(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes report-draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes report-point-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .learning-report-page {
+    .report-section,
+    .report-section.is-active,
+    .report-section:not(.is-active) {
+      .overview-companion,
+      .overview-copy > *,
+      .metric-hero,
+      .agent-chip,
+      .section-copy > *,
+      .header-companion,
+      .section-panel,
+      .chart-header,
+      .trend-chart,
+      .knowledge-card,
+      .weakness-card,
+      .cause-board,
+      .cause-row,
+      .timeline-panel,
+      .timeline-item,
+      .inline-explainer,
+      .risk-table,
+      .risk-row,
+      .next-plan,
+      .next-plan-content > *,
+      .summary-companion,
+      .summary-panel,
+      .summary-panel > *,
+      .grade-card,
+      .summary-actions {
+        opacity: 1;
+        transform: none;
+        filter: none;
+        animation: none !important;
+      }
+
+      .trend-line {
+        stroke-dashoffset: 0;
+        animation: none !important;
+      }
+
+      .trend-point {
+        opacity: 1;
+        animation: none !important;
+      }
+    }
+  }
+}
+</style>
