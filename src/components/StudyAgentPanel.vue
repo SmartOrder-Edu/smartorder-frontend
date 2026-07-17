@@ -26,9 +26,13 @@
 
     <!-- 教学继续按钮（教学暂停 + 非弹题时） -->
     <div class="teaching-continue-bar" v-if="stepStore.isTeachingPaused && !stepStore.quizState">
+      <div class="continue-copy" v-if="isSegmentEndWaiting">
+        <span class="continue-dot"></span>
+        <span>本段讲解完成，准备好了点击继续。</span>
+      </div>
       <button class="teaching-continue-btn" @click="stepStore.resumeTeaching()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
-        继续
+        {{ continueButtonLabel }}
       </button>
     </div>
 
@@ -88,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
@@ -102,6 +106,18 @@ const agentStore = useAgentStore()
 
 const input = ref('')
 const chatEl = ref<HTMLElement>()
+
+const isSegmentEndWaiting = computed(() =>
+  stepStore.timelineStatus === 'waiting_user'
+  && stepStore.currentWaitReason === 'segment_end_check',
+)
+
+const continueButtonLabel = computed(() => {
+  const flow = stepStore.currentTeachingFlow
+  if (!flow) return '继续'
+  if (flow.currentSegmentIndex >= flow.segments.length - 1) return '完成本步学习'
+  return '继续讲解'
+})
 
 const feedbackButtons: { type: FeedbackType; label: string; variant: string; icon: string }[] = [
   { type: 'dont_understand', label: '没看懂', variant: 'default', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
@@ -174,7 +190,32 @@ export default { name: 'StudyAgentPanel' }
 }
 
 .teaching-continue-bar {
+  display: grid;
+  gap: 8px;
   padding: 0 16px 8px;
+}
+
+.continue-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 183, 170, 0.16);
+  background: rgba(240, 253, 250, 0.72);
+  color: #0f766e;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.continue-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: #0bb7aa;
+  animation: agentDotPulse 1s ease-in-out infinite;
+  flex-shrink: 0;
 }
 
 .teaching-continue-btn {

@@ -123,3 +123,28 @@
 .continue-btn-pulse {
   animation: continuePulse 1.8s ease-in-out infinite;
 }
+
+// ---- 当前段环境光呼吸 ----
+@keyframes ambientGlow {
+  from {
+    opacity: 0.58;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+
+// ---- 语音波形 ----
+@keyframes voiceWave {
+  0%,
+  100% {
+    height: 5px;
+    opacity: 0.45;
+  }
+  45% {
+    height: 14px;
+    opacity: 0.95;
+  }
+}

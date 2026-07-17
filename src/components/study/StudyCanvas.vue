@@ -29,7 +29,7 @@
         <!-- Agent 讲解中指示器 -->
         <span class="teaching-badge" v-if="stepStore.teachingActive">
           <span class="teaching-dot" v-if="stepStore.timelineStatus === 'playing'"></span>
-          {{ stepStore.timelineStatus === 'ended' ? '讲解完成' : 'Agent 讲解中' }}
+          {{ teachingBadgeLabel }}
         </span>
       </div>
       <div class="header-right">
@@ -42,8 +42,7 @@
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><path d="M10 4H3"/><path d="M10 9H3"/><path d="M10 15H3"/><path d="M10 20H3"/></svg>
         </button>
-        <!-- 教学模式：隐藏导航，显示"跳过"按钮 -->
-        <template v-if="stepStore.teachingActive">
+        <template v-if="stepStore.teachingActive && !stepStore.timelineEnded">
           <button
             v-if="stepStore.timelineStatus === 'playing'"
             class="nav-btn"
@@ -58,8 +57,28 @@
           >
             继续
           </button>
+          <button
+            v-else-if="stepStore.timelineStatus === 'waiting_user' && !stepStore.quizState"
+            class="nav-btn primary"
+            @click="stepStore.resumeTeaching()"
+          >
+            {{ continueButtonLabel }}
+          </button>
           <button class="nav-btn skip" @click="stepStore.endTeaching()">
             跳过教学
+          </button>
+        </template>
+        <template v-else-if="stepStore.timelineEnded">
+          <button class="nav-btn" @click="stepStore.replayTeaching()">
+            重放本段
+          </button>
+          <button class="nav-btn" :disabled="stepStore.currentStepIndex === 0" @click="stepStore.prevStep()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15,18 9,12 15,6"/></svg>
+            上一步
+          </button>
+          <button class="nav-btn primary" @click="stepStore.nextStep()" :disabled="stepStore.currentStepIndex >= stepStore.scriptSteps.length - 1">
+            下一步
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9,18 15,12 9,6"/></svg>
           </button>
         </template>
         <template v-else>
@@ -76,7 +95,11 @@
     </header>
 
     <!-- 画布主体 -->
-    <div class="canvas-body" v-if="stepStore.canvasContent">
+    <div
+      class="canvas-body"
+      :class="{ 'canvas-waiting': isSegmentEndWaiting }"
+      v-if="stepStore.canvasContent"
+    >
       <!-- Agent 教学模式：分段式讲解 -->
       <template v-if="stepStore.canvasContent.teachingFlow && stepStore.teachingActive">
         <!-- 教学段列表（降序：所有已展示的段 + 当前段） -->
@@ -91,6 +114,8 @@
               :scene-action="stepStore.getActiveSceneAction(seg.id, idx)"
               :revealed-board-block-index="stepStore.getRevealedBoardBlockIndex(seg.id)"
               :revealed-board-item-indexes="stepStore.getRevealedBoardItemIndexes(seg.id)"
+              :waiting-for-continue="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex && isSegmentEndWaiting"
+              :timeline-status="stepStore.timelineStatus"
               @quiz-answer="onQuizAnswer"
             />
           </template>
@@ -104,7 +129,7 @@
             class="continue-btn continue-btn-pulse"
             @click="stepStore.resumeTeaching()"
           >
-            继续讲解
+            继续学习
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9,18 15,12 9,6"/></svg>
           </button>
           <!-- 教学暂停（非弹题）→ 继续 -->
@@ -113,7 +138,7 @@
             class="continue-btn continue-btn-pulse"
             @click="stepStore.resumeTeaching()"
           >
-            继续
+            {{ continueButtonLabel }}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9,18 15,12 9,6"/></svg>
           </button>
           <button
@@ -161,6 +186,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import ExampleStage from './ExampleStage.vue'
@@ -173,6 +199,25 @@ defineProps<{ scriptCollapsed: boolean; agentCollapsed: boolean }>()
 defineEmits<{ (e: 'toggleScript'): void; (e: 'toggleAgent'): void }>()
 
 const stepStore = useTaskStepStore()
+
+const isSegmentEndWaiting = computed(() =>
+  stepStore.timelineStatus === 'waiting_user'
+  && stepStore.currentWaitReason === 'segment_end_check',
+)
+
+const continueButtonLabel = computed(() => {
+  const flow = stepStore.currentTeachingFlow
+  if (!flow) return '继续讲解'
+  if (flow.currentSegmentIndex >= flow.segments.length - 1) return '完成本步学习'
+  return '继续讲解'
+})
+
+const teachingBadgeLabel = computed(() => {
+  if (stepStore.timelineStatus === 'ended') return '讲解完成'
+  if (stepStore.timelineStatus === 'waiting_user') return '等待继续'
+  if (stepStore.timelineStatus === 'paused') return '已暂停'
+  return 'Agent 讲解中'
+})
 
 function bindTimelineAudio(el: Element | ComponentPublicInstance | null) {
   stepStore.setTimelineAudioElement(el instanceof HTMLAudioElement ? el : null)
@@ -385,6 +430,12 @@ function onQuizAnswer(_quizId: string, answer: string) {
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px 28px;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.canvas-waiting {
+  opacity: 0.97;
+  background: linear-gradient(180deg, rgba(240, 253, 250, 0.2), rgba(248, 250, 252, 0));
 }
 
 // ---- 教学段列表 ----

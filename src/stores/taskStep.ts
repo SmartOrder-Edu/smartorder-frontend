@@ -63,6 +63,10 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const activeSceneActions = ref<LessonSceneAction[]>([])
   const revealedBoardBlockIndexes = ref<Record<string, number>>({})
   const revealedBoardItemIndexes = ref<Record<string, Record<string, number>>>({})
+  const quickContinueCount = ref(0)
+  const segmentWaitStartedAtMs = ref(0)
+  const currentWaitReason = ref('')
+  const skipNextSegmentEndPause = ref(false)
   const sceneActionTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   const timelinePlayer = useTimelinePlayer({
@@ -103,6 +107,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const isTeachingPaused = computed(
     () => currentTeachingFlow.value?.isPaused || false,
   )
+  const timelineEnded = computed(() => timelinePlayer.status.value === 'ended')
 
   // =============================================================
   // 教学流控制方法
@@ -150,7 +155,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         answered: false,
       }
       if (waitImmediately) {
-        timelinePlayer.waitForUser()
+        markTimelineWaiting(String(cue.payload.reason || 'interaction'))
       }
       pushSegmentCommentary(seg, cue.id)
       return
@@ -162,8 +167,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     }
 
     if (waitImmediately) {
-      flow.isPaused = true
-      timelinePlayer.waitForUser()
+      markTimelineWaiting(String(cue.payload.reason || 'segment_end_check'))
     }
 
     pushSegmentCommentary(seg, cue.id)
@@ -202,8 +206,11 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   function resumeTeaching() {
     const flow = currentTeachingFlow.value
     if (!flow) return
+    trackContinueRhythm()
     flow.isPaused = false
     quizState.value = null
+    currentWaitReason.value = ''
+    segmentWaitStartedAtMs.value = 0
     void reportStudyEvent({
       eventType: 'resume_clicked',
       targetType: 'timeline',
@@ -231,6 +238,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     if (flow) {
       flow.isPaused = true
     }
+    currentWaitReason.value = 'manual_pause'
+    segmentWaitStartedAtMs.value = 0
   }
 
   /** 重放当前教学时间轴 */
@@ -242,6 +251,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   function endTeaching() {
     timelinePlayer.stop()
     teachingActive.value = false
+    resetContinueRhythm()
     const flow = currentTeachingFlow.value
     if (flow) {
       flow.isActive = false
@@ -546,6 +556,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     quizState.value = null
     revealedBoardBlockIndexes.value = {}
     revealedBoardItemIndexes.value = {}
+    resetContinueRhythm()
   }
 
   function prepareCanvasContent(step: ScriptStep): CanvasContent {
@@ -660,7 +671,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       const startMs = cursorMs
       const segmentDurationMs = resolveSegmentDurationMs(segment)
       const endMs = startMs + segmentDurationMs
-      const waitForUser = segment.autoAdvanceMs <= 0 || isInteractiveSegment(segment.type)
+      const waitForUser = true
       const sceneAction = buildSceneActionFromSegment(segment, index, startMs)
       sceneAction.durationMs = Math.min(Math.max(segmentDurationMs, 1200), 5200)
       sceneAction.payload = {
@@ -704,7 +715,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
             segmentIndex: index,
             segmentType: segment.type,
             waitForUser: true,
-            reason: isInteractiveSegment(segment.type) ? 'interaction' : 'manual_continue',
+            reason: isInteractiveSegment(segment.type) ? 'interaction' : 'segment_end_check',
           },
         })
       }
@@ -836,7 +847,72 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   function resolveSegmentDurationMs(segment: TeachingSegment): number {
     const speechMs = estimateSpeechDurationMs(segmentSpeechText(segment))
     const explicitMs = Number(segment.autoAdvanceMs || 0)
-    return Math.max(1200, Math.min(30000, Math.max(speechMs, explicitMs)))
+    let base = Math.max(speechMs, explicitMs)
+    const blocks = segment.boardBlocks || []
+    const denseTypes = ['comparison', 'vs_compare', 'code', 'formula', 'structure', 'trace']
+    const denseBlockCount = blocks.filter(block => denseTypes.includes(normalizeBoardBlockType(block.type))).length
+    if (denseBlockCount >= 3) {
+      base *= 2
+    } else if (denseBlockCount >= 2) {
+      base *= 1.5
+    }
+    const totalTextSize = blocks.reduce((sum, block) => sum + boardBlockTextSize(block), 0)
+    if (totalTextSize > 800) {
+      base *= 1.3
+    }
+    return Math.max(1200, Math.min(30000, base))
+  }
+
+  function boardBlockTextSize(block: TeachingBoardBlock): number {
+    const record = block as unknown as Record<string, unknown>
+    const textParts: unknown[] = [
+      block.title,
+      block.content,
+      block.caption,
+      record.term,
+      record.definition,
+      record.intuition,
+      record.formal,
+      record.lead,
+      record.question,
+      record.summary,
+      record.conclusion,
+      record.rule,
+      record.context,
+      record.reminder,
+      record.explanation,
+      record.invariant,
+      record.statement,
+      record.whyItMatters,
+      record.time,
+      record.space,
+      record.reason,
+      compactBoardText(record.items),
+      compactBoardText(record.points),
+      compactBoardText(record.steps),
+      compactBoardText(record.keyPoints),
+      compactBoardText(record.examples),
+      compactBoardText(record.cases),
+      compactBoardText(record.criteria),
+    ]
+    return textParts.reduce<number>((sum, value) => sum + stringValue(value).length, 0)
+  }
+
+  function compactBoardText(value: unknown): string {
+    if (!Array.isArray(value)) return ''
+    return value
+      .map((item) => {
+        if (item === null || item === undefined) return ''
+        if (typeof item === 'string') return item
+        if (typeof item !== 'object') return String(item)
+        return Object.values(item as Record<string, unknown>).map(stringValue).join(' ')
+      })
+      .join(' ')
+  }
+
+  function stringValue(value: unknown): string {
+    if (value === null || value === undefined) return ''
+    return typeof value === 'string' ? value : String(value)
   }
 
   function segmentSpeechText(segment: TeachingSegment): string {
@@ -940,6 +1016,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     currentSubtitle.value = ''
     revealedBoardBlockIndexes.value = {}
     revealedBoardItemIndexes.value = {}
+    currentWaitReason.value = ''
+    segmentWaitStartedAtMs.value = 0
     const flow = currentTeachingFlow.value
     if (flow) {
       flow.currentSegmentIndex = -1
@@ -956,7 +1034,6 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       flow.isPaused = false
     }
     quizState.value = null
-    teachingActive.value = true
   }
 
   function setTimelineAudioElement(element: HTMLAudioElement | null) {
@@ -1068,10 +1145,53 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     }, cue.startMs)
 
     if (cue.type === 'pause' || cue.payload.waitForUser === true) {
-      const flow = currentTeachingFlow.value
-      if (flow) flow.isPaused = true
-      timelinePlayer.waitForUser()
+      const reason = String(cue.payload.reason || '')
+      if (reason === 'segment_end_check' && skipNextSegmentEndPause.value) {
+        skipNextSegmentEndPause.value = false
+        return
+      }
+      markTimelineWaiting(reason || 'manual_continue')
     }
+  }
+
+  function markTimelineWaiting(reason: string) {
+    const flow = currentTeachingFlow.value
+    if (flow) flow.isPaused = true
+    currentWaitReason.value = reason
+    segmentWaitStartedAtMs.value = Date.now()
+    timelinePlayer.waitForUser()
+  }
+
+  function trackContinueRhythm() {
+    if (timelinePlayer.status.value !== 'waiting_user' || currentWaitReason.value !== 'segment_end_check') {
+      return
+    }
+
+    const elapsedMs = segmentWaitStartedAtMs.value ? Date.now() - segmentWaitStartedAtMs.value : Number.POSITIVE_INFINITY
+    if (elapsedMs <= 2000) {
+      quickContinueCount.value += 1
+    } else {
+      quickContinueCount.value = 0
+    }
+
+    if (quickContinueCount.value >= 3) {
+      skipNextSegmentEndPause.value = true
+      quickContinueCount.value = 0
+      chatMessages.value.push({
+        id: `agent-rhythm-${Date.now()}`,
+        role: 'agent',
+        text: '我注意到你节奏很快，下一小段会顺着讲完，不额外停顿。',
+        markdown: false,
+        createTime: Date.now(),
+      })
+    }
+  }
+
+  function resetContinueRhythm() {
+    quickContinueCount.value = 0
+    segmentWaitStartedAtMs.value = 0
+    currentWaitReason.value = ''
+    skipNextSegmentEndPause.value = false
   }
 
   function applySceneActionPayload(value: unknown, fallbackStartMs: number) {
@@ -1095,10 +1215,20 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         : undefined,
     }
 
-    activeSceneActions.value = [
+    const nextActions = [
       action,
       ...activeSceneActions.value.filter(item => item.actionId !== action.actionId),
-    ].slice(0, 4)
+    ]
+    if (nextActions.length > 4) {
+      nextActions.slice(4).forEach((item) => {
+        const timer = sceneActionTimers.get(item.actionId)
+        if (timer) {
+          clearTimeout(timer)
+          sceneActionTimers.delete(item.actionId)
+        }
+      })
+    }
+    activeSceneActions.value = nextActions.slice(0, 4)
 
     const existedTimer = sceneActionTimers.get(action.actionId)
     if (existedTimer) {
@@ -1304,6 +1434,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     currentTimeline,
     currentSegment,
     isTeachingPaused,
+    timelineEnded,
+    quickContinueCount,
+    currentWaitReason,
     timelineStatus: timelinePlayer.status,
     timelineCurrentTimeMs: timelinePlayer.currentTimeMs,
     timelinePlaybackRate: timelinePlayer.playbackRate,
