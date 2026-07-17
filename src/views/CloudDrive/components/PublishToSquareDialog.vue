@@ -43,8 +43,10 @@
             :label="opt.label"
             :value="opt.value"
           >
-            <span v-html="opt.icon" style="margin-right: 6px; vertical-align: middle;"></span>
-            {{ opt.label }}
+            <div class="category-option">
+              <span class="category-icon" v-html="opt.icon"></span>
+              <span class="category-label">{{ opt.label }}</span>
+            </div>
           </el-option>
         </el-select>
       </div>
@@ -260,5 +262,22 @@ const handleSubmit = async () => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.category-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-icon {
+  display: inline-flex;
+  align-items: center;
+  color: #6366f1;
+  flex-shrink: 0;
+}
+
+.category-label {
+  line-height: 1;
 }
 </style>

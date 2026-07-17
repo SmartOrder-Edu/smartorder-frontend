@@ -370,12 +370,11 @@ const formatProgress = (progress: number | null | undefined) => {
 const topMenuItems = [
   { id: 'dashboard', label: '总学习指挥台', path: '/dashboard', type: 'dashboard' },
   { id: 'ai-partner', label: 'AI 学习伙伴', path: '/ai-tutor', type: 'ai-tutor' },
-  { id: 'daily-plan', label: '今日总计划', path: '/daily-plan', type: 'daily-plan' },
+  { id: 'tasks', label: '任务日程', path: '/tasks', type: 'tasks' },
   { id: 'messages', label: '消息', path: '/messages', type: 'messages' }
 ]
 
 const bottomMenuItems = [
-  { id: 'tasks', label: '任务日程', path: '/tasks', type: 'tasks' },
   { id: 'resources', label: '资源广场', path: '/resources', type: 'resources' },
   { id: 'knowledge-base', label: '知识库管理', path: '/knowledge-base', type: 'knowledge-base' },
   { id: 'exam', label: '练习测评', path: '/exam', type: 'exam' },

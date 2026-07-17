@@ -12,7 +12,7 @@
     <div class="agent-overlay" v-if="open && isMobile" @click="open = false"></div>
 
     <!-- Panel content -->
-    <aside class="agent-panel" :class="{ open, mobile: isMobile }">
+    <aside class="agent-panel" :class="{ open, mobile: isMobile, 'log-expanded': logExpanded }">
       <div class="panel-header">
         <div class="panel-header-left">
           <div class="agent-avatar">
@@ -94,8 +94,15 @@
       </div>
 
       <!-- Agent action log -->
-      <div class="panel-log" v-if="agentActions && agentActions.length">
-        <AgentActionLog :actions="agentActions" />
+      <div class="panel-log" :class="{ expanded: logExpanded }" v-if="agentActions && agentActions.length">
+        <button class="log-header-btn" @click="logExpanded = !logExpanded">
+          <svg class="log-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="9 6 15 12 9 18"/></svg>
+          <span class="log-header-title">Agent 操作日志</span>
+          <span class="log-count-badge">{{ agentActions.length }}</span>
+        </button>
+        <div class="log-expanded-body" v-show="logExpanded">
+          <AgentActionLog :actions="agentActions" />
+        </div>
       </div>
     </aside>
   </div>
@@ -129,6 +136,7 @@ const isMobile = ref(window.innerWidth <= 1024)
 const input = ref('')
 const messages = ref<ChatMessage[]>([])
 const chatContainer = ref<HTMLElement>()
+const logExpanded = ref(false)
 
 const quickActions = [
   { label: '我在哪里薄弱？', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' },
@@ -466,11 +474,76 @@ export default { name: 'SpaceAgentPanel' }
 }
 
 .panel-log {
-  padding: 0 16px 16px;
-  max-height: 180px;
-  overflow-y: auto;
+  padding: 10px 16px 16px;
   border-top: 1px solid rgba(148, 163, 184, 0.14);
-  padding-top: 12px;
+
+  &.expanded {
+    flex: 1 1 240px;
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+}
+
+.log-header-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+
+  &:hover { color: #0a9e94; }
+}
+
+.log-caret {
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.panel-log.expanded .log-caret { transform: rotate(90deg); }
+
+.log-header-title {
+  flex: 1;
+  text-align: left;
+}
+
+.log-count-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #0bb7aa;
+  background: #ecfdfb;
+  padding: 1px 8px;
+  border-radius: 99px;
+  min-width: 20px;
+  text-align: center;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.log-expanded-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+// hide AgentActionLog's own title to avoid duplication with the toggle bar
+.panel-log.expanded :deep(.log-title) { display: none; }
+
+// shrink chat when the log is expanded so the log gets the bulk of the space
+.agent-panel.log-expanded .panel-chat {
+  flex: 0 1 110px;
+  min-height: 80px;
+  max-height: 150px;
 }
 
 @media (max-width: 1200px) {
