@@ -693,6 +693,8 @@ export type StudyTeachingActionType =
   | 'agent_reply'
   | 'append_agent_note'
   | 'mark_current_step_skipped'
+  | 'trigger_feedback_visual_effect'
+  | 'set_playback_rate'
   | 'insert_timeline_patch'
 
 export interface StudyTeachingAction {

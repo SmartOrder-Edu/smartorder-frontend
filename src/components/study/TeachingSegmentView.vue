@@ -11,6 +11,11 @@
       'segment-collapsed': isPast && collapsed,
       'scene-action-active': !!sceneAction,
       [`scene-action-${sceneAction?.actionType}`]: !!sceneAction,
+      'feedback-effect-active': !!feedbackEffect,
+      'feedback-slower': feedbackEffect?.type === 'slower',
+      'feedback-dont-understand': feedbackEffect?.type === 'dont_understand',
+      'feedback-mastered': feedbackEffect?.type === 'already_mastered',
+      'feedback-skip': feedbackEffect?.type === 'skip',
     }"
     :style="sceneActionStyle"
   >
@@ -130,6 +135,7 @@ const props = defineProps<{
   revealedBoardItemIndexes?: Record<string, number>
   waitingForContinue?: boolean
   timelineStatus?: string
+  feedbackEffect?: { type: string; segmentId?: string; ts: number } | null
 }>()
 
 defineEmits<{
@@ -630,6 +636,79 @@ function applyFocus(el: HTMLElement) {
   border-radius: 14px;
   scroll-margin-top: 12px;
   transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+}
+
+.feedback-effect-active {
+  &::after {
+    position: absolute;
+    top: 4px;
+    right: 2px;
+    z-index: 2;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    pointer-events: none;
+  }
+
+  .classroom-shell {
+    border-radius: 12px;
+  }
+}
+
+.feedback-slower {
+  &::after {
+    content: '已减速';
+    background: rgba(255, 251, 235, 0.94);
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.24);
+  }
+
+  .classroom-shell {
+    animation: feedbackSlow 1.3s ease;
+  }
+}
+
+.feedback-dont-understand {
+  &::after {
+    content: '再讲一遍';
+    background: rgba(254, 242, 242, 0.94);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .segment-board,
+  .teacher-text {
+    animation: feedbackNeedHelp 1.2s ease;
+  }
+}
+
+.feedback-mastered {
+  &::after {
+    content: '已掌握';
+    background: rgba(236, 253, 245, 0.96);
+    color: #047857;
+    border: 1px solid rgba(16, 185, 129, 0.22);
+  }
+
+  .classroom-shell {
+    animation: feedbackMastered 1.2s ease;
+  }
+}
+
+.feedback-skip {
+  &::after {
+    content: '已跳过';
+    background: rgba(248, 250, 252, 0.96);
+    color: #475569;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+  }
+
+  .classroom-shell {
+    animation: feedbackSkip 0.9s ease;
+  }
 }
 
 // ---- 过去段折叠态：标题条 ----
@@ -1631,6 +1710,42 @@ function applyFocus(el: HTMLElement) {
   }
 }
 
+@keyframes feedbackSlow {
+  0%, 100% {
+    filter: none;
+  }
+  45% {
+    filter: drop-shadow(0 10px 20px rgba(245, 158, 11, 0.12));
+  }
+}
+
+@keyframes feedbackNeedHelp {
+  0%, 100% {
+    box-shadow: none;
+  }
+  45% {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  }
+}
+
+@keyframes feedbackMastered {
+  0%, 100% {
+    filter: none;
+  }
+  45% {
+    filter: drop-shadow(0 10px 18px rgba(16, 185, 129, 0.14));
+  }
+}
+
+@keyframes feedbackSkip {
+  0%, 100% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.58;
+  }
+}
+
 // 板书落定（落墨感）
 @keyframes boardEnter {
   from {
@@ -1665,7 +1780,12 @@ function applyFocus(el: HTMLElement) {
   .segment-waiting::before,
   .teacher-avatar.is-speaking::after,
   .voice-waveform.active span,
-  .segment-end-hint .hint-dot {
+  .segment-end-hint .hint-dot,
+  .feedback-slower .classroom-shell,
+  .feedback-dont-understand .segment-board,
+  .feedback-dont-understand .teacher-text,
+  .feedback-mastered .classroom-shell,
+  .feedback-skip .classroom-shell {
     animation: none !important;
   }
 }

@@ -116,6 +116,7 @@
               :revealed-board-item-indexes="stepStore.getRevealedBoardItemIndexes(seg.id)"
               :waiting-for-continue="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex && isSegmentEndWaiting"
               :timeline-status="stepStore.timelineStatus"
+              :feedback-effect="feedbackEffectForSegment(seg.id)"
               @quiz-answer="onQuizAnswer"
             />
           </template>
@@ -218,6 +219,13 @@ const teachingBadgeLabel = computed(() => {
   if (stepStore.timelineStatus === 'paused') return '已暂停'
   return 'Agent 讲解中'
 })
+
+function feedbackEffectForSegment(segmentId: string) {
+  const effect = stepStore.feedbackVisualEffect
+  if (!effect) return null
+  if (effect.segmentId && effect.segmentId !== segmentId) return null
+  return effect
+}
 
 function bindTimelineAudio(el: Element | ComponentPublicInstance | null) {
   stepStore.setTimelineAudioElement(el instanceof HTMLAudioElement ? el : null)

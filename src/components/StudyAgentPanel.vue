@@ -4,10 +4,7 @@
     <div class="panel-top">
       <div class="agent-mini-header">
         <div class="agent-mini-avatar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
-          </svg>
+          <img :src="teacherAvatar" alt="学习伙伴" class="agent-mini-avatar-img" />
         </div>
         <span class="agent-mini-name">学习伙伴</span>
         <span class="agent-mini-status">在线</span>
@@ -98,6 +95,7 @@ import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
 import { useAgentStore } from '@/stores/agent'
 import type { FeedbackType } from '@/types/study'
+import teacherAvatar from '@/assets/teacher.png'
 
 const collapsed = defineModel<boolean>('collapsed', { default: false })
 
@@ -289,6 +287,15 @@ export default { name: 'StudyAgentPanel' }
   align-items: center;
   justify-content: center;
   color: white;
+  overflow: hidden;
+}
+
+.agent-mini-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
 }
 
 .agent-mini-name {

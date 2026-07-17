@@ -63,6 +63,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const activeSceneActions = ref<LessonSceneAction[]>([])
   const revealedBoardBlockIndexes = ref<Record<string, number>>({})
   const revealedBoardItemIndexes = ref<Record<string, Record<string, number>>>({})
+  const feedbackVisualEffect = ref<{ type: string; segmentId?: string; ts: number } | null>(null)
   const quickContinueCount = ref(0)
   const segmentWaitStartedAtMs = ref(0)
   const currentWaitReason = ref('')
@@ -418,6 +419,10 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       // 模拟网络延迟
       await new Promise(r => setTimeout(r, 400))
       if (!handledByBackend) {
+        triggerFeedbackVisualEffect(type)
+        if (type === 'slower') {
+          setTimelinePlaybackRate(0.75)
+        }
         const reply = getMockFeedbackReply(type)
         chatMessages.value.push({
           id: `a-${Date.now()}`,
@@ -556,6 +561,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     quizState.value = null
     revealedBoardBlockIndexes.value = {}
     revealedBoardItemIndexes.value = {}
+    feedbackVisualEffect.value = null
     resetContinueRhythm()
   }
 
@@ -1365,6 +1371,14 @@ export const useTaskStepStore = defineStore('taskStep', () => {
             if (cur) cur.status = 'skipped'
             break
           }
+
+          case 'trigger_feedback_visual_effect':
+            triggerFeedbackVisualEffect(String(action.payload.type || ''))
+            break
+
+          case 'set_playback_rate':
+            setTimelinePlaybackRate(Number(action.payload.rate || 1))
+            break
         }
         void reportTeachingActionStatus(action.actionId, 'applied', {
           actionType: action.actionType,
@@ -1379,6 +1393,20 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         )
       }
     })
+  }
+
+  function triggerFeedbackVisualEffect(type: string) {
+    if (!type) return
+    feedbackVisualEffect.value = {
+      type,
+      segmentId: currentSegment.value?.id,
+      ts: Date.now(),
+    }
+  }
+
+  function setTimelinePlaybackRate(rate: number) {
+    if (!Number.isFinite(rate) || rate <= 0) return
+    timelinePlayer.setPlaybackRate(rate)
   }
 
   async function reportTeachingActionStatus(
@@ -1427,6 +1455,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     quizState,
     currentSubtitle,
     activeSceneActions,
+    feedbackVisualEffect,
     getActiveSceneAction,
     getRevealedBoardBlockIndex,
     getRevealedBoardItemIndexes,
