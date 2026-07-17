@@ -61,6 +61,7 @@ export interface TaskVO {
   agentReason?: string | null
   isOverdue: boolean
   isToday: boolean
+  spaceName?: string
   metadata: string | Record<string, any> | null
 }
 

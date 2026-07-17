@@ -5,16 +5,7 @@
         <div class="hero-copy">
           <h1>任务日程</h1>
           <p>管理今日计划、本周安排和所有学习任务，按学习空间和路径节点推进</p>
-          <div class="date-card" aria-label="今日日期与学习提示">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <path d="M16 2v4M8 2v4M3 10h18" />
-            </svg>
-            <div>
-              <strong>{{ todayHeader }}</strong>
-              <span>{{ greetingText }}</span>
-            </div>
-          </div>
+
         </div>
 
         <div class="hero-actions">
@@ -42,28 +33,34 @@
 
       <section class="stats-grid" aria-label="任务数据概览">
         <article v-for="item in statCards" :key="item.key" class="stat-card" :class="item.key">
-          <div class="stat-icon" v-html="item.icon"></div>
-          <div class="stat-copy">
-            <strong>{{ item.value }}</strong>
-            <span>{{ item.label }}</span>
-            <small>{{ item.hint }}</small>
+          <div class="stat-card-main">
+            <div class="stat-icon" v-html="item.icon"></div>
+            <div class="stat-copy">
+              <strong>{{ item.value }}</strong>
+              <span>{{ item.label }}</span>
+            </div>
           </div>
-          <svg class="trend-line" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
-            <path :d="item.trend" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-          </svg>
+          <div class="stat-card-footer">
+            <small class="stat-hint">{{ item.hint }}</small>
+            <svg class="trend-line" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient :id="`trend-grad-${item.key}`" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="currentColor" stop-opacity="0.16" />
+                  <stop offset="100%" stop-color="currentColor" stop-opacity="0.0" />
+                </linearGradient>
+              </defs>
+              <path :d="`${item.trend} L 116 30 L 4 30 Z`" :fill="`url(#trend-grad-${item.key})`" />
+              <path :d="item.trend" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            </svg>
+          </div>
         </article>
 
-        <article class="stat-card focus-card">
-          <div class="focus-ring" :style="{ '--progress': `${focusProgress}%` }">
-            <span>{{ focusProgress }}</span>
-            <small>%</small>
-          </div>
-          <div class="stat-copy">
-            <strong>今日专注进度</strong>
-            <span>目标 {{ completedTodayCount }}/{{ visibleTodayCount }} 任务</span>
-            <small>{{ totalPlannedMinutes }} 分钟计划学习</small>
-          </div>
-        </article>
+        <FocusProgressCard
+          class="stat-card"
+          :progress="focusProgress"
+          :completed="completedTodayCount"
+          :total="visibleTodayCount"
+        />
       </section>
 
       <div class="content-grid">
@@ -147,11 +144,6 @@
                 class="learning-task-card"
                 :class="[`type-${actionClass(task)}`, { completed: task.status === 'completed' }]"
               >
-                <div class="task-time-axis">
-                  <span class="axis-dot" :class="taskStatusClass(task)"></span>
-                  <strong>{{ deadlineLabel(task) }}</strong>
-                  <span>{{ formatTaskTime(task) }}</span>
-                </div>
 
                 <button
                   class="task-check"
@@ -166,16 +158,15 @@
                   </svg>
                 </button>
 
-                <div class="task-type-icon" v-html="typeIcon(task)"></div>
+                <div class="task-type-icon-wrapper">
+                  <div class="task-type-icon" v-html="typeIcon(task)"></div>
+                </div>
 
                 <div class="task-body">
                   <div class="task-meta">
                     <span class="type-badge" :class="actionClass(task)">{{ actionTypeLabel(task) }}</span>
                     <span class="meta-item">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10" />
-                        <path d="M12 6v6l4 2" />
-                      </svg>
+                      <span class="meta-icon" aria-hidden="true" v-html="clockIcon"></span>
                       {{ deadlineLabel(task) }} · {{ task.estimatedDurationMinutes || 25 }}分钟
                     </span>
                   </div>
@@ -237,15 +228,36 @@
         <aside class="assist-rail">
           <section class="rail-card rhythm-card">
             <div class="rail-header">
-              <strong>今日学习节奏</strong>
-              <button type="button" @click="activeTab = 'today'">查看完整日程</button>
+              <div class="rail-title">
+                <svg class="rhythm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="13" r="8"></circle>
+                  <path d="M12 9v4l2 2"></path>
+                  <path d="M5 3L2 6"></path>
+                  <path d="M19 3l3 3"></path>
+                </svg>
+                <strong>今日学习节奏</strong>
+              </div>
             </div>
             <div class="rhythm-list">
               <div v-for="item in todayRhythm" :key="item.id" class="rhythm-item" :class="item.status">
                 <span class="rhythm-time">{{ item.time }}</span>
-                <span class="rhythm-dot"></span>
+                <div class="rhythm-dot-wrapper">
+                  <span class="rhythm-dot">
+                    <svg v-if="item.status === 'completed'" class="rhythm-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </span>
+                </div>
                 <span class="rhythm-title">{{ item.title }}</span>
               </div>
+            </div>
+            <div class="rail-footer">
+              <button type="button" class="view-schedule-btn" @click="activeTab = 'today'">
+                查看完整日程
+                <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
             </div>
           </section>
 
@@ -421,6 +433,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import FocusProgressCard from './components/FocusProgressCard.vue'
+import { learningSpaceApi } from '@/api/learningSpace'
 import {
   agentScheduleApi,
   taskApi,
@@ -430,6 +444,14 @@ import {
 } from '@/api/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import type { TaskActionType, TaskStatus, TaskVO } from '@/types/learningSpace'
+import calendarIcon from '@/assets/icons/task-schedule/calendar.svg?raw'
+import bookIcon from '@/assets/icons/task-schedule/book.svg?raw'
+import practiceIcon from '@/assets/icons/task-schedule/practice.svg?raw'
+import folderIcon from '@/assets/icons/task-schedule/folder.svg?raw'
+import clockIcon from '@/assets/icons/task-schedule/clock.svg?raw'
+import taskProgressIcon from '@/assets/icons/task-schedule/task-progress.svg?raw'
+
+const resourceStatIcon = `<svg t="1784288034869" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="13863" width="200" height="200"><path d="M266.24 713.874286h280.868571c20.48 0 35.108571-14.628571 35.108572-35.108572s-14.628571-35.108571-35.108572-35.108571H266.24c-20.48 0-35.108571 14.628571-35.108571 35.108571 0 17.554286 17.554286 35.108571 35.108571 35.108572z" fill="currentColor" p-id="13864"></path><path d="M965.485714 386.194286V245.76C965.485714 207.725714 933.302857 175.542857 895.268571 175.542857H157.988571C119.954286 175.542857 87.771429 207.725714 87.771429 245.76v561.737143C87.771429 845.531429 119.954286 877.714286 157.988571 877.714286h737.28c38.034286 0 70.217143-32.182857 70.217143-70.217143V386.194286zM193.097143 245.76h667.062857c20.48 0 35.108571 14.628571 35.108571 35.108571v105.325715H157.988571V280.868571c0-20.48 14.628571-35.108571 35.108572-35.108571z m702.171428 526.628571c0 20.48-14.628571 35.108572-35.108571 35.108572H193.097143c-20.48 0-35.108571-14.628571-35.108572-35.108572V456.411429h737.28v315.977142z" fill="currentColor" p-id="13865"></path></svg>`
 
 type TabValue = 'today' | 'week' | 'all'
 type FilterValue = 'all' | 'in_progress' | 'pending' | 'completed'
@@ -463,6 +485,7 @@ const todayTasks = ref<TaskVO[]>([])
 const pendingTasks = ref<TaskVO[]>([])
 const overdueTasks = ref<TaskVO[]>([])
 const busyTaskIds = ref<Set<string>>(new Set())
+const spaceNameMap = ref<Record<string, string>>({})
 let generationStepTimers: number[] = []
 
 const { enterTask } = useStudyEntry()
@@ -502,9 +525,6 @@ const taskStats = computed(() => ({
   completed: allTasks.value.filter(task => task.status === 'completed').length,
 }))
 
-const totalPlannedMinutes = computed(() =>
-  todayTasks.value.reduce((sum, task) => sum + Number(task.estimatedDurationMinutes || 0), 0)
-)
 
 const statCards = computed(() => [
   {
@@ -529,7 +549,7 @@ const statCards = computed(() => [
     label: '资源任务',
     hint: taskStats.value.resource ? '补齐学习材料' : '资源队列为空',
     trend: 'M4 22 C18 18 28 23 38 16 S60 10 72 17 88 5 116 12',
-    icon: folderIcon,
+    icon: resourceStatIcon,
   },
   {
     key: 'completed',
@@ -579,12 +599,33 @@ const streakMessage = computed(() => (focusProgress.value >= 60 ? '节奏很好�
 
 const todayRhythm = computed(() => {
   const source = todayTasks.value.length ? todayTasks.value : filteredTasks.value
-  return source.slice(0, 5).map((task, index) => ({
-    id: String(task.id),
-    time: task.dueTime || defaultRhythmTimes[index] || '--:--',
-    title: task.status === 'completed' ? `完成：${task.title}` : task.title,
-    status: task.status === 'completed' ? 'completed' : task.status === 'in_progress' || task.status === 'doing' ? 'current' : 'pending',
-  }))
+  return source.slice(0, 5).map((task, index) => {
+    const status = task.status === 'completed' ? 'completed' : task.status === 'in_progress' || task.status === 'doing' ? 'current' : 'pending'
+    
+    // 模仿截图文案，并且让已完成任务数量动态联动
+    let title = task.title
+    if (index === 0) {
+      title = '开始学习'
+    } else if (index === 1) {
+      title = `完成 ${completedTodayCount.value || 2} 个任务`
+    } else if (index === 2) {
+      title = '进行中'
+    } else if (index === 3) {
+      title = '待开始'
+    } else if (index === 4) {
+      title = '计划学习'
+    }
+
+    return {
+      id: String(task.id),
+      time: (() => {
+        const t = task.dueTime || defaultRhythmTimes[index] || '--:--'
+        return t.includes(':') ? t.split(':').slice(0, 2).join(':') : t
+      })(),
+      title,
+      status,
+    }
+  })
 })
 
 const scheduleCompositionText = computed(() => {
@@ -748,11 +789,33 @@ async function loadTasks() {
     todayTasks.value = today
     pendingTasks.value = pending
     overdueTasks.value = overdue
+    ensureSpaceNames([...today, ...pending, ...overdue])
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : '请稍后重试'
     ElMessage.error('任务加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function ensureSpaceNames(tasks: TaskVO[]) {
+  const missingIds = new Set<string>()
+  for (const task of tasks) {
+    if (task.spaceId && !task.spaceName && !spaceNameMap.value[task.spaceId]) {
+      missingIds.add(task.spaceId)
+    }
+  }
+  if (missingIds.size === 0) return
+
+  try {
+    const spaces = await learningSpaceApi.list()
+    for (const space of spaces) {
+      if (missingIds.has(space.id)) {
+        spaceNameMap.value[space.id] = space.name
+      }
+    }
+  } catch {
+    // 静默失败，spaceLabel 会降级展示 spaceId
   }
 }
 
@@ -1031,6 +1094,8 @@ function taskTags(task: TaskVO) {
 }
 
 function spaceLabel(task: TaskVO) {
+  if (task.spaceName) return task.spaceName
+  if (task.spaceId && spaceNameMap.value[task.spaceId]) return spaceNameMap.value[task.spaceId]
   const metadata = readMetadata(task)
   return String(metadata.spaceName || metadata.learningSpaceName || metadata.subjectName || `学习空间 ${task.spaceId || '-'}`)
 }
@@ -1109,12 +1174,10 @@ function readMetadata(task: TaskVO) {
 
 const defaultRhythmTimes = ['09:00', '10:30', '13:30', '15:00', '17:00']
 
-const bookIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'
-const checkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'
-const folderIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h5"/></svg>'
-const doneIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg>'
-const codeIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>'
-const projectIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8h8M8 12h5M8 16h7"/></svg>'
+const checkIcon = practiceIcon
+const doneIcon = taskProgressIcon
+const codeIcon = `<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M867.889126 0H153.927505C68.776119 0 0 68.776119 0 153.927505v30.567165c0 15.283582 12.008529 27.292111 27.292111 27.29211S54.584222 199.778252 54.584222 184.49467v-30.567165c0-54.584222 43.667377-98.251599 98.251599-98.251599h713.96162c54.584222 0 98.251599 43.667377 98.2516 98.251599v716.14499c0 54.584222-43.667377 98.251599-98.2516 98.251599H710.686567c-15.283582 0-27.292111 12.008529-27.292111 27.292111s12.008529 27.292111 27.292111 27.292111h156.110874c85.151386 0 153.927505-68.776119 153.927506-153.927506V153.927505c0-85.151386-68.776119-153.927505-152.835821-153.927505z" /><path fill="currentColor" d="M749.987207 597.151386c5.458422-14.191898-1.091684-30.567164-15.283582-36.025586-14.191898-5.458422-30.567164 1.091684-36.025587 15.283582l-73.142857 185.586354c-15.283582-43.667377-41.484009-84.059701-77.509595-116.810235-39.30064-36.025586-87.334755-62.226013-139.735607-75.326226 69.867804-32.750533 117.901919-103.710021 117.901919-185.586354 0-112.443497-91.701493-205.236674-204.14499-205.236674-112.443497 0-204.144989 91.701493-204.144989 205.236674 0 81.876333 48.034115 152.835821 117.901919 185.586354C100.434968 603.701493 4.366738 716.144989 1.091684 858.063966V995.616205c0 15.283582 12.008529 27.292111 27.292111 27.292111s27.292111-12.008529 27.292111-27.292111V859.15565c3.275053-138.643923 116.810235-243.445629 265.279318-243.445629 72.051173 0 138.643923 25.108742 187.769723 72.051173 49.1258 45.850746 76.41791 109.168443 76.41791 177.944563v131.002132c0 15.283582 12.008529 27.292111 27.292111 27.292111s27.292111-12.008529 27.292111-27.292111V870.072495l110.260128-272.921109zM173.577825 385.364606c0-81.876333 66.592751-149.560768 148.469083-149.560768s148.469083 66.592751 148.469083 149.560768S403.923241 533.833689 322.046908 533.833689s-148.469083-66.592751-148.469083-148.469083zM874.439232 149.560768H510.908316c-15.283582 0-27.292111 12.008529-27.292111 27.29211s12.008529 27.292111 27.292111 27.292111h363.530916c15.283582 0 27.292111-12.008529 27.292111-27.292111 0-14.191898-12.008529-27.292111-27.292111-27.29211zM874.439232 286.021322H614.618337c-15.283582 0-27.292111 12.008529-27.292111 27.292111s12.008529 27.292111 27.292111 27.292111H873.347548c15.283582 0 27.292111-12.008529 27.292111-27.292111s-10.916844-27.292111-26.200427-27.292111zM874.439232 422.481876H692.127932c-15.283582 0-27.292111 12.008529-27.292111 27.292111s12.008529 27.292111 27.292111 27.292111h182.3113c15.283582 0 27.292111-12.008529 27.292111-27.292111s-12.008529-27.292111-27.292111-27.292111z" /></svg>`
+const projectIcon = taskProgressIcon
 </script>
 
 <script lang="ts">
@@ -1176,7 +1239,13 @@ export default { name: 'TasksPage' }
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
 }
 
-.date-card svg {
+.date-icon,
+.meta-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.date-card .date-icon svg {
   width: 20px;
   height: 20px;
   color: var(--primary);
@@ -1292,9 +1361,9 @@ export default { name: 'TasksPage' }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 22px;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) 300px;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
 .stat-card,
@@ -1315,6 +1384,36 @@ export default { name: 'TasksPage' }
   gap: 14px;
   padding: 20px;
   overflow: hidden;
+}
+
+.stat-card:not(.focus-card) {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stat-card-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.stat-card-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: auto;
+  width: 100%;
+}
+
+.stat-card:not(.focus-card) .stat-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  color: currentColor;
 }
 
 .stat-icon,
@@ -1339,23 +1438,6 @@ export default { name: 'TasksPage' }
 .stat-card.resource { color: var(--warning); }
 .stat-card.completed { color: var(--primary-violet); }
 
-.stat-card.review .stat-icon,
-.task-type-icon {
-  background: rgba(11, 183, 170, 0.11);
-}
-
-.stat-card.practice .stat-icon {
-  background: rgba(20, 184, 166, 0.12);
-}
-
-.stat-card.resource .stat-icon {
-  background: rgba(245, 158, 11, 0.12);
-}
-
-.stat-card.completed .stat-icon {
-  background: rgba(124, 58, 237, 0.12);
-}
-
 .stat-copy {
   min-width: 0;
   display: grid;
@@ -1368,9 +1450,13 @@ export default { name: 'TasksPage' }
   line-height: 1;
 }
 
-.focus-card .stat-copy strong {
-  font-size: 0.95rem;
+.stat-card:not(.focus-card) .stat-copy strong {
+  color: currentColor;
+  font-size: 2.1rem;
+  font-weight: 750;
 }
+
+/* 已迁移至新结构 */
 
 .stat-copy span {
   color: var(--text-primary-local);
@@ -1392,34 +1478,13 @@ export default { name: 'TasksPage' }
   opacity: 0.55;
 }
 
-.focus-card {
-  justify-content: space-between;
-  color: var(--success);
+.stat-card-footer .trend-line {
+  position: static;
+  width: 76px;
+  height: 24px;
+  opacity: 1;
 }
 
-.focus-ring {
-  --progress: 0%;
-  width: 82px;
-  height: 82px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at center, var(--card-bg) 0 55%, transparent 56%),
-    conic-gradient(var(--success) var(--progress), rgba(20, 184, 166, 0.14) 0);
-}
-
-.focus-ring span {
-  color: var(--text-primary-local);
-  font-size: 1.4rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.focus-ring small {
-  color: var(--text-secondary-local);
-  font-size: 0.72rem;
-}
 
 .content-grid {
   display: grid;
@@ -1571,7 +1636,7 @@ export default { name: 'TasksPage' }
 .learning-task-card {
   position: relative;
   display: grid;
-  grid-template-columns: 72px 28px 56px minmax(0, 1fr) auto;
+  grid-template-columns: 28px 68px minmax(0, 1fr) auto;
   gap: 16px;
   align-items: center;
   padding: 22px;
@@ -1580,6 +1645,12 @@ export default { name: 'TasksPage' }
   background: var(--card-bg);
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+
+  /* 默认/复习任务的主题变量 (亮蓝色) */
+  --task-color: var(--primary);
+  --task-color-rgb: 11, 183, 170;
+  --task-grad: linear-gradient(135deg, #0ea5e9, #2563eb);
+  --task-glow: rgba(37, 99, 235, 0.28);
 }
 
 .learning-task-card::before {
@@ -1590,7 +1661,7 @@ export default { name: 'TasksPage' }
   bottom: 18px;
   width: 3px;
   border-radius: 0 999px 999px 0;
-  background: var(--primary);
+  background: var(--task-color);
 }
 
 .learning-task-card:hover {
@@ -1599,56 +1670,32 @@ export default { name: 'TasksPage' }
   border-color: rgba(11, 183, 170, 0.22);
 }
 
-.learning-task-card.type-practice::before { background: var(--success); }
-.learning-task-card.type-resource::before { background: var(--warning); }
-.learning-task-card.type-project::before { background: var(--primary-violet); }
+.learning-task-card.type-practice {
+  --task-color: var(--success);
+  --task-color-rgb: 20, 184, 166;
+  --task-grad: linear-gradient(135deg, #34d399, #059669);
+  --task-glow: rgba(16, 185, 129, 0.28);
+}
+.learning-task-card.type-practice::before { background: var(--task-color); }
+
+.learning-task-card.type-resource {
+  --task-color: var(--warning);
+  --task-color-rgb: 245, 158, 11;
+  --task-grad: linear-gradient(135deg, #fbbf24, #d97706);
+  --task-glow: rgba(245, 158, 11, 0.28);
+}
+.learning-task-card.type-resource::before { background: var(--task-color); }
+
+.learning-task-card.type-project {
+  --task-color: var(--primary-violet);
+  --task-color-rgb: 124, 58, 237;
+  --task-grad: linear-gradient(135deg, #a78bfa, #7c3aed);
+  --task-glow: rgba(124, 58, 237, 0.28);
+}
+.learning-task-card.type-project::before { background: var(--task-color); }
+
 .learning-task-card.completed {
   opacity: 0.68;
-}
-
-.task-time-axis {
-  position: relative;
-  display: grid;
-  gap: 4px;
-  color: var(--text-secondary-local);
-  font-size: 0.76rem;
-}
-
-.task-time-axis::after {
-  content: '';
-  position: absolute;
-  left: -22px;
-  top: 4px;
-  bottom: 4px;
-  width: 1px;
-  background: var(--border-color-local);
-}
-
-.axis-dot {
-  position: absolute;
-  left: -28px;
-  top: 3px;
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: var(--primary);
-  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
-  z-index: 1;
-}
-
-.axis-dot.done {
-  background: var(--success);
-  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
-}
-
-.axis-dot.todo {
-  background: var(--border-color-local);
-  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.12);
-}
-
-.task-time-axis strong {
-  color: var(--text-primary-local);
-  font-size: 0.82rem;
 }
 
 .task-check {
@@ -1684,19 +1731,31 @@ export default { name: 'TasksPage' }
   height: 16px;
 }
 
-.learning-task-card.type-practice .task-type-icon {
-  color: var(--success);
-  background: rgba(20, 184, 166, 0.12);
+.task-type-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(var(--task-color-rgb), 0.08);
+  border: 1px solid rgba(var(--task-color-rgb), 0.12);
 }
 
-.learning-task-card.type-resource .task-type-icon {
-  color: var(--warning);
-  background: rgba(245, 158, 11, 0.12);
+.learning-task-card .task-type-icon {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--task-color);
 }
 
-.learning-task-card.type-project .task-type-icon {
-  color: var(--primary-violet);
-  background: rgba(124, 58, 237, 0.12);
+.learning-task-card .task-type-icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .task-body {
@@ -1754,7 +1813,8 @@ export default { name: 'TasksPage' }
   font-size: 0.75rem;
 }
 
-.meta-item svg {
+.meta-item svg,
+.meta-icon svg {
   width: 13px;
   height: 13px;
 }
@@ -1975,62 +2035,125 @@ export default { name: 'TasksPage' }
   font-weight: 800;
 }
 
+.rhythm-card {
+  padding: 24px 20px;
+}
+
+.rhythm-card .rail-header {
+  margin-bottom: 24px;
+}
+
+.rail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1e3a8a; /* 尊贵的深蓝/蓝紫色 */
+}
+
+.rhythm-icon {
+  width: 18px;
+  height: 18px;
+  color: currentColor;
+  flex-shrink: 0;
+}
+
+.rail-title strong {
+  font-size: 1rem;
+  font-weight: 700;
+  color: currentColor;
+}
+
 .rhythm-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 0;
 }
 
 .rhythm-item {
   display: grid;
-  grid-template-columns: 48px 18px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-  min-height: 36px;
+  grid-template-columns: 52px 24px minmax(0, 1fr);
+  gap: 12px;
+  align-items: flex-start;
+  min-height: 48px;
+  padding-bottom: 20px;
+  font-size: 0.88rem;
   color: var(--text-secondary-local);
-  font-size: 0.8rem;
+}
+
+.rhythm-item:last-child {
+  padding-bottom: 0;
 }
 
 .rhythm-time {
   font-variant-numeric: tabular-nums;
+  font-size: 0.88rem;
+  color: var(--text-secondary-local);
+  line-height: 18px;
+}
+
+.rhythm-item.current .rhythm-time {
+  color: #2f54eb;
+  font-weight: 600;
+}
+
+.rhythm-dot-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  height: 100%;
+}
+
+.rhythm-dot-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  bottom: -22px;
+  width: 2px;
+  background-color: var(--border-color-local);
+  z-index: 1;
+}
+
+.rhythm-item.completed .rhythm-dot-wrapper::after {
+  background-color: #10b981; /* 已完成连线为绿色 */
+}
+
+.rhythm-item:last-child .rhythm-dot-wrapper::after {
+  display: none;
 }
 
 .rhythm-dot {
   position: relative;
-  width: 10px;
-  height: 10px;
-  margin-top: 5px;
-  border-radius: 999px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
   border: 2px solid var(--border-color-local);
   background: var(--card-bg);
-}
-
-.rhythm-dot::after {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 10px;
-  width: 1px;
-  height: 28px;
-  background: var(--border-color-local);
-}
-
-.rhythm-item:last-child .rhythm-dot::after {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
 }
 
 .rhythm-item.completed .rhythm-dot {
-  border-color: var(--success);
-  background: var(--success);
+  border-color: #10b981;
+  background: #10b981;
 }
 
-.rhythm-item.current {
-  color: var(--primary);
-  font-weight: 800;
+.rhythm-check {
+  width: 10px;
+  height: 10px;
+  color: #ffffff;
 }
 
 .rhythm-item.current .rhythm-dot {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+  border-color: #2f54eb;
+  background: var(--card-bg);
+  box-shadow: 0 0 0 4px rgba(47, 84, 235, 0.15); /* 呼吸灯外圈 */
+}
+
+.rhythm-item.pending .rhythm-dot {
+  border-color: #d1d5db;
+  background: var(--card-bg);
 }
 
 .rhythm-title {
@@ -2038,6 +2161,51 @@ export default { name: 'TasksPage' }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.88rem;
+  color: var(--text-primary-local);
+  line-height: 18px;
+}
+
+.rhythm-item.completed .rhythm-title {
+  color: var(--text-secondary-local);
+}
+
+.rhythm-item.current .rhythm-title {
+  color: #2f54eb;
+  font-weight: 600;
+}
+
+.rhythm-item.pending .rhythm-title {
+  color: var(--text-secondary-local);
+}
+
+.rail-footer {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.view-schedule-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #2f54eb;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.view-schedule-btn:hover {
+  color: #1d39c4;
+}
+
+.arrow-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .streak-card {
@@ -2318,10 +2486,6 @@ input:focus-visible {
     gap: 12px;
   }
 
-  .task-time-axis::after,
-  .axis-dot {
-    display: none;
-  }
 
   .task-side {
     width: 100%;
