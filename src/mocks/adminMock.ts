@@ -267,8 +267,8 @@ for (let i = 6; i <= 25; i++) {
 let ragJobs = [
   {
     id: "3001",
-    fileName: "2026智能点餐前沿业务场景分析报告.pdf",
-    knowledgeBaseName: "智能点餐研究库",
+    fileName: "数据结构算法之二叉树及深度优先遍历精讲.pdf",
+    knowledgeBaseName: "数据结构与算法核心知识库",
     jobType: "VECTORIZE",
     status: "success",
     progress: 100,
@@ -282,8 +282,8 @@ let ragJobs = [
   },
   {
     id: "3002",
-    fileName: "分布式缓存高可用集群核心方案说明.md",
-    knowledgeBaseName: "技术架构知识库",
+    fileName: "关系型数据库MySQL高性能索引优化方案.md",
+    knowledgeBaseName: "经典数据库原理知识库",
     jobType: "VECTORIZE",
     status: "running",
     progress: 68,
@@ -297,8 +297,8 @@ let ragJobs = [
   },
   {
     id: "3003",
-    fileName: "用户点餐个性化推荐模型参数调优指南.docx",
-    knowledgeBaseName: "推荐算法演练库",
+    fileName: "数据结构高频知识点背诵与链表操作指南.docx",
+    knowledgeBaseName: "数据结构期末考试复习库",
     jobType: "VECTORIZE",
     status: "failed",
     progress: 15,
@@ -312,8 +312,8 @@ let ragJobs = [
   },
   {
     id: "3004",
-    fileName: "扫码快速点餐后端数据库分库分表DDL.sql",
-    knowledgeBaseName: "技术架构知识库",
+    fileName: "数据库核心知识点与高频面试题精选.sql",
+    knowledgeBaseName: "数据库与缓存常用知识点库",
     jobType: "VECTORIZE",
     status: "pending",
     progress: 0,
@@ -567,6 +567,13 @@ let feedbacks = [
   }
 ];
 
+function getMockUsername(userId: string): string {
+  if (userId === "1001" || userId === "1111111111111111111") return "1";
+  if (userId === "2005" || userId === "2056418990037258240") return "vibe-coder";
+  if (userId === "2008" || userId === "2077386505944932352") return "845473457";
+  return "测试用户_" + userId;
+}
+
 let prizes = [
   {
     id: "1",
@@ -574,6 +581,7 @@ let prizes = [
     prizeCode: "ALIPAY-5-XGZ9021A",
     status: 1, // 已发放
     userId: "1001",
+    username: "1",
     feedbackId: "2",
     feedbackTitle: "希望前台在展示‘知识库思维导图’时能增加一键导出...",
     allocateTime: "2026-07-17T09:05:00.000Z",
@@ -641,6 +649,7 @@ for (let i = 5; i <= 30; i++) {
     prizeCode: `${prefix}-CODE-${100000 + i}-${Date.now().toString().slice(-4)}`,
     status: status,
     userId: status === 1 ? (2000 + i).toString() : "",
+    username: status === 1 ? getMockUsername((2000 + i).toString()) : "",
     feedbackId: status === 1 ? (10 + i).toString() : "",
     feedbackTitle: status === 1 ? `关于点餐退款、结算细节的优化建言_${i}` : "",
     allocateTime: status === 1 ? new Date(Date.now() - i * 5 * 3600 * 1000).toISOString() : "",
@@ -801,6 +810,7 @@ export async function handleAdminMock(config: any): Promise<any> {
         if (availablePrize) {
           availablePrize.status = 1; // 已发放
           availablePrize.userId = "1001"; // 模拟分配给当前用户
+          availablePrize.username = "1";
           availablePrize.feedbackId = feedback.id;
           availablePrize.feedbackTitle = feedback.content.length > 22 ? feedback.content.slice(0, 22) + '...' : feedback.content;
           availablePrize.allocateTime = new Date().toISOString();

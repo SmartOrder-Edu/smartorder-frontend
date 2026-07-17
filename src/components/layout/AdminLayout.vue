@@ -10,7 +10,7 @@
         <div class="admin-logo-container" @click="goHome">
           <img src="/logo.png" alt="知序智学" class="admin-logo-img" />
           <div class="admin-logo-text">
-            <span class="admin-logo-title admin-gradient-text">知序管理后台</span>
+            <span class="admin-logo-title admin-gradient-text">知序智学管理后台</span>
             <span class="admin-logo-subtitle">Admin Portal</span>
           </div>
         </div>
@@ -18,13 +18,7 @@
         <!-- 主题切换与返回入口 -->
         <div class="theme-switch-row">
           <span class="theme-label">{{ isDark ? '暗黑科技风' : '优雅明亮风' }}</span>
-          <el-button 
-            type="primary" 
-            link 
-            class="theme-toggle-btn" 
-            @click="toggleTheme" 
-            title="切换黑白主题"
-          >
+          <el-button type="primary" link class="theme-toggle-btn" @click="toggleTheme" title="切换黑白主题">
             <el-icon class="theme-toggle-icon">
               <Sunny v-if="isDark" />
               <Moon v-else />
@@ -34,13 +28,8 @@
 
         <!-- 侧边导航栏 -->
         <nav class="admin-sidebar-nav">
-          <router-link
-            v-for="item in menuItems"
-            :key="item.id"
-            :to="item.path"
-            class="admin-nav-item"
-            :class="{ active: isActive(item.path) }"
-          >
+          <router-link v-for="item in menuItems" :key="item.id" :to="item.path" class="admin-nav-item"
+            :class="{ active: isActive(item.path) }">
             <el-icon class="admin-nav-icon">
               <component :is="item.icon" />
             </el-icon>
@@ -51,7 +40,9 @@
 
           <!-- 返回用户端 -->
           <router-link to="/dashboard" class="admin-nav-item back-user-btn">
-            <el-icon class="admin-nav-icon"><Back /></el-icon>
+            <el-icon class="admin-nav-icon">
+              <Back />
+            </el-icon>
             <span class="admin-nav-label">返回学习空间</span>
           </router-link>
         </nav>
@@ -59,11 +50,8 @@
         <!-- 管理员信息 -->
         <div class="admin-sidebar-footer">
           <div class="admin-info">
-            <img 
-              :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin'" 
-              alt="头像" 
-              class="admin-avatar" 
-            />
+            <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=admin'"
+              alt="头像" class="admin-avatar" />
             <div class="admin-meta">
               <span class="admin-name">{{ userStore.userName || '超级管理员' }}</span>
               <span class="admin-role-badge">SYSTEM ADMIN</span>
@@ -87,12 +75,12 @@ import { ref, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import AnimatedBackground from '@/components/common/AnimatedBackground.vue'
-import { 
-  Odometer, 
-  Cpu, 
-  Connection, 
-  ChatLineRound, 
-  Present, 
+import {
+  Odometer,
+  Cpu,
+  Connection,
+  ChatLineRound,
+  Present,
   Back,
   Sunny,
   Moon
@@ -127,7 +115,7 @@ const isActive = (path: string) => {
 }
 
 const goHome = () => {
-  router.push('/admin/dashboard').catch(() => {})
+  router.push('/admin/dashboard').catch(() => { })
 }
 </script>
 
@@ -139,7 +127,7 @@ const goHome = () => {
   height: 100vh;
   overflow: hidden;
   box-sizing: border-box;
-  
+
   /* 暗黑主题变量定义 */
   --admin-bg: #0b0f19;
   --admin-card-bg: rgba(30, 41, 59, 0.35);

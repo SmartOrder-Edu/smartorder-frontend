@@ -52,7 +52,7 @@ const dashboardCharts = {
 let toolExecutions = [
   {
     id: "1001",
-    userName: "赵铁柱",
+    userName: "我最爱学习了",
     toolName: "web_search",
     status: "SUCCESS",
     durationMs: 1420,

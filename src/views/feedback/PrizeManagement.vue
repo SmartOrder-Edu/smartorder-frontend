@@ -141,11 +141,11 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="userId" label="中奖者" width="110">
+        <el-table-column prop="username" label="中奖者" width="130">
           <template #default="{ row }">
-            <span v-if="row.userId" class="user-id-text">
+            <span v-if="row.username" class="user-id-text">
               <el-icon style="vertical-align: middle; margin-right: 4px;"><User /></el-icon>
-              UID: {{ row.userId }}
+              {{ row.username }}
             </span>
             <span v-else class="empty-holder">-</span>
           </template>
