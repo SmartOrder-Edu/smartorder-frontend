@@ -180,6 +180,23 @@
           </div>
         </template>
       </template>
+
+      <div class="temporary-board-notes" v-if="stepStore.temporaryBoardNotes.length">
+        <article
+          v-for="note in stepStore.temporaryBoardNotes"
+          :key="note.id"
+          class="temporary-board-note"
+        >
+          <div class="temporary-board-head">
+            <span class="temporary-board-dot"></span>
+            <h3>{{ note.title }}</h3>
+          </div>
+          <p class="temporary-board-question" v-if="note.sourceQuestion">
+            来自你的提问：{{ note.sourceQuestion }}
+          </p>
+          <MarkdownRenderer :content="note.content" />
+        </article>
+      </div>
     </div>
 
     <div v-else class="canvas-empty">画布加载中…</div>
@@ -444,6 +461,92 @@ function onQuizAnswer(_quizId: string, answer: string) {
 .canvas-waiting {
   opacity: 0.97;
   background: linear-gradient(180deg, rgba(240, 253, 250, 0.2), rgba(248, 250, 252, 0));
+}
+
+.temporary-board-notes {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.temporary-board-note {
+  position: relative;
+  padding: 15px 18px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  background:
+    linear-gradient(180deg, rgba(240, 253, 250, 0.82), rgba(255, 255, 255, 0.96)),
+    repeating-linear-gradient(0deg, rgba(14, 165, 233, 0.05) 0, rgba(14, 165, 233, 0.05) 1px, transparent 1px, transparent 30px);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+  animation: boardNoteIn 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+
+  :deep(.markdown-renderer) {
+    font-size: 13px;
+    color: #1e293b;
+
+    h3 {
+      margin: 6px 0 8px;
+      font-size: 14px;
+    }
+
+    p {
+      margin: 6px 0;
+    }
+
+    ol,
+    ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    blockquote {
+      margin: 10px 0 0;
+      padding: 8px 10px;
+      border-left: 3px solid rgba(11, 183, 170, 0.4);
+      background: rgba(255, 255, 255, 0.66);
+      color: #475569;
+    }
+  }
+}
+
+.temporary-board-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+
+  h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f766e;
+  }
+}
+
+.temporary-board-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #0bb7aa;
+  box-shadow: 0 0 0 5px rgba(11, 183, 170, 0.12);
+  animation: agentDotPulse 1.6s ease-in-out infinite;
+}
+
+.temporary-board-question {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+@keyframes boardNoteIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 // ---- 教学段列表 ----

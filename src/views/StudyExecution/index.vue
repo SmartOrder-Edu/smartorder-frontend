@@ -61,6 +61,10 @@
       </div>
 
       <!-- 底：进度反馈 -->
+      <StudyQuickAsk
+        :agent-collapsed="agentCollapsed"
+        @open-agent-panel="agentCollapsed = false"
+      />
       <StudyProgressFooter />
     </div>
   </AppLayout>
@@ -72,6 +76,7 @@ import { useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LearningScript from '@/components/study/LearningScript.vue'
 import StudyCanvas from '@/components/study/StudyCanvas.vue'
+import StudyQuickAsk from '@/components/study/StudyQuickAsk.vue'
 import StudyAgentPanel from '@/components/StudyAgentPanel.vue'
 import StudyProgressFooter from '@/components/study/StudyProgressFooter.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
@@ -156,6 +161,7 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 .study-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 0px);

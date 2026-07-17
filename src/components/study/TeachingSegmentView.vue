@@ -35,12 +35,7 @@
     <div v-if="segment.type !== 'pause'" v-show="!(isPast && collapsed)" class="classroom-shell" :class="[`tone-${segment.emotionTone || 'serious'}`]">
       <div class="teacher-talk" v-if="teacherLine">
         <div class="teacher-avatar" :class="{ 'is-speaking': isCurrent && timelineStatus === 'playing' }" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-            <circle cx="12" cy="12" r="9"/>
-            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" y1="9" x2="9.01" y2="9"/>
-            <line x1="15" y1="9" x2="15.01" y2="9"/>
-          </svg>
+          <img :src="teacherAvatar" alt="" class="teacher-avatar-img" />
         </div>
         <div class="voice-waveform" :class="{ active: isCurrent && timelineStatus === 'playing' }" aria-hidden="true">
           <span></span>
@@ -123,6 +118,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import BoardBlockRenderer from './board/BoardBlockRenderer.vue'
 import InlineQuizCard from './InlineQuizCard.vue'
+import teacherAvatar from '@/assets/teacher.png'
 import type { LessonSceneAction, TeachingBoardBlock, TeachingSegment, QuizState } from '@/types/study'
 
 const props = defineProps<{
@@ -1708,6 +1704,14 @@ function applyFocus(el: HTMLElement) {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+.teacher-avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 
 @keyframes feedbackSlow {

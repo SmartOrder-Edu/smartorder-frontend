@@ -20,6 +20,7 @@ import type {
   StudyChatMessage,
   StudyMode,
   StudyTeachingAction,
+  TemporaryBoardNote,
   TeachingBoardBlock,
   TeachingFlow,
   TeachingSegment,
@@ -53,6 +54,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const sessionTimelines = ref<Record<string, LessonTimeline>>({})
   const mastery = ref<MasteryJudge | null>(null)
   const chatMessages = ref<StudyChatMessage[]>([])
+  const temporaryBoardNotes = ref<TemporaryBoardNote[]>([])
   const sendingFeedback = ref(false)
   const completing = ref(false)
 
@@ -382,6 +384,26 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     canvasContent.value = { ...canvasContent.value, agentNote: note }
   }
 
+  /** 在当前画布追加一张临时板书卡片（来自自由提问或后端教学动作） */
+  function appendTemporaryBoardNote(note: {
+    title?: string
+    content: string
+    sourceQuestion?: string
+  }) {
+    const content = note.content.trim()
+    if (!content) return
+    temporaryBoardNotes.value = [
+      ...temporaryBoardNotes.value,
+      {
+        id: `board-note-${Date.now()}-${temporaryBoardNotes.value.length}`,
+        title: note.title?.trim() || 'Agent 补充板书',
+        content,
+        sourceQuestion: note.sourceQuestion?.trim(),
+        createTime: Date.now(),
+      },
+    ].slice(-4)
+  }
+
   /**
    * 发送反馈到 Agent 陪伴面板
    * mock 阶段：本地生成回复；后端就绪后：调用 useAgentChat 发起 study-scoped SSE
@@ -446,30 +468,38 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   /** 用户在右侧自由输入消息 */
   async function sendCustomMessage(text: string) {
-    if (!text.trim()) return
+    const question = text.trim()
+    if (!question) return
     sendingFeedback.value = true
     try {
       chatMessages.value.push({
         id: `u-${Date.now()}`,
         role: 'user',
-        text: text.trim(),
+        text: question,
         markdown: false,
         createTime: Date.now(),
       })
-      void reportStudyEvent({
+      const receipt = await reportStudyEvent({
         eventType: 'custom_message_submitted',
         targetType: 'chat',
         payload: {
-          text: text.trim(),
+          text: question,
         },
       })
+      if (receipt?.actions?.length) return
       await new Promise(r => setTimeout(r, 400))
+      const reply = buildMockCustomReply(question)
       chatMessages.value.push({
         id: `a-${Date.now()}`,
         role: 'agent',
-        text: `收到你的问题：「${text.trim()}」\n\nAgent 正在结合本次学习上下文分析。这是一个 mock 回复，后端 study-scoped SSE 接入后会给出真实讲解。`,
+        text: reply.chat,
         markdown: true,
         createTime: Date.now(),
+      })
+      appendTemporaryBoardNote({
+        title: '临时补充板书',
+        content: reply.board,
+        sourceQuestion: question,
       })
     } finally {
       sendingFeedback.value = false
@@ -552,6 +582,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     sessionTimelines.value = {}
     mastery.value = null
     chatMessages.value = []
+    temporaryBoardNotes.value = []
     currentStepIndex.value = 0
     taskId.value = ''
     spaceId.value = null
@@ -566,6 +597,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   }
 
   function prepareCanvasContent(step: ScriptStep): CanvasContent {
+    temporaryBoardNotes.value = []
     const backendScene = sessionScenes.value[step.id]
     const backendContent = toCanvasContent(backendScene?.content)
     if (backendContent) {
@@ -1366,6 +1398,14 @@ export const useTaskStepStore = defineStore('taskStep', () => {
             appendAgentNote(String(action.payload.note || ''))
             break
 
+          case 'append_board_note':
+            appendTemporaryBoardNote({
+              title: String(action.payload.title || ''),
+              content: String(action.payload.content || action.payload.markdown || ''),
+              sourceQuestion: String(action.payload.sourceQuestion || ''),
+            })
+            break
+
           case 'mark_current_step_skipped': {
             const cur = scriptSteps.value[currentStepIndex.value]
             if (cur) cur.status = 'skipped'
@@ -1409,6 +1449,16 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     timelinePlayer.setPlaybackRate(rate)
   }
 
+  function buildMockCustomReply(question: string): { chat: string; board: string } {
+    const segment = currentSegment.value
+    const title = segment?.boardContent || segment?.markdown || currentScriptStep.value?.title || '当前知识点'
+    const compactTitle = title.replace(/\s+/g, ' ').slice(0, 42)
+    return {
+      chat: `可以，我换个角度再讲一遍。\n\n你问的是：「${question}」。先抓住当前这一步的核心：${compactTitle}。我会把它拆成“先看目标、再看条件、最后看为什么这样做”三层，你可以先对照中间板书看一遍。`,
+      board: `### 再讲一遍：${compactTitle}\n\n1. **先看目标**：这一步要解决的是“我现在到底要证明、计算或判断什么”。\n2. **再看条件**：把题目或概念里已经给出的条件逐条摆出来，不急着套公式。\n3. **最后看连接**：找到条件通向目标的那条最短链路；如果卡住，通常是少了一步中间转换。\n\n> 你的问题：${question}`,
+    }
+  }
+
   async function reportTeachingActionStatus(
     actionId: string,
     status: 'applied' | 'failed',
@@ -1443,6 +1493,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     scriptSteps,
     currentScriptStep,
     canvasContent,
+    temporaryBoardNotes,
     mastery,
     chatMessages,
     sendingFeedback,
