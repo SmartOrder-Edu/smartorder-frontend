@@ -31,6 +31,38 @@
         </div>
       </header>
 
+      <section class="weekly-report-card">
+        <div class="report-card-main">
+          <div class="report-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 3v18h18" />
+              <path d="m7 14 4-4 3 3 5-7" />
+              <circle cx="7" cy="14" r="1" />
+              <circle cx="11" cy="10" r="1" />
+              <circle cx="14" cy="13" r="1" />
+              <circle cx="19" cy="6" r="1" />
+            </svg>
+          </div>
+          <div class="report-card-copy">
+            <div class="report-card-title-row">
+              <span class="report-card-label">AI 学习周报已生成</span>
+              <span class="report-card-range">07/10 - 07/16</span>
+            </div>
+            <h2>最近 7 天你完成 18 个任务，链表基础掌握明显提升</h2>
+            <p>递归调用栈仍存在步骤缺失问题，系统已为下周前两天安排补弱与验证练习。</p>
+          </div>
+        </div>
+        <div class="report-card-actions">
+          <button class="report-primary-btn" type="button" @click="openWeeklyReport">
+            查看学习周报
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9,18 15,12 9,6" />
+            </svg>
+          </button>
+          <button class="report-secondary-btn" type="button" @click="activeTab = 'week'">查看本周任务</button>
+        </div>
+      </section>
+
       <section class="stats-grid" aria-label="任务数据概览">
         <article v-for="item in statCards" :key="item.key" class="stat-card" :class="item.key">
           <div class="stat-card-main">
@@ -431,6 +463,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import FocusProgressCard from './components/FocusProgressCard.vue'
@@ -444,7 +477,6 @@ import {
 } from '@/api/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import type { TaskActionType, TaskStatus, TaskVO } from '@/types/learningSpace'
-import calendarIcon from '@/assets/icons/task-schedule/calendar.svg?raw'
 import bookIcon from '@/assets/icons/task-schedule/book.svg?raw'
 import practiceIcon from '@/assets/icons/task-schedule/practice.svg?raw'
 import folderIcon from '@/assets/icons/task-schedule/folder.svg?raw'
@@ -488,6 +520,7 @@ const busyTaskIds = ref<Set<string>>(new Set())
 const spaceNameMap = ref<Record<string, string>>({})
 let generationStepTimers: number[] = []
 
+const router = useRouter()
 const { enterTask } = useStudyEntry()
 
 const tabs: Array<{ label: string; value: TabValue }> = [
@@ -576,22 +609,6 @@ const localTodayExistingCount = computed(() =>
 const localRecentCompletionRate = computed(() => {
   if (!allTasks.value.length) return 0
   return Math.round((taskStats.value.completed / allTasks.value.length) * 100)
-})
-
-const todayHeader = computed(() => {
-  const formatter = new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long',
-  })
-  return formatter.format(new Date())
-})
-
-const greetingText = computed(() => {
-  const hour = new Date().getHours()
-  if (hour < 12) return '上午好，先完成最小的一步'
-  if (hour < 18) return '下午好，继续保持专注'
-  return '晚上好，收个漂亮的尾'
 })
 
 const streakDays = computed(() => Math.max(1, Math.min(7 + taskStats.value.completed, 30)))
@@ -910,6 +927,10 @@ function toggleSort() {
   sortMode.value = sortMode.value === 'time_asc' ? 'priority_desc' : 'time_asc'
 }
 
+function openWeeklyReport() {
+  router.push('/learning-report/weekly')
+}
+
 function sortTasks(items: TaskVO[]) {
   const sorted = [...items]
   if (sortMode.value === 'priority_desc') {
@@ -1068,12 +1089,6 @@ function deadlineLabel(task: TaskVO) {
   if (diff === 1) return '明天'
   if (diff > 1 && diff <= 7) return '本周'
   return task.dueDate
-}
-
-function formatTaskTime(task: TaskVO) {
-  if (task.dueTime) return task.dueTime.slice(0, 5)
-  if (task.status === 'completed') return '已完成'
-  return '待安排'
 }
 
 function taskReason(task: TaskVO) {
@@ -1357,6 +1372,133 @@ export default { name: 'TasksPage' }
   border: 2px solid rgba(255, 255, 255, 0.45);
   border-top-color: #ffffff;
   animation: spin 0.8s linear infinite;
+}
+
+.weekly-report-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-xl);
+  margin-bottom: 24px;
+  border: 1px solid rgba(11, 183, 170, 0.14);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(11, 183, 170, 0.1), rgba(59, 130, 246, 0.06)),
+    var(--card-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.report-card-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.report-card-icon {
+  width: 54px;
+  height: 54px;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: #0bb7aa;
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(11, 183, 170, 0.24);
+}
+
+.report-card-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.report-card-copy {
+  min-width: 0;
+}
+
+.report-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.report-card-label {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.report-card-range {
+  color: var(--text-secondary-local);
+  font-size: 0.75rem;
+}
+
+.report-card-copy h2 {
+  margin: 0 0 6px;
+  color: var(--text-primary-local);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.report-card-copy p {
+  margin: 0;
+  color: var(--text-secondary-local);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.report-card-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.report-primary-btn,
+.report-secondary-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  border-radius: var(--radius-full);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.report-primary-btn {
+  border: 0;
+  background: var(--primary-color);
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(11, 183, 170, 0.2);
+}
+
+.report-primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px rgba(11, 183, 170, 0.24);
+}
+
+.report-primary-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.report-secondary-btn {
+  border: 1px solid var(--border-color-local);
+  background: var(--button-bg, var(--card-bg));
+  color: var(--text-secondary-local);
+}
+
+.report-secondary-btn:hover {
+  border-color: var(--primary-color);
+  background: var(--button-hover-bg, rgba(11, 183, 170, 0.08));
+  color: var(--primary-color);
 }
 
 .stats-grid {
@@ -2466,6 +2608,9 @@ input:focus-visible {
 
 @media (max-width: 900px) {
   .task-hero,
+  .weekly-report-card,
+  .report-card-main,
+  .report-card-actions,
   .task-toolbar {
     align-items: stretch;
     flex-direction: column;

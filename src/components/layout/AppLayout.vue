@@ -664,13 +664,12 @@ const handleLogout = async () => {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 48px;
+  gap: var(--spacing-md);
   padding: 10px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-xl);
   color: var(--text-regular);
   text-decoration: none;
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   font-weight: 500;
   overflow: hidden;
@@ -685,14 +684,14 @@ const handleLogout = async () => {
 }
 
 .nav-item:hover {
-  background: rgba(11, 183, 170, 0.08);
-  color: var(--primary-color);
-  transform: translateX(3px);
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+  transform: translateX(4px);
 }
 
 .nav-item:hover .nav-icon {
-  background: rgba(11, 183, 170, 0.16);
-  box-shadow: 0 0 15px rgba(11, 183, 170, 0.24);
+  background: rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
 }
 
 .nav-item:hover .nav-icon svg {
@@ -700,20 +699,20 @@ const handleLogout = async () => {
 }
 
 .nav-item.active {
-  background: var(--gradient-primary);
-  color: #ffffff;
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
   font-weight: 600;
-  box-shadow: 0 12px 24px rgba(11, 183, 170, 0.22);
+  box-shadow: none;
 }
 
 /* 选中态下图标跟随文字颜色，不强制变白 */
 .nav-item.active :deep(.animated-icon.active) svg,
 .nav-item.active :deep(.animated-icon.active) svg * {
-  stroke: #ffffff !important;
+  stroke: currentColor !important;
 }
 
 .nav-item.active :deep(.animated-icon.active) svg circle[fill="currentColor"] {
-  fill: #ffffff !important;
+  fill: currentColor !important;
 }
 
 .nav-item.active .nav-icon {
