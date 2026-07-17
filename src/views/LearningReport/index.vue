@@ -1,5 +1,9 @@
 <template>
   <main ref="reportRoot" class="learning-report-page" @scroll.passive="handleScroll">
+    <div class="page-progress" aria-hidden="true">
+      <span :style="{ width: `${readingProgress}%` }"></span>
+    </div>
+
     <header class="report-topbar">
       <button class="back-button" @click="goBack" aria-label="返回任务日程">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -14,6 +18,11 @@
       <div class="report-range">{{ report.range }}</div>
     </header>
 
+    <div class="section-counter" aria-live="polite">
+      <span>{{ String(activeSection + 1).padStart(2, '0') }}</span>
+      <strong>/ {{ String(sections.length).padStart(2, '0') }}</strong>
+    </div>
+
     <nav class="section-nav" aria-label="学习报告分页导航">
       <button
         v-for="(section, index) in sections"
@@ -27,9 +36,26 @@
       </button>
     </nav>
 
-    <section :id="sections[0].id" class="report-section cover-section">
+    <div class="page-controls">
+      <button :disabled="activeSection === 0" aria-label="上一屏" @click="goPreviousSection">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="18,15 12,9 6,15" />
+        </svg>
+      </button>
+      <button :disabled="activeSection === sections.length - 1" aria-label="下一屏" @click="goNextSection">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6,9 12,15 18,9" />
+        </svg>
+      </button>
+    </div>
+
+    <section :id="sections[0].id" class="report-section cover-section" :class="{ 'is-active': activeSection === 0 }">
       <div class="cover-orbit orbit-a"></div>
       <div class="cover-orbit orbit-b"></div>
+      <div class="agent-chip">
+        <span class="agent-pulse"></span>
+        AI 学习助手正在解读你的 7 天轨迹
+      </div>
       <div class="cover-content">
         <p class="eyebrow">最近 7 天学习报告</p>
         <h1>{{ report.studentName }} 的专属学习周报</h1>
@@ -49,13 +75,14 @@
       </div>
     </section>
 
-    <section :id="sections[1].id" class="report-section split-section mastery-section">
+    <section :id="sections[1].id" class="report-section split-section mastery-section" :class="{ 'is-active': activeSection === 1 }">
       <div class="section-copy">
         <p class="eyebrow">知识掌握变化</p>
         <h2>你的知识掌握正在发生变化</h2>
         <p>
           系统综合本周测评表现、学习行为、答题耗时与连续表现，评估关键知识点的掌握状态。
         </p>
+        <button class="evidence-link" @click="openEvidence('mastery')">查看算法依据</button>
       </div>
       <div class="section-panel chart-panel">
         <div class="chart-header">
@@ -100,13 +127,14 @@
       </div>
     </section>
 
-    <section :id="sections[2].id" class="report-section split-section weakness-section">
+    <section :id="sections[2].id" class="report-section split-section weakness-section" :class="{ 'is-active': activeSection === 2 }">
       <div class="section-copy">
         <p class="eyebrow">薄弱点与错因</p>
         <h2>你的问题，不只是做错了</h2>
         <p>
           报告会把错题背后的原因拆开，帮助你区分“概念没懂”“条件误用”和“过程遗漏”。
         </p>
+        <button class="evidence-link" @click="openEvidence('weakness')">查看错因判定依据</button>
       </div>
       <div class="section-panel weakness-panel">
         <div class="weakness-list">
@@ -135,11 +163,12 @@
       </div>
     </section>
 
-    <section :id="sections[3].id" class="report-section adjustments-section">
+    <section :id="sections[3].id" class="report-section adjustments-section" :class="{ 'is-active': activeSection === 3 }">
       <div class="section-copy centered">
         <p class="eyebrow">系统智能调整</p>
         <h2>这一周，系统为你做了这些智能调整</h2>
         <p>每一次调整都来自真实学习证据，并继续落到任务、复习和测评安排里。</p>
+        <button class="evidence-link" @click="openEvidence('adjustments')">查看决策依据</button>
       </div>
       <div class="timeline-panel">
         <article v-for="(item, index) in report.adjustments" :key="item.title" class="timeline-item">
@@ -154,11 +183,12 @@
       </div>
     </section>
 
-    <section :id="sections[4].id" class="report-section split-section review-section">
+    <section :id="sections[4].id" class="report-section split-section review-section" :class="{ 'is-active': activeSection === 4 }">
       <div class="section-copy">
         <p class="eyebrow">遗忘风险与下周建议</p>
         <h2>哪些内容该复习了？下周该怎么学？</h2>
         <p>系统结合掌握度、复习记录和遗忘风险，为下周生成优先建议。</p>
+        <button class="evidence-link" @click="openEvidence('review')">查看复习排序依据</button>
       </div>
       <div class="section-panel review-panel">
         <div class="risk-table">
@@ -185,7 +215,7 @@
       </div>
     </section>
 
-    <section :id="sections[5].id" class="report-section summary-section">
+    <section :id="sections[5].id" class="report-section summary-section" :class="{ 'is-active': activeSection === 5 }">
       <div class="summary-panel">
         <p class="eyebrow">行动入口</p>
         <h2>你的下一周，已经准备好了</h2>
@@ -203,6 +233,32 @@
         </div>
       </div>
     </section>
+
+    <transition name="evidence">
+      <aside v-if="activeEvidence" class="evidence-drawer" role="dialog" aria-modal="true" aria-label="算法依据">
+        <div class="evidence-backdrop" @click="closeEvidence"></div>
+        <div class="evidence-panel">
+          <div class="evidence-header">
+            <div>
+              <span>算法依据</span>
+              <h3>{{ evidenceContent.title }}</h3>
+            </div>
+            <button class="evidence-close" aria-label="关闭算法依据" @click="closeEvidence">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div class="evidence-body">
+            <article v-for="item in evidenceContent.items" :key="item.label" class="evidence-item">
+              <span>{{ item.label }}</span>
+              <p>{{ item.value }}</p>
+            </article>
+          </div>
+        </div>
+      </aside>
+    </transition>
   </main>
 </template>
 
@@ -213,6 +269,9 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 const reportRoot = ref<HTMLElement | null>(null)
 const activeSection = ref(0)
+const activeEvidence = ref<EvidenceKey | null>(null)
+
+type EvidenceKey = 'mastery' | 'weakness' | 'adjustments' | 'review'
 
 const sections = [
   { id: 'overview', label: '总览' },
@@ -286,6 +345,41 @@ const report = {
   ],
 }
 
+const evidenceMap: Record<EvidenceKey, { title: string; items: Array<{ label: string; value: string }> }> = {
+  mastery: {
+    title: '掌握度如何评估',
+    items: [
+      { label: '输入数据', value: '任务完成记录、练习正确率、答题耗时、同类题连续表现和最近复习间隔。' },
+      { label: '计算方式', value: '用最近表现提高权重，结合知识点前后置关系，避免单次答对直接判定为已掌握。' },
+      { label: '可靠度', value: '当同一知识点有多次练习、测评和复习记录时，判断可靠度会提高。' },
+    ],
+  },
+  weakness: {
+    title: '错因如何归类',
+    items: [
+      { label: '步骤缺失', value: '题目思路正确，但过程记录或答案中缺少关键中间状态。' },
+      { label: '条件误用', value: '概念能识别，但在适用条件、边界条件或题目场景迁移时发生偏差。' },
+      { label: '细节遗漏', value: '主体思路稳定，错误集中在符号、顺序、指针更新或最后校验。' },
+    ],
+  },
+  adjustments: {
+    title: '系统为什么调整计划',
+    items: [
+      { label: '路径调整', value: '当前知识点依赖的前置能力不稳定时，系统会插入短复习任务。' },
+      { label: '难度调整', value: '连续稳定答对后提升难度；出现高置信错因时降低推进速度。' },
+      { label: '估时修正', value: '使用实际学习时长回写同类任务估时，减少后续计划过载。' },
+    ],
+  },
+  review: {
+    title: '复习优先级如何排序',
+    items: [
+      { label: '遗忘风险', value: '综合上次复习时间、掌握度、最近错因和知识点重要性。' },
+      { label: '下周策略', value: '优先安排高风险且影响后续学习路径的知识点，再补充轻量验证任务。' },
+      { label: '执行承接', value: '高风险项会直接进入计划，低风险项保持观察，不打断当前主线。' },
+    ],
+  },
+}
+
 const chartWidth = 628
 const chartHeight = 250
 const chartLeft = 56
@@ -308,6 +402,15 @@ const trendAreaPath = computed(() => {
   const first = points[0]
   const last = points[points.length - 1]
   return `M ${first.x} ${chartTop + chartHeight} L ${trendPolyline.value} L ${last.x} ${chartTop + chartHeight} Z`
+})
+
+const readingProgress = computed(() =>
+  Math.round(((activeSection.value + 1) / sections.length) * 100)
+)
+
+const evidenceContent = computed(() => {
+  const key = activeEvidence.value || 'mastery'
+  return evidenceMap[key]
 })
 
 function formatDelta(value: number) {
@@ -336,14 +439,35 @@ function scrollToSection(index: number) {
   root.scrollTo({ top: root.clientHeight * index, behavior: 'smooth' })
 }
 
+function goPreviousSection() {
+  scrollToSection(Math.max(0, activeSection.value - 1))
+}
+
+function goNextSection() {
+  scrollToSection(Math.min(sections.length - 1, activeSection.value + 1))
+}
+
+function openEvidence(key: EvidenceKey) {
+  activeEvidence.value = key
+}
+
+function closeEvidence() {
+  activeEvidence.value = null
+}
+
 function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && activeEvidence.value) {
+    closeEvidence()
+    return
+  }
+  if (activeEvidence.value) return
   if (event.key === 'ArrowDown' || event.key === 'PageDown') {
     event.preventDefault()
-    scrollToSection(Math.min(sections.length - 1, activeSection.value + 1))
+    goNextSection()
   }
   if (event.key === 'ArrowUp' || event.key === 'PageUp') {
     event.preventDefault()
-    scrollToSection(Math.max(0, activeSection.value - 1))
+    goPreviousSection()
   }
 }
 
@@ -385,6 +509,23 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, #f7fbff 0%, #eef6f8 52%, #f9fbf7 100%);
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
+}
+
+.page-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 35;
+  height: 3px;
+  background: rgba(16, 32, 51, 0.08);
+}
+
+.page-progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #0bb7aa, #3b82f6, #f59e0b);
+  transition: width 0.28s ease;
 }
 
 .report-topbar {
@@ -458,6 +599,30 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(16px);
 }
 
+.section-counter {
+  position: fixed;
+  left: 30px;
+  bottom: 26px;
+  z-index: 22;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: rgba(16, 32, 51, 0.58);
+  pointer-events: none;
+}
+
+.section-counter span {
+  color: #0b7d76;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.section-counter strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .section-nav {
   position: fixed;
   top: 50%;
@@ -513,6 +678,48 @@ onBeforeUnmount(() => {
   background: #0bb7aa;
 }
 
+.page-controls {
+  position: fixed;
+  right: 28px;
+  bottom: 26px;
+  z-index: 22;
+  display: flex;
+  gap: 8px;
+}
+
+.page-controls button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(16, 32, 51, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #294057;
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(44, 70, 90, 0.1);
+  backdrop-filter: blur(16px);
+  transition: all 0.2s ease;
+}
+
+.page-controls button:hover:not(:disabled) {
+  color: #ffffff;
+  background: #0bb7aa;
+  border-color: #0bb7aa;
+  transform: translateY(-1px);
+}
+
+.page-controls button:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+
+.page-controls svg {
+  width: 18px;
+  height: 18px;
+}
+
 .report-section {
   position: relative;
   min-height: 100vh;
@@ -521,6 +728,20 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 96px 9vw 72px;
   overflow: hidden;
+}
+
+.report-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 0 solid rgba(11, 183, 170, 0);
+  pointer-events: none;
+  transition: border-width 0.4s ease, border-color 0.4s ease;
+}
+
+.report-section.is-active::after {
+  border-left-width: 4px;
+  border-color: rgba(11, 183, 170, 0.34);
 }
 
 .eyebrow {
@@ -534,6 +755,35 @@ onBeforeUnmount(() => {
 .cover-section {
   justify-content: center;
   text-align: center;
+}
+
+.agent-chip {
+  position: absolute;
+  top: 92px;
+  left: 50%;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  padding: 8px 12px;
+  border: 1px solid rgba(11, 183, 170, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #0b7d76;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 12px 30px rgba(44, 70, 90, 0.08);
+  backdrop-filter: blur(16px);
+}
+
+.agent-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #0bb7aa;
+  box-shadow: 0 0 0 0 rgba(11, 183, 170, 0.42);
+  animation: agent-pulse 1.6s ease-in-out infinite;
 }
 
 .cover-content {
@@ -669,6 +919,29 @@ onBeforeUnmount(() => {
   color: #52687c;
   font-size: 16px;
   line-height: 1.8;
+}
+
+.evidence-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 22px;
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #0b7d76;
+  padding: 8px 13px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(44, 70, 90, 0.08);
+  transition: all 0.2s ease;
+}
+
+.evidence-link:hover {
+  color: #ffffff;
+  background: #0bb7aa;
+  border-color: #0bb7aa;
+  transform: translateY(-1px);
 }
 
 .section-panel,
@@ -1124,6 +1397,120 @@ onBeforeUnmount(() => {
   color: #294057;
 }
 
+.evidence-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.evidence-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 32, 51, 0.24);
+  backdrop-filter: blur(6px);
+}
+
+.evidence-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(460px, 92vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: -24px 0 60px rgba(16, 32, 51, 0.16);
+}
+
+.evidence-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(16, 32, 51, 0.1);
+}
+
+.evidence-header span {
+  color: #0b7d76;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.evidence-header h3 {
+  margin: 8px 0 0;
+  color: #102033;
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.evidence-close {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(16, 32, 51, 0.1);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #52687c;
+  cursor: pointer;
+}
+
+.evidence-close svg {
+  width: 17px;
+  height: 17px;
+}
+
+.evidence-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 22px;
+}
+
+.evidence-item {
+  padding: 18px;
+  border: 1px solid rgba(16, 32, 51, 0.08);
+  border-radius: 8px;
+  background: #f7fbff;
+}
+
+.evidence-item span {
+  display: block;
+  margin-bottom: 8px;
+  color: #102033;
+  font-weight: 900;
+}
+
+.evidence-item p {
+  margin: 0;
+  color: #52687c;
+  line-height: 1.7;
+}
+
+.evidence-enter-active,
+.evidence-leave-active {
+  transition: opacity 0.22s ease;
+}
+
+.evidence-enter-from,
+.evidence-leave-to {
+  opacity: 0;
+}
+
+.evidence-enter-active .evidence-panel,
+.evidence-leave-active .evidence-panel {
+  transition: transform 0.26s ease;
+}
+
+.evidence-enter-from .evidence-panel,
+.evidence-leave-to .evidence-panel {
+  transform: translateX(100%);
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -1132,6 +1519,15 @@ onBeforeUnmount(() => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes agent-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(11, 183, 170, 0.34);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(11, 183, 170, 0);
   }
 }
 
@@ -1197,9 +1593,21 @@ onBeforeUnmount(() => {
     display: none;
   }
 
+  .section-counter,
+  .page-controls {
+    display: none;
+  }
+
   .report-section {
     min-height: auto;
     padding: 94px 18px 54px;
+  }
+
+  .agent-chip {
+    top: 74px;
+    max-width: calc(100% - 36px);
+    white-space: normal;
+    text-align: left;
   }
 
   .cover-content h1,
