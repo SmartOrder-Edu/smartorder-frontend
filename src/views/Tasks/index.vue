@@ -228,38 +228,130 @@
         </div>
       </section>
 
-      <!-- 生成任务对话框 -->
+      <!-- Agent 生成任务对话框 -->
       <el-dialog
         v-model="showGenerateDialog"
-        title="生成今日学习任务"
-        width="min(520px, calc(100vw - 32px))"
+        title="Agent 生成今日任务"
+        width="min(720px, calc(100vw - 32px))"
         append-to-body
         destroy-on-close
         :close-on-click-modal="!generating"
         class="generate-task-dialog"
+        @closed="resetGenerateDialog"
       >
         <el-form class="generate-form" label-position="top">
           <p class="generate-tip">
-            系统会读取活跃学习空间，沿学习路径选择尚未安排的下一节点，生成可直接开始的学习脚本任务。
+            Agent 会读取最近学习记录、今日已有任务、未完成任务和学习路径，再生成可执行的今日任务。
           </p>
-          <el-form-item label="任务数量">
-            <el-input-number v-model="generateCount" :min="1" :max="8" :step="1" style="width: 100%" />
+          <div class="generate-grid">
+            <el-form-item label="任务数量">
+              <el-input-number v-model="generateCount" :min="1" :max="8" :step="1" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="今日可用时间（分钟）">
+              <el-input-number v-model="generateMinutes" :min="5" :max="600" :step="15" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="编排策略">
+              <el-select v-model="generateStrategy" style="width: 100%">
+                <el-option label="截止时间优先" value="deadline_first" />
+                <el-option label="薄弱点优先" value="weakness_first" />
+                <el-option label="均衡分配" value="balanced" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="练习测评">
+              <el-select v-model="evaluationTaskType" :disabled="!createPracticeTasks" style="width: 100%">
+                <el-option label="即时练习" value="practice_set" />
+                <el-option label="阶段测评" value="assessment" />
+              </el-select>
+            </el-form-item>
+          </div>
+
+          <div class="generate-options">
+            <el-checkbox v-model="createResourceTasks">补充学习资源</el-checkbox>
+            <el-checkbox v-model="createPracticeTasks">追加练习测评</el-checkbox>
+          </div>
+
+          <el-form-item v-if="createResourceTasks" label="资源类型">
+            <el-checkbox-group v-model="resourceTypes" class="resource-type-group">
+              <el-checkbox label="doc">文档</el-checkbox>
+              <el-checkbox label="mind_map">思维导图</el-checkbox>
+              <el-checkbox label="bilibili_video">B站视频入口</el-checkbox>
+            </el-checkbox-group>
           </el-form-item>
-          <el-form-item label="今日可用时间（分钟）">
-            <el-input-number v-model="generateMinutes" :min="5" :max="600" :step="15" style="width: 100%" />
-          </el-form-item>
-          <el-form-item label="编排策略">
-            <el-select v-model="generateStrategy" style="width: 100%">
-              <el-option label="截止时间优先" value="deadline_first" />
-              <el-option label="薄弱点优先" value="weakness_first" />
-              <el-option label="均衡分配" value="balanced" />
-            </el-select>
-          </el-form-item>
+
+          <div v-if="generating || generationSteps.length" class="generation-process">
+            <div
+              v-for="step in generationSteps"
+              :key="step.key"
+              class="process-step"
+              :class="step.status"
+            >
+              <span class="process-dot"></span>
+              <div class="process-copy">
+                <span class="process-label">{{ step.label }}</span>
+                <span class="process-detail">{{ step.detail }}</span>
+              </div>
+            </div>
+          </div>
+
+          <section v-if="scheduleResult" class="agent-schedule-result">
+            <div class="result-header">
+              <span class="result-label">Agent 编排说明</span>
+              <strong>{{ scheduleResult.summary }}</strong>
+            </div>
+
+            <div class="evidence-grid">
+              <div class="evidence-item">
+                <span>最近学习</span>
+                <strong>{{ scheduleResult.evidence.recentStudyMinutes }} 分钟</strong>
+              </div>
+              <div class="evidence-item">
+                <span>完成率</span>
+                <strong>{{ scheduleResult.evidence.recentCompletionRate }}%</strong>
+              </div>
+              <div class="evidence-item">
+                <span>未完成</span>
+                <strong>{{ scheduleResult.evidence.unfinishedTaskCount }} 个</strong>
+              </div>
+              <div class="evidence-item">
+                <span>逾期</span>
+                <strong>{{ scheduleResult.evidence.overdueTaskCount }} 个</strong>
+              </div>
+            </div>
+
+            <div class="result-block">
+              <h4>Agent 参考依据</h4>
+              <ul>
+                <li v-for="item in scheduleResult.evidence.decisionBasis" :key="item">{{ item }}</li>
+              </ul>
+            </div>
+
+            <div class="result-block" v-if="scheduleResult.evidence.weakSignals?.length">
+              <h4>最近学习信号</h4>
+              <div class="weak-signal-list">
+                <span v-for="signal in scheduleResult.evidence.weakSignals" :key="signal">{{ signal }}</span>
+              </div>
+            </div>
+
+            <div class="result-block" v-if="scheduleResult.taskReasons?.length">
+              <h4>任务安排理由</h4>
+              <div class="task-reason-list">
+                <div v-for="item in scheduleResult.taskReasons" :key="item.taskId" class="task-reason-card">
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.reason }}</p>
+                  <div class="reason-tags">
+                    <span v-for="tag in item.evidenceTags" :key="tag">{{ tag }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
         </el-form>
         <template #footer>
-          <el-button :disabled="generating" @click="showGenerateDialog = false">取消</el-button>
+          <el-button :disabled="generating" @click="closeGenerateDialog">
+            {{ scheduleResult ? '完成' : '取消' }}
+          </el-button>
           <el-button type="primary" :loading="generating" @click="generateTasks">
-            {{ generating ? '生成中...' : '开始生成' }}
+            {{ generating ? 'Agent 编排中...' : scheduleResult ? '重新生成' : '开始生成' }}
           </el-button>
         </template>
       </el-dialog>
@@ -272,7 +364,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { taskApi } from '@/api/spaceDashboard'
+import {
+  agentScheduleApi,
+  taskApi,
+  type AgentScheduleProcessStep,
+  type PlanTodayScheduleResult,
+} from '@/api/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import type { TaskActionType, TaskStatus, TaskVO } from '@/types/learningSpace'
 
@@ -285,9 +382,16 @@ const loading = ref(false)
 const generateCount = ref(3)
 const generateMinutes = ref(90)
 const generateStrategy = ref<'deadline_first' | 'weakness_first' | 'balanced'>('deadline_first')
+const createResourceTasks = ref(true)
+const createPracticeTasks = ref(true)
+const resourceTypes = ref<string[]>(['doc', 'mind_map'])
+const evaluationTaskType = ref<'practice_set' | 'assessment'>('practice_set')
+const generationSteps = ref<AgentScheduleProcessStep[]>([])
+const scheduleResult = ref<PlanTodayScheduleResult | null>(null)
 const todayTasks = ref<TaskVO[]>([])
 const pendingTasks = ref<TaskVO[]>([])
 const overdueTasks = ref<TaskVO[]>([])
+let generationStepTimers: number[] = []
 
 const { enterTask } = useStudyEntry()
 const router = useRouter()
@@ -361,23 +465,104 @@ async function loadTasks() {
 
 async function generateTasks() {
   generating.value = true
+  scheduleResult.value = null
+  beginLocalGenerationSteps()
   try {
-    const created = await taskApi.planToday({
+    const result = await agentScheduleApi.planToday({
       maxTasks: generateCount.value,
       totalAvailableMinutes: generateMinutes.value,
       strategy: generateStrategy.value,
-      allowedActionTypes: ['learn_script'],
+      createResourceTasks: createResourceTasks.value,
+      createPracticeTasks: createPracticeTasks.value,
+      resourceTypes: createResourceTasks.value ? resourceTypes.value : [],
+      evaluationTaskType: evaluationTaskType.value,
+      practiceTaskCount: createPracticeTasks.value ? 1 : undefined,
+      practiceQuestionCount: createPracticeTasks.value ? 5 : undefined,
     })
-    showGenerateDialog.value = false
+    scheduleResult.value = result
+    applyServerProcessSteps(result.processSteps)
     await loadTasks()
-    if (created.length === 0) {
+    if (result.createdTaskCount === 0) {
       ElMessage.info('当前没有可新生成的今日任务，可能已有待完成任务或学习路径暂未生成')
     } else {
-      ElMessage.success(`已生成 ${created.length} 个今日任务`)
+      ElMessage.success(`Agent 已生成 ${result.createdTaskCount} 个今日任务`)
     }
+  } catch (error) {
+    markCurrentGenerationStepFailed()
   } finally {
+    clearGenerationTimers()
     generating.value = false
   }
+}
+
+function closeGenerateDialog() {
+  showGenerateDialog.value = false
+}
+
+function resetGenerateDialog() {
+  if (generating.value) return
+  scheduleResult.value = null
+  generationSteps.value = []
+  clearGenerationTimers()
+}
+
+function defaultGenerationSteps(): AgentScheduleProcessStep[] {
+  return [
+    { key: 'analyze_recent_learning', label: '分析最近学习记录', status: 'running', detail: '正在读取最近学习记录和今日已有任务' },
+    { key: 'identify_focus', label: '识别编排重点', status: 'pending', detail: '等待分析风险信号和薄弱项' },
+    { key: 'match_learning_path', label: '匹配学习路径', status: 'pending', detail: '等待选择学习空间和路径节点' },
+    { key: 'create_tasks', label: '创建学习任务', status: 'pending', detail: '等待写入今日任务' },
+    { key: 'finalize_schedule', label: '整理今日任务说明', status: 'pending', detail: '等待生成编排依据和任务理由' },
+  ]
+}
+
+function beginLocalGenerationSteps() {
+  clearGenerationTimers()
+  generationSteps.value = defaultGenerationSteps()
+  generationStepTimers = [
+    window.setTimeout(() => advanceGenerationStep(0, 1), 500),
+    window.setTimeout(() => advanceGenerationStep(1, 2), 1100),
+    window.setTimeout(() => advanceGenerationStep(2, 3), 1700),
+    window.setTimeout(() => advanceGenerationStep(3, 4), 2300),
+  ]
+}
+
+function advanceGenerationStep(doneIndex: number, runningIndex: number) {
+  if (!generating.value || !generationSteps.value[doneIndex]) return
+  generationSteps.value[doneIndex] = {
+    ...generationSteps.value[doneIndex],
+    status: 'completed',
+  }
+  if (generationSteps.value[runningIndex]) {
+    generationSteps.value[runningIndex] = {
+      ...generationSteps.value[runningIndex],
+      status: 'running',
+    }
+  }
+}
+
+function applyServerProcessSteps(steps: AgentScheduleProcessStep[] = []) {
+  clearGenerationTimers()
+  generationSteps.value = steps.length
+    ? steps.map(step => ({ ...step, status: step.status || 'completed' }))
+    : generationSteps.value.map(step => ({ ...step, status: 'completed' }))
+}
+
+function markCurrentGenerationStepFailed() {
+  const runningIndex = generationSteps.value.findIndex(step => step.status === 'running')
+  const targetIndex = runningIndex >= 0 ? runningIndex : generationSteps.value.length - 1
+  if (targetIndex >= 0) {
+    generationSteps.value[targetIndex] = {
+      ...generationSteps.value[targetIndex],
+      status: 'failed',
+      detail: 'Agent 编排失败，请稍后重试或检查学习空间配置',
+    }
+  }
+}
+
+function clearGenerationTimers() {
+  generationStepTimers.forEach(timer => window.clearTimeout(timer))
+  generationStepTimers = []
 }
 
 async function startTask(task: TaskVO) {
@@ -980,6 +1165,197 @@ function openWeeklyReport() {
   line-height: 1.7;
 }
 
+.generate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md) var(--spacing-lg);
+}
+
+.generate-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-sm) 0 var(--spacing-md);
+}
+
+.resource-type-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm) var(--spacing-lg);
+}
+
+.generation-process {
+  display: grid;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  margin: var(--spacing-md) 0;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--background-color-base);
+}
+
+.process-step {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.process-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--border-color);
+}
+
+.process-step.running .process-dot {
+  background: var(--primary-color);
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+}
+
+.process-step.completed .process-dot {
+  background: var(--accent-color);
+}
+
+.process-step.failed .process-dot {
+  background: var(--danger-color);
+}
+
+.process-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.process-label {
+  color: var(--text-dark);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.process-detail {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.agent-schedule-result {
+  display: grid;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  margin-top: var(--spacing-md);
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  border-radius: var(--radius-lg);
+  background: rgba(11, 183, 170, 0.04);
+}
+
+.result-header {
+  display: grid;
+  gap: 4px;
+}
+
+.result-label {
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.result-header strong {
+  color: var(--text-dark);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.evidence-item {
+  display: grid;
+  gap: 4px;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-light);
+}
+
+.evidence-item span {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+}
+
+.evidence-item strong {
+  color: var(--text-dark);
+  font-size: 0.9375rem;
+}
+
+.result-block {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.result-block h4 {
+  margin: 0;
+  color: var(--text-dark);
+  font-size: 0.8125rem;
+}
+
+.result-block ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+
+.weak-signal-list,
+.reason-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.weak-signal-list span,
+.reason-tags span {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.task-reason-list {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.task-reason-card {
+  display: grid;
+  gap: 6px;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-light);
+}
+
+.task-reason-card strong {
+  color: var(--text-dark);
+  font-size: 0.8125rem;
+}
+
+.task-reason-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
 .generate-form :deep(.el-form-item) {
   margin-bottom: var(--spacing-lg);
 }
@@ -1006,6 +1382,11 @@ function openWeeklyReport() {
   .report-card-actions {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .generate-grid,
+  .evidence-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
