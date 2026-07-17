@@ -279,6 +279,46 @@
           </el-form-item>
 
           <div v-if="generating || generationSteps.length" class="generation-process">
+            <div class="generation-analysis">
+              <div class="analysis-header">
+                <span>AI 分析情况</span>
+                <strong>{{ agentAnalysisTitle }}</strong>
+              </div>
+
+              <div class="analysis-grid">
+                <div v-for="item in agentAnalysisCards" :key="item.label" class="analysis-item">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                  <small>{{ item.detail }}</small>
+                </div>
+              </div>
+
+              <div class="analysis-panels">
+                <div class="analysis-panel weakness-panel">
+                  <h4>学习薄弱点</h4>
+                  <ul>
+                    <li v-for="item in agentWeaknessItems" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+
+                <div class="analysis-panel">
+                  <h4>相关学习信息</h4>
+                  <ul>
+                    <li v-for="item in agentRelatedInfo" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+
+                <div class="analysis-panel basis-panel">
+                  <h4>Agent 编排依据</h4>
+                  <ul>
+                    <li v-for="item in agentDecisionBasis" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="process-divider"></div>
+
             <div
               v-for="step in generationSteps"
               :key="step.key"
@@ -367,6 +407,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import {
   agentScheduleApi,
   taskApi,
+  type AgentScheduleEvidence,
   type AgentScheduleProcessStep,
   type PlanTodayScheduleResult,
 } from '@/api/spaceDashboard'
@@ -417,6 +458,150 @@ const taskStats = computed(() => ({
   resource: allTasks.value.filter(task => task.actionType === 'read_resource' || task.actionType === 'watch_video').length,
   completed: allTasks.value.filter(task => task.status === 'completed').length,
 }))
+
+interface AgentAnalysisCard {
+  label: string
+  value: string
+  detail: string
+}
+
+const localUnfinishedCount = computed(() =>
+  allTasks.value.filter(task => task.status !== 'completed' && task.status !== 'cancelled').length
+)
+
+const localOverdueCount = computed(() =>
+  allTasks.value.filter(task => task.isOverdue || task.status === 'overdue').length
+)
+
+const localTodayExistingCount = computed(() =>
+  todayTasks.value.filter(task => task.status !== 'cancelled').length
+)
+
+const localRecentCompletionRate = computed(() => {
+  if (!allTasks.value.length) return 0
+  return Math.round((taskStats.value.completed / allTasks.value.length) * 100)
+})
+
+const scheduleCompositionText = computed(() => {
+  const result = scheduleResult.value
+  if (result) {
+    const parts = [
+      result.learningTaskCount ? `学习 ${result.learningTaskCount}` : '',
+      result.resourceTaskCount ? `资源 ${result.resourceTaskCount}` : '',
+      result.practiceTaskCount ? `练习 ${result.practiceTaskCount}` : '',
+    ].filter(Boolean)
+    return parts.length ? parts.join(' / ') : '暂无新增任务'
+  }
+
+  const parts = ['学习任务优先']
+  if (createResourceTasks.value) parts.push(`资源 ${resourceTypes.value.length || 1} 类`)
+  if (createPracticeTasks.value) parts.push(evaluationTaskType.value === 'assessment' ? '阶段测评' : '即时练习')
+  return parts.join(' / ')
+})
+
+const agentAnalysisTitle = computed(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) {
+    return `已基于最近 ${evidence.recentDays} 天学习数据完成编排判断`
+  }
+  return `正在按「${strategyLabel(generateStrategy.value)}」分析今日任务负载`
+})
+
+const agentAnalysisCards = computed<AgentAnalysisCard[]>(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) return buildEvidenceAnalysisCards(evidence)
+
+  return [
+    {
+      label: '可用时间',
+      value: `${generateMinutes.value} 分钟`,
+      detail: `目标生成 ${generateCount.value} 个任务`,
+    },
+    {
+      label: '当前完成率',
+      value: `${localRecentCompletionRate.value}%`,
+      detail: `${taskStats.value.completed}/${allTasks.value.length || 0} 个任务已完成`,
+    },
+    {
+      label: '今日负载',
+      value: `${localTodayExistingCount.value} 个`,
+      detail: `未完成 ${localUnfinishedCount.value} 个，逾期 ${localOverdueCount.value} 个`,
+    },
+    {
+      label: '编排倾向',
+      value: strategyLabel(generateStrategy.value),
+      detail: scheduleCompositionText.value,
+    },
+  ]
+})
+
+const agentWeaknessItems = computed(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) {
+    return normalizeInsightList(evidence.weakSignals, '未发现明显薄弱点，按学习路径稳定推进')
+  }
+
+  const signals: string[] = []
+  if (localOverdueCount.value > 0) {
+    signals.push(`学习节奏风险：当前有 ${localOverdueCount.value} 个逾期任务`)
+  }
+  if (localUnfinishedCount.value > localTodayExistingCount.value) {
+    signals.push(`任务消化不足：仍有 ${localUnfinishedCount.value} 个未完成任务`)
+  }
+  const reviewTasks = allTasks.value
+    .filter(task => task.actionType === 'mistake_review' || task.taskType === 'review')
+    .slice(0, 2)
+  reviewTasks.forEach(task => signals.push(`待复习巩固：${task.title}`))
+  if (createPracticeTasks.value) {
+    signals.push(`需要验证掌握：将通过${evaluationTaskType.value === 'assessment' ? '阶段测评' : '即时练习'}检查学习效果`)
+  }
+  if (!signals.length) {
+    signals.push('暂无明确薄弱信号，Agent 会优先依据学习路径下一节点推进')
+  }
+  return signals.slice(0, 4)
+})
+
+const agentRelatedInfo = computed(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) {
+    const info = [
+      `最近 ${evidence.recentDays} 天学习记录 ${evidence.recentRecordCount} 条，累计 ${evidence.recentStudyMinutes} 分钟`,
+      `近期任务完成 ${evidence.recentCompletedTasks}/${evidence.recentPlannedTasks || 0}，完成率 ${evidence.recentCompletionRate}%`,
+      evidence.averageFocusLevel != null ? `平均专注度 ${evidence.averageFocusLevel}` : '',
+      evidence.averageSelfRating != null ? `平均自评掌握度 ${evidence.averageSelfRating}` : '',
+      evidence.recentSpaces?.length ? `涉及空间：${evidence.recentSpaces.slice(0, 3).join('、')}` : '',
+    ]
+    return normalizeInsightList(info, '最近暂无足够学习记录，主要参考任务状态和学习路径')
+  }
+
+  return [
+    `今日已有任务 ${localTodayExistingCount.value} 个，未完成 ${localUnfinishedCount.value} 个`,
+    `本次可用时间 ${generateMinutes.value} 分钟，计划生成 ${generateCount.value} 个任务`,
+    `资源补充：${createResourceTasks.value ? resourceTypeLabels(resourceTypes.value).join('、') : '未开启'}`,
+    `练习测评：${createPracticeTasks.value ? evaluationTaskTypeLabel(evaluationTaskType.value) : '未开启'}`,
+  ]
+})
+
+const agentDecisionBasis = computed(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) {
+    const basis = [
+      ...evidence.decisionBasis,
+      ...(scheduleResult.value?.taskReasons?.slice(0, 2).map(item => `${item.title}：${item.reason}`) || []),
+    ]
+    return normalizeInsightList(basis, 'Agent 已完成任务编排，但暂无额外依据说明')
+  }
+
+  const basis = [
+    `按「${strategyLabel(generateStrategy.value)}」选择学习空间和路径节点`,
+    localOverdueCount.value > 0
+      ? '先处理逾期和高优先级任务，避免继续堆积'
+      : '优先推进当前学习路径中的下一步任务',
+    createResourceTasks.value ? '为薄弱点补充配套资源，降低回看成本' : '',
+    createPracticeTasks.value ? '追加练习/测评，用结果验证是否真正掌握' : '',
+  ]
+  return normalizeInsightList(basis, '等待 Agent 读取学习记录和路径节点')
+})
 
 const filteredTasks = computed(() => {
   let result = activeTab.value === 'today'
@@ -504,6 +689,66 @@ function resetGenerateDialog() {
   scheduleResult.value = null
   generationSteps.value = []
   clearGenerationTimers()
+}
+
+function buildEvidenceAnalysisCards(evidence: AgentScheduleEvidence): AgentAnalysisCard[] {
+  const plannedTotal = evidence.recentPlannedTasks || 0
+  const completedDetail = plannedTotal > 0
+    ? `${evidence.recentCompletedTasks}/${plannedTotal} 个任务完成`
+    : `${evidence.recentRecordCount} 条学习记录`
+
+  return [
+    {
+      label: '可用时间',
+      value: `${evidence.availableMinutes || generateMinutes.value} 分钟`,
+      detail: `目标生成 ${generateCount.value} 个任务`,
+    },
+    {
+      label: '近期完成率',
+      value: `${evidence.recentCompletionRate}%`,
+      detail: completedDetail,
+    },
+    {
+      label: '今日负载',
+      value: `${evidence.todayExistingTaskCount} 个`,
+      detail: `未完成 ${evidence.unfinishedTaskCount} 个，逾期 ${evidence.overdueTaskCount} 个`,
+    },
+    {
+      label: '编排倾向',
+      value: strategyLabel(evidence.strategy),
+      detail: scheduleCompositionText.value,
+    },
+  ]
+}
+
+function strategyLabel(strategy?: string) {
+  const labels: Record<string, string> = {
+    deadline_first: '截止时间优先',
+    weakness_first: '薄弱点优先',
+    balanced: '均衡分配',
+  }
+  return labels[strategy || ''] || '智能均衡'
+}
+
+function normalizeInsightList(items: Array<string | null | undefined>, fallback: string) {
+  const normalized = items
+    .map(item => item?.trim())
+    .filter((item): item is string => !!item)
+  return normalized.length ? normalized.slice(0, 5) : [fallback]
+}
+
+function resourceTypeLabels(types: string[]) {
+  const labels: Record<string, string> = {
+    doc: '文档',
+    mind_map: '思维导图',
+    bilibili_video: 'B站视频入口',
+  }
+  const result = types.map(type => labels[type] || type).filter(Boolean)
+  return result.length ? result : ['默认资料']
+}
+
+function evaluationTaskTypeLabel(type: 'practice_set' | 'assessment') {
+  return type === 'assessment' ? '阶段测评' : '即时练习'
 }
 
 function defaultGenerationSteps(): AgentScheduleProcessStep[] {
@@ -1195,6 +1440,125 @@ function openWeeklyReport() {
   background: var(--background-color-base);
 }
 
+.generation-analysis {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.analysis-header {
+  display: grid;
+  gap: 3px;
+}
+
+.analysis-header span {
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.analysis-header strong {
+  color: var(--text-dark);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.analysis-item {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+}
+
+.analysis-item span {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+}
+
+.analysis-item strong {
+  color: var(--text-dark);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+
+.analysis-item small {
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+}
+
+.process-divider {
+  height: 1px;
+  background: var(--border-light);
+}
+
+.analysis-panels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.analysis-panel {
+  min-width: 0;
+  display: grid;
+  align-content: flex-start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+}
+
+.analysis-panel h4 {
+  margin: 0;
+  color: var(--text-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.analysis-panel ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-panel li {
+  position: relative;
+  padding-left: 12px;
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.55;
+}
+
+.analysis-panel li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.65em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--primary-color);
+}
+
+.weakness-panel li::before {
+  background: var(--warning-color);
+}
+
+.basis-panel li::before {
+  background: var(--accent-color);
+}
+
 .process-step {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr);
@@ -1385,6 +1749,8 @@ function openWeeklyReport() {
   }
 
   .generate-grid,
+  .analysis-grid,
+  .analysis-panels,
   .evidence-grid {
     grid-template-columns: 1fr;
   }
