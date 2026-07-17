@@ -229,16 +229,35 @@
       </section>
 
       <!-- 生成任务对话框 -->
-      <el-dialog v-model="showGenerateDialog" title="生成今日学习任务" width="520px">
-        <div class="generate-form">
-          <p class="generate-tip">系统会读取你的活跃学习空间，沿学习路径选择尚未安排的下一节点，生成可直接开始的今日学习任务。</p>
-          <div class="form-item">
-            <label>任务数量</label>
-            <el-slider v-model="generateCount" :min="1" :max="8" show-stops />
-          </div>
-        </div>
+      <el-dialog
+        v-model="showGenerateDialog"
+        title="生成今日学习任务"
+        width="min(520px, calc(100vw - 32px))"
+        append-to-body
+        destroy-on-close
+        :close-on-click-modal="!generating"
+        class="generate-task-dialog"
+      >
+        <el-form class="generate-form" label-position="top">
+          <p class="generate-tip">
+            系统会读取活跃学习空间，沿学习路径选择尚未安排的下一节点，生成可直接开始的学习脚本任务。
+          </p>
+          <el-form-item label="任务数量">
+            <el-input-number v-model="generateCount" :min="1" :max="8" :step="1" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="今日可用时间（分钟）">
+            <el-input-number v-model="generateMinutes" :min="5" :max="600" :step="15" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="编排策略">
+            <el-select v-model="generateStrategy" style="width: 100%">
+              <el-option label="截止时间优先" value="deadline_first" />
+              <el-option label="薄弱点优先" value="weakness_first" />
+              <el-option label="均衡分配" value="balanced" />
+            </el-select>
+          </el-form-item>
+        </el-form>
         <template #footer>
-          <el-button @click="showGenerateDialog = false">取消</el-button>
+          <el-button :disabled="generating" @click="showGenerateDialog = false">取消</el-button>
           <el-button type="primary" :loading="generating" @click="generateTasks">
             {{ generating ? '生成中...' : '开始生成' }}
           </el-button>
@@ -264,6 +283,8 @@ const showGenerateDialog = ref(false)
 const generating = ref(false)
 const loading = ref(false)
 const generateCount = ref(3)
+const generateMinutes = ref(90)
+const generateStrategy = ref<'deadline_first' | 'weakness_first' | 'balanced'>('deadline_first')
 const todayTasks = ref<TaskVO[]>([])
 const pendingTasks = ref<TaskVO[]>([])
 const overdueTasks = ref<TaskVO[]>([])
@@ -341,7 +362,12 @@ async function loadTasks() {
 async function generateTasks() {
   generating.value = true
   try {
-    const created = await taskApi.planToday({ maxTasks: generateCount.value })
+    const created = await taskApi.planToday({
+      maxTasks: generateCount.value,
+      totalAvailableMinutes: generateMinutes.value,
+      strategy: generateStrategy.value,
+      allowedActionTypes: ['learn_script'],
+    })
     showGenerateDialog.value = false
     await loadTasks()
     if (created.length === 0) {
@@ -954,16 +980,20 @@ function openWeeklyReport() {
   line-height: 1.7;
 }
 
-.generate-form .form-item {
+.generate-form :deep(.el-form-item) {
   margin-bottom: var(--spacing-lg);
 }
 
-.generate-form label {
-  display: block;
+.generate-form :deep(.el-form-item__label) {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-dark);
-  margin-bottom: var(--spacing-sm);
+  line-height: 1.4;
+  margin-bottom: var(--spacing-xs);
+}
+
+.generate-task-dialog :deep(.el-dialog__body) {
+  padding-top: var(--spacing-sm);
 }
 
 @media (max-width: 768px) {

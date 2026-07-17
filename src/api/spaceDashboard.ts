@@ -137,6 +137,9 @@ export interface CreateTaskDTO {
 
 export interface PlanTodayTasksDTO {
   maxTasks?: number
+  totalAvailableMinutes?: number
+  strategy?: 'deadline_first' | 'weakness_first' | 'balanced'
+  allowedActionTypes?: TaskActionType[]
 }
 
 export const taskApi = {

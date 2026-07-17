@@ -68,6 +68,18 @@ export function useStudyEntry() {
       ElMessage.warning('Agent 暂未为该任务准备好执行入口，请稍后再试')
       return
     }
+    if (task.targetType === 'resource' && task.targetId) {
+      router.push({
+        name: 'LearningResourceDetail',
+        params: { resourceId: String(task.targetId) },
+        query: {
+          taskId: String(task.id),
+          spaceId: stringifyOptional(task.spaceId),
+          source: options.source || 'task',
+        },
+      })
+      return
+    }
     if (
       (task.actionType === 'practice_set' || task.actionType === 'assessment') &&
       (task.targetType === 'practice_session' || task.targetType === 'assessment_session') &&
