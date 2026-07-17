@@ -160,7 +160,7 @@
                       :key="idx" 
                       :src="url" 
                       :preview-src-list="item.imageUrls"
-                      :initial-index="idx"
+                      :initial-index="Number(idx)"
                       fit="cover" 
                       class="thumb-img"
                       style="width: 56px; height: 56px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: zoom-in;"
@@ -348,7 +348,7 @@ const getTypeTagType = (type: number) => {
     case 1: return 'info'
     case 2: return 'success'
     case 3: return 'danger'
-    default: return ''
+    default: return undefined
   }
 }
 
@@ -373,7 +373,7 @@ const getStatusTagType = (status: number) => {
     case 3: return 'primary'
     case 4: return 'danger'
     case 5: return 'success'
-    default: return ''
+    default: return undefined
   }
 }
 

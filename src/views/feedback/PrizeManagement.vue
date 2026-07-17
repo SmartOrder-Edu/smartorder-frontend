@@ -307,7 +307,7 @@ const getStatusTagType = (status: number) => {
     case 0: return 'success'
     case 1: return 'primary'
     case 2: return 'info'
-    default: return ''
+    default: return undefined
   }
 }
 

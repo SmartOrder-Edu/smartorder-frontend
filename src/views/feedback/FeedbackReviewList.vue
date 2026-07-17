@@ -322,7 +322,7 @@ const getTypeTagType = (type: number) => {
     case 1: return 'info'
     case 2: return 'success'
     case 3: return 'danger'
-    default: return ''
+    default: return undefined
   }
 }
 
@@ -347,7 +347,7 @@ const getStatusTagType = (status: number) => {
     case 3: return 'primary'
     case 4: return 'danger'
     case 5: return 'success'
-    default: return ''
+    default: return undefined
   }
 }
 
