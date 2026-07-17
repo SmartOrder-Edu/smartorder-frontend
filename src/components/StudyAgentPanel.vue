@@ -39,12 +39,12 @@
         v-for="btn in feedbackButtons"
         :key="btn.type"
         class="feedback-btn"
-        :class="[btn.variant, { active: btn.type === 'draw_diagram' && stepStore.diagramGenerating }]"
+        :class="[btn.variant, { active: isFeedbackGenerating(btn.type) }]"
         @click="onFeedback(btn.type)"
-        :disabled="stepStore.sendingFeedback || stepStore.diagramGenerating"
+        :disabled="stepStore.sendingFeedback || stepStore.diagramGenerating || !!stepStore.contextualFeedbackGenerating"
       >
         <span
-          v-if="btn.type === 'draw_diagram' && stepStore.diagramGenerating"
+          v-if="isFeedbackGenerating(btn.type)"
           class="fb-spinner"
         ></span>
         <span v-else class="fb-icon" v-html="btn.icon"></span>
@@ -121,7 +121,20 @@ function feedbackLabel(btn: { type: FeedbackType; label: string }) {
   if (btn.type === 'draw_diagram' && stepStore.diagramGenerating) {
     return '正在画图'
   }
+  if (btn.type === stepStore.contextualFeedbackGenerating) {
+    const loadingLabels: Partial<Record<FeedbackType, string>> = {
+      dont_understand: '重新解释中',
+      another_example: '换例子中',
+      similar_question: '出题中',
+    }
+    return loadingLabels[btn.type] || btn.label
+  }
   return btn.label
+}
+
+function isFeedbackGenerating(type: FeedbackType) {
+  return (type === 'draw_diagram' && stepStore.diagramGenerating)
+    || type === stepStore.contextualFeedbackGenerating
 }
 
 async function onFeedback(type: FeedbackType) {

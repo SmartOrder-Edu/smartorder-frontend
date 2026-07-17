@@ -36,6 +36,12 @@ import {
   getMockScriptSteps,
 } from '@/mocks/studySession'
 
+const CONTEXTUAL_AGENT_FEEDBACK_TYPES = new Set<FeedbackType>([
+  'dont_understand',
+  'another_example',
+  'similar_question',
+])
+
 export const useTaskStepStore = defineStore('taskStep', () => {
   // ---- 原有步骤状态 ----
   const steps = ref<TaskStepVO[]>([])
@@ -61,6 +67,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const temporaryBoardNotes = ref<TemporaryBoardNote[]>([])
   const sendingFeedback = ref(false)
   const diagramGenerating = ref(false)
+  const contextualFeedbackGenerating = ref<FeedbackType | null>(null)
   const completing = ref(false)
 
   // ---- 教学流状态（v2 Agent 主动教学交互）----
@@ -413,10 +420,10 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   /**
    * 发送反馈到 Agent 陪伴面板
-   * mock 阶段：本地生成回复；后端就绪后：调用 useAgentChat 发起 study-scoped SSE
+   * 教学内容型反馈由 study-scoped SSE 生成，控制型反馈继续交给后端教学动作处理。
    */
   async function sendFeedback(type: FeedbackType) {
-    if (sendingFeedback.value || diagramGenerating.value) return
+    if (sendingFeedback.value || diagramGenerating.value || contextualFeedbackGenerating.value) return
     const labels: Record<FeedbackType, string> = {
       dont_understand: '我没看懂',
       slower: '讲慢一点',
@@ -438,6 +445,10 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       })
       if (type === 'draw_diagram') {
         await sendDiagramExplanation(labels[type])
+        return
+      }
+      if (CONTEXTUAL_AGENT_FEEDBACK_TYPES.has(type)) {
+        await sendContextualAgentFeedback(type, labels[type])
         return
       }
 
@@ -522,6 +533,53 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       })
     } finally {
       sendingFeedback.value = false
+    }
+  }
+
+  async function sendContextualAgentFeedback(type: FeedbackType, label: string) {
+    contextualFeedbackGenerating.value = type
+    if (type === 'dont_understand' && timelinePlayer.status.value === 'playing') {
+      pauseTeaching()
+    }
+
+    try {
+      await reportStudyEvent({
+        eventType: 'feedback_clicked',
+        targetType: 'feedback',
+        targetId: type,
+        payload: {
+          feedbackType: type,
+          label,
+          clientHandled: true,
+        },
+      })
+
+      triggerFeedbackVisualEffect(type)
+
+      const assistantMessage: StudyChatMessage = {
+        id: `a-feedback-${type}-${Date.now()}`,
+        role: 'agent',
+        text: '',
+        markdown: true,
+        createTime: Date.now(),
+      }
+      chatMessages.value.push(assistantMessage)
+
+      const agentPrompt = buildContextualFeedbackPrompt(type, label)
+      const streamOk = await streamStudyAgentReply(label, assistantMessage, agentPrompt)
+      if (!streamOk || !assistantMessage.text.trim()) {
+        assistantMessage.text = buildContextualFeedbackFailureText(type)
+        ElMessage.error('Agent 反馈接口未返回有效内容')
+        return
+      }
+
+      appendTemporaryBoardNote({
+        title: buildContextualFeedbackNoteTitle(type),
+        content: buildBoardNoteFromAgentReply(label, assistantMessage.text),
+        sourceQuestion: label,
+      })
+    } finally {
+      contextualFeedbackGenerating.value = null
     }
   }
 
@@ -763,6 +821,57 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     ].join('\n')
   }
 
+  function buildContextualFeedbackPrompt(type: FeedbackType, label: string): string {
+    const baseRules = [
+      '请基于当前学习执行页上下文回答学生的即时反馈。',
+      '要求：',
+      '1. 只解释当前脚本步骤和当前教学段，不要泛泛讲整章。',
+      '2. 回答要短，优先用 Markdown，必要时用公式或列表。',
+      '3. 先回应学生反馈，再给出可直接对照中间板书看的内容。',
+      '4. 不要声称已经修改数据库或学习计划，只说明本次讲解如何调整。',
+    ]
+
+    const taskRules: Partial<Record<FeedbackType, string[]>> = {
+      dont_understand: [
+        '学生没看懂：请用“核心意思 -> 为什么这样做 -> 怎么检查自己懂了”三层重新解释。',
+        '最后给一个 1 句话的自检问题。',
+      ],
+      another_example: [
+        '学生想换个例子：请给一个与当前知识点同构、但数字或场景不同的新例子。',
+        '必须包含“例子、解法、对应回当前步骤”三部分。',
+      ],
+      similar_question: [
+        '学生想做类似题：请出一道和当前步骤同类型的练习。',
+        '必须包含“题目、提示、答案与讲解”三部分，答案不要太长。',
+      ],
+    }
+
+    return [
+      ...baseRules,
+      ...(taskRules[type] || []),
+      `学生触发：${label}`,
+    ].join('\n')
+  }
+
+  function buildContextualFeedbackNoteTitle(type: FeedbackType): string {
+    const prefix: Partial<Record<FeedbackType, string>> = {
+      dont_understand: '再讲一遍',
+      another_example: '换个例子',
+      similar_question: '类似练习',
+    }
+    const title = currentScriptStep.value?.title || '当前步骤'
+    return `${prefix[type] || 'Agent 补充'}：${trimForContext(title, 24) || '当前步骤'}`
+  }
+
+  function buildContextualFeedbackFailureText(type: FeedbackType): string {
+    const action = type === 'dont_understand'
+      ? '重新解释'
+      : type === 'another_example'
+        ? '生成新例子'
+        : '生成类似题'
+    return `Agent 暂时没有完成${action}，请检查后端服务和 \`/agent/chat/stream\` 接口。`
+  }
+
   function buildDiagramNoteTitle(): string {
     const title = currentScriptStep.value?.title || '当前步骤'
     return `图解：${trimForContext(title, 28) || '当前步骤'}`
@@ -891,6 +1000,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     chatMessages.value = []
     temporaryBoardNotes.value = []
     diagramGenerating.value = false
+    contextualFeedbackGenerating.value = null
     currentStepIndex.value = 0
     taskId.value = ''
     spaceId.value = null
@@ -1803,6 +1913,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     canvasContent,
     temporaryBoardNotes,
     diagramGenerating,
+    contextualFeedbackGenerating,
     mastery,
     chatMessages,
     sendingFeedback,
