@@ -39,12 +39,16 @@
         v-for="btn in feedbackButtons"
         :key="btn.type"
         class="feedback-btn"
-        :class="btn.variant"
+        :class="[btn.variant, { active: btn.type === 'draw_diagram' && stepStore.diagramGenerating }]"
         @click="onFeedback(btn.type)"
-        :disabled="stepStore.sendingFeedback"
+        :disabled="stepStore.sendingFeedback || stepStore.diagramGenerating"
       >
-        <span class="fb-icon" v-html="btn.icon"></span>
-        <span class="fb-label">{{ btn.label }}</span>
+        <span
+          v-if="btn.type === 'draw_diagram' && stepStore.diagramGenerating"
+          class="fb-spinner"
+        ></span>
+        <span v-else class="fb-icon" v-html="btn.icon"></span>
+        <span class="fb-label">{{ feedbackLabel(btn) }}</span>
       </button>
     </div>
 
@@ -112,6 +116,13 @@ const feedbackButtons: { type: FeedbackType; label: string; variant: string; ico
   { type: 'add_review', label: '加入复习', variant: 'warn', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>' },
   { type: 'skip', label: '跳过', variant: 'default', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5,4 15,12 5,20"/><line x1="19" y1="5" x2="19" y2="19"/></svg>' },
 ]
+
+function feedbackLabel(btn: { type: FeedbackType; label: string }) {
+  if (btn.type === 'draw_diagram' && stepStore.diagramGenerating) {
+    return '正在画图'
+  }
+  return btn.label
+}
 
 async function onFeedback(type: FeedbackType) {
   await stepStore.sendFeedback(type)
@@ -319,10 +330,26 @@ export default { name: 'StudyAgentPanel' }
 
   &:hover:not(:disabled) { border-color: #0bb7aa; background: rgba(11, 183, 170, 0.06); color: #0bb7aa; }
 
+  &.active {
+    border-color: rgba(11, 183, 170, 0.34);
+    background: rgba(240, 253, 250, 0.92);
+    color: #0f766e;
+  }
+
   &.accent { background: #ecfeff; border-color: #a5f3fc; color: #0e7490; &:hover:not(:disabled) { background: #cffafe; } }
   &.success { background: #ecfdf5; border-color: #a7f3d0; color: #047857; &:hover:not(:disabled) { background: #d1fae5; } }
   &.warn { background: #fef3c7; border-color: #fcd34d; color: #92400e; &:hover:not(:disabled) { background: #fef08a; } }
   &:disabled { opacity: 0.5; cursor: default; }
+}
+
+.fb-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(15, 118, 110, 0.18);
+  border-top-color: #0f766e;
+  animation: fbSpin 0.82s linear infinite;
+  flex-shrink: 0;
 }
 
 .chat-section {
@@ -379,6 +406,10 @@ export default { name: 'StudyAgentPanel' }
 @keyframes typing {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
   30% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes fbSpin {
+  to { transform: rotate(360deg); }
 }
 
 .msg-bubble {

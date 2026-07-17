@@ -186,6 +186,7 @@
           v-for="note in stepStore.temporaryBoardNotes"
           :key="note.id"
           class="temporary-board-note"
+          :class="{ 'temporary-board-note--diagram': note.kind === 'diagram' }"
         >
           <div class="temporary-board-head">
             <span class="temporary-board-dot"></span>
@@ -506,6 +507,29 @@ function onQuizAnswer(_quizId: string, answer: string) {
       background: rgba(255, 255, 255, 0.66);
       color: #475569;
     }
+  }
+}
+
+.temporary-board-note--diagram {
+  border-color: rgba(14, 165, 233, 0.24);
+  background:
+    linear-gradient(180deg, rgba(240, 249, 255, 0.9), rgba(255, 255, 255, 0.98)),
+    repeating-linear-gradient(90deg, rgba(14, 165, 233, 0.055) 0, rgba(14, 165, 233, 0.055) 1px, transparent 1px, transparent 34px),
+    repeating-linear-gradient(0deg, rgba(11, 183, 170, 0.05) 0, rgba(11, 183, 170, 0.05) 1px, transparent 1px, transparent 34px);
+
+  .temporary-board-head h3 {
+    color: #0369a1;
+  }
+
+  .temporary-board-dot {
+    background: #0ea5e9;
+    box-shadow: 0 0 0 5px rgba(14, 165, 233, 0.12);
+  }
+
+  :deep(.markdown-renderer .mermaid-block) {
+    margin-top: 10px;
+    border-color: rgba(14, 165, 233, 0.18);
+    box-shadow: 0 12px 28px rgba(14, 165, 233, 0.08);
   }
 }
 

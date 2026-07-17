@@ -60,6 +60,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const chatMessages = ref<StudyChatMessage[]>([])
   const temporaryBoardNotes = ref<TemporaryBoardNote[]>([])
   const sendingFeedback = ref(false)
+  const diagramGenerating = ref(false)
   const completing = ref(false)
 
   // ---- 教学流状态（v2 Agent 主动教学交互）----
@@ -390,6 +391,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   /** 在当前画布追加一张临时板书卡片（来自自由提问或后端教学动作） */
   function appendTemporaryBoardNote(note: {
+    kind?: TemporaryBoardNote['kind']
     title?: string
     content: string
     sourceQuestion?: string
@@ -400,6 +402,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       ...temporaryBoardNotes.value,
       {
         id: `board-note-${Date.now()}-${temporaryBoardNotes.value.length}`,
+        kind: note.kind || 'note',
         title: note.title?.trim() || 'Agent 补充板书',
         content,
         sourceQuestion: note.sourceQuestion?.trim(),
@@ -413,6 +416,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
    * mock 阶段：本地生成回复；后端就绪后：调用 useAgentChat 发起 study-scoped SSE
    */
   async function sendFeedback(type: FeedbackType) {
+    if (sendingFeedback.value || diagramGenerating.value) return
     const labels: Record<FeedbackType, string> = {
       dont_understand: '我没看懂',
       slower: '讲慢一点',
@@ -432,6 +436,11 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         markdown: false,
         createTime: Date.now(),
       })
+      if (type === 'draw_diagram') {
+        await sendDiagramExplanation(labels[type])
+        return
+      }
+
       const receipt = await reportStudyEvent({
         eventType: 'feedback_clicked',
         targetType: 'feedback',
@@ -516,7 +525,60 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     }
   }
 
-  async function streamStudyAgentReply(question: string, assistantMessage: StudyChatMessage): Promise<boolean> {
+  async function sendDiagramExplanation(label: string) {
+    if (diagramGenerating.value) return
+    diagramGenerating.value = true
+    if (timelinePlayer.status.value === 'playing') {
+      pauseTeaching()
+    }
+
+    try {
+      await reportStudyEvent({
+        eventType: 'feedback_clicked',
+        targetType: 'feedback',
+        targetId: 'draw_diagram',
+        payload: {
+          feedbackType: 'draw_diagram',
+          label,
+          clientHandled: true,
+        },
+      })
+
+      triggerFeedbackVisualEffect('draw_diagram')
+
+      const assistantMessage: StudyChatMessage = {
+        id: `a-diagram-${Date.now()}`,
+        role: 'agent',
+        text: '',
+        markdown: true,
+        createTime: Date.now(),
+      }
+      chatMessages.value.push(assistantMessage)
+
+      const agentPrompt = buildDiagramAgentPrompt(label)
+      const streamOk = await streamStudyAgentReply(label, assistantMessage, agentPrompt)
+      if (!streamOk || !assistantMessage.text.trim()) {
+        assistantMessage.text = 'Agent 图解暂时没有生成成功，请检查后端服务和 `/agent/chat/stream` 接口。'
+        ElMessage.error('Agent 图解接口未返回有效内容')
+        return
+      }
+
+      appendTemporaryBoardNote({
+        kind: 'diagram',
+        title: buildDiagramNoteTitle(),
+        content: buildDiagramBoardNote(label, assistantMessage.text),
+        sourceQuestion: label,
+      })
+    } finally {
+      diagramGenerating.value = false
+    }
+  }
+
+  async function streamStudyAgentReply(
+    question: string,
+    assistantMessage: StudyChatMessage,
+    agentPrompt?: string,
+  ): Promise<boolean> {
     let token = ''
     try {
       token = await refreshAccessToken()
@@ -525,7 +587,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     }
 
     const body: AgentChatRequest = {
-      message: question,
+      message: agentPrompt || question,
       conversationId: studyConversationId.value || undefined,
       forceMode: 'REACT',
       studyContext: buildStudyContext(question),
@@ -688,6 +750,68 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     return `### 针对你的问题\n\n> ${question}\n\n${trimForContext(reply, 1200) || ''}`
   }
 
+  function buildDiagramAgentPrompt(question: string): string {
+    return [
+      '请基于当前学习执行页上下文，把学生当前没懂的这一步画成图解释。',
+      '要求：',
+      '1. 先用一句话说明图在解释什么。',
+      '2. 必须给出一个 Mermaid flowchart，使用 ```mermaid 代码块包裹。',
+      '3. 图里只放 3 到 5 个关键节点，按“当前目标 -> 关键条件 -> 推理/操作 -> 结论/下一步”的顺序组织。',
+      '4. 图后用 3 条短句解释读图顺序。',
+      '5. 不要泛泛讲整章，只解释当前脚本步骤和当前教学段。',
+      `学生触发：${question}`,
+    ].join('\n')
+  }
+
+  function buildDiagramNoteTitle(): string {
+    const title = currentScriptStep.value?.title || '当前步骤'
+    return `图解：${trimForContext(title, 28) || '当前步骤'}`
+  }
+
+  function buildDiagramBoardNote(question: string, reply: string): string {
+    const trimmedReply = trimForContext(reply, 2200) || ''
+    if (/```mermaid[\s\S]*?```/.test(trimmedReply)) {
+      return trimmedReply
+    }
+
+    return [
+      `我先把“${question}”对应的这一步画成一张简图：`,
+      '',
+      '```mermaid',
+      buildFallbackContextDiagram(),
+      '```',
+      '',
+      trimmedReply || '你可以按箭头顺序看：先确认当前目标，再看关键条件，最后看这一步为什么能推出结论。',
+    ].join('\n')
+  }
+
+  function buildFallbackContextDiagram(): string {
+    const stepTitle = safeMermaidLabel(currentScriptStep.value?.title || '当前步骤')
+    const segmentTitle = safeMermaidLabel(
+      currentSegment.value?.teachingIntent
+      || currentSegment.value?.boardContent
+      || currentSegment.value?.markdown
+      || '当前讲解段',
+    )
+    const questionLabel = safeMermaidLabel('你的问题')
+    const conclusion = safeMermaidLabel(currentScriptStep.value?.subtitle || '回到这一步的结论')
+
+    return [
+      'flowchart TD',
+      `  A["${stepTitle}"] --> B["${segmentTitle}"]`,
+      `  B --> C["${questionLabel}"]`,
+      `  C --> D["${conclusion}"]`,
+    ].join('\n')
+  }
+
+  function safeMermaidLabel(value: unknown): string {
+    return String(value || '')
+      .replace(/\s+/g, ' ')
+      .replace(/["<>`]/g, '')
+      .slice(0, 34)
+      || '当前内容'
+  }
+
   /** 提交答题（practice / assessment 步骤） */
   function submitPracticeAnswer(answer: string): { correct: boolean; explanation: string } {
     const q = canvasContent.value?.question
@@ -766,6 +890,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     mastery.value = null
     chatMessages.value = []
     temporaryBoardNotes.value = []
+    diagramGenerating.value = false
     currentStepIndex.value = 0
     taskId.value = ''
     spaceId.value = null
@@ -1677,6 +1802,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     currentScriptStep,
     canvasContent,
     temporaryBoardNotes,
+    diagramGenerating,
     mastery,
     chatMessages,
     sendingFeedback,

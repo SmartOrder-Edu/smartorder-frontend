@@ -715,6 +715,7 @@ export interface StudyTeachingActionStatusRequest {
 /** 学习中由 Agent 临时追加的板书补充 */
 export interface TemporaryBoardNote {
   id: string
+  kind?: 'note' | 'diagram'
   title: string
   content: string
   sourceQuestion?: string
