@@ -364,10 +364,17 @@
             </el-checkbox-group>
           </el-form-item>
 
-          <div v-if="generating || generationSteps.length" class="generation-process">
+          <div
+            v-if="generating || generationSteps.length"
+            class="generation-process"
+            :class="{ running: generating, completed: !!scheduleResult && !generating }"
+          >
             <div class="generation-analysis">
               <div class="analysis-header">
-                <span>AI 分析情况</span>
+                <div class="analysis-status">
+                  <span class="analysis-status-dot"></span>
+                  <span>{{ generating ? 'Agent 正在编排' : 'Agent 编排完成' }}</span>
+                </div>
                 <strong>{{ agentAnalysisTitle }}</strong>
               </div>
 
@@ -403,13 +410,13 @@
               </div>
             </div>
 
-            <div class="process-divider"></div>
-
-            <div v-for="step in generationSteps" :key="step.key" class="process-step" :class="step.status">
-              <span class="process-dot"></span>
-              <div class="process-copy">
-                <span class="process-label">{{ step.label }}</span>
-                <span class="process-detail">{{ step.detail }}</span>
+            <div class="process-timeline">
+              <div v-for="step in generationSteps" :key="step.key" class="process-step" :class="step.status">
+                <span class="process-dot"></span>
+                <div class="process-copy">
+                  <span class="process-label">{{ step.label }}</span>
+                  <span class="process-detail">{{ step.detail }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -478,12 +485,12 @@ import {
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import type { TaskActionType, TaskStatus, TaskVO } from '@/types/learningSpace'
 import bookIcon from '@/assets/icons/task-schedule/book.svg?raw'
-import practiceIcon from '@/assets/icons/task-schedule/practice.svg?raw'
 import folderIcon from '@/assets/icons/task-schedule/folder.svg?raw'
 import clockIcon from '@/assets/icons/task-schedule/clock.svg?raw'
 import taskProgressIcon from '@/assets/icons/task-schedule/task-progress.svg?raw'
 
 const resourceStatIcon = `<svg t="1784288034869" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="13863" width="200" height="200"><path d="M266.24 713.874286h280.868571c20.48 0 35.108571-14.628571 35.108572-35.108572s-14.628571-35.108571-35.108572-35.108571H266.24c-20.48 0-35.108571 14.628571-35.108571 35.108571 0 17.554286 17.554286 35.108571 35.108571 35.108572z" fill="currentColor" p-id="13864"></path><path d="M965.485714 386.194286V245.76C965.485714 207.725714 933.302857 175.542857 895.268571 175.542857H157.988571C119.954286 175.542857 87.771429 207.725714 87.771429 245.76v561.737143C87.771429 845.531429 119.954286 877.714286 157.988571 877.714286h737.28c38.034286 0 70.217143-32.182857 70.217143-70.217143V386.194286zM193.097143 245.76h667.062857c20.48 0 35.108571 14.628571 35.108571 35.108571v105.325715H157.988571V280.868571c0-20.48 14.628571-35.108571 35.108572-35.108571z m702.171428 526.628571c0 20.48-14.628571 35.108572-35.108571 35.108572H193.097143c-20.48 0-35.108571-14.628571-35.108572-35.108572V456.411429h737.28v315.977142z" fill="currentColor" p-id="13865"></path></svg>`
+const practiceTaskIcon = `<svg t="1784294599618" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="9915" width="200" height="200"><path d="M584.62954694 477.7404272L572.82103927 498.19491906l-9.30347348-5.36840007 11.81179513-20.45777931z" fill="#bfbfbf" p-id="9916"></path><path d="M531.392 607.616l-38.784-22.4-42.432 73.408-47.04-27.072L632.96 233.216l47.04 27.136-43.264 74.944 38.784 22.4 54.464-94.336a22.4 22.4 0 0 0-8.192-30.592L501.952 105.792a22.592 22.592 0 0 0-30.656 8.192L219.072 551.04a21.952 21.952 0 0 0-2.752 9.856l-0.384-0.192 3.2 226.752 0.448 0.256a33.92 33.92 0 0 0 16.64 32.384 33.92 33.92 0 0 0 36.352-1.728l0.384 0.256 198.016-110.592-0.384-0.192a22.144 22.144 0 0 0 7.168-7.232l53.632-92.992z m33.984-413.44l48.192 27.84-229.888 398.336-48.128-27.776 229.824-398.4z m-66.432-38.336l47.04 27.2L316.16 581.376l-47.104-27.328 229.888-398.208z m-195.072 594.944l-41.664-24.192-0.448-124.928 149.76 86.528-107.648 62.592z" fill="currentColor" p-id="9917"></path><path d="M585.28 514.112l-38.784-22.4 54.336-94.08 38.784 22.4z" fill="currentColor" p-id="9918"></path><path d="M655.424 347.712m-22.4 0a22.4 22.4 0 1 0 44.8 0 22.4 22.4 0 1 0-44.8 0Z" fill="currentColor" p-id="9919"></path><path d="M620.16 408.832m-22.4 0a22.4 22.4 0 1 0 44.8 0 22.4 22.4 0 1 0-44.8 0Z" fill="currentColor" p-id="9920"></path><path d="M512.832 594.944m-22.4 0a22.4 22.4 0 1 0 44.8 0 22.4 22.4 0 1 0-44.8 0Z" fill="currentColor" p-id="9921"></path><path d="M565.824 502.912m-22.4 0a22.4 22.4 0 1 0 44.8 0 22.4 22.4 0 1 0-44.8 0Z" fill="currentColor" p-id="9922"></path><path d="M99.584 906.88m-22.4 0a22.4 22.4 0 1 0 44.8 0 22.4 22.4 0 1 0-44.8 0Z" fill="currentColor" p-id="9923"></path><path d="M950.4 906.944c0 12.288-10.048 22.4-22.4 22.4H188.928a22.464 22.464 0 0 1-22.4-22.4v-0.064c0-12.288 10.112-22.4 22.4-22.4H928c12.288 0 22.4 10.112 22.4 22.464zM950.4 811.328c0 12.288-10.048 22.4-22.4 22.4H496.96a22.464 22.464 0 0 1-22.4-22.4v-0.064c0-12.288 10.112-22.4 22.4-22.4H928c12.288 0 22.4 10.048 22.4 22.464z" fill="currentColor" p-id="9924"></path></svg>`
 
 type TabValue = 'today' | 'week' | 'all'
 type FilterValue = 'all' | 'in_progress' | 'pending' | 'completed'
@@ -1189,7 +1196,7 @@ function readMetadata(task: TaskVO) {
 
 const defaultRhythmTimes = ['09:00', '10:30', '13:30', '15:00', '17:00']
 
-const checkIcon = practiceIcon
+const checkIcon = practiceTaskIcon
 const doneIcon = taskProgressIcon
 const codeIcon = `<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M867.889126 0H153.927505C68.776119 0 0 68.776119 0 153.927505v30.567165c0 15.283582 12.008529 27.292111 27.292111 27.29211S54.584222 199.778252 54.584222 184.49467v-30.567165c0-54.584222 43.667377-98.251599 98.251599-98.251599h713.96162c54.584222 0 98.251599 43.667377 98.2516 98.251599v716.14499c0 54.584222-43.667377 98.251599-98.2516 98.251599H710.686567c-15.283582 0-27.292111 12.008529-27.292111 27.292111s12.008529 27.292111 27.292111 27.292111h156.110874c85.151386 0 153.927505-68.776119 153.927506-153.927506V153.927505c0-85.151386-68.776119-153.927505-152.835821-153.927505z" /><path fill="currentColor" d="M749.987207 597.151386c5.458422-14.191898-1.091684-30.567164-15.283582-36.025586-14.191898-5.458422-30.567164 1.091684-36.025587 15.283582l-73.142857 185.586354c-15.283582-43.667377-41.484009-84.059701-77.509595-116.810235-39.30064-36.025586-87.334755-62.226013-139.735607-75.326226 69.867804-32.750533 117.901919-103.710021 117.901919-185.586354 0-112.443497-91.701493-205.236674-204.14499-205.236674-112.443497 0-204.144989 91.701493-204.144989 205.236674 0 81.876333 48.034115 152.835821 117.901919 185.586354C100.434968 603.701493 4.366738 716.144989 1.091684 858.063966V995.616205c0 15.283582 12.008529 27.292111 27.292111 27.292111s27.292111-12.008529 27.292111-27.292111V859.15565c3.275053-138.643923 116.810235-243.445629 265.279318-243.445629 72.051173 0 138.643923 25.108742 187.769723 72.051173 49.1258 45.850746 76.41791 109.168443 76.41791 177.944563v131.002132c0 15.283582 12.008529 27.292111 27.292111 27.292111s27.292111-12.008529 27.292111-27.292111V870.072495l110.260128-272.921109zM173.577825 385.364606c0-81.876333 66.592751-149.560768 148.469083-149.560768s148.469083 66.592751 148.469083 149.560768S403.923241 533.833689 322.046908 533.833689s-148.469083-66.592751-148.469083-148.469083zM874.439232 149.560768H510.908316c-15.283582 0-27.292111 12.008529-27.292111 27.29211s12.008529 27.292111 27.292111 27.292111h363.530916c15.283582 0 27.292111-12.008529 27.292111-27.292111 0-14.191898-12.008529-27.292111-27.292111-27.29211zM874.439232 286.021322H614.618337c-15.283582 0-27.292111 12.008529-27.292111 27.292111s12.008529 27.292111 27.292111 27.292111H873.347548c15.283582 0 27.292111-12.008529 27.292111-27.292111s-10.916844-27.292111-26.200427-27.292111zM874.439232 422.481876H692.127932c-15.283582 0-27.292111 12.008529-27.292111 27.292111s12.008529 27.292111 27.292111 27.292111h182.3113c15.283582 0 27.292111-12.008529 27.292111-27.292111s-12.008529-27.292111-27.292111-27.292111z" /></svg>`
 const projectIcon = taskProgressIcon
@@ -1575,10 +1582,10 @@ export default { name: 'TasksPage' }
   height: 26px;
 }
 
-.stat-card.review { color: var(--primary); }
-.stat-card.practice { color: var(--success); }
-.stat-card.resource { color: var(--warning); }
-.stat-card.completed { color: var(--primary-violet); }
+.stat-card.review { color: #2563eb; }
+.stat-card.practice { color: #10b981; }
+.stat-card.resource { color: #f59e0b; }
+.stat-card.completed { color: #7c3aed; }
 
 .stat-copy {
   min-width: 0;
@@ -1762,7 +1769,11 @@ export default { name: 'TasksPage' }
 
 .tasks-panel {
   min-height: 280px;
-  padding: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .task-list {
@@ -1778,8 +1789,8 @@ export default { name: 'TasksPage' }
 .learning-task-card {
   position: relative;
   display: grid;
-  grid-template-columns: 28px 68px minmax(0, 1fr) auto;
-  gap: 16px;
+  grid-template-columns: 28px 50px minmax(0, 1fr) auto;
+  gap: 14px;
   align-items: center;
   padding: 22px;
   border: 1px solid var(--border-color-local);
@@ -1788,9 +1799,8 @@ export default { name: 'TasksPage' }
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 
-  /* 默认/复习任务的主题变量 (亮蓝色) */
-  --task-color: var(--primary);
-  --task-color-rgb: 11, 183, 170;
+  --task-color: #2563eb;
+  --task-color-rgb: 37, 99, 235;
   --task-grad: linear-gradient(135deg, #0ea5e9, #2563eb);
   --task-glow: rgba(37, 99, 235, 0.28);
 }
@@ -1809,7 +1819,7 @@ export default { name: 'TasksPage' }
 .learning-task-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
-  border-color: rgba(11, 183, 170, 0.22);
+  border-color: rgba(var(--task-color-rgb), 0.24);
 }
 
 .learning-task-card.type-practice {
@@ -1874,20 +1884,20 @@ export default { name: 'TasksPage' }
 }
 
 .task-type-icon-wrapper {
-  width: 64px;
-  height: 64px;
-  border-radius: 18px;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: rgba(var(--task-color-rgb), 0.08);
-  border: 1px solid rgba(var(--task-color-rgb), 0.12);
+  background: rgba(var(--task-color-rgb), 0.1);
+  border: 1px solid rgba(var(--task-color-rgb), 0.16);
 }
 
 .learning-task-card .task-type-icon {
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1896,8 +1906,8 @@ export default { name: 'TasksPage' }
 }
 
 .learning-task-card .task-type-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
 }
 
 .task-body {
@@ -1928,8 +1938,8 @@ export default { name: 'TasksPage' }
 }
 
 .type-badge.review {
-  color: var(--primary);
-  background: rgba(11, 183, 170, 0.1);
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
 }
 
 .type-badge.practice {
@@ -2414,11 +2424,20 @@ export default { name: 'TasksPage' }
 .agent-schedule-result {
   display: grid;
   gap: 14px;
-  padding: 16px;
+  padding: 18px;
   margin-top: 16px;
-  border: 1px solid var(--border-color-local);
-  border-radius: 14px;
-  background: var(--background-color-base, #f1f5f9);
+  border: 1px solid rgba(11, 183, 170, 0.22);
+  border-radius: 18px;
+  background: var(--card-bg);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.04);
+}
+
+.generation-process.running {
+  border-color: rgba(11, 183, 170, 0.26);
+}
+
+.generation-process.completed {
+  border-color: rgba(16, 185, 129, 0.24);
 }
 
 .generation-analysis,
@@ -2432,7 +2451,37 @@ export default { name: 'TasksPage' }
   gap: 6px;
 }
 
-.analysis-header span,
+.analysis-header {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
+.analysis-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--primary);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.analysis-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+}
+
+.generation-process.running .analysis-status-dot {
+  animation: statusPulse 1.3s ease-in-out infinite;
+}
+
 .result-header span {
   color: var(--primary);
   font-size: 0.76rem;
@@ -2449,10 +2498,11 @@ export default { name: 'TasksPage' }
 .analysis-item,
 .analysis-panel,
 .evidence-item {
-  padding: 12px;
-  border: 1px solid var(--border-color-local);
+  padding: 13px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 12px;
   background: var(--card-bg);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.035);
 }
 
 .analysis-item span,
@@ -2464,7 +2514,8 @@ export default { name: 'TasksPage' }
 .analysis-item strong,
 .evidence-item strong {
   color: var(--text-primary-local);
-  font-size: 0.96rem;
+  font-size: 1rem;
+  line-height: 1.25;
 }
 
 .analysis-item small {
@@ -2476,6 +2527,24 @@ export default { name: 'TasksPage' }
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.analysis-panel {
+  align-content: start;
+}
+
+.weakness-panel {
+  border-color: rgba(245, 158, 11, 0.32);
+  background:
+    linear-gradient(180deg, rgba(245, 158, 11, 0.13), transparent 48%),
+    var(--card-bg);
+}
+
+.basis-panel {
+  border-color: rgba(124, 58, 237, 0.28);
+  background:
+    linear-gradient(180deg, rgba(124, 58, 237, 0.12), transparent 48%),
+    var(--card-bg);
 }
 
 .analysis-panel h4,
@@ -2490,21 +2559,35 @@ export default { name: 'TasksPage' }
   display: grid;
   gap: 6px;
   margin: 0;
-  padding-left: 18px;
+  padding-left: 16px;
   color: var(--text-secondary-local);
   font-size: 0.76rem;
   line-height: 1.6;
 }
 
-.process-divider {
-  height: 1px;
-  background: var(--border-color-local);
+.process-timeline {
+  position: relative;
+  display: grid;
+  gap: 0;
+  padding: 4px 0 2px;
+}
+
+.process-timeline::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 16px;
+  bottom: 14px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(11, 183, 170, 0.3), rgba(148, 163, 184, 0.18));
 }
 
 .process-step {
+  position: relative;
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
+  padding: 8px 0;
 }
 
 .process-dot {
@@ -2518,6 +2601,7 @@ export default { name: 'TasksPage' }
 .process-step.running .process-dot {
   background: var(--primary);
   box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+  animation: statusPulse 1.3s ease-in-out infinite;
 }
 
 .process-step.completed .process-dot {
@@ -2530,7 +2614,8 @@ export default { name: 'TasksPage' }
 
 .process-copy {
   display: grid;
-  gap: 2px;
+  gap: 3px;
+  padding: 0 0 2px;
 }
 
 .process-label {
@@ -2542,6 +2627,7 @@ export default { name: 'TasksPage' }
 .process-detail {
   color: var(--text-secondary-local);
   font-size: 0.76rem;
+  line-height: 1.5;
 }
 
 :deep(.el-dialog),
@@ -2575,9 +2661,14 @@ export default { name: 'TasksPage' }
 :global(html[data-theme='dark']) .learning-task-card,
 :global(html[data-theme='dark']) .stat-card,
 :global(html[data-theme='dark']) .rail-card,
-:global(html[data-theme='dark']) .tasks-panel,
 :global(html[data-theme='dark']) .task-toolbar {
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+}
+
+:global(html[data-theme='dark']) .generation-process,
+:global(html[data-theme='dark']) .agent-schedule-result {
+  background: var(--card-bg);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
 }
 
 button:focus-visible,
@@ -2589,6 +2680,16 @@ input:focus-visible {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(11, 183, 170, 0);
   }
 }
 
