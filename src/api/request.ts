@@ -1,6 +1,10 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import JSONBig from 'json-bigint'
+import { handleAdminMock } from '@/mocks/adminMock'
+
+const ENABLE_ADMIN_MOCK = true
+
 
 const JSONBigString = JSONBig({ storeAsString: true })
 
@@ -196,28 +200,34 @@ class Request {
     window.location.href = '/login'
   }
 
-  public request<T = any>(config: RequestConfig): Promise<T> {
+  public async request<T = any>(config: RequestConfig): Promise<T> {
+    if (ENABLE_ADMIN_MOCK && config.url && config.url.includes('/admin/')) {
+      const mockResult = await handleAdminMock(config)
+      if (mockResult !== null) {
+        return mockResult as T
+      }
+    }
     return this.instance.request(config)
   }
 
   public get<T = any>(url: string, config?: RequestConfig): Promise<T> {
-    return this.instance.get(url, config)
+    return this.request<T>({ ...config, method: 'get', url })
   }
 
   public post<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> {
-    return this.instance.post(url, data, config)
+    return this.request<T>({ ...config, method: 'post', url, data })
   }
 
   public put<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> {
-    return this.instance.put(url, data, config)
+    return this.request<T>({ ...config, method: 'put', url, data })
   }
 
   public delete<T = any>(url: string, config?: RequestConfig): Promise<T> {
-    return this.instance.delete(url, config)
+    return this.request<T>({ ...config, method: 'delete', url })
   }
 
   public patch<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> {
-    return this.instance.patch(url, data, config)
+    return this.request<T>({ ...config, method: 'patch', url, data })
   }
 }
 

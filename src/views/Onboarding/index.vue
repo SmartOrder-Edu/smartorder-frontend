@@ -13,7 +13,7 @@
         <button class="skip-link" @click="handleSkip">
           稍后完善，直接开始学习
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <path d="M5 12h14M12 5l7 7-7 7"/>
+            <path d="M5 12h14M12 5l7 7-7 7" />
           </svg>
         </button>
       </div>
@@ -25,12 +25,8 @@
           <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
         </div>
         <div class="progress-steps">
-          <span
-            v-for="(label, i) in stepLabels"
-            :key="i"
-            class="progress-step"
-            :class="{ active: currentStep === i, completed: currentStep > i }"
-          >
+          <span v-for="(label, i) in stepLabels" :key="i" class="progress-step"
+            :class="{ active: currentStep === i, completed: currentStep > i }">
             {{ currentStep > i ? '✓' : i + 1 }}
           </span>
         </div>
@@ -45,13 +41,8 @@
           <div class="question-block">
             <label class="question-label">你的身份是？</label>
             <div class="option-cards">
-              <div
-                v-for="opt in identityOptions"
-                :key="opt.value"
-                class="option-card"
-                :class="{ selected: profileData.identity === opt.value }"
-                @click="profileData.identity = opt.value"
-              >
+              <div v-for="opt in identityOptions" :key="opt.value" class="option-card"
+                :class="{ selected: profileData.identity === opt.value }" @click="profileData.identity = opt.value">
                 <span class="option-icon" v-html="opt.icon"></span>
                 <span class="option-label">{{ opt.label }}</span>
               </div>
@@ -62,25 +53,17 @@
             <div v-if="profileData.identity" class="question-block sub-question">
               <label class="question-label">当前年级？</label>
               <div class="option-chips">
-                <span
-                  v-for="opt in gradeOptions"
-                  :key="opt.value"
-                  class="option-chip"
-                  :class="{ selected: profileData.grade === opt.value }"
-                  @click="profileData.grade = opt.value"
-                >{{ opt.label }}</span>
+                <span v-for="opt in gradeOptions" :key="opt.value" class="option-chip"
+                  :class="{ selected: profileData.grade === opt.value }" @click="profileData.grade = opt.value">{{
+                  opt.label }}</span>
               </div>
             </div>
           </transition>
 
-          <button
-            class="next-btn"
-            :disabled="!profileData.identity"
-            @click="currentStep = 1"
-          >
+          <button class="next-btn" :disabled="!profileData.identity" @click="currentStep = 1">
             下一步
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
+              <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
           </button>
         </div>
@@ -95,13 +78,8 @@
           <div class="question-block">
             <label class="question-label">主要学习方向</label>
             <div class="option-chips">
-              <span
-                v-for="opt in directionOptions"
-                :key="opt.value"
-                class="option-chip"
-                :class="{ selected: profileData.direction === opt.value }"
-                @click="profileData.direction = opt.value"
-              >
+              <span v-for="opt in directionOptions" :key="opt.value" class="option-chip"
+                :class="{ selected: profileData.direction === opt.value }" @click="profileData.direction = opt.value">
                 <span class="chip-emoji">{{ opt.emoji }}</span>
                 {{ opt.label }}
               </span>
@@ -111,25 +89,16 @@
           <transition name="slide-fade">
             <div v-if="profileData.direction === 'other'" class="question-block">
               <label class="question-label">请简要描述你的学习方向</label>
-              <el-input
-                v-model="profileData.directionDetail"
-                placeholder="例如：哲学、医学、艺术..."
-                maxlength="30"
-                show-word-limit
-              />
+              <el-input v-model="profileData.directionDetail" placeholder="例如：哲学、医学、艺术..." maxlength="30"
+                show-word-limit />
             </div>
           </transition>
 
           <div class="question-block">
             <label class="question-label">你当前的水平如何？</label>
             <div class="option-chips option-chips--described">
-              <span
-                v-for="opt in levelOptions"
-                :key="opt.value"
-                class="option-chip option-chip--described"
-                :class="{ selected: profileData.level === opt.value }"
-                @click="profileData.level = opt.value"
-              >
+              <span v-for="opt in levelOptions" :key="opt.value" class="option-chip option-chip--described"
+                :class="{ selected: profileData.level === opt.value }" @click="profileData.level = opt.value">
                 <span class="chip-main">{{ opt.label }}</span>
                 <span class="chip-desc">{{ opt.desc }}</span>
               </span>
@@ -139,18 +108,14 @@
           <div class="btn-group">
             <button class="back-btn" @click="currentStep = 0">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                <path d="M19 12H5M12 19l-7-7 7-7" />
               </svg>
               上一步
             </button>
-            <button
-              class="next-btn"
-              :disabled="!profileData.direction"
-              @click="currentStep = 2"
-            >
+            <button class="next-btn" :disabled="!profileData.direction" @click="currentStep = 2">
               下一步
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
+                <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
             </button>
           </div>
@@ -166,13 +131,8 @@
           <div class="question-block">
             <label class="question-label">近期主要目标</label>
             <div class="option-chips">
-              <span
-                v-for="opt in goalOptions"
-                :key="opt.value"
-                class="option-chip"
-                :class="{ selected: profileData.goal === opt.value }"
-                @click="profileData.goal = opt.value"
-              >
+              <span v-for="opt in goalOptions" :key="opt.value" class="option-chip"
+                :class="{ selected: profileData.goal === opt.value }" @click="profileData.goal = opt.value">
                 <span class="chip-emoji">{{ opt.emoji }}</span>
                 {{ opt.label }}
               </span>
@@ -182,32 +142,23 @@
           <div class="question-block">
             <label class="question-label">每天可用于学习的时间？</label>
             <div class="option-chips">
-              <span
-                v-for="opt in timeOptions"
-                :key="opt.value"
-                class="option-chip option-chip--time"
+              <span v-for="opt in timeOptions" :key="opt.value" class="option-chip option-chip--time"
                 :class="{ selected: profileData.dailyStudyTime === opt.value }"
-                @click="profileData.dailyStudyTime = opt.value"
-              >{{ opt.label }}</span>
+                @click="profileData.dailyStudyTime = opt.value">{{ opt.label }}</span>
             </div>
           </div>
 
           <div class="btn-group">
             <button class="back-btn" @click="currentStep = 1">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
+                <path d="M19 12H5M12 19l-7-7 7-7" />
               </svg>
               上一步
             </button>
-            <button
-              class="create-btn"
-              :loading="loading"
-              :disabled="!profileData.goal"
-              @click="handleComplete"
-            >
+            <button class="create-btn" :loading="loading" :disabled="!profileData.goal" @click="handleComplete">
               完成画像，开始学习
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <polyline points="20,6 9,17 4,12"/>
+                <polyline points="20,6 9,17 4,12" />
               </svg>
             </button>
           </div>
@@ -374,9 +325,8 @@ const handleComplete = async () => {
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg,
-    rgba(11, 183, 170, 0.05) 0%,
-    rgba(18, 184, 134, 0.05) 100%
-  );
+      rgba(11, 183, 170, 0.05) 0%,
+      rgba(18, 184, 134, 0.05) 100%);
 }
 
 .onboarding-bg .bg-blob {
@@ -592,7 +542,7 @@ const handleComplete = async () => {
 .option-card:hover {
   background: white;
   border-color: var(--border-light);
-  box-shadow: 0 2px 8px  var(--color-shadow);
+  box-shadow: 0 2px 8px var(--color-shadow);
 }
 
 .option-card.selected {
@@ -804,7 +754,14 @@ const handleComplete = async () => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

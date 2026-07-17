@@ -54,9 +54,20 @@ const storedVoiceId = localStorage.getItem('avatar_voice_id');
 const currentBgIndex = ref(storedBgIndex ? parseInt(storedBgIndex, 10) : 0);
 const currentAvatarId = ref(storedAvatarId || avatarsList[0].id);
 const currentVoiceId = ref(storedVoiceId || voicesList[0].vcn);
+
+const getAvatarRuntimeSnapshot = () => ({
+  avatarId: currentAvatarId.value,
+  voiceId: currentVoiceId.value,
+  backgroundIndex: currentBgIndex.value,
+  backgroundExists: Boolean(backgrounds[currentBgIndex.value]),
+  backgroundDataLength: backgrounds[currentBgIndex.value]?.length || 0,
+  storedAvatarId,
+  storedVoiceId,
+});
 const isSettingsVisible = ref(false);
 
 const applySettings = () => {
+  logAvatarStep('settings:apply', getAvatarRuntimeSnapshot());
   localStorage.setItem('avatar_bg_index', currentBgIndex.value.toString());
   localStorage.setItem('avatar_id', currentAvatarId.value);
   localStorage.setItem('avatar_voice_id', currentVoiceId.value);
@@ -81,6 +92,51 @@ const emit = defineEmits(['collapse']);
 const AVATAR_HEARTBEAT_INTERVAL = 25000;
 const AVATAR_RECONNECT_BASE_DELAY = 3000;
 const AVATAR_RECONNECT_MAX_DELAY = 30000;
+const AVATAR_DEBUG_PREFIX = '[AvatarDebug]';
+
+const redactAvatarUrl = (url: string) => {
+  if (!url) return '';
+  try {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.searchParams.has('authorization')) {
+      parsedUrl.searchParams.set('authorization', '***redacted***');
+    }
+    return parsedUrl.toString();
+  } catch (error) {
+    return url.replace(/authorization=[^&]+/, 'authorization=***redacted***');
+  }
+};
+
+const logAvatarStep = (step: string, details?: unknown) => {
+  if (details === undefined) {
+    console.info(`${AVATAR_DEBUG_PREFIX}[${step}]`);
+    return;
+  }
+  console.info(`${AVATAR_DEBUG_PREFIX}[${step}]`, details);
+};
+
+const warnAvatarStep = (step: string, details?: unknown) => {
+  if (details === undefined) {
+    console.warn(`${AVATAR_DEBUG_PREFIX}[${step}]`);
+    return;
+  }
+  console.warn(`${AVATAR_DEBUG_PREFIX}[${step}]`, details);
+};
+
+const getSocketStateName = (state?: number) => {
+  switch (state) {
+    case WebSocket.CONNECTING:
+      return 'CONNECTING';
+    case WebSocket.OPEN:
+      return 'OPEN';
+    case WebSocket.CLOSING:
+      return 'CLOSING';
+    case WebSocket.CLOSED:
+      return 'CLOSED';
+    default:
+      return 'UNKNOWN';
+  }
+};
 
 const playerContainer = ref<HTMLElement | null>(null);
 const isAvatarReady = ref(false);
@@ -106,16 +162,26 @@ const currentAvatarName = computed(() => {
 });
 
 const dispatchAvatarAction = (commandType: string, payloadData: any = {}) => {
-  if (!avatarSocket || avatarSocket.readyState !== WebSocket.OPEN) return;
+  if (!avatarSocket || avatarSocket.readyState !== WebSocket.OPEN) {
+    warnAvatarStep('command:skip', {
+      commandType,
+      socketState: getSocketStateName(avatarSocket?.readyState),
+      ready: isAvatarReady.value,
+      muted: isMuted.value,
+    });
+    return;
+  }
   const requestObj = {
     header: { app_id: avatarAuth.value.appId, ctrl: commandType, request_id: crypto.randomUUID() },
     ...payloadData
   };
+  logAvatarStep('command:send', { commandType, requestId: requestObj.header.request_id });
   avatarSocket.send(JSON.stringify(requestObj));
 };
 
 const destroyAvatarPlayer = () => {
   if (playerInstance && typeof playerInstance.destroy === 'function') {
+    logAvatarStep('player:destroy');
     playerInstance.destroy();
   }
   playerInstance = null;
@@ -137,6 +203,7 @@ const clearAvatarReconnect = () => {
 
 const closeAvatarSocket = () => {
   if (!avatarSocket) return;
+  logAvatarStep('socket:manual-close', { state: getSocketStateName(avatarSocket.readyState) });
   isManualSocketClose = true;
   avatarSocket.close();
   avatarSocket = null;
@@ -257,11 +324,15 @@ watch(() => props.authInfoLoading, (loading) => {
 });
 
 const initDigitalHuman = async () => {
-  if (isInitializing || isUnmounted) return;
+  if (isInitializing || isUnmounted) {
+    warnAvatarStep('auth:skip', { isInitializing, isUnmounted });
+    return;
+  }
   isInitializing = true;
   clearAvatarReconnect();
   try {
     isLoading.value = true;
+    logAvatarStep('auth:start', getAvatarRuntimeSnapshot());
     const response: any = await getAvatarAuthInfo();
     const result = response?.data || response || {};
     const authData: Partial<AvatarAuthInfo> = result?.wssUrl ? result : (result?.data || {});
@@ -271,12 +342,19 @@ const initDigitalHuman = async () => {
         wssUrl: authData.wssUrl || '',
         sceneId: authData.sceneId || ''
       };
+      logAvatarStep('auth:success', {
+        appId: avatarAuth.value.appId,
+        sceneId: avatarAuth.value.sceneId,
+        wssUrl: redactAvatarUrl(avatarAuth.value.wssUrl),
+      });
       connectXfWebSocket();
     } else {
+      warnAvatarStep('auth:empty', { response });
       ElMessage.error('获取虚拟人鉴权失败：返回数据为空');
       isLoading.value = false;
     }
   } catch (error: any) {
+    warnAvatarStep('auth:error', error);
     ElMessage.error('无法连接视频渲染服务: ' + (error?.message || ''));
     isLoading.value = false;
   } finally {
@@ -285,16 +363,22 @@ const initDigitalHuman = async () => {
 };
 
 const connectXfWebSocket = () => {
-  if (isUnmounted) return;
+  if (isUnmounted) {
+    warnAvatarStep('socket:skip', { reason: 'component unmounted' });
+    return;
+  }
   if (!avatarAuth.value.wssUrl) {
+    warnAvatarStep('socket:skip', { reason: 'missing wssUrl' });
     isLoading.value = false;
     return;
   }
   closeAvatarSocket();
   const requestId = crypto.randomUUID();
+  logAvatarStep('socket:connect', { requestId, wssUrl: redactAvatarUrl(avatarAuth.value.wssUrl), ...getAvatarRuntimeSnapshot() });
   avatarSocket = new WebSocket(avatarAuth.value.wssUrl);
   isManualSocketClose = false;
   avatarSocket.onopen = () => {
+    logAvatarStep('socket:open', { requestId, readyState: getSocketStateName(avatarSocket?.readyState) });
     reconnectAttempts = 0;
     startAvatarHeartbeat();
     const startCmd = {
@@ -305,6 +389,17 @@ const connectXfWebSocket = () => {
       },
       payload: { background: { data: backgrounds[currentBgIndex.value] } }
     };
+    logAvatarStep('start:send', {
+      requestId,
+      header: startCmd.header,
+      avatar: startCmd.parameter.avatar,
+      tts: startCmd.parameter.tts,
+      background: {
+        index: currentBgIndex.value,
+        exists: Boolean(backgrounds[currentBgIndex.value]),
+        dataLength: backgrounds[currentBgIndex.value]?.length || 0,
+      },
+    });
     avatarSocket?.send(JSON.stringify(startCmd));
   };
   avatarSocket.onmessage = (event) => {
@@ -313,27 +408,47 @@ const connectXfWebSocket = () => {
     try {
       res = JSON.parse(event.data);
     } catch (error) {
-      if (event.data === 'pong') return;
+      if (event.data === 'pong') {
+        logAvatarStep('heartbeat:pong');
+        return;
+      }
       if (event.data === 'ping') {
+        logAvatarStep('heartbeat:ping');
         avatarSocket?.send('pong');
         return;
       }
-      console.warn('[Avatar] failed to parse message:', event.data, error);
+      warnAvatarStep('message:parse-error', { data: event.data, error });
       return;
     }
     if (res.header && res.header.code !== 0) {
       if (res.header.ctrl === 'heartbeat') return;
-      console.warn('[Avatar] command failed:', res.header);
+      warnAvatarStep('message:command-failed', res.header);
       return;
     }
     const payload = res.payload;
     if (payload && payload.avatar) {
-      if (payload.avatar.event_type === 'stream_info') { startPlayVideo(payload.avatar.stream_url, res.header.sid); }
+      logAvatarStep('message:avatar', {
+        code: res.header?.code,
+        message: res.header?.message,
+        sid: res.header?.sid,
+        eventType: payload.avatar.event_type,
+        errorCode: payload.avatar.error_code,
+        errorMessage: payload.avatar.error_message,
+        hasStreamUrl: Boolean(payload.avatar.stream_url),
+      });
+      if (payload.avatar.event_type === 'stream_info') {
+        logAvatarStep('stream:info', {
+          sid: res.header?.sid,
+          streamUrl: payload.avatar.stream_url,
+          streamExtend: payload.avatar.stream_extend,
+        });
+        startPlayVideo(payload.avatar.stream_url, res.header.sid, payload.avatar.stream_extend);
+      }
       if (payload.avatar.event_type === 'driver_status' && res.payload.avatar.vmr_status === 2) { isPlaying.value = false; currentSpeechText.value = "静候您的指令..."; }
     }
   };
   avatarSocket.onerror = (event) => {
-    console.warn('[Avatar] WebSocket error:', event);
+    warnAvatarStep('socket:error', { event, readyState: getSocketStateName(avatarSocket?.readyState) });
   };
   avatarSocket.onclose = (event) => {
     stopAvatarHeartbeat();
@@ -343,20 +458,29 @@ const connectXfWebSocket = () => {
       isManualSocketClose = false;
       return;
     }
-    console.warn('[Avatar] WebSocket closed:', event.code, event.reason);
+    warnAvatarStep('socket:close', { code: event.code, reason: event.reason, wasClean: event.wasClean });
     scheduleAvatarReconnect(`socket closed: ${event.code}`);
   };
 };
 
-const startPlayVideo = (streamUrl: string, sid: string) => {
-  if (!playerContainer.value) return;
+const startPlayVideo = (streamUrl: string, sid: string, streamExtend?: { appid?: string; user_sign?: string }) => {
+  logAvatarStep('player:start', { sid, streamUrl, hasStreamExtend: Boolean(streamExtend), hasContainer: Boolean(playerContainer.value) });
+  if (!playerContainer.value) {
+    warnAvatarStep('player:skip', { reason: 'missing container', sid, streamUrl });
+    return;
+  }
   destroyAvatarPlayer();
   playerInstance = new RTCPlayer();
-  playerInstance.on("playing", () => { isLoading.value = false; isAvatarReady.value = true; });
-  playerInstance.on("error", (e: any) => { console.warn("拉流错误拦截:", e); });
-  playerInstance.on("not-allowed", () => { isMuted.value = true; });
+  playerInstance.on("playing", () => { logAvatarStep('player:playing', { sid, streamUrl }); isLoading.value = false; isAvatarReady.value = true; });
+  playerInstance.on("error", (e: any) => { warnAvatarStep('player:error', e); });
+  playerInstance.on("not-allowed", () => { warnAvatarStep('player:not-allowed'); isMuted.value = true; });
   playerInstance.playerType = 6;
-  playerInstance.stream = { sid: sid, streamUrl: streamUrl };
+  playerInstance.stream = {
+    sid: sid,
+    streamUrl: streamUrl,
+    ...(streamExtend?.user_sign ? { userSign: streamExtend.user_sign } : {}),
+    ...(streamExtend?.appid ? { appId: streamExtend.appid } : {}),
+  };
   playerInstance.videoSize = { width: 720, height: 1280 };
   playerInstance.container = playerContainer.value;
   playerInstance.play();
