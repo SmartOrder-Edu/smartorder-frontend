@@ -6,10 +6,16 @@
       'segment-enter': visible && isNew,
       'segment-past': isPast && !collapsed,
       'segment-current': isCurrent,
+      'segment-waiting': waitingForContinue,
       'segment-future': !visible,
       'segment-collapsed': isPast && collapsed,
       'scene-action-active': !!sceneAction,
       [`scene-action-${sceneAction?.actionType}`]: !!sceneAction,
+      'feedback-effect-active': !!feedbackEffect,
+      'feedback-slower': feedbackEffect?.type === 'slower',
+      'feedback-dont-understand': feedbackEffect?.type === 'dont_understand',
+      'feedback-mastered': feedbackEffect?.type === 'already_mastered',
+      'feedback-skip': feedbackEffect?.type === 'skip',
     }"
     :style="sceneActionStyle"
   >
@@ -28,9 +34,24 @@
 
     <div v-if="segment.type !== 'pause'" v-show="!(isPast && collapsed)" class="classroom-shell" :class="[`tone-${segment.emotionTone || 'serious'}`]">
       <div class="teacher-talk" v-if="teacherLine">
+        <div class="teacher-avatar" :class="{ 'is-speaking': isCurrent && timelineStatus === 'playing' }" aria-hidden="true">
+          <img :src="teacherAvatar" alt="" class="teacher-avatar-img" />
+        </div>
+        <div class="voice-waveform" :class="{ active: isCurrent && timelineStatus === 'playing' }" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+          <span></span>
+        </div>
         <div class="teacher-text">
           <MarkdownRenderer :content="teacherLine" />
         </div>
+      </div>
+
+      <div v-if="waitingForContinue" class="segment-end-hint">
+        <span class="hint-dot"></span>
+        <span>这部分讲完了，清楚吗？准备好了继续。</span>
       </div>
 
       <div
@@ -76,7 +97,7 @@
       <InlineQuizCard
         v-if="isInteractive && segment.quiz"
         :quiz="segment.quiz"
-        :disabled="quizState?.answered ?? false"
+        :disabled="isPast || (quizState?.answered ?? false)"
         @answer="(qid, val) => $emit('quizAnswer', qid, val)"
       />
 
@@ -97,6 +118,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import BoardBlockRenderer from './board/BoardBlockRenderer.vue'
 import InlineQuizCard from './InlineQuizCard.vue'
+import teacherAvatar from '@/assets/teacher.png'
 import type { LessonSceneAction, TeachingBoardBlock, TeachingSegment, QuizState } from '@/types/study'
 
 const props = defineProps<{
@@ -107,6 +129,9 @@ const props = defineProps<{
   sceneAction?: LessonSceneAction | null
   revealedBoardBlockIndex?: number | null
   revealedBoardItemIndexes?: Record<string, number>
+  waitingForContinue?: boolean
+  timelineStatus?: string
+  feedbackEffect?: { type: string; segmentId?: string; ts: number } | null
 }>()
 
 defineEmits<{
@@ -602,10 +627,84 @@ function applyFocus(el: HTMLElement) {
 
 <style scoped lang="scss">
 .teaching-segment {
+  position: relative;
   margin-bottom: 0;
   border-radius: 14px;
   scroll-margin-top: 12px;
   transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
+}
+
+.feedback-effect-active {
+  &::after {
+    position: absolute;
+    top: 4px;
+    right: 2px;
+    z-index: 2;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.4;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    pointer-events: none;
+  }
+
+  .classroom-shell {
+    border-radius: 12px;
+  }
+}
+
+.feedback-slower {
+  &::after {
+    content: '已减速';
+    background: rgba(255, 251, 235, 0.94);
+    color: #b45309;
+    border: 1px solid rgba(245, 158, 11, 0.24);
+  }
+
+  .classroom-shell {
+    animation: feedbackSlow 1.3s ease;
+  }
+}
+
+.feedback-dont-understand {
+  &::after {
+    content: '再讲一遍';
+    background: rgba(254, 242, 242, 0.94);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+  }
+
+  .segment-board,
+  .teacher-text {
+    animation: feedbackNeedHelp 1.2s ease;
+  }
+}
+
+.feedback-mastered {
+  &::after {
+    content: '已掌握';
+    background: rgba(236, 253, 245, 0.96);
+    color: #047857;
+    border: 1px solid rgba(16, 185, 129, 0.22);
+  }
+
+  .classroom-shell {
+    animation: feedbackMastered 1.2s ease;
+  }
+}
+
+.feedback-skip {
+  &::after {
+    content: '已跳过';
+    background: rgba(248, 250, 252, 0.96);
+    color: #475569;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+  }
+
+  .classroom-shell {
+    animation: feedbackSkip 0.9s ease;
+  }
 }
 
 // ---- 过去段折叠态：标题条 ----
@@ -669,14 +768,20 @@ function applyFocus(el: HTMLElement) {
 }
 
 .segment-past {
-  opacity: 0.42;
-  pointer-events: none;
+  opacity: 0.75;
+  pointer-events: auto;
   transform: scale(0.985);
-  filter: saturate(0.92);
+  filter: none;
+
+  &:hover {
+    opacity: 0.85;
+  }
 
   .classroom-shell {
     gap: 10px;
     padding-bottom: 4px;
+    padding-left: 12px;
+    border-left: 2px solid rgba(11, 183, 170, 0.3);
   }
 
   .teacher-text {
@@ -704,8 +809,22 @@ function applyFocus(el: HTMLElement) {
 }
 
 .segment-current {
+  --segment-tone-rgb: 11, 183, 170;
+  position: relative;
+  isolation: isolate;
   opacity: 1;
   filter: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -20px -12px;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: 20px;
+    background: radial-gradient(ellipse at top, rgba(var(--segment-tone-rgb), 0.08), transparent 70%);
+    animation: ambientGlow 4s ease-in-out infinite alternate;
+  }
 
   // 当前段不再给外层板书容器加卡片阴影，避免大卡片套小卡片。
   .segment-board {
@@ -723,6 +842,25 @@ function applyFocus(el: HTMLElement) {
     background: linear-gradient(135deg, rgba(11, 183, 170, 0.08), rgba(248, 250, 252, 0.95));
     backdrop-filter: blur(6px);
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  }
+}
+
+.segment-current:has(.tone-curious) {
+  --segment-tone-rgb: 14, 165, 233;
+}
+
+.segment-current:has(.tone-warning) {
+  --segment-tone-rgb: 245, 158, 11;
+}
+
+.segment-current:has(.tone-summary) {
+  --segment-tone-rgb: 16, 185, 129;
+}
+
+.segment-waiting {
+  &::before {
+    background: radial-gradient(ellipse at top, rgba(var(--segment-tone-rgb), 0.13), transparent 72%);
+    animation-duration: 2.4s;
   }
 }
 
@@ -830,6 +968,7 @@ function applyFocus(el: HTMLElement) {
 }
 
 .classroom-shell {
+  --segment-tone-rgb: 11, 183, 170;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -837,18 +976,21 @@ function applyFocus(el: HTMLElement) {
   padding: 8px 0;
 
   &.tone-curious {
+    --segment-tone-rgb: 14, 165, 233;
     .teacher-text {
       border-left-color: rgba(14, 165, 233, 0.46);
     }
   }
 
   &.tone-warning {
+    --segment-tone-rgb: 245, 158, 11;
     .teacher-text {
       border-left-color: rgba(245, 158, 11, 0.58);
     }
   }
 
   &.tone-summary {
+    --segment-tone-rgb: 16, 185, 129;
     .teacher-text {
       border-left-color: rgba(16, 185, 129, 0.54);
     }
@@ -856,7 +998,66 @@ function applyFocus(el: HTMLElement) {
 }
 
 .teacher-talk {
+  display: grid;
+  grid-template-columns: 40px 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   margin: 0;
+}
+
+.teacher-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(11, 183, 170, 0.2);
+  flex-shrink: 0;
+
+  &.is-speaking::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: inherit;
+    border: 1px solid rgba(11, 183, 170, 0.32);
+    animation: agentDotPulse 1.4s ease-in-out infinite;
+  }
+}
+
+.voice-waveform {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 26px;
+  color: #0f766e;
+
+  span {
+    width: 3px;
+    height: 5px;
+    border-radius: 999px;
+    background: currentColor;
+    opacity: 0.45;
+    transition: height 0.2s ease, opacity 0.2s ease;
+
+    &:nth-child(2) { height: 8px; }
+    &:nth-child(3) { height: 12px; }
+    &:nth-child(4) { height: 7px; }
+  }
+
+  &.active span {
+    opacity: 0.85;
+    animation: voiceWave 0.9s ease-in-out infinite;
+
+    &:nth-child(2) { animation-delay: 0.1s; }
+    &:nth-child(3) { animation-delay: 0.2s; }
+    &:nth-child(4) { animation-delay: 0.3s; }
+    &:nth-child(5) { animation-delay: 0.4s; }
+  }
 }
 
 .teacher-text {
@@ -886,6 +1087,30 @@ function applyFocus(el: HTMLElement) {
       box-decoration-break: clone;
       -webkit-box-decoration-break: clone;
     }
+  }
+}
+
+.segment-end-hint {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  margin-left: 66px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  background: rgba(240, 253, 250, 0.85);
+  color: #0f766e;
+  font-size: 12px;
+  line-height: 1.4;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+
+  .hint-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: #0bb7aa;
+    animation: agentDotPulse 1s ease-in-out infinite;
   }
 }
 
@@ -1481,6 +1706,50 @@ function applyFocus(el: HTMLElement) {
   }
 }
 
+.teacher-avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+@keyframes feedbackSlow {
+  0%, 100% {
+    filter: none;
+  }
+  45% {
+    filter: drop-shadow(0 10px 20px rgba(245, 158, 11, 0.12));
+  }
+}
+
+@keyframes feedbackNeedHelp {
+  0%, 100% {
+    box-shadow: none;
+  }
+  45% {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  }
+}
+
+@keyframes feedbackMastered {
+  0%, 100% {
+    filter: none;
+  }
+  45% {
+    filter: drop-shadow(0 10px 18px rgba(16, 185, 129, 0.14));
+  }
+}
+
+@keyframes feedbackSkip {
+  0%, 100% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0.58;
+  }
+}
+
 // 板书落定（落墨感）
 @keyframes boardEnter {
   from {
@@ -1490,6 +1759,38 @@ function applyFocus(el: HTMLElement) {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .teacher-talk {
+    grid-template-columns: 34px 14px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .teacher-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .segment-end-hint {
+    margin-left: 56px;
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segment-current::before,
+  .segment-waiting::before,
+  .teacher-avatar.is-speaking::after,
+  .voice-waveform.active span,
+  .segment-end-hint .hint-dot,
+  .feedback-slower .classroom-shell,
+  .feedback-dont-understand .segment-board,
+  .feedback-dont-understand .teacher-text,
+  .feedback-mastered .classroom-shell,
+  .feedback-skip .classroom-shell {
+    animation: none !important;
   }
 }
 </style>

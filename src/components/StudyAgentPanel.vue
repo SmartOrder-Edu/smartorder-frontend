@@ -4,10 +4,7 @@
     <div class="panel-top">
       <div class="agent-mini-header">
         <div class="agent-mini-avatar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
-          </svg>
+          <img :src="teacherAvatar" alt="学习伙伴" class="agent-mini-avatar-img" />
         </div>
         <span class="agent-mini-name">学习伙伴</span>
         <span class="agent-mini-status">在线</span>
@@ -26,9 +23,13 @@
 
     <!-- 教学继续按钮（教学暂停 + 非弹题时） -->
     <div class="teaching-continue-bar" v-if="stepStore.isTeachingPaused && !stepStore.quizState">
+      <div class="continue-copy" v-if="isSegmentEndWaiting">
+        <span class="continue-dot"></span>
+        <span>本段讲解完成，准备好了点击继续。</span>
+      </div>
       <button class="teaching-continue-btn" @click="stepStore.resumeTeaching()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5,3 19,12 5,21"/></svg>
-        继续
+        {{ continueButtonLabel }}
       </button>
     </div>
 
@@ -38,12 +39,16 @@
         v-for="btn in feedbackButtons"
         :key="btn.type"
         class="feedback-btn"
-        :class="btn.variant"
+        :class="[btn.variant, { active: isFeedbackGenerating(btn.type) }]"
         @click="onFeedback(btn.type)"
-        :disabled="stepStore.sendingFeedback"
+        :disabled="stepStore.sendingFeedback || stepStore.diagramGenerating || !!stepStore.contextualFeedbackGenerating"
       >
-        <span class="fb-icon" v-html="btn.icon"></span>
-        <span class="fb-label">{{ btn.label }}</span>
+        <span
+          v-if="isFeedbackGenerating(btn.type)"
+          class="fb-spinner"
+        ></span>
+        <span v-else class="fb-icon" v-html="btn.icon"></span>
+        <span class="fb-label">{{ feedbackLabel(btn) }}</span>
       </button>
     </div>
 
@@ -66,20 +71,6 @@
           </div>
         </div>
       </div>
-      <div class="chat-input-row">
-        <input
-          v-model="input"
-          class="chat-input"
-          placeholder="随时向学习伙伴提问..."
-          @keyup.enter="sendMessage"
-          :disabled="stepStore.sendingFeedback"
-        />
-        <button class="chat-send" @click="sendMessage" :disabled="!input.trim() || stepStore.sendingFeedback">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/>
-          </svg>
-        </button>
-      </div>
     </div>
 
     <!-- Agent trace drawer -->
@@ -88,23 +79,35 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import { useTaskStepStore } from '@/stores/taskStep'
 import { useAgentStore } from '@/stores/agent'
 import type { FeedbackType } from '@/types/study'
+import teacherAvatar from '@/assets/teacher.png'
 
 const collapsed = defineModel<boolean>('collapsed', { default: false })
 
 const stepStore = useTaskStepStore()
 const agentStore = useAgentStore()
 
-const input = ref('')
 const chatEl = ref<HTMLElement>()
 
+const isSegmentEndWaiting = computed(() =>
+  stepStore.timelineStatus === 'waiting_user'
+  && stepStore.currentWaitReason === 'segment_end_check',
+)
+
+const continueButtonLabel = computed(() => {
+  const flow = stepStore.currentTeachingFlow
+  if (!flow) return '继续'
+  if (flow.currentSegmentIndex >= flow.segments.length - 1) return '完成本步学习'
+  return '继续讲解'
+})
+
 const feedbackButtons: { type: FeedbackType; label: string; variant: string; icon: string }[] = [
-  { type: 'dont_understand', label: '没看懂', variant: 'default', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
+  { type: 'dont_understand', label: '没看懂', variant: 'default', icon: '<svg viewBox="0 0 1024 1024" width="16" height="16"><path d="M510.153444 63.611783c-246.955508 0-447.140807 200.185298-447.140807 447.139783 0 246.955508 200.185298 447.140807 447.140807 447.140807 246.955508 0 447.139783-200.185298 447.139783-447.140807C957.293227 263.797082 757.108952 63.611783 510.153444 63.611783zM510.153444 913.179009c-222.273363 0-402.426419-180.152033-402.426419-402.427442 0-222.272339 180.152033-402.426419 402.426419-402.426419 222.273363 0 402.425396 180.153056 402.425396 402.426419C912.57884 733.024929 732.426807 913.179009 510.153444 913.179009zM510.153444 667.251923c-24.682146 0-44.714388 20.032242-44.714388 44.713364 0 24.682146 20.032242 44.713364 44.714388 44.713364 24.681122 0 44.713364-20.031219 44.713364-44.713364C554.866808 687.284165 534.834566 667.251923 510.153444 667.251923zM510.153444 264.825504c-74.091462 0-134.14214 60.051701-134.14214 134.14214l44.713364 0c0-49.364291 40.019459-89.427752 89.428775-89.427752s89.428775 40.063461 89.428775 89.427752c0 49.364291-40.018436 89.428775-89.428775 89.428775-7.78122 0-15.158235-1.297552-22.358217-3.174296l0 114.960265c0 12.340049 10.017144 22.356171 22.358217 22.356171 12.340049 0 22.357194-10.016121 22.357194-22.356171l0-69.307506c63.404052-10.730389 111.783923-65.460898 111.783923-131.906216C644.29456 324.876182 584.242859 264.825504 510.153444 264.825504z" fill="currentColor"/></svg>' },
   { type: 'slower', label: '讲慢一点', variant: 'default', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>' },
   { type: 'another_example', label: '换个例子', variant: 'default', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="8" cy="18" r="1"/></svg>' },
   { type: 'draw_diagram', label: '画图解释', variant: 'default', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>' },
@@ -114,16 +117,29 @@ const feedbackButtons: { type: FeedbackType; label: string; variant: string; ico
   { type: 'skip', label: '跳过', variant: 'default', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5,4 15,12 5,20"/><line x1="19" y1="5" x2="19" y2="19"/></svg>' },
 ]
 
+function feedbackLabel(btn: { type: FeedbackType; label: string }) {
+  if (btn.type === 'draw_diagram' && stepStore.diagramGenerating) {
+    return '正在画图'
+  }
+  if (btn.type === stepStore.contextualFeedbackGenerating) {
+    const loadingLabels: Partial<Record<FeedbackType, string>> = {
+      dont_understand: '重新解释中',
+      another_example: '换例子中',
+      similar_question: '出题中',
+    }
+    return loadingLabels[btn.type] || btn.label
+  }
+  return btn.label
+}
+
+function isFeedbackGenerating(type: FeedbackType) {
+  return (type === 'draw_diagram' && stepStore.diagramGenerating)
+    || type === stepStore.contextualFeedbackGenerating
+}
+
 async function onFeedback(type: FeedbackType) {
   await stepStore.sendFeedback(type)
   scrollBottom()
-}
-
-function sendMessage() {
-  const text = input.value.trim()
-  if (!text) return
-  input.value = ''
-  stepStore.sendCustomMessage(text).then(scrollBottom)
 }
 
 function openTrace() {
@@ -174,7 +190,32 @@ export default { name: 'StudyAgentPanel' }
 }
 
 .teaching-continue-bar {
+  display: grid;
+  gap: 8px;
   padding: 0 16px 8px;
+}
+
+.continue-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(11, 183, 170, 0.16);
+  background: rgba(240, 253, 250, 0.72);
+  color: #0f766e;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.continue-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: #0bb7aa;
+  animation: agentDotPulse 1s ease-in-out infinite;
+  flex-shrink: 0;
 }
 
 .teaching-continue-btn {
@@ -248,6 +289,15 @@ export default { name: 'StudyAgentPanel' }
   align-items: center;
   justify-content: center;
   color: white;
+  overflow: hidden;
+}
+
+.agent-mini-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
 }
 
 .agent-mini-name {
@@ -293,10 +343,26 @@ export default { name: 'StudyAgentPanel' }
 
   &:hover:not(:disabled) { border-color: #0bb7aa; background: rgba(11, 183, 170, 0.06); color: #0bb7aa; }
 
+  &.active {
+    border-color: rgba(11, 183, 170, 0.34);
+    background: rgba(240, 253, 250, 0.92);
+    color: #0f766e;
+  }
+
   &.accent { background: #ecfeff; border-color: #a5f3fc; color: #0e7490; &:hover:not(:disabled) { background: #cffafe; } }
   &.success { background: #ecfdf5; border-color: #a7f3d0; color: #047857; &:hover:not(:disabled) { background: #d1fae5; } }
   &.warn { background: #fef3c7; border-color: #fcd34d; color: #92400e; &:hover:not(:disabled) { background: #fef08a; } }
   &:disabled { opacity: 0.5; cursor: default; }
+}
+
+.fb-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(15, 118, 110, 0.18);
+  border-top-color: #0f766e;
+  animation: fbSpin 0.82s linear infinite;
+  flex-shrink: 0;
 }
 
 .chat-section {
@@ -355,6 +421,10 @@ export default { name: 'StudyAgentPanel' }
   30% { transform: translateY(-4px); opacity: 1; }
 }
 
+@keyframes fbSpin {
+  to { transform: rotate(360deg); }
+}
+
 .msg-bubble {
   padding: 7px 11px;
   font-size: 12px;
@@ -372,35 +442,4 @@ export default { name: 'StudyAgentPanel' }
   }
 }
 
-.chat-input-row {
-  display: flex;
-  gap: 6px;
-  padding: 8px 0 14px;
-}
-
-.chat-input {
-  flex: 1;
-  padding: 7px 10px;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  font-size: 12px;
-  color: #374151;
-  background: #f9fafb;
-  outline: none;
-  &:focus { border-color: #0bb7aa; background: white; }
-}
-
-.chat-send {
-  width: 30px; height: 30px;
-  border-radius: 8px;
-  border: none;
-  background: linear-gradient(135deg, #0bb7aa, #0284c7);
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  &:disabled { opacity: 0.4; cursor: default; }
-}
 </style>

@@ -90,10 +90,15 @@
           class="chat-msg"
           :class="msg.role"
         >
-          <div class="msg-text">{{ msg.content }}</div>
+          <div v-if="msg.role === 'ai'" class="msg-text markdown-text">
+            <MarkdownRenderer :content="msg.content" />
+          </div>
+          <div v-else class="msg-text">{{ msg.content }}</div>
         </div>
         <div v-if="streaming" class="chat-msg ai streaming">
-          <div class="msg-text">{{ streamingText || '思考中...' }}</div>
+          <div class="msg-text markdown-text">
+            <MarkdownRenderer :content="streamingText || '思考中...'" />
+          </div>
         </div>
       </div>
 
@@ -130,6 +135,7 @@
 import { ref, nextTick } from 'vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { refreshAccessToken } from '@/api/request'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
 const props = defineProps<{
   resourceId: string
@@ -550,6 +556,69 @@ function stopStreaming() {
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* AI Markdown 渲染：交给 MarkdownRenderer 处理换行与排版 */
+.msg-text.markdown-text {
+  white-space: normal;
+
+  :deep(.markdown-renderer) {
+    font-size: 0.78rem;
+    line-height: 1.55;
+  }
+
+  :deep(.markdown-renderer p) {
+    margin: 0 0 0.5em;
+  }
+
+  :deep(.markdown-renderer p:last-child) {
+    margin-bottom: 0;
+  }
+
+  :deep(.markdown-renderer ul),
+  :deep(.markdown-renderer ol) {
+    margin: 0.3em 0;
+    padding-left: 1.3em;
+  }
+
+  :deep(.markdown-renderer li) {
+    margin: 0.15em 0;
+  }
+
+  :deep(.markdown-renderer h1),
+  :deep(.markdown-renderer h2),
+  :deep(.markdown-renderer h3),
+  :deep(.markdown-renderer h4) {
+    margin: 0.6em 0 0.35em;
+    font-size: 0.85rem;
+  }
+
+  :deep(.markdown-renderer code:not(pre code)) {
+    font-size: 0.74rem;
+  }
+
+  :deep(.markdown-renderer pre) {
+    font-size: 0.74rem;
+  }
+
+  :deep(.markdown-renderer .code-block-wrapper) {
+    margin: 0.5em 0;
+  }
+
+  :deep(.markdown-renderer blockquote) {
+    margin: 0.4em 0;
+    padding: 2px 10px;
+    font-size: 0.74rem;
+  }
+
+  :deep(.markdown-renderer table) {
+    font-size: 0.74rem;
+  }
+
+  :deep(.markdown-renderer table th),
+  :deep(.markdown-renderer table td) {
+    padding: 4px 8px;
+  }
 }
 
 .chat-input-row {

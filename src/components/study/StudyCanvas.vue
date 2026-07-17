@@ -29,7 +29,7 @@
         <!-- Agent 讲解中指示器 -->
         <span class="teaching-badge" v-if="stepStore.teachingActive">
           <span class="teaching-dot" v-if="stepStore.timelineStatus === 'playing'"></span>
-          {{ stepStore.timelineStatus === 'ended' ? '讲解完成' : 'Agent 讲解中' }}
+          {{ teachingBadgeLabel }}
         </span>
       </div>
       <div class="header-right">
@@ -42,8 +42,7 @@
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><path d="M10 4H3"/><path d="M10 9H3"/><path d="M10 15H3"/><path d="M10 20H3"/></svg>
         </button>
-        <!-- 教学模式：隐藏导航，显示"跳过"按钮 -->
-        <template v-if="stepStore.teachingActive">
+        <template v-if="stepStore.teachingActive && !stepStore.timelineEnded">
           <button
             v-if="stepStore.timelineStatus === 'playing'"
             class="nav-btn"
@@ -58,8 +57,28 @@
           >
             继续
           </button>
+          <button
+            v-else-if="stepStore.timelineStatus === 'waiting_user' && !stepStore.quizState"
+            class="nav-btn primary"
+            @click="stepStore.resumeTeaching()"
+          >
+            {{ continueButtonLabel }}
+          </button>
           <button class="nav-btn skip" @click="stepStore.endTeaching()">
             跳过教学
+          </button>
+        </template>
+        <template v-else-if="stepStore.timelineEnded">
+          <button class="nav-btn" @click="stepStore.replayTeaching()">
+            重放本段
+          </button>
+          <button class="nav-btn" :disabled="stepStore.currentStepIndex === 0" @click="stepStore.prevStep()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15,18 9,12 15,6"/></svg>
+            上一步
+          </button>
+          <button class="nav-btn primary" @click="stepStore.nextStep()" :disabled="stepStore.currentStepIndex >= stepStore.scriptSteps.length - 1">
+            下一步
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9,18 15,12 9,6"/></svg>
           </button>
         </template>
         <template v-else>
@@ -76,7 +95,11 @@
     </header>
 
     <!-- 画布主体 -->
-    <div class="canvas-body" v-if="stepStore.canvasContent">
+    <div
+      class="canvas-body"
+      :class="{ 'canvas-waiting': isSegmentEndWaiting }"
+      v-if="stepStore.canvasContent"
+    >
       <!-- Agent 教学模式：分段式讲解 -->
       <template v-if="stepStore.canvasContent.teachingFlow && stepStore.teachingActive">
         <!-- 教学段列表（降序：所有已展示的段 + 当前段） -->
@@ -91,6 +114,9 @@
               :scene-action="stepStore.getActiveSceneAction(seg.id, idx)"
               :revealed-board-block-index="stepStore.getRevealedBoardBlockIndex(seg.id)"
               :revealed-board-item-indexes="stepStore.getRevealedBoardItemIndexes(seg.id)"
+              :waiting-for-continue="idx === stepStore.canvasContent.teachingFlow.currentSegmentIndex && isSegmentEndWaiting"
+              :timeline-status="stepStore.timelineStatus"
+              :feedback-effect="feedbackEffectForSegment(seg.id)"
               @quiz-answer="onQuizAnswer"
             />
           </template>
@@ -104,7 +130,7 @@
             class="continue-btn continue-btn-pulse"
             @click="stepStore.resumeTeaching()"
           >
-            继续讲解
+            继续学习
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9,18 15,12 9,6"/></svg>
           </button>
           <!-- 教学暂停（非弹题）→ 继续 -->
@@ -113,7 +139,7 @@
             class="continue-btn continue-btn-pulse"
             @click="stepStore.resumeTeaching()"
           >
-            继续
+            {{ continueButtonLabel }}
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9,18 15,12 9,6"/></svg>
           </button>
           <button
@@ -154,6 +180,24 @@
           </div>
         </template>
       </template>
+
+      <div class="temporary-board-notes" v-if="stepStore.temporaryBoardNotes.length">
+        <article
+          v-for="note in stepStore.temporaryBoardNotes"
+          :key="note.id"
+          class="temporary-board-note"
+          :class="{ 'temporary-board-note--diagram': note.kind === 'diagram' }"
+        >
+          <div class="temporary-board-head">
+            <span class="temporary-board-dot"></span>
+            <h3>{{ note.title }}</h3>
+          </div>
+          <p class="temporary-board-question" v-if="note.sourceQuestion">
+            来自你的提问：{{ note.sourceQuestion }}
+          </p>
+          <MarkdownRenderer :content="note.content" />
+        </article>
+      </div>
     </div>
 
     <div v-else class="canvas-empty">画布加载中…</div>
@@ -161,6 +205,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import ExampleStage from './ExampleStage.vue'
@@ -173,6 +218,32 @@ defineProps<{ scriptCollapsed: boolean; agentCollapsed: boolean }>()
 defineEmits<{ (e: 'toggleScript'): void; (e: 'toggleAgent'): void }>()
 
 const stepStore = useTaskStepStore()
+
+const isSegmentEndWaiting = computed(() =>
+  stepStore.timelineStatus === 'waiting_user'
+  && stepStore.currentWaitReason === 'segment_end_check',
+)
+
+const continueButtonLabel = computed(() => {
+  const flow = stepStore.currentTeachingFlow
+  if (!flow) return '继续讲解'
+  if (flow.currentSegmentIndex >= flow.segments.length - 1) return '完成本步学习'
+  return '继续讲解'
+})
+
+const teachingBadgeLabel = computed(() => {
+  if (stepStore.timelineStatus === 'ended') return '讲解完成'
+  if (stepStore.timelineStatus === 'waiting_user') return '等待继续'
+  if (stepStore.timelineStatus === 'paused') return '已暂停'
+  return 'Agent 讲解中'
+})
+
+function feedbackEffectForSegment(segmentId: string) {
+  const effect = stepStore.feedbackVisualEffect
+  if (!effect) return null
+  if (effect.segmentId && effect.segmentId !== segmentId) return null
+  return effect
+}
 
 function bindTimelineAudio(el: Element | ComponentPublicInstance | null) {
   stepStore.setTimelineAudioElement(el instanceof HTMLAudioElement ? el : null)
@@ -385,6 +456,159 @@ function onQuizAnswer(_quizId: string, answer: string) {
   flex: 1;
   overflow-y: auto;
   padding: 20px 24px 28px;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.canvas-waiting {
+  opacity: 0.97;
+  background: linear-gradient(180deg, rgba(240, 253, 250, 0.2), rgba(248, 250, 252, 0));
+}
+
+.temporary-board-notes {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.temporary-board-note {
+  position: relative;
+  padding: 16px 18px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.98)),
+    radial-gradient(circle at 18px 18px, rgba(14, 165, 233, 0.1) 1px, transparent 1.5px);
+  background-size: 100% 100%, 26px 26px;
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.07),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  animation: boardNoteIn 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+
+  :deep(.markdown-renderer) {
+    font-size: 13px;
+    color: #1e293b;
+
+    h3 {
+      margin: 6px 0 8px;
+      font-size: 14px;
+    }
+
+    p {
+      margin: 6px 0;
+    }
+
+    ol,
+    ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    blockquote {
+      margin: 10px 0 0;
+      padding: 8px 10px;
+      border-left: 3px solid rgba(11, 183, 170, 0.4);
+      background: rgba(255, 255, 255, 0.66);
+      color: #475569;
+    }
+  }
+}
+
+.temporary-board-note--diagram {
+  padding: 0;
+  overflow: hidden;
+  border-color: rgba(14, 165, 233, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98)),
+    #fff;
+  box-shadow:
+    0 22px 54px rgba(14, 165, 233, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+
+  .temporary-board-head {
+    margin: 0;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+    background:
+      linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.92));
+  }
+
+  .temporary-board-head h3 {
+    color: #0369a1;
+    font-size: 13px;
+  }
+
+  .temporary-board-dot {
+    background: #0ea5e9;
+    box-shadow: 0 0 0 5px rgba(14, 165, 233, 0.12);
+  }
+
+  .temporary-board-question {
+    margin: 12px 16px 0;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: rgba(14, 165, 233, 0.06);
+    color: #475569;
+  }
+
+  :deep(.markdown-renderer) {
+    padding: 14px 16px 16px;
+  }
+
+  :deep(.markdown-renderer > p:first-child) {
+    margin-top: 0;
+  }
+
+  :deep(.markdown-renderer .mermaid-block) {
+    margin: 12px 0 0;
+    border-color: rgba(14, 165, 233, 0.2);
+    box-shadow:
+      0 18px 42px rgba(14, 165, 233, 0.1),
+      0 1px 0 rgba(255, 255, 255, 0.92) inset;
+  }
+
+  :deep(.markdown-renderer .mermaid-diagram-body) {
+    max-height: 620px;
+  }
+}
+
+.temporary-board-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+
+  h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f766e;
+  }
+}
+
+.temporary-board-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #0bb7aa;
+  box-shadow: 0 0 0 5px rgba(11, 183, 170, 0.12);
+  animation: agentDotPulse 1.6s ease-in-out infinite;
+}
+
+.temporary-board-question {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+@keyframes boardNoteIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 // ---- 教学段列表 ----

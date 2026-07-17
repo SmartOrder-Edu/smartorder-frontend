@@ -71,6 +71,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '任务日程 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/learning-report/weekly',
+    name: 'WeeklyLearningReport',
+    component: () => import('@/views/LearningReport/index.vue'),
+    meta: { title: '最近 7 天学习报告 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/study/:taskId',
     name: 'StudyExecution',
     component: () => import('@/views/StudyExecution/index.vue'),

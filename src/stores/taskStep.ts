@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { taskStepApi } from '@/api/spaceDashboard'
 import { studySessionApi } from '@/api/studySession'
+import { agentApi, type AgentChatRequest } from '@/api/agent'
+import { refreshAccessToken } from '@/api/request'
 import { ElMessage } from 'element-plus'
 import { useTimelinePlayer } from '@/composables/useTimelinePlayer'
 import type { TaskStepVO, StepStatus } from '@/types/learningSpace'
@@ -20,6 +23,7 @@ import type {
   StudyChatMessage,
   StudyMode,
   StudyTeachingAction,
+  TemporaryBoardNote,
   TeachingBoardBlock,
   TeachingFlow,
   TeachingSegment,
@@ -31,6 +35,12 @@ import {
   getMockMasteryJudge,
   getMockScriptSteps,
 } from '@/mocks/studySession'
+
+const CONTEXTUAL_AGENT_FEEDBACK_TYPES = new Set<FeedbackType>([
+  'dont_understand',
+  'another_example',
+  'similar_question',
+])
 
 export const useTaskStepStore = defineStore('taskStep', () => {
   // ---- 原有步骤状态 ----
@@ -49,11 +59,15 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const canvasContent = ref<CanvasContent | null>(null)
   const sessionId = ref<string>('')
   const lessonBundleId = ref<string>('')
+  const studyConversationId = ref<string>('')
   const sessionScenes = ref<Record<string, StudySessionVO['currentScene']>>({})
   const sessionTimelines = ref<Record<string, LessonTimeline>>({})
   const mastery = ref<MasteryJudge | null>(null)
   const chatMessages = ref<StudyChatMessage[]>([])
+  const temporaryBoardNotes = ref<TemporaryBoardNote[]>([])
   const sendingFeedback = ref(false)
+  const diagramGenerating = ref(false)
+  const contextualFeedbackGenerating = ref<FeedbackType | null>(null)
   const completing = ref(false)
 
   // ---- 教学流状态（v2 Agent 主动教学交互）----
@@ -63,6 +77,11 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const activeSceneActions = ref<LessonSceneAction[]>([])
   const revealedBoardBlockIndexes = ref<Record<string, number>>({})
   const revealedBoardItemIndexes = ref<Record<string, Record<string, number>>>({})
+  const feedbackVisualEffect = ref<{ type: string; segmentId?: string; ts: number } | null>(null)
+  const quickContinueCount = ref(0)
+  const segmentWaitStartedAtMs = ref(0)
+  const currentWaitReason = ref('')
+  const skipNextSegmentEndPause = ref(false)
   const sceneActionTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
   const timelinePlayer = useTimelinePlayer({
@@ -103,6 +122,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const isTeachingPaused = computed(
     () => currentTeachingFlow.value?.isPaused || false,
   )
+  const timelineEnded = computed(() => timelinePlayer.status.value === 'ended')
 
   // =============================================================
   // 教学流控制方法
@@ -150,7 +170,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         answered: false,
       }
       if (waitImmediately) {
-        timelinePlayer.waitForUser()
+        markTimelineWaiting(String(cue.payload.reason || 'interaction'))
       }
       pushSegmentCommentary(seg, cue.id)
       return
@@ -162,8 +182,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     }
 
     if (waitImmediately) {
-      flow.isPaused = true
-      timelinePlayer.waitForUser()
+      markTimelineWaiting(String(cue.payload.reason || 'segment_end_check'))
     }
 
     pushSegmentCommentary(seg, cue.id)
@@ -202,8 +221,11 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   function resumeTeaching() {
     const flow = currentTeachingFlow.value
     if (!flow) return
+    trackContinueRhythm()
     flow.isPaused = false
     quizState.value = null
+    currentWaitReason.value = ''
+    segmentWaitStartedAtMs.value = 0
     void reportStudyEvent({
       eventType: 'resume_clicked',
       targetType: 'timeline',
@@ -231,6 +253,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     if (flow) {
       flow.isPaused = true
     }
+    currentWaitReason.value = 'manual_pause'
+    segmentWaitStartedAtMs.value = 0
   }
 
   /** 重放当前教学时间轴 */
@@ -242,6 +266,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   function endTeaching() {
     timelinePlayer.stop()
     teachingActive.value = false
+    resetContinueRhythm()
     const flow = currentTeachingFlow.value
     if (flow) {
       flow.isActive = false
@@ -371,11 +396,34 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     canvasContent.value = { ...canvasContent.value, agentNote: note }
   }
 
+  /** 在当前画布追加一张临时板书卡片（来自自由提问或后端教学动作） */
+  function appendTemporaryBoardNote(note: {
+    kind?: TemporaryBoardNote['kind']
+    title?: string
+    content: string
+    sourceQuestion?: string
+  }) {
+    const content = note.content.trim()
+    if (!content) return
+    temporaryBoardNotes.value = [
+      ...temporaryBoardNotes.value,
+      {
+        id: `board-note-${Date.now()}-${temporaryBoardNotes.value.length}`,
+        kind: note.kind || 'note',
+        title: note.title?.trim() || 'Agent 补充板书',
+        content,
+        sourceQuestion: note.sourceQuestion?.trim(),
+        createTime: Date.now(),
+      },
+    ].slice(-4)
+  }
+
   /**
    * 发送反馈到 Agent 陪伴面板
-   * mock 阶段：本地生成回复；后端就绪后：调用 useAgentChat 发起 study-scoped SSE
+   * 教学内容型反馈由 study-scoped SSE 生成，控制型反馈继续交给后端教学动作处理。
    */
   async function sendFeedback(type: FeedbackType) {
+    if (sendingFeedback.value || diagramGenerating.value || contextualFeedbackGenerating.value) return
     const labels: Record<FeedbackType, string> = {
       dont_understand: '我没看懂',
       slower: '讲慢一点',
@@ -395,6 +443,15 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         markdown: false,
         createTime: Date.now(),
       })
+      if (type === 'draw_diagram') {
+        await sendDiagramExplanation(labels[type])
+        return
+      }
+      if (CONTEXTUAL_AGENT_FEEDBACK_TYPES.has(type)) {
+        await sendContextualAgentFeedback(type, labels[type])
+        return
+      }
+
       const receipt = await reportStudyEvent({
         eventType: 'feedback_clicked',
         targetType: 'feedback',
@@ -408,6 +465,10 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       // 模拟网络延迟
       await new Promise(r => setTimeout(r, 400))
       if (!handledByBackend) {
+        triggerFeedbackVisualEffect(type)
+        if (type === 'slower') {
+          setTimelinePlaybackRate(0.75)
+        }
         const reply = getMockFeedbackReply(type)
         chatMessages.value.push({
           id: `a-${Date.now()}`,
@@ -431,34 +492,433 @@ export const useTaskStepStore = defineStore('taskStep', () => {
 
   /** 用户在右侧自由输入消息 */
   async function sendCustomMessage(text: string) {
-    if (!text.trim()) return
+    const question = text.trim()
+    if (!question) return
     sendingFeedback.value = true
+    const assistantMessage: StudyChatMessage = {
+      id: `a-stream-${Date.now()}`,
+      role: 'agent',
+      text: '',
+      markdown: true,
+      createTime: Date.now(),
+    }
     try {
       chatMessages.value.push({
         id: `u-${Date.now()}`,
         role: 'user',
-        text: text.trim(),
+        text: question,
         markdown: false,
         createTime: Date.now(),
       })
-      void reportStudyEvent({
+      const receipt = await reportStudyEvent({
         eventType: 'custom_message_submitted',
         targetType: 'chat',
         payload: {
-          text: text.trim(),
+          text: question,
         },
       })
-      await new Promise(r => setTimeout(r, 400))
-      chatMessages.value.push({
-        id: `a-${Date.now()}`,
-        role: 'agent',
-        text: `收到你的问题：「${text.trim()}」\n\nAgent 正在结合本次学习上下文分析。这是一个 mock 回复，后端 study-scoped SSE 接入后会给出真实讲解。`,
-        markdown: true,
-        createTime: Date.now(),
+      if (receipt?.actions?.length) return
+
+      chatMessages.value.push(assistantMessage)
+      const streamOk = await streamStudyAgentReply(question, assistantMessage)
+      if (!streamOk || !assistantMessage.text.trim()) {
+        assistantMessage.text = 'Agent 对话暂时没有连上后端，请检查登录状态、后端服务和 `/agent/chat/stream` 接口。'
+        ElMessage.error('Agent 对话接口未返回有效内容')
+        return
+      }
+      appendTemporaryBoardNote({
+        title: 'Agent 补充板书',
+        content: buildBoardNoteFromAgentReply(question, assistantMessage.text),
+        sourceQuestion: question,
       })
     } finally {
       sendingFeedback.value = false
     }
+  }
+
+  async function sendContextualAgentFeedback(type: FeedbackType, label: string) {
+    contextualFeedbackGenerating.value = type
+    if (type === 'dont_understand' && timelinePlayer.status.value === 'playing') {
+      pauseTeaching()
+    }
+
+    try {
+      await reportStudyEvent({
+        eventType: 'feedback_clicked',
+        targetType: 'feedback',
+        targetId: type,
+        payload: {
+          feedbackType: type,
+          label,
+          clientHandled: true,
+        },
+      })
+
+      triggerFeedbackVisualEffect(type)
+
+      const assistantMessage: StudyChatMessage = {
+        id: `a-feedback-${type}-${Date.now()}`,
+        role: 'agent',
+        text: '',
+        markdown: true,
+        createTime: Date.now(),
+      }
+      chatMessages.value.push(assistantMessage)
+
+      const agentPrompt = buildContextualFeedbackPrompt(type, label)
+      const streamOk = await streamStudyAgentReply(label, assistantMessage, agentPrompt)
+      if (!streamOk || !assistantMessage.text.trim()) {
+        assistantMessage.text = buildContextualFeedbackFailureText(type)
+        ElMessage.error('Agent 反馈接口未返回有效内容')
+        return
+      }
+
+      appendTemporaryBoardNote({
+        title: buildContextualFeedbackNoteTitle(type),
+        content: buildBoardNoteFromAgentReply(label, assistantMessage.text),
+        sourceQuestion: label,
+      })
+    } finally {
+      contextualFeedbackGenerating.value = null
+    }
+  }
+
+  async function sendDiagramExplanation(label: string) {
+    if (diagramGenerating.value) return
+    diagramGenerating.value = true
+    if (timelinePlayer.status.value === 'playing') {
+      pauseTeaching()
+    }
+
+    try {
+      await reportStudyEvent({
+        eventType: 'feedback_clicked',
+        targetType: 'feedback',
+        targetId: 'draw_diagram',
+        payload: {
+          feedbackType: 'draw_diagram',
+          label,
+          clientHandled: true,
+        },
+      })
+
+      triggerFeedbackVisualEffect('draw_diagram')
+
+      const assistantMessage: StudyChatMessage = {
+        id: `a-diagram-${Date.now()}`,
+        role: 'agent',
+        text: '',
+        markdown: true,
+        createTime: Date.now(),
+      }
+      chatMessages.value.push(assistantMessage)
+
+      const agentPrompt = buildDiagramAgentPrompt(label)
+      const streamOk = await streamStudyAgentReply(label, assistantMessage, agentPrompt)
+      if (!streamOk || !assistantMessage.text.trim()) {
+        assistantMessage.text = 'Agent 图解暂时没有生成成功，请检查后端服务和 `/agent/chat/stream` 接口。'
+        ElMessage.error('Agent 图解接口未返回有效内容')
+        return
+      }
+
+      appendTemporaryBoardNote({
+        kind: 'diagram',
+        title: buildDiagramNoteTitle(),
+        content: buildDiagramBoardNote(label, assistantMessage.text),
+        sourceQuestion: label,
+      })
+    } finally {
+      diagramGenerating.value = false
+    }
+  }
+
+  async function streamStudyAgentReply(
+    question: string,
+    assistantMessage: StudyChatMessage,
+    agentPrompt?: string,
+  ): Promise<boolean> {
+    let token = ''
+    try {
+      token = await refreshAccessToken()
+    } catch {
+      return false
+    }
+
+    const body: AgentChatRequest = {
+      message: agentPrompt || question,
+      conversationId: studyConversationId.value || undefined,
+      forceMode: 'REACT',
+      studyContext: buildStudyContext(question),
+    }
+
+    try {
+      await fetchEventSource(agentApi.chatStreamUrl(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+        openWhenHidden: true,
+        onmessage(event) {
+          if (!event.data) return
+
+          if (event.event === 'done') {
+            try {
+              const donePayload = JSON.parse(event.data)
+              if (donePayload?.conversationId) {
+                studyConversationId.value = String(donePayload.conversationId)
+              }
+            } catch {
+              // ignore malformed done payload
+            }
+            return
+          }
+
+          try {
+            const data = JSON.parse(event.data)
+            if (data?.conversationId) {
+              studyConversationId.value = String(data.conversationId)
+            }
+            if (event.event === 'agent.text.delta' && data?.payload?.text) {
+              assistantMessage.text += String(data.payload.text)
+            }
+          } catch {
+            // ignore non-json SSE payloads
+          }
+        },
+        onerror(error) {
+          console.error('[StudyAgent] SSE error:', error)
+          throw error
+        },
+      })
+      return true
+    } catch (error) {
+      console.warn('[StudyAgent] 流式对话失败。', error)
+      return false
+    }
+  }
+
+  function buildStudyContext(question: string): Record<string, unknown> {
+    const step = currentScriptStep.value
+    const segment = currentSegment.value
+    const flow = currentTeachingFlow.value
+    const content = canvasContent.value
+    const timeline = currentTimeline.value
+
+    return {
+      source: 'study_execution',
+      userQuestion: question,
+      session: {
+        sessionId: sessionId.value,
+        lessonBundleId: lessonBundleId.value,
+        taskId: taskId.value,
+        spaceId: spaceId.value,
+        pathNodeId: pathNodeId.value,
+        mode: mode.value,
+      },
+      script: {
+        currentStepIndex: currentStepIndex.value,
+        totalSteps: scriptSteps.value.length,
+        currentStep: step ? {
+          id: step.id,
+          title: step.title,
+          subtitle: step.subtitle,
+          phase: step.phase,
+          nodeType: step.nodeType,
+          canvasType: step.canvasType,
+          status: step.status,
+        } : null,
+      },
+      teaching: {
+        currentSegmentIndex: flow?.currentSegmentIndex ?? -1,
+        totalSegments: flow?.segments.length ?? 0,
+        isPaused: flow?.isPaused ?? false,
+        waitReason: currentWaitReason.value,
+        currentSegment: segment ? compactSegmentForContext(segment) : null,
+      },
+      canvas: content ? {
+        type: content.type,
+        markdown: trimForContext(content.markdown, 1800),
+        mermaid: trimForContext(content.mermaid, 1000),
+        agentNote: trimForContext(content.agentNote, 600),
+        question: content.question ? {
+          prompt: content.question.prompt,
+          body: trimForContext(content.question.body, 1000),
+          hint: content.question.hint,
+        } : null,
+      } : null,
+      timeline: {
+        timelineId: timeline?.id,
+        status: timelinePlayer.status.value,
+        currentTimeMs: Math.round(timelinePlayer.currentTimeMs.value),
+        playbackRate: timelinePlayer.playbackRate.value,
+        currentSubtitle: trimForContext(currentSubtitle.value, 500),
+      },
+    }
+  }
+
+  function compactSegmentForContext(segment: TeachingSegment): Record<string, unknown> {
+    return {
+      id: segment.id,
+      type: segment.type,
+      teachingIntent: segment.teachingIntent,
+      teacherTalk: trimForContext(segment.teacherTalk, 1200),
+      agentCommentary: trimForContext(segment.agentCommentary, 800),
+      markdown: trimForContext(segment.markdown, 1200),
+      boardContent: trimForContext(segment.boardContent, 1200),
+      boardBlocks: segment.boardBlocks?.slice(0, 6).map(block => ({
+        type: block.type,
+        title: trimForContext(block.title, 120),
+        content: trimForContext(extractBoardBlockText(block), 800),
+      })),
+      quiz: segment.quiz ? {
+        prompt: segment.quiz.prompt,
+        options: segment.quiz.options,
+      } : null,
+      focusTarget: segment.focusTarget,
+    }
+  }
+
+  function extractBoardBlockText(block: TeachingBoardBlock): string {
+    const record = block as unknown as Record<string, unknown>
+    return [
+      record.content,
+      record.caption,
+      record.definition,
+      record.intuition,
+      record.formal,
+      compactBoardText(record.keyPoints),
+      compactBoardText(record.conditions),
+      compactBoardText(record.items),
+      compactBoardText(record.points),
+      compactBoardText(record.steps),
+      compactBoardText(record.examples),
+    ].map(stringValue).filter(Boolean).join(' ')
+  }
+
+  function trimForContext(value: unknown, maxLength: number): string | undefined {
+    if (value === null || value === undefined) return undefined
+    const text = String(value).trim()
+    if (!text) return undefined
+    return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+  }
+
+  function buildBoardNoteFromAgentReply(question: string, reply: string): string {
+    return `### 针对你的问题\n\n> ${question}\n\n${trimForContext(reply, 1200) || ''}`
+  }
+
+  function buildDiagramAgentPrompt(question: string): string {
+    return [
+      '请基于当前学习执行页上下文，把学生当前没懂的这一步画成图解释。',
+      '要求：',
+      '1. 先用一句话说明图在解释什么。',
+      '2. 必须给出一个 Mermaid flowchart，使用 ```mermaid 代码块包裹。',
+      '3. 图里只放 3 到 5 个关键节点，按“当前目标 -> 关键条件 -> 推理/操作 -> 结论/下一步”的顺序组织。',
+      '4. 图后用 3 条短句解释读图顺序。',
+      '5. 不要泛泛讲整章，只解释当前脚本步骤和当前教学段。',
+      `学生触发：${question}`,
+    ].join('\n')
+  }
+
+  function buildContextualFeedbackPrompt(type: FeedbackType, label: string): string {
+    const baseRules = [
+      '请基于当前学习执行页上下文回答学生的即时反馈。',
+      '要求：',
+      '1. 只解释当前脚本步骤和当前教学段，不要泛泛讲整章。',
+      '2. 回答要短，优先用 Markdown，必要时用公式或列表。',
+      '3. 先回应学生反馈，再给出可直接对照中间板书看的内容。',
+      '4. 不要声称已经修改数据库或学习计划，只说明本次讲解如何调整。',
+    ]
+
+    const taskRules: Partial<Record<FeedbackType, string[]>> = {
+      dont_understand: [
+        '学生没看懂：请用“核心意思 -> 为什么这样做 -> 怎么检查自己懂了”三层重新解释。',
+        '最后给一个 1 句话的自检问题。',
+      ],
+      another_example: [
+        '学生想换个例子：请给一个与当前知识点同构、但数字或场景不同的新例子。',
+        '必须包含“例子、解法、对应回当前步骤”三部分。',
+      ],
+      similar_question: [
+        '学生想做类似题：请出一道和当前步骤同类型的练习。',
+        '必须包含“题目、提示、答案与讲解”三部分，答案不要太长。',
+      ],
+    }
+
+    return [
+      ...baseRules,
+      ...(taskRules[type] || []),
+      `学生触发：${label}`,
+    ].join('\n')
+  }
+
+  function buildContextualFeedbackNoteTitle(type: FeedbackType): string {
+    const prefix: Partial<Record<FeedbackType, string>> = {
+      dont_understand: '再讲一遍',
+      another_example: '换个例子',
+      similar_question: '类似练习',
+    }
+    const title = currentScriptStep.value?.title || '当前步骤'
+    return `${prefix[type] || 'Agent 补充'}：${trimForContext(title, 24) || '当前步骤'}`
+  }
+
+  function buildContextualFeedbackFailureText(type: FeedbackType): string {
+    const action = type === 'dont_understand'
+      ? '重新解释'
+      : type === 'another_example'
+        ? '生成新例子'
+        : '生成类似题'
+    return `Agent 暂时没有完成${action}，请检查后端服务和 \`/agent/chat/stream\` 接口。`
+  }
+
+  function buildDiagramNoteTitle(): string {
+    const title = currentScriptStep.value?.title || '当前步骤'
+    return `图解：${trimForContext(title, 28) || '当前步骤'}`
+  }
+
+  function buildDiagramBoardNote(question: string, reply: string): string {
+    const trimmedReply = trimForContext(reply, 2200) || ''
+    if (/```mermaid[\s\S]*?```/.test(trimmedReply)) {
+      return trimmedReply
+    }
+
+    return [
+      `我先把“${question}”对应的这一步画成一张简图：`,
+      '',
+      '```mermaid',
+      buildFallbackContextDiagram(),
+      '```',
+      '',
+      trimmedReply || '你可以按箭头顺序看：先确认当前目标，再看关键条件，最后看这一步为什么能推出结论。',
+    ].join('\n')
+  }
+
+  function buildFallbackContextDiagram(): string {
+    const stepTitle = safeMermaidLabel(currentScriptStep.value?.title || '当前步骤')
+    const segmentTitle = safeMermaidLabel(
+      currentSegment.value?.teachingIntent
+      || currentSegment.value?.boardContent
+      || currentSegment.value?.markdown
+      || '当前讲解段',
+    )
+    const questionLabel = safeMermaidLabel('你的问题')
+    const conclusion = safeMermaidLabel(currentScriptStep.value?.subtitle || '回到这一步的结论')
+
+    return [
+      'flowchart TD',
+      `  A["${stepTitle}"] --> B["${segmentTitle}"]`,
+      `  B --> C["${questionLabel}"]`,
+      `  C --> D["${conclusion}"]`,
+    ].join('\n')
+  }
+
+  function safeMermaidLabel(value: unknown): string {
+    return String(value || '')
+      .replace(/\s+/g, ' ')
+      .replace(/["<>`]/g, '')
+      .slice(0, 34)
+      || '当前内容'
   }
 
   /** 提交答题（practice / assessment 步骤） */
@@ -533,10 +993,14 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     canvasContent.value = null
     sessionId.value = ''
     lessonBundleId.value = ''
+    studyConversationId.value = ''
     sessionScenes.value = {}
     sessionTimelines.value = {}
     mastery.value = null
     chatMessages.value = []
+    temporaryBoardNotes.value = []
+    diagramGenerating.value = false
+    contextualFeedbackGenerating.value = null
     currentStepIndex.value = 0
     taskId.value = ''
     spaceId.value = null
@@ -546,9 +1010,12 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     quizState.value = null
     revealedBoardBlockIndexes.value = {}
     revealedBoardItemIndexes.value = {}
+    feedbackVisualEffect.value = null
+    resetContinueRhythm()
   }
 
   function prepareCanvasContent(step: ScriptStep): CanvasContent {
+    temporaryBoardNotes.value = []
     const backendScene = sessionScenes.value[step.id]
     const backendContent = toCanvasContent(backendScene?.content)
     if (backendContent) {
@@ -660,7 +1127,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       const startMs = cursorMs
       const segmentDurationMs = resolveSegmentDurationMs(segment)
       const endMs = startMs + segmentDurationMs
-      const waitForUser = segment.autoAdvanceMs <= 0 || isInteractiveSegment(segment.type)
+      const waitForUser = true
       const sceneAction = buildSceneActionFromSegment(segment, index, startMs)
       sceneAction.durationMs = Math.min(Math.max(segmentDurationMs, 1200), 5200)
       sceneAction.payload = {
@@ -704,7 +1171,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
             segmentIndex: index,
             segmentType: segment.type,
             waitForUser: true,
-            reason: isInteractiveSegment(segment.type) ? 'interaction' : 'manual_continue',
+            reason: isInteractiveSegment(segment.type) ? 'interaction' : 'segment_end_check',
           },
         })
       }
@@ -836,7 +1303,72 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   function resolveSegmentDurationMs(segment: TeachingSegment): number {
     const speechMs = estimateSpeechDurationMs(segmentSpeechText(segment))
     const explicitMs = Number(segment.autoAdvanceMs || 0)
-    return Math.max(1200, Math.min(30000, Math.max(speechMs, explicitMs)))
+    let base = Math.max(speechMs, explicitMs)
+    const blocks = segment.boardBlocks || []
+    const denseTypes = ['comparison', 'vs_compare', 'code', 'formula', 'structure', 'trace']
+    const denseBlockCount = blocks.filter(block => denseTypes.includes(normalizeBoardBlockType(block.type))).length
+    if (denseBlockCount >= 3) {
+      base *= 2
+    } else if (denseBlockCount >= 2) {
+      base *= 1.5
+    }
+    const totalTextSize = blocks.reduce((sum, block) => sum + boardBlockTextSize(block), 0)
+    if (totalTextSize > 800) {
+      base *= 1.3
+    }
+    return Math.max(1200, Math.min(30000, base))
+  }
+
+  function boardBlockTextSize(block: TeachingBoardBlock): number {
+    const record = block as unknown as Record<string, unknown>
+    const textParts: unknown[] = [
+      block.title,
+      block.content,
+      block.caption,
+      record.term,
+      record.definition,
+      record.intuition,
+      record.formal,
+      record.lead,
+      record.question,
+      record.summary,
+      record.conclusion,
+      record.rule,
+      record.context,
+      record.reminder,
+      record.explanation,
+      record.invariant,
+      record.statement,
+      record.whyItMatters,
+      record.time,
+      record.space,
+      record.reason,
+      compactBoardText(record.items),
+      compactBoardText(record.points),
+      compactBoardText(record.steps),
+      compactBoardText(record.keyPoints),
+      compactBoardText(record.examples),
+      compactBoardText(record.cases),
+      compactBoardText(record.criteria),
+    ]
+    return textParts.reduce<number>((sum, value) => sum + stringValue(value).length, 0)
+  }
+
+  function compactBoardText(value: unknown): string {
+    if (!Array.isArray(value)) return ''
+    return value
+      .map((item) => {
+        if (item === null || item === undefined) return ''
+        if (typeof item === 'string') return item
+        if (typeof item !== 'object') return String(item)
+        return Object.values(item as Record<string, unknown>).map(stringValue).join(' ')
+      })
+      .join(' ')
+  }
+
+  function stringValue(value: unknown): string {
+    if (value === null || value === undefined) return ''
+    return typeof value === 'string' ? value : String(value)
   }
 
   function segmentSpeechText(segment: TeachingSegment): string {
@@ -940,6 +1472,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     currentSubtitle.value = ''
     revealedBoardBlockIndexes.value = {}
     revealedBoardItemIndexes.value = {}
+    currentWaitReason.value = ''
+    segmentWaitStartedAtMs.value = 0
     const flow = currentTeachingFlow.value
     if (flow) {
       flow.currentSegmentIndex = -1
@@ -956,7 +1490,6 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       flow.isPaused = false
     }
     quizState.value = null
-    teachingActive.value = true
   }
 
   function setTimelineAudioElement(element: HTMLAudioElement | null) {
@@ -1068,10 +1601,53 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     }, cue.startMs)
 
     if (cue.type === 'pause' || cue.payload.waitForUser === true) {
-      const flow = currentTeachingFlow.value
-      if (flow) flow.isPaused = true
-      timelinePlayer.waitForUser()
+      const reason = String(cue.payload.reason || '')
+      if (reason === 'segment_end_check' && skipNextSegmentEndPause.value) {
+        skipNextSegmentEndPause.value = false
+        return
+      }
+      markTimelineWaiting(reason || 'manual_continue')
     }
+  }
+
+  function markTimelineWaiting(reason: string) {
+    const flow = currentTeachingFlow.value
+    if (flow) flow.isPaused = true
+    currentWaitReason.value = reason
+    segmentWaitStartedAtMs.value = Date.now()
+    timelinePlayer.waitForUser()
+  }
+
+  function trackContinueRhythm() {
+    if (timelinePlayer.status.value !== 'waiting_user' || currentWaitReason.value !== 'segment_end_check') {
+      return
+    }
+
+    const elapsedMs = segmentWaitStartedAtMs.value ? Date.now() - segmentWaitStartedAtMs.value : Number.POSITIVE_INFINITY
+    if (elapsedMs <= 2000) {
+      quickContinueCount.value += 1
+    } else {
+      quickContinueCount.value = 0
+    }
+
+    if (quickContinueCount.value >= 3) {
+      skipNextSegmentEndPause.value = true
+      quickContinueCount.value = 0
+      chatMessages.value.push({
+        id: `agent-rhythm-${Date.now()}`,
+        role: 'agent',
+        text: '我注意到你节奏很快，下一小段会顺着讲完，不额外停顿。',
+        markdown: false,
+        createTime: Date.now(),
+      })
+    }
+  }
+
+  function resetContinueRhythm() {
+    quickContinueCount.value = 0
+    segmentWaitStartedAtMs.value = 0
+    currentWaitReason.value = ''
+    skipNextSegmentEndPause.value = false
   }
 
   function applySceneActionPayload(value: unknown, fallbackStartMs: number) {
@@ -1095,10 +1671,20 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         : undefined,
     }
 
-    activeSceneActions.value = [
+    const nextActions = [
       action,
       ...activeSceneActions.value.filter(item => item.actionId !== action.actionId),
-    ].slice(0, 4)
+    ]
+    if (nextActions.length > 4) {
+      nextActions.slice(4).forEach((item) => {
+        const timer = sceneActionTimers.get(item.actionId)
+        if (timer) {
+          clearTimeout(timer)
+          sceneActionTimers.delete(item.actionId)
+        }
+      })
+    }
+    activeSceneActions.value = nextActions.slice(0, 4)
 
     const existedTimer = sceneActionTimers.get(action.actionId)
     if (existedTimer) {
@@ -1230,11 +1816,27 @@ export const useTaskStepStore = defineStore('taskStep', () => {
             appendAgentNote(String(action.payload.note || ''))
             break
 
+          case 'append_board_note':
+            appendTemporaryBoardNote({
+              title: String(action.payload.title || ''),
+              content: String(action.payload.content || action.payload.markdown || ''),
+              sourceQuestion: String(action.payload.sourceQuestion || ''),
+            })
+            break
+
           case 'mark_current_step_skipped': {
             const cur = scriptSteps.value[currentStepIndex.value]
             if (cur) cur.status = 'skipped'
             break
           }
+
+          case 'trigger_feedback_visual_effect':
+            triggerFeedbackVisualEffect(String(action.payload.type || ''))
+            break
+
+          case 'set_playback_rate':
+            setTimelinePlaybackRate(Number(action.payload.rate || 1))
+            break
         }
         void reportTeachingActionStatus(action.actionId, 'applied', {
           actionType: action.actionType,
@@ -1249,6 +1851,30 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         )
       }
     })
+  }
+
+  function triggerFeedbackVisualEffect(type: string) {
+    if (!type) return
+    feedbackVisualEffect.value = {
+      type,
+      segmentId: currentSegment.value?.id,
+      ts: Date.now(),
+    }
+  }
+
+  function setTimelinePlaybackRate(rate: number) {
+    if (!Number.isFinite(rate) || rate <= 0) return
+    timelinePlayer.setPlaybackRate(rate)
+  }
+
+  function buildMockCustomReply(question: string): { chat: string; board: string } {
+    const segment = currentSegment.value
+    const title = segment?.boardContent || segment?.markdown || currentScriptStep.value?.title || '当前知识点'
+    const compactTitle = title.replace(/\s+/g, ' ').slice(0, 42)
+    return {
+      chat: `可以，我换个角度再讲一遍。\n\n你问的是：「${question}」。先抓住当前这一步的核心：${compactTitle}。我会把它拆成“先看目标、再看条件、最后看为什么这样做”三层，你可以先对照中间板书看一遍。`,
+      board: `### 再讲一遍：${compactTitle}\n\n1. **先看目标**：这一步要解决的是“我现在到底要证明、计算或判断什么”。\n2. **再看条件**：把题目或概念里已经给出的条件逐条摆出来，不急着套公式。\n3. **最后看连接**：找到条件通向目标的那条最短链路；如果卡住，通常是少了一步中间转换。\n\n> 你的问题：${question}`,
+    }
   }
 
   async function reportTeachingActionStatus(
@@ -1285,6 +1911,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     scriptSteps,
     currentScriptStep,
     canvasContent,
+    temporaryBoardNotes,
+    diagramGenerating,
+    contextualFeedbackGenerating,
     mastery,
     chatMessages,
     sendingFeedback,
@@ -1297,6 +1926,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     quizState,
     currentSubtitle,
     activeSceneActions,
+    feedbackVisualEffect,
     getActiveSceneAction,
     getRevealedBoardBlockIndex,
     getRevealedBoardItemIndexes,
@@ -1304,6 +1934,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     currentTimeline,
     currentSegment,
     isTeachingPaused,
+    timelineEnded,
+    quickContinueCount,
+    currentWaitReason,
     timelineStatus: timelinePlayer.status,
     timelineCurrentTimeMs: timelinePlayer.currentTimeMs,
     timelinePlaybackRate: timelinePlayer.playbackRate,

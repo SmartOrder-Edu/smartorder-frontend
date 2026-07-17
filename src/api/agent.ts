@@ -5,6 +5,8 @@ export interface AgentChatRequest {
   message: string
   conversationId?: string
   fileIds?: number[]
+  /** 学习执行页上下文：当前脚本步骤、教学段、画布、时间轴位置等 */
+  studyContext?: Record<string, unknown>
   /** 强制运行模式：'REACT' 快速回答 / 'PLAN_AND_EXECUTE' 目标规划，不传则走意图路由 */
   forceMode?: 'REACT' | 'PLAN_AND_EXECUTE'
   /** 结构化澄清回答 JSON（可选），格式: {"clarificationId": "uuid", "answer": "用户回答"} */

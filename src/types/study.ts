@@ -692,7 +692,10 @@ export interface StudyEventReceipt {
 export type StudyTeachingActionType =
   | 'agent_reply'
   | 'append_agent_note'
+  | 'append_board_note'
   | 'mark_current_step_skipped'
+  | 'trigger_feedback_visual_effect'
+  | 'set_playback_rate'
   | 'insert_timeline_patch'
 
 export interface StudyTeachingAction {
@@ -707,6 +710,16 @@ export interface StudyTeachingActionStatusRequest {
   status: 'applied' | 'failed' | 'pending'
   errorMessage?: string
   payload?: Record<string, unknown>
+}
+
+/** 学习中由 Agent 临时追加的板书补充 */
+export interface TemporaryBoardNote {
+  id: string
+  kind?: 'note' | 'diagram'
+  title: string
+  content: string
+  sourceQuestion?: string
+  createTime: number
 }
 
 /** 弹题回答状态 */

@@ -137,6 +137,89 @@ export interface CreateTaskDTO {
 
 export interface PlanTodayTasksDTO {
   maxTasks?: number
+  totalAvailableMinutes?: number
+  strategy?: 'deadline_first' | 'weakness_first' | 'balanced'
+  allowedActionTypes?: TaskActionType[]
+}
+
+export interface PlanTodayScheduleRequest extends PlanTodayTasksDTO {
+  createPracticeTasks?: boolean
+  createResourceTasks?: boolean
+  resourceTypes?: string[]
+  resourceTaskCount?: number
+  resourceTargetMinutes?: number
+  resourceDueTime?: string
+  evaluationTaskType?: 'practice_set' | 'assessment'
+  practiceTaskCount?: number
+  practiceQuestionCount?: number
+  practiceDifficulty?: number
+  practiceTopic?: string
+  practiceDueTime?: string
+}
+
+export interface AgentScheduleEvidence {
+  recentDays: number
+  recentRecordCount: number
+  recentSpaces: string[]
+  recentStudyMinutes: number
+  recentCompletedTasks: number
+  recentPlannedTasks: number
+  recentCompletionRate: number
+  averageFocusLevel: number | null
+  averageSelfRating: number | null
+  todayExistingTaskCount: number
+  unfinishedTaskCount: number
+  overdueTaskCount: number
+  availableMinutes: number
+  strategy: 'deadline_first' | 'weakness_first' | 'balanced' | string
+  weakSignals: string[]
+  decisionBasis: string[]
+}
+
+export interface AgentScheduleProcessStep {
+  key: string
+  label: string
+  status: 'pending' | 'running' | 'completed' | 'failed' | string
+  detail: string
+}
+
+export interface AgentScheduleTaskPayload {
+  taskId: string
+  spaceId: string
+  pathNodeId: string | null
+  title: string
+  taskType: TaskType
+  actionType?: TaskActionType
+  targetType?: TaskTargetType | null
+  targetId?: string | number | null
+  priority: number
+  dueDate: string | null
+  dueTime: string | null
+  estimatedDurationMinutes: number | null
+  agentReason?: string | null
+}
+
+export interface AgentScheduleTaskReason {
+  taskId: string
+  title: string
+  reason: string
+  evidenceTags: string[]
+}
+
+export interface PlanTodayScheduleResult {
+  type: 'today_schedule_created'
+  summary: string
+  date: string
+  strategy: string
+  evidence: AgentScheduleEvidence
+  processSteps: AgentScheduleProcessStep[]
+  learningTaskCount: number
+  resourceTaskCount: number
+  practiceTaskCount: number
+  createdTaskCount: number
+  tasks: AgentScheduleTaskPayload[]
+  taskReasons: AgentScheduleTaskReason[]
+  actions: Array<Record<string, any>>
 }
 
 export const taskApi = {
@@ -166,6 +249,12 @@ export const taskApi = {
 
   async complete(taskId: string, data: { actualDurationMinutes: number }): Promise<TaskVO> {
     return request.patch(`/tasks/${taskId}/complete`, data)
+  },
+}
+
+export const agentScheduleApi = {
+  async planToday(data: PlanTodayScheduleRequest = {}): Promise<PlanTodayScheduleResult> {
+    return request.post('/agent/daily-schedule/plan-today', data)
   },
 }
 
