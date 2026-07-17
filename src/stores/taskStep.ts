@@ -1,7 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { taskStepApi } from '@/api/spaceDashboard'
 import { studySessionApi } from '@/api/studySession'
+import { agentApi, type AgentChatRequest } from '@/api/agent'
+import { refreshAccessToken } from '@/api/request'
 import { ElMessage } from 'element-plus'
 import { useTimelinePlayer } from '@/composables/useTimelinePlayer'
 import type { TaskStepVO, StepStatus } from '@/types/learningSpace'
@@ -50,6 +53,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const canvasContent = ref<CanvasContent | null>(null)
   const sessionId = ref<string>('')
   const lessonBundleId = ref<string>('')
+  const studyConversationId = ref<string>('')
   const sessionScenes = ref<Record<string, StudySessionVO['currentScene']>>({})
   const sessionTimelines = ref<Record<string, LessonTimeline>>({})
   const mastery = ref<MasteryJudge | null>(null)
@@ -471,6 +475,13 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     const question = text.trim()
     if (!question) return
     sendingFeedback.value = true
+    const assistantMessage: StudyChatMessage = {
+      id: `a-stream-${Date.now()}`,
+      role: 'agent',
+      text: '',
+      markdown: true,
+      createTime: Date.now(),
+    }
     try {
       chatMessages.value.push({
         id: `u-${Date.now()}`,
@@ -487,23 +498,199 @@ export const useTaskStepStore = defineStore('taskStep', () => {
         },
       })
       if (receipt?.actions?.length) return
-      await new Promise(r => setTimeout(r, 400))
-      const reply = buildMockCustomReply(question)
-      chatMessages.value.push({
-        id: `a-${Date.now()}`,
-        role: 'agent',
-        text: reply.chat,
-        markdown: true,
-        createTime: Date.now(),
-      })
+
+      chatMessages.value.push(assistantMessage)
+      const streamOk = await streamStudyAgentReply(question, assistantMessage)
+      if (!streamOk || !assistantMessage.text.trim()) {
+        const reply = buildMockCustomReply(question)
+        assistantMessage.text = reply.chat
+        appendTemporaryBoardNote({
+          title: '临时补充板书',
+          content: reply.board,
+          sourceQuestion: question,
+        })
+        return
+      }
       appendTemporaryBoardNote({
-        title: '临时补充板书',
-        content: reply.board,
+        title: 'Agent 补充板书',
+        content: buildBoardNoteFromAgentReply(question, assistantMessage.text),
         sourceQuestion: question,
       })
     } finally {
       sendingFeedback.value = false
     }
+  }
+
+  async function streamStudyAgentReply(question: string, assistantMessage: StudyChatMessage): Promise<boolean> {
+    let token = ''
+    try {
+      token = await refreshAccessToken()
+    } catch {
+      return false
+    }
+
+    const body: AgentChatRequest = {
+      message: question,
+      conversationId: studyConversationId.value || undefined,
+      forceMode: 'REACT',
+      studyContext: buildStudyContext(question),
+    }
+
+    try {
+      await fetchEventSource(agentApi.chatStreamUrl(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+        openWhenHidden: true,
+        onmessage(event) {
+          if (!event.data) return
+
+          if (event.event === 'done') {
+            try {
+              const donePayload = JSON.parse(event.data)
+              if (donePayload?.conversationId) {
+                studyConversationId.value = String(donePayload.conversationId)
+              }
+            } catch {
+              // ignore malformed done payload
+            }
+            return
+          }
+
+          try {
+            const data = JSON.parse(event.data)
+            if (data?.conversationId) {
+              studyConversationId.value = String(data.conversationId)
+            }
+            if (event.event === 'agent.text.delta' && data?.payload?.text) {
+              assistantMessage.text += String(data.payload.text)
+            }
+          } catch {
+            // ignore non-json SSE payloads
+          }
+        },
+        onerror(error) {
+          console.error('[StudyAgent] SSE error:', error)
+          throw error
+        },
+      })
+      return true
+    } catch (error) {
+      console.warn('[StudyAgent] 流式对话失败，回退本地回答。', error)
+      return false
+    }
+  }
+
+  function buildStudyContext(question: string): Record<string, unknown> {
+    const step = currentScriptStep.value
+    const segment = currentSegment.value
+    const flow = currentTeachingFlow.value
+    const content = canvasContent.value
+    const timeline = currentTimeline.value
+
+    return {
+      source: 'study_execution',
+      userQuestion: question,
+      session: {
+        sessionId: sessionId.value,
+        lessonBundleId: lessonBundleId.value,
+        taskId: taskId.value,
+        spaceId: spaceId.value,
+        pathNodeId: pathNodeId.value,
+        mode: mode.value,
+      },
+      script: {
+        currentStepIndex: currentStepIndex.value,
+        totalSteps: scriptSteps.value.length,
+        currentStep: step ? {
+          id: step.id,
+          title: step.title,
+          subtitle: step.subtitle,
+          phase: step.phase,
+          nodeType: step.nodeType,
+          canvasType: step.canvasType,
+          status: step.status,
+        } : null,
+      },
+      teaching: {
+        currentSegmentIndex: flow?.currentSegmentIndex ?? -1,
+        totalSegments: flow?.segments.length ?? 0,
+        isPaused: flow?.isPaused ?? false,
+        waitReason: currentWaitReason.value,
+        currentSegment: segment ? compactSegmentForContext(segment) : null,
+      },
+      canvas: content ? {
+        type: content.type,
+        markdown: trimForContext(content.markdown, 1800),
+        mermaid: trimForContext(content.mermaid, 1000),
+        agentNote: trimForContext(content.agentNote, 600),
+        question: content.question ? {
+          prompt: content.question.prompt,
+          body: trimForContext(content.question.body, 1000),
+          hint: content.question.hint,
+        } : null,
+      } : null,
+      timeline: {
+        timelineId: timeline?.id,
+        status: timelinePlayer.status.value,
+        currentTimeMs: Math.round(timelinePlayer.currentTimeMs.value),
+        playbackRate: timelinePlayer.playbackRate.value,
+        currentSubtitle: trimForContext(currentSubtitle.value, 500),
+      },
+    }
+  }
+
+  function compactSegmentForContext(segment: TeachingSegment): Record<string, unknown> {
+    return {
+      id: segment.id,
+      type: segment.type,
+      teachingIntent: segment.teachingIntent,
+      teacherTalk: trimForContext(segment.teacherTalk, 1200),
+      agentCommentary: trimForContext(segment.agentCommentary, 800),
+      markdown: trimForContext(segment.markdown, 1200),
+      boardContent: trimForContext(segment.boardContent, 1200),
+      boardBlocks: segment.boardBlocks?.slice(0, 6).map(block => ({
+        type: block.type,
+        title: trimForContext(block.title, 120),
+        content: trimForContext(extractBoardBlockText(block), 800),
+      })),
+      quiz: segment.quiz ? {
+        prompt: segment.quiz.prompt,
+        options: segment.quiz.options,
+      } : null,
+      focusTarget: segment.focusTarget,
+    }
+  }
+
+  function extractBoardBlockText(block: TeachingBoardBlock): string {
+    const record = block as unknown as Record<string, unknown>
+    return [
+      record.content,
+      record.caption,
+      record.definition,
+      record.intuition,
+      record.formal,
+      compactBoardText(record.keyPoints),
+      compactBoardText(record.conditions),
+      compactBoardText(record.items),
+      compactBoardText(record.points),
+      compactBoardText(record.steps),
+      compactBoardText(record.examples),
+    ].map(stringValue).filter(Boolean).join(' ')
+  }
+
+  function trimForContext(value: unknown, maxLength: number): string | undefined {
+    if (value === null || value === undefined) return undefined
+    const text = String(value).trim()
+    if (!text) return undefined
+    return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+  }
+
+  function buildBoardNoteFromAgentReply(question: string, reply: string): string {
+    return `### 针对你的问题\n\n> ${question}\n\n${trimForContext(reply, 1200) || ''}`
   }
 
   /** 提交答题（practice / assessment 步骤） */
@@ -578,6 +765,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     canvasContent.value = null
     sessionId.value = ''
     lessonBundleId.value = ''
+    studyConversationId.value = ''
     sessionScenes.value = {}
     sessionTimelines.value = {}
     mastery.value = null
