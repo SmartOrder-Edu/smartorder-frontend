@@ -364,10 +364,17 @@
             </el-checkbox-group>
           </el-form-item>
 
-          <div v-if="generating || generationSteps.length" class="generation-process">
+          <div
+            v-if="generating || generationSteps.length"
+            class="generation-process"
+            :class="{ running: generating, completed: !!scheduleResult && !generating }"
+          >
             <div class="generation-analysis">
               <div class="analysis-header">
-                <span>AI 分析情况</span>
+                <div class="analysis-status">
+                  <span class="analysis-status-dot"></span>
+                  <span>{{ generating ? 'Agent 正在编排' : 'Agent 编排完成' }}</span>
+                </div>
                 <strong>{{ agentAnalysisTitle }}</strong>
               </div>
 
@@ -403,13 +410,13 @@
               </div>
             </div>
 
-            <div class="process-divider"></div>
-
-            <div v-for="step in generationSteps" :key="step.key" class="process-step" :class="step.status">
-              <span class="process-dot"></span>
-              <div class="process-copy">
-                <span class="process-label">{{ step.label }}</span>
-                <span class="process-detail">{{ step.detail }}</span>
+            <div class="process-timeline">
+              <div v-for="step in generationSteps" :key="step.key" class="process-step" :class="step.status">
+                <span class="process-dot"></span>
+                <div class="process-copy">
+                  <span class="process-label">{{ step.label }}</span>
+                  <span class="process-detail">{{ step.detail }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1792,9 +1799,8 @@ export default { name: 'TasksPage' }
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 
-  /* 默认/复习任务的主题变量 (亮蓝色) */
-  --task-color: var(--primary);
-  --task-color-rgb: 11, 183, 170;
+  --task-color: #2563eb;
+  --task-color-rgb: 37, 99, 235;
   --task-grad: linear-gradient(135deg, #0ea5e9, #2563eb);
   --task-glow: rgba(37, 99, 235, 0.28);
 }
@@ -1813,7 +1819,7 @@ export default { name: 'TasksPage' }
 .learning-task-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
-  border-color: rgba(11, 183, 170, 0.22);
+  border-color: rgba(var(--task-color-rgb), 0.24);
 }
 
 .learning-task-card.type-practice {
@@ -1932,8 +1938,8 @@ export default { name: 'TasksPage' }
 }
 
 .type-badge.review {
-  color: var(--primary);
-  background: rgba(11, 183, 170, 0.1);
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
 }
 
 .type-badge.practice {
@@ -2418,11 +2424,20 @@ export default { name: 'TasksPage' }
 .agent-schedule-result {
   display: grid;
   gap: 14px;
-  padding: 16px;
+  padding: 18px;
   margin-top: 16px;
-  border: 1px solid var(--border-color-local);
-  border-radius: 14px;
-  background: var(--background-color-base, #f1f5f9);
+  border: 1px solid rgba(11, 183, 170, 0.22);
+  border-radius: 18px;
+  background: var(--card-bg);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.04);
+}
+
+.generation-process.running {
+  border-color: rgba(11, 183, 170, 0.26);
+}
+
+.generation-process.completed {
+  border-color: rgba(16, 185, 129, 0.24);
 }
 
 .generation-analysis,
@@ -2436,7 +2451,37 @@ export default { name: 'TasksPage' }
   gap: 6px;
 }
 
-.analysis-header span,
+.analysis-header {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding-bottom: 2px;
+}
+
+.analysis-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--primary);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.analysis-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+}
+
+.generation-process.running .analysis-status-dot {
+  animation: statusPulse 1.3s ease-in-out infinite;
+}
+
 .result-header span {
   color: var(--primary);
   font-size: 0.76rem;
@@ -2453,10 +2498,11 @@ export default { name: 'TasksPage' }
 .analysis-item,
 .analysis-panel,
 .evidence-item {
-  padding: 12px;
-  border: 1px solid var(--border-color-local);
+  padding: 13px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 12px;
   background: var(--card-bg);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.035);
 }
 
 .analysis-item span,
@@ -2468,7 +2514,8 @@ export default { name: 'TasksPage' }
 .analysis-item strong,
 .evidence-item strong {
   color: var(--text-primary-local);
-  font-size: 0.96rem;
+  font-size: 1rem;
+  line-height: 1.25;
 }
 
 .analysis-item small {
@@ -2480,6 +2527,24 @@ export default { name: 'TasksPage' }
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.analysis-panel {
+  align-content: start;
+}
+
+.weakness-panel {
+  border-color: rgba(245, 158, 11, 0.32);
+  background:
+    linear-gradient(180deg, rgba(245, 158, 11, 0.13), transparent 48%),
+    var(--card-bg);
+}
+
+.basis-panel {
+  border-color: rgba(124, 58, 237, 0.28);
+  background:
+    linear-gradient(180deg, rgba(124, 58, 237, 0.12), transparent 48%),
+    var(--card-bg);
 }
 
 .analysis-panel h4,
@@ -2494,21 +2559,35 @@ export default { name: 'TasksPage' }
   display: grid;
   gap: 6px;
   margin: 0;
-  padding-left: 18px;
+  padding-left: 16px;
   color: var(--text-secondary-local);
   font-size: 0.76rem;
   line-height: 1.6;
 }
 
-.process-divider {
-  height: 1px;
-  background: var(--border-color-local);
+.process-timeline {
+  position: relative;
+  display: grid;
+  gap: 0;
+  padding: 4px 0 2px;
+}
+
+.process-timeline::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 16px;
+  bottom: 14px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(11, 183, 170, 0.3), rgba(148, 163, 184, 0.18));
 }
 
 .process-step {
+  position: relative;
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
+  padding: 8px 0;
 }
 
 .process-dot {
@@ -2522,6 +2601,7 @@ export default { name: 'TasksPage' }
 .process-step.running .process-dot {
   background: var(--primary);
   box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+  animation: statusPulse 1.3s ease-in-out infinite;
 }
 
 .process-step.completed .process-dot {
@@ -2534,7 +2614,8 @@ export default { name: 'TasksPage' }
 
 .process-copy {
   display: grid;
-  gap: 2px;
+  gap: 3px;
+  padding: 0 0 2px;
 }
 
 .process-label {
@@ -2546,6 +2627,7 @@ export default { name: 'TasksPage' }
 .process-detail {
   color: var(--text-secondary-local);
   font-size: 0.76rem;
+  line-height: 1.5;
 }
 
 :deep(.el-dialog),
@@ -2583,6 +2665,12 @@ export default { name: 'TasksPage' }
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
 }
 
+:global(html[data-theme='dark']) .generation-process,
+:global(html[data-theme='dark']) .agent-schedule-result {
+  background: var(--card-bg);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+}
+
 button:focus-visible,
 input:focus-visible {
   outline: 2px solid rgba(11, 183, 170, 0.6);
@@ -2592,6 +2680,16 @@ input:focus-visible {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(11, 183, 170, 0);
   }
 }
 
