@@ -16,9 +16,9 @@
       <div class="stat-glass-card user-card">
         <div class="card-glow"></div>
         <div class="stat-content">
-          <div class="stat-label">总注册用户</div>
+          <div class="stat-label">知序累计学员总数</div>
           <div class="stat-value">{{ stats.userCount }}</div>
-          <div class="stat-badge success">正常运行中</div>
+          <div class="stat-badge success">在线课堂正常</div>
         </div>
         <div class="stat-icon-wrap">
           <el-icon><User /></el-icon>
@@ -28,9 +28,9 @@
       <div class="stat-glass-card agent-card">
         <div class="card-glow"></div>
         <div class="stat-content">
-          <div class="stat-label">今日 AI 调用次数</div>
+          <div class="stat-label">今日 Agent 推荐调用</div>
           <div class="stat-value">{{ stats.agentExecutionCount }}</div>
-          <div class="stat-badge primary">智能体活跃</div>
+          <div class="stat-badge primary">智能推荐引擎活跃</div>
         </div>
         <div class="stat-icon-wrap">
           <el-icon><Cpu /></el-icon>
@@ -40,9 +40,9 @@
       <div class="stat-glass-card rag-card">
         <div class="card-glow"></div>
         <div class="stat-content">
-          <div class="stat-label">排队中向量化任务</div>
+          <div class="stat-label">排队中 RAG 向量化任务</div>
           <div class="stat-value">{{ stats.pendingRAGJobCount }}</div>
-          <div class="stat-badge warning">等待 RAG 调度</div>
+          <div class="stat-badge warning">正在分块嵌入</div>
         </div>
         <div class="stat-icon-wrap">
           <el-icon><Connection /></el-icon>
@@ -52,9 +52,9 @@
       <div class="stat-glass-card feedback-card">
         <div class="card-glow"></div>
         <div class="stat-content">
-          <div class="stat-label">待审核反馈</div>
+          <div class="stat-label">待复核学情反馈</div>
           <div class="stat-value">{{ stats.pendingFeedbackCount }}</div>
-          <div class="stat-badge danger" v-if="stats.pendingFeedbackCount > 0">需人工介入</div>
+          <div class="stat-badge danger" v-if="stats.pendingFeedbackCount > 0">需人工审阅</div>
           <div class="stat-badge info" v-else>暂无积压</div>
         </div>
         <div class="stat-icon-wrap">

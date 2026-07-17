@@ -5,17 +5,10 @@
 
     <div class="layout-container" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
       <!-- 左侧边栏 -->
-      <aside 
-        class="sidebar" 
-        :class="{ collapsed: sidebarCollapsed }"
-        @mouseenter="sidebarHovered = true"
-        @mouseleave="sidebarHovered = false"
-      >
+      <aside class="sidebar" :class="{ collapsed: sidebarCollapsed }" @mouseenter="sidebarHovered = true"
+        @mouseleave="sidebarHovered = false">
         <!-- Logo / 展开控制区 -->
-        <div 
-          class="sidebar-logo-container"
-          :class="{ 'is-collapsed': sidebarCollapsed }"
-        >
+        <div class="sidebar-logo-container" :class="{ 'is-collapsed': sidebarCollapsed }">
           <!-- 非折叠状态下正常显示 Logo 和折叠按钮 -->
           <div v-if="!sidebarCollapsed" class="sidebar-logo" @click="goHome">
             <img src="/logo.png" alt="知序智学" class="sidebar-logo-img" />
@@ -25,7 +18,7 @@
             </div>
             <button class="collapse-btn" @click.stop="handleCollapse" title="收起侧边栏">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15,18 9,12 15,6"/>
+                <polyline points="15,18 9,12 15,6" />
               </svg>
             </button>
           </div>
@@ -33,23 +26,19 @@
           <!-- 折叠状态下 -->
           <div v-else class="sidebar-logo-collapsed">
             <!-- 鼠标悬停在侧边栏区域时显示“打开边栏”图标，否则显示星星 Logo -->
-            <el-tooltip
-              :disabled="!sidebarCollapsed || !sidebarHovered"
-              content="打开边栏"
-              placement="right"
-              effect="dark"
-              :show-after="50"
-            >
+            <el-tooltip :disabled="!sidebarCollapsed || !sidebarHovered" content="打开边栏" placement="right" effect="dark"
+              :show-after="50">
               <div class="sidebar-logo-collapsed-inner" @click.stop="handleLogoClick">
                 <transition name="fade-icon" mode="out-in">
                   <div v-if="sidebarHovered" class="expand-action-btn" key="expand">
-                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-linejoin="round">
                       <rect width="18" height="18" x="3" y="3" rx="2" />
                       <path d="M9 3v18" />
                       <path d="m14 9 3 3-3 3" />
                     </svg>
                   </div>
-                  
+
                   <div v-else class="sidebar-logo-mini" key="logo">
                     <img src="/logo.png" alt="知序智学" class="sidebar-logo-img" />
                   </div>
@@ -62,13 +51,8 @@
 
         <nav class="sidebar-nav">
           <!-- 核心入口 -->
-          <router-link
-            v-for="item in topMenuItems"
-            :key="item.id"
-            :to="item.path"
-            class="nav-item"
-            :class="{ active: isActive(item.path) }"
-          >
+          <router-link v-for="item in topMenuItems" :key="item.id" :to="item.path" class="nav-item"
+            :class="{ active: isActive(item.path) }">
             <AnimatedIcon :type="item.type" :isActive="isActive(item.path)" />
             <span class="nav-label" v-if="!sidebarCollapsed">{{ item.label }}</span>
           </router-link>
@@ -89,7 +73,8 @@
               </div>
               <button class="space-create-btn" @click="showCreateSpace = true" title="新建学习空间">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
               </button>
             </div>
@@ -100,14 +85,9 @@
             </div>
 
             <div class="nav-space-list" v-else>
-              <router-link
-                v-for="space in displayedSpaces"
-                :key="space.id"
-                :to="`/space/${space.id}`"
-                class="nav-space-card"
-                :class="[`health-${space.healthStatus}`, { active: isActiveSpace(space.id) }]"
-                :title="space.name"
-              >
+              <router-link v-for="space in displayedSpaces" :key="space.id" :to="`/space/${space.id}`"
+                class="nav-space-card" :class="[`health-${space.healthStatus}`, { active: isActiveSpace(space.id) }]"
+                :title="space.name">
                 <span class="space-row-dot" :style="{ background: space.color }"></span>
                 <span class="space-row-name">{{ space.name }}</span>
                 <span class="space-row-meta" :class="space.healthStatus">
@@ -117,31 +97,25 @@
             </div>
 
             <div class="space-workspace-footer">
-              <router-link
-                to="/spaces"
-                class="space-manage-link"
-              >
+              <router-link to="/spaces" class="space-manage-link">
                 <span>{{ hiddenSpaceCount > 0 ? `查看全部，还有 ${hiddenSpaceCount} 个` : '管理全部空间' }}</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="9,6 15,12 9,18"/>
+                  <polyline points="9,6 15,12 9,18" />
                 </svg>
               </router-link>
             </div>
           </div>
           <div class="nav-section-mini space-mini-rail" v-else>
-            <router-link
-              to="/spaces"
-              class="nav-item space-mini-home"
-              :class="{ active: isSpacesRoute }"
-              :title="`学习空间${spaceStore.spaceCount ? `（${spaceStore.spaceCount} 个进行中）` : ''}`"
-            >
+            <router-link to="/spaces" class="nav-item space-mini-home" :class="{ active: isSpacesRoute }"
+              :title="`学习空间${spaceStore.spaceCount ? `（${spaceStore.spaceCount} 个进行中）` : ''}`">
               <AnimatedIcon type="spaces" :isActive="isSpacesRoute" />
               <span v-if="spaceStore.spaceCount > 0" class="space-mini-count">{{ spaceStore.spaceCount }}</span>
             </router-link>
             <div class="nav-item space-mini-add" title="新建学习空间" @click="showCreateSpace = true">
               <span class="space-mini-plus">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
               </span>
             </div>
@@ -150,13 +124,8 @@
           <div class="nav-divider" v-if="!sidebarCollapsed"></div>
 
           <!-- 功能页面 -->
-          <router-link
-            v-for="item in bottomMenuItems"
-            :key="item.id"
-            :to="item.path"
-            class="nav-item"
-            :class="{ active: isActive(item.path) }"
-          >
+          <router-link v-for="item in bottomMenuItems" :key="item.id" :to="item.path" class="nav-item"
+            :class="{ active: isActive(item.path) }">
             <AnimatedIcon :type="item.type" :isActive="isActive(item.path)" />
             <span class="nav-label" v-if="!sidebarCollapsed">{{ item.label }}</span>
           </router-link>
@@ -165,35 +134,24 @@
         <div class="sidebar-footer">
           <!-- 用户区 -->
           <div class="sidebar-user" v-if="!sidebarCollapsed">
-            <div 
-              class="sidebar-user-info" 
-              tabindex="0"
-              role="button"
-              aria-haspopup="true"
-              :aria-expanded="showUserMenu"
-              @click="showUserMenu = !showUserMenu"
-              @keydown.enter.prevent="showUserMenu = !showUserMenu"
-              @keydown.space.prevent="showUserMenu = !showUserMenu"
-            >
+            <div class="sidebar-user-info" tabindex="0" role="button" aria-haspopup="true" :aria-expanded="showUserMenu"
+              @click="showUserMenu = !showUserMenu" @keydown.enter.prevent="showUserMenu = !showUserMenu"
+              @keydown.space.prevent="showUserMenu = !showUserMenu">
               <div class="sidebar-avatar-wrap">
-                <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="头像" class="sidebar-avatar" />
+                <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'"
+                  alt="头像" class="sidebar-avatar" />
                 <span v-if="!userStore.profileInitialized" class="profile-dot" title="画像未完善"></span>
               </div>
               <span class="sidebar-username">{{ userStore.userName || '用户' }}</span>
             </div>
           </div>
           <div class="sidebar-user-mini" v-else>
-            <div 
-              class="sidebar-avatar-wrap"
-              tabindex="0"
-              role="button"
-              aria-haspopup="true"
-              :aria-expanded="showUserMenu"
-              @click="showUserMenu = !showUserMenu"
+            <div class="sidebar-avatar-wrap" tabindex="0" role="button" aria-haspopup="true"
+              :aria-expanded="showUserMenu" @click="showUserMenu = !showUserMenu"
               @keydown.enter.prevent="showUserMenu = !showUserMenu"
-              @keydown.space.prevent="showUserMenu = !showUserMenu"
-            >
-              <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'" alt="头像" class="sidebar-avatar-mini" />
+              @keydown.space.prevent="showUserMenu = !showUserMenu">
+              <img :src="userStore.userInfo?.avatarUrl || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default'"
+                alt="头像" class="sidebar-avatar-mini" />
               <span v-if="!userStore.profileInitialized" class="profile-dot-mini" title="画像未完善"></span>
             </div>
           </div>
@@ -201,38 +159,41 @@
           <!-- 用户下拉菜单 -->
           <transition name="slide-up">
             <div class="sidebar-user-menu" v-if="showUserMenu" :class="{ 'is-collapsed': sidebarCollapsed }">
-              <button
-                v-if="!userStore.profileInitialized"
-                class="user-menu-item profile-init-item"
-                @click="goOnboarding"
-              >
+              <button v-if="!userStore.profileInitialized" class="user-menu-item profile-init-item"
+                @click="goOnboarding">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                  <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
                 </svg>
                 完善学习画像
               </button>
               <button class="user-menu-item" @click="goProfile">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
                 </svg>
                 个人中心
               </button>
               <button class="user-menu-item" @click="goSettings">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                  <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  <circle cx="12" cy="12" r="3" />
+                  <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
                 设置
               </button>
               <button class="user-menu-item" @click="goFeedback">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
                 问题反馈
               </button>
               <div class="user-menu-divider"></div>
               <button class="user-menu-item logout" @click="handleLogout">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16,17 21,12 16,7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
                 退出登录
               </button>
@@ -251,10 +212,11 @@
 
     <!-- 通知悬浮按钮 -->
     <div class="notif-fab" :class="{ 'has-unread': unreadCount > 0 }">
-      <button class="notif-fab-btn" @click="showNotifications = !showNotifications" :title="unreadCount > 0 ? `${unreadCount} 条未读通知` : '通知'">
+      <button class="notif-fab-btn" @click="showNotifications = !showNotifications"
+        :title="unreadCount > 0 ? `${unreadCount} 条未读通知` : '通知'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
         <span class="notif-fab-badge" v-if="unreadCount > 0">{{ unreadCount }}</span>
       </button>
@@ -364,7 +326,7 @@ const handleClickOutside = (e: MouseEvent) => {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   if (userStore.isLogin && !userStore.userInfo) {
-    userStore.fetchUserInfo().catch(() => {})
+    userStore.fetchUserInfo().catch(() => { })
   }
   spaceStore.fetchSpaces('active')
 })
@@ -431,7 +393,7 @@ const isActiveSpace = (spaceId: string) => {
 
 const goHome = () => {
   if (route.path !== '/ai-tutor') {
-    router.push('/ai-tutor').catch(() => {})
+    router.push('/ai-tutor').catch(() => { })
   }
 }
 const goOnboarding = () => {
@@ -486,8 +448,13 @@ const handleLogout = async () => {
 }
 
 @keyframes bg-shift {
-  0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(20deg); }
+  0% {
+    filter: hue-rotate(0deg);
+  }
+
+  100% {
+    filter: hue-rotate(20deg);
+  }
 }
 
 /* 布局容器 */
@@ -520,7 +487,7 @@ const handleLogout = async () => {
 .sidebar-logo-container {
   margin-bottom: var(--spacing-sm);
   border-bottom: 1px solid var(--border-soft);
-  height: 64px; 
+  height: 64px;
   display: flex;
   align-items: center;
   transition: all var(--transition-base);
@@ -528,7 +495,8 @@ const handleLogout = async () => {
 
 .sidebar-logo-container.is-collapsed {
   justify-content: center;
-  border-bottom: none; /* 折叠时去除底边框 */
+  border-bottom: none;
+  /* 折叠时去除底边框 */
   margin-bottom: 0;
   height: 64px;
 }
@@ -618,6 +586,7 @@ const handleLogout = async () => {
 .fade-icon-leave-active {
   transition: opacity 0.08s cubic-bezier(0.4, 0, 0.2, 1), transform 0.08s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
 .fade-icon-enter-from,
 .fade-icon-leave-to {
   opacity: 0;
@@ -744,6 +713,7 @@ const handleLogout = async () => {
 .nav-item.active :deep(.animated-icon.active) svg * {
   stroke: currentColor !important;
 }
+
 .nav-item.active :deep(.animated-icon.active) svg circle[fill="currentColor"] {
   fill: currentColor !important;
 }
@@ -763,12 +733,10 @@ const handleLogout = async () => {
 .nav-divider {
   position: relative;
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(139, 92, 246, 0.3) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(139, 92, 246, 0.3) 50%,
+      transparent 100%);
   margin: var(--spacing-md) 0;
 }
 
@@ -1102,8 +1070,15 @@ const handleLogout = async () => {
 }
 
 @keyframes blink-warn {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
+
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 .sidebar-footer {
@@ -1114,11 +1089,9 @@ const handleLogout = async () => {
   padding-top: var(--spacing-md);
   margin-top: var(--spacing-sm);
   border-top: 1px solid rgba(139, 92, 246, 0.15);
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(139, 92, 246, 0.03) 100%
-  );
+  background: linear-gradient(180deg,
+      transparent 0%,
+      rgba(139, 92, 246, 0.03) 100%);
 }
 
 .collapse-btn {
@@ -1324,10 +1297,23 @@ const handleLogout = async () => {
 }
 
 @keyframes bell-bounce {
-  0%, 100% { transform: rotate(0) scale(1); }
-  25% { transform: rotate(15deg) scale(1.1); }
-  50% { transform: rotate(-10deg) scale(1.05); }
-  75% { transform: rotate(5deg) scale(1.02); }
+
+  0%,
+  100% {
+    transform: rotate(0) scale(1);
+  }
+
+  25% {
+    transform: rotate(15deg) scale(1.1);
+  }
+
+  50% {
+    transform: rotate(-10deg) scale(1.05);
+  }
+
+  75% {
+    transform: rotate(5deg) scale(1.02);
+  }
 }
 
 .notif-fab-btn svg {
@@ -1346,11 +1332,14 @@ const handleLogout = async () => {
 }
 
 @keyframes notif-pulse-enhanced {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow:
       0 4px 20px rgba(139, 92, 246, 0.15),
       0 0 0 0 rgba(139, 92, 246, 0.4);
   }
+
   50% {
     box-shadow:
       0 4px 20px rgba(139, 92, 246, 0.15),

@@ -23,8 +23,8 @@ function createCompatibleMock(rawObj: any) {
 
 // 1.1 大盘 ECharts 数据统计
 const dashboardStats = {
-  userCount: 1248,
-  agentExecutionCount: 14205,
+  userCount: 64,
+  agentExecutionCount: 305,
   pendingRAGJobCount: 5,
   pendingFeedbackCount: 3
 };
@@ -327,43 +327,19 @@ let ragJobs = [
   }
 ];
 
-for (let i = 5; i <= 20; i++) {
-  const users = ["赵铁柱", "李美华", "王小明", "张三锋", "钱七七"];
-  const extensions = [".pdf", ".docx", ".md", ".txt"];
-  const ext = extensions[i % extensions.length];
-  const statuses = ["success", "success", "failed"];
-  const status = statuses[i % statuses.length];
-  
-  ragJobs.push({
-    id: (3000 + i).toString(),
-    fileName: `运营决策及点餐报表自动化归档文档_${i}${ext}`,
-    knowledgeBaseName: i % 2 === 0 ? "智能点餐研究库" : "技术架构知识库",
-    jobType: "VECTORIZE",
-    status: status,
-    progress: status === "success" ? 100 : 35,
-    currentStep: status === "success" ? "已完成" : "提取文本报错",
-    retryCount: status === "failed" ? 1 : 0,
-    userName: users[i % users.length],
-    createdAt: new Date(Date.now() - i * 6 * 3600 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - i * 6 * 3600 * 1000 + 300000).toISOString(),
-    fileId: `file-300-${i}`,
-    errorMessage: status === "failed" ? "IOException: Connection reset by peer during python service request." : ""
-  });
-}
-
 // 1.5 用户反馈列表 (15条)
 let feedbacks = [
   {
     id: "1",
     type: 3, // Bug反馈
-    content: "多人同时扫同一个桌码点餐时，购物车里的菜品数量偶尔会出现乱序和延迟同步，体验极差，希望尽快优化！",
-    imageUrls: ["https://smart-order.oss-cn-beijing.aliyuncs.com/feedback/demo-cart-error.png"],
+    content: "在多人协作学习空间中，多Agent协同规划的学习路径任务偶尔会出现乱序，且小组成员的执行状态有十几秒的延迟同步，体验极差，希望尽快优化！",
+    imageUrls: ["https://smart-order.oss-cn-beijing.aliyuncs.com/feedback/agent-path-error.png"],
     status: 1, // 待人工复核
     createTime: "2026-07-17T09:30:00.000Z",
     aiAnalysisResult: JSON.stringify({
       score: 92,
       isValid: true,
-      reason: "反馈描述了多人协同点餐这一具体场景下的并发同步Bug。提供了清晰的并发场景现象（菜品数量乱序、延迟同步），可信度极高。建议立即审核通过，安排测试复现。"
+      reason: "反馈描述了多人协同学习空间中，多Agent任务流在调度同步学习状态时的并发乱序缺陷。涉及高并发多线程下状态持久化的Bug，可信度极高。建议审核通过，加急安排研发排错。"
     }),
     reviewRemark: "",
     replyContent: "",
@@ -372,39 +348,39 @@ let feedbacks = [
   {
     id: "2",
     type: 2, // 功能建议
-    content: "希望前台扫码加点菜品时，能增加一个‘常用搭配推荐’的折叠区域，展示跟我目前购物车菜品绝配的饮料或者小吃，能刺激消费。",
+    content: "希望前台在展示‘知识库思维导图’时，能增加一个‘一键导出高清 PNG 图片’的折叠功能，目前只能在线浏览，不方便打印复习。",
     imageUrls: [],
     status: 5, // 已采纳
     createTime: "2026-07-16T14:20:00.000Z",
     aiAnalysisResult: JSON.stringify({
       score: 88,
       isValid: true,
-      reason: "该建议属于高价值的营销功能提案，旨在提高客单价。逻辑完整清晰，具有很高的实用价值和可落地性。建议采纳并在下个季度排入开发计划。"
+      reason: "该建议属于典型的高价值交互体验优化方案，旨在增强知识导出的便捷性。逻辑完整清晰，具有很高的实用价值和可落地性。建议采纳并在下个版本排期开发。"
     }),
-    reviewRemark: "高价值建议，已转交产品经理。感谢支持！",
-    replyContent: "十分感谢您的宝贵建议！我们认为‘常用搭配推荐’确实是能促进商家营收、方便用户下单的绝佳设计。我们已将该提案提交给产品团队，目前正安排在后续的迭代中进行排期。为表谢意，为您发放一张50元京东E卡！",
+    reviewRemark: "高价值建议，已转交前端产品经理。感谢支持！",
+    replyContent: "十分感谢您的宝贵建议！我们认为‘一键导出高清 PNG 图谱’确实是能够极大方便学员线下复习、笔记整理的优秀设计。我们已将该提案提交给前端交互团队，目前正安排在后续的迭代中进行排期。为表谢意，系统自动为您发放 5 元支付宝红包，祝您学习愉快！\n【系统发放奖品：支付宝 5元红包，兑换码：ALIPAY-5-XGZ9021A】",
     replyTime: "2026-07-17T09:05:00.000Z"
   },
   {
     id: "3",
     type: 1, // 体验评价
-    content: "垃圾软件，点个餐还要强制我关注公众号，而且弹窗关都关不掉，用户体验极其恶劣，再也不用这个点餐了！",
+    content: "这个个性化推荐算法有点激进啊，我刚在第一阶段测评中错了一道高阶题，系统就把第二阶段难度直接拉满了，根本不考虑基础薄弱者的认知负荷，希望能温和过渡。",
     imageUrls: [],
     status: 4, // 已驳回
     createTime: "2026-07-17T08:15:00.000Z",
     aiAnalysisResult: JSON.stringify({
-      score: 45,
-      isValid: false,
-      reason: "用户表达了对强制关注公众号这一普遍行业规范的不满，情绪化用词较多。虽指出了用户痛点，但内容没有实质性的建设性反馈，属于规则投诉。建议驳回并采用标准格式答复。"
+      score: 55,
+      isValid: true,
+      reason: "用户反馈个性化推荐算法在学习难度梯度调节上过于陡峭，给学习者带来了认知超载。这属于推荐系统在能力界定参数上的阈值策略优化，非故障故障Bug，建议反馈至算法调优组并做好兜底提示。"
     }),
-    reviewRemark: "违反审核标准，纯属发泄情绪且与实际功能故障无关。",
-    replyContent: "您好，非常抱歉给您带来了不佳的体验。强制关注公众号通常为商家的自主设置选项。我们后续将引导商家优化点餐流程，提供更便捷的游客模式。感谢您的反馈！",
+    reviewRemark: "属于算法策略调优建议，非核心功能故障，已移交算法专项小组进行参数平滑测试。",
+    replyContent: "您好，非常抱歉给您带来了高难度的学习压力。我们的个性化推荐算法默认是基于能力上限探索的。我们后续会考虑加入‘平滑度调节器’，让不同学习风格的学员能自主选择‘激进’或‘稳健’的推荐梯度。感谢您的反馈！",
     replyTime: "2026-07-17T10:12:00.000Z"
   },
   {
     id: "4",
     type: 2, // 功能建议
-    content: "呼叫服务员功能只能呼叫服务，希望能细化选项：如‘加水’、‘拿餐巾纸’、‘催菜’、‘结账’。这样服务员可以直接带着相应的东西过来，省得跑两趟。",
+    content: "点击‘一键生成 PPT 课件’后，后台生成任务偶尔会出现超时。希望能在界面进度条下方展示 Agent 正在执行哪一个子任务（例如：提炼大纲、设计模板、渲染结构等），防止我们以为卡死。",
     imageUrls: [],
     status: 0, // 待AI初审
     createTime: "2026-07-17T10:50:00.000Z",
@@ -412,51 +388,201 @@ let feedbacks = [
     reviewRemark: "",
     replyContent: "",
     replyTime: ""
+  },
+  {
+    id: "5",
+    type: 3, // Bug反馈
+    content: "在大模型AI对话助手界面，当连续发送包含 Markdown 表格的复杂提问时，界面在移动端（微信小程序）会出现排版错乱，导致单元格溢出屏幕且无法横向滚动，极度影响移动端答疑体验。",
+    imageUrls: [],
+    status: 5, // 已采纳
+    createTime: "2026-07-14T15:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 85,
+      isValid: true,
+      reason: "该问题反馈了移动端AI对话框中 Markdown 表格渲染的自适应排版 Bug。在移动设备上溢出且未提供滚动条，属于界面响应式设计的缺陷，对C端体验影响较大。建议前端优化 Markdown 表格组件，添加 overflow-x: auto。"
+    }),
+    reviewRemark: "已确认该移动端样式溢出缺陷，已安排前端研发小组修复。",
+    replyContent: "您好，非常感谢您对知序智学移动端体验的细心关注！我们已复现了在微信小程序下 Markdown 表格无法横向滚动的 Bug。目前前端团队已针对移动端表格组件进行了自适应优化并添加了滚动条支持，该优化将在下个微信小程序版本更新后正式生效。非常感谢您的热心反馈，特奖励 5 元支付宝红包，请在您的奖品中心查收！\n【系统发放奖品：支付宝 5元红包，兑换码：ALIPAY-5-MBX8812D】",
+    replyTime: "2026-07-15T01:30:00.000Z"
+  },
+  {
+    id: "6",
+    type: 1, // 体验评价
+    content: "体验了一下智能知识库解析功能，PDF 文档一键导入并转化为思维导图确实很震撼，不过解析超过 10MB 的英文教材时，反应有点慢（大概等了2分钟），建议在加载动画里加一些解析进度的百分比提示，而不是干等着，容易让人以为系统崩溃了。",
+    imageUrls: [],
+    status: 3, // 有效反馈
+    createTime: "2026-07-14T03:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 78,
+      isValid: true,
+      reason: "用户对智能解析大文件时的等待体验提出了合理优化诉求。并非系统缺陷，但缺乏加载进度提示会导致体验打折扣。建议在 RAG 解析流水线中引入分段解析进度反馈，并在前端展示百分比。"
+    }),
+    reviewRemark: "已移交产品部门，作为后续提升大文件上传及解析等待体验的交互优化参考。",
+    replyContent: "您好，非常高兴您能喜欢我们的 PDF 一键转思维导图功能！关于大文件解析时间较长且缺乏细分进度条的问题，我们非常认同您的看法。由于 PDF 文档（尤其是英文教材）的 OCR、分段切片及向量化需要消耗较多计算资源，确实容易产生长等待。我们已经把‘显示解析百分比进度’的优化案提交给交互设计团队，后续版本将逐步加入实时进度展示，避免用户产生焦虑。感谢您的反馈！",
+    replyTime: "2026-07-14T07:20:00.000Z"
+  },
+  {
+    id: "7",
+    type: 2, // 功能建议
+    content: "建议平台加入类似‘王者荣耀’排位赛的实时PK刷题模式，学生可以联机对战PK微积分或逻辑题，这样能大大增加趣味性，吸引更多人来玩。",
+    imageUrls: [],
+    status: 4, // 已驳回
+    createTime: "2026-07-13T15:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 45,
+      isValid: false,
+      reason: "该建议期望引入实时联机竞技刷题模式（游戏化PK）。虽然出发点是增加趣味性，但对于知序智学偏向严肃考研及专业课学习的定位不够匹配，且研发及运维联机服务器的成本过高，建议先以个人趣味挑战、积分排行榜形式兜底，暂不开放实时联机PK功能。"
+    }),
+    reviewRemark: "经评估，联机竞技刷题模式与本平台定位（严肃学术及专业备考）有偏差，且开发维护成本较高，暂不采纳。",
+    replyContent: "您好，感谢您别出心裁的有趣提议！我们也非常期望能在学习中引入更多激励机制。不过，知序智学目前定位是面向研究生备考、专业资质考试的深度学习平台，更注重沉浸式与个人化训练。若引入实时的玩家对战，可能容易引入过多娱乐性元素，干扰考生的复习状态。因此该方案我们暂不予采用。后续我们会设计更温和的‘每日个人挑战榜’等轻量化趣味组件，再次感谢您的建言！",
+    replyTime: "2026-07-14T02:10:00.000Z"
+  },
+  {
+    id: "8",
+    type: 3, // Bug反馈
+    content: "小程序端在网络不稳定（比如地铁上）的时候，提交每日测评，有时候会弹出‘提交失败’，但是重新连上网后发现系统竟然扣除了我 5 个积分（正常提交也扣积分），而且还没有本次的测评记录。白白扣了积分还找不到考试结果，希望能退回积分并修复这个防重提交机制。",
+    imageUrls: [],
+    status: 5, // 已采纳
+    createTime: "2026-07-13T03:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 90,
+      isValid: true,
+      reason: "涉及积分结算的幂等性与分布式事务回退 Bug。小程序端在弱网或网络瞬断时，网络请求虽返回超时，但后端可能已经执行了扣分操作，且由于客户端报错未成功建立测评历史记录。此问题直接影响用户资产与核心流程，属于高危漏洞，建议立即审核通过，安排后端排查接口防重及幂等逻辑。"
+    }),
+    reviewRemark: "高危积分结算漏洞，已紧急提交后端团队修复防重与扣分事务。已为该用户手工补偿 10 倍积分。",
+    replyContent: "您好，非常抱歉在地铁等弱网环境下给您带来了极差的测评体验！经研发团队排查，确实存在客户端因网络延时报错、而后端已经扣减积分且数据库事务未回滚的一致性缺陷。我们已在最新的后端更新中上线了幂等性验证和重试回滚机制，完美解决了防重提交问题。同时，我们已将扣除 the 5 积分以及额外赠送的 50 积分手工补发到您的账户中。非常感谢您的纠错反馈，已为您发放 5 元支付宝红包，祝您备考顺利！\n【系统发放奖品：支付宝 5元红包，兑换码：ALIPAY-5-PQA9012N】",
+    replyTime: "2026-07-13T06:45:00.000Z"
+  },
+  {
+    id: "9",
+    type: 1, // 体验评价
+    content: "智能导师角色‘小知’的性格设定非常暖心，每次回答不仅提供专业的解题思路，还会适度鼓励我。但是，回答的字数有时过长（一页密密麻麻全是字），能不能增加一个‘精简模式/大纲模式’，让我们可以一键切换看精简版结论？",
+    imageUrls: [],
+    status: 3, // 有效反馈
+    createTime: "2026-07-12T15:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 76,
+      isValid: true,
+      reason: "用户对AI导师回复文字量过大存在阅读疲劳。该体验反馈非常合理，代表了一类期望快速获取核心考点的用户需求。建议在AI对话气泡下方增加‘缩写/大纲化’或者‘一键精简’的功能按钮，利用大模型进行二次精简输出。"
+    }),
+    reviewRemark: "已移交AI应用开发组，计划在‘小知’对话界面上新增‘字数控制（详细/精简）’的动态切换选项。",
+    replyContent: "您好，听到您喜欢我们AI导师‘小知’的鼓励，我们感到十分欣慰！对于‘文字过多、阅读疲劳’的问题，我们也非常赞同。不同场景下用户的阅读节奏不同，有时确实只需看三言两语的干货。我们正着手在对话面板的常用工具中加入‘一键缩写’或切换‘极简模式’的功能。再次感谢您陪伴知序智学成长，祝您学习愉快！",
+    replyTime: "2026-07-13T01:15:00.000Z"
+  },
+  {
+    id: "10",
+    type: 2, // 功能建议
+    content: "能否在平台里直接接入各大主流网盘（比如百度网盘、阿里云盘等）的一键登录下载？因为我的很多学习资料都在网盘里，每次都要先下载到本地再上传到知序智能知识库，非常繁琐。",
+    imageUrls: [],
+    status: 4, // 已驳回
+    createTime: "2026-07-12T03:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 50,
+      isValid: false,
+      reason: "建议接入第三方主流网盘 direct download 授权。虽然这能简化用户上传路径，但接入多个网盘的 OAuth 授权、大文件直连中转对于服务安全、带宽流量以及版权合规等方面有极高风险。目前更建议推广现有的本地拖拽上传和浏览器插件抓取功能，网盘对接计划暂缓。"
+    }),
+    reviewRemark: "对接主流网盘涉及第三方平台授权限制、流量带宽以及版权合规性风险，短期内暂不具备可行性，做驳回处理。",
+    replyContent: "您好，非常理解您期望一键同步网盘资料的迫切需求。然而，直接对接百度网盘或阿里云盘的 API 接口，不仅需要处理极其严格的第三方授权凭证，更涉及版权合规、敏感内容审核以及大流量带宽下载的运维压力。从平台安全和合规角度出发，我们短期内无法直接打通网盘。建议您使用我们新上线的‘浏览器插件’，它能帮您快速同步网页端公开的学术文档。感谢您的理解与建言！",
+    replyTime: "2026-07-12T08:30:00.000Z"
+  },
+  {
+    id: "11",
+    type: 3, // Bug反馈
+    content: "在‘错题集’界面，如果我把错题加入了‘已掌握’列表，刷新页面后它们居然又重新出现在了错题集里。也就是说‘掌握’状态根本没有写入数据库，太浪费复习时间了，请求排查！",
+    imageUrls: [],
+    status: 3, // 有效反馈
+    createTime: "2026-07-11T15:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 82,
+      isValid: true,
+      reason: "错题集状态更新未持久化。可能是前端在操作‘已掌握’时，仅在内存中改变了状态，或调用的 API 接口发生异常被拦截，导致数据没有真正写入 DB。需要核对错题状态更新的接口调用和持久化机制。"
+    }),
+    reviewRemark: "已定位到错题集持久化更新的控制器（Controller）存在事务未提交的缺陷，已修复。",
+    replyContent: "您好，非常抱歉给您的复习带来了不便！技术团队已定位到此问题：在错题分类操作时，由于后端事务注解 @Transactional 在特定异常下回滚导致写入数据库失败，但前端没有显示报错。我们已经完成了修复并发布上线，现在‘已掌握’状态会永久保存了。感谢您的及时反馈，您的监督让知序智学更加完善！",
+    replyTime: "2026-07-12T02:20:00.000Z"
+  },
+  {
+    id: "12",
+    type: 2, // 功能建议
+    content: "建议在‘生成课件’导出的 PPT 模版中，增加一些支持深色模式的现代科技风格。目前系统自带的模版基本都是白底浅色系的，在暗光教室里播放投影时非常刺眼，而且科技感不够强。",
+    imageUrls: [],
+    status: 5, // 已采纳
+    createTime: "2026-07-11T03:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 84,
+      isValid: true,
+      reason: "关于增加深色模式/极客科技风课件模版的建议，具有很高实用性。在很多讲座和汇报场景中，黑底或深蓝底的 PPT 更具现代感且护眼。开发成本适中（属于模板库扩展）。"
+    }),
+    reviewRemark: "已转交设计与课件模板组，将在下个季度的模板库更新中加入‘极客深蓝’和‘赛博朋克’两款深色PPT模板。",
+    replyContent: "您好，非常棒的建议！PPT 模版的视觉格调直接影响着最终的展示效果，深色模式模板确实是目前很多理工科和科技项目汇报的刚需。设计团队已将‘极客科技深蓝版’和‘护眼暗黑版’的设计稿提上日程，预计在 8 月初更新进系统课件库。非常感谢您的宝贵建议！已发放 5 元支付宝红包，祝您使用愉快！\n【系统发放奖品：支付宝 5元红包，兑换码：ALIPAY-5-KLS2918Z】",
+    replyTime: "2026-07-11T07:05:00.000Z"
+  },
+  {
+    id: "13",
+    type: 1, // 体验评价
+    content: "智能课件生成的排版逻辑很不错，大纲提炼也很精准。但是在生成逻辑图和关系网时，文字稍微多一点，各种方框和箭头就会叠在一起，甚至连线还会交叉，看起来像蜘蛛网，体验不够完美，能否优化拓扑图的力导向布局算法？",
+    imageUrls: [],
+    status: 3, // 有效反馈
+    createTime: "2026-07-10T15:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 79,
+      isValid: true,
+      reason: "用户指出关系网拓扑图节点重叠与文本重合缺陷。属于典型的图可视化布局算力参数调整问题。建议调整组件排斥力，加入文字字数截断与自适应排版控制。"
+    }),
+    reviewRemark: "属于图可视化性能和布局问题，已转交给前端团队，将对关系网组件进行节点防重叠和字符截断优化。",
+    replyContent: "您好，感谢您对我们图谱生成功能的深入体验！图谱节点重叠、连线交叉确实是一个较为复杂的计算几何问题。我们的前端团队已经针对该拓扑图组件（基于 G6 库）的力导向（Force Layout）参数进行了重构，调大了节点间的排斥力，并加入了自动折行和文字溢出省略。目前已在开发环境测试完毕，下周就会上线。感谢您的反馈！",
+    replyTime: "2026-07-11T01:40:00.000Z"
+  },
+  {
+    id: "14",
+    type: 3, // Bug反馈
+    content: "我昨天充值购买系统专业版会员，支付成功了，但是会员期限还是显示的普通版。我想退款或者立即给我开通！",
+    imageUrls: [],
+    status: 2, // 已被AI拦截
+    createTime: "2026-07-10T03:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 30,
+      isValid: false,
+      reason: "系统检测到该内容包含充值、退款及个人资金敏感词。根据初审规则，判定为财务账务类紧急工单，非日常功能性或Bug反馈。系统已自动拦截本记录并同步派发加急财务工单，不进入常规审核流。"
+    }),
+    reviewRemark: "属于充值不到账的账务类加急问题，已为用户转接人工财务通道并于10分钟内成功开通。已从常规反馈中拦截/关闭。",
+    replyContent: "您好，给您带来不便了！由于此反馈包含充值与账务退款等紧急敏感业务，根据系统规范，本常规审核通道已予以拦截，并已将您的诉求一键流转给专门的‘财务工单通道’。经财务核实，微信支付回调有几分钟的网络拥堵，我们已在昨日下午为您手工补发并多赠送了 7 天会员。祝您使用愉快，如有疑问可拨打客服电话！",
+    replyTime: "2026-07-10T04:05:00.000Z"
+  },
+  {
+    id: "15",
+    type: 2, // 功能建议
+    content: "目前‘思维导图’的编辑是全鼠标操作，能不能引入类似 XMind 的键盘快捷键？比如按 Tab 新建子节点，按 Enter 新建兄弟节点，按 Delete 删除。对于做笔记的人来说，双手不离键盘效率真的会高很多。",
+    imageUrls: [],
+    status: 5, // 已采纳
+    createTime: "2026-07-09T15:51:00.000Z",
+    aiAnalysisResult: JSON.stringify({
+      score: 87,
+      isValid: true,
+      reason: "高价值交互建议。对效率工具而言，键盘快捷键是实现流畅输入的关键。实现此建议能够极大提升深度复习和笔记用户的留存度，属于低成本高回报的功能，极力推荐采纳。"
+    }),
+    reviewRemark: "非常赞的快捷键体验优化，已安排前端团队排期开发，将于近期版本支持 Tab/Enter 等基础导图快捷操作。",
+    replyContent: "您好，非常感谢您对思维导图交互细节的精彩建议！我们深深地感到：做笔记、整理知识时的流畅感对大家至关重要，键盘快捷键（Tab/Enter/Del）的缺失确实降低了编辑效率。产品经理在收到您的反馈后，已立即召集开发团队进行了快捷键功能评估，并将该功能列为最高优先级的交互体验改进。我们已于本周完成了该特性的部署，您现在就可以在思维导图中使用这些快捷键了！特为您送上 5 元支付宝红包作为感谢，祝您学业有成！\n【系统发放奖品：支付宝 5元红包，兑换码：ALIPAY-5-XWY0982E】",
+    replyTime: "2026-07-10T01:30:00.000Z"
   }
 ];
 
-// 补齐反馈列表
-for (let i = 5; i <= 15; i++) {
-  const types = [1, 2, 3];
-  const statuses = [3, 4, 5];
-  const type = types[i % types.length];
-  const status = statuses[i % statuses.length];
-  
-  feedbacks.push({
-    id: i.toString(),
-    type: type,
-    content: `这是用户提交的自动生成模拟反馈内容_${i}。内容描述了关于点餐界面排版、或者是支付流程、退单流程的局部建议，以保持开发环境的数据丰满性。`,
-    imageUrls: [],
-    status: status,
-    createTime: new Date(Date.now() - i * 12 * 3600 * 1000).toISOString(),
-    aiAnalysisResult: JSON.stringify({
-      score: 70 + (i % 30),
-      isValid: true,
-      reason: `这是关于反馈_${i}的AI分析日志报告。模型认定此反馈具有中等合规性与参考价值。`
-    }),
-    reviewRemark: status === 5 ? "同意采纳，已发放小额奖励积分。" : "归档保存。",
-    replyContent: status === 5 ? "感谢您的精彩建议，您的回馈是我们前进的动力！" : "感谢您的建议，我们将持续关注相关性能并适度调优。",
-    replyTime: new Date(Date.now() - i * 12 * 3600 * 1000 + 3600000).toISOString()
-  });
-}
-
-// 1.6 奖品卡密总账 (30条)
 let prizes = [
   {
     id: "1",
-    name: "京东卡 50 元",
-    prizeCode: "JD-E-50-XGZ9021A",
+    name: "支付宝 5元红包",
+    prizeCode: "ALIPAY-5-XGZ9021A",
     status: 1, // 已发放
     userId: "1001",
     feedbackId: "2",
-    feedbackTitle: "希望前台扫码加点菜品时能增加推荐搭配...",
+    feedbackTitle: "希望前台在展示‘知识库思维导图’时能增加一键导出...",
     allocateTime: "2026-07-17T09:05:00.000Z",
     createTime: "2026-07-15T08:00:00.000Z"
   },
   {
     id: "2",
-    name: "京东卡 10 元",
-    prizeCode: "JD-E-10-HUA9820C",
+    name: "支付宝 1元红包",
+    prizeCode: "ALIPAY-1-HUA9820C",
     status: 0, // 可用
     userId: "",
     feedbackId: "",
@@ -466,8 +592,8 @@ let prizes = [
   },
   {
     id: "3",
-    name: "美团外卖 20 元优惠券",
-    prizeCode: "MT-WM20-CNY7739X",
+    name: "创意金属书签",
+    prizeCode: "ITEM-BOOKMARK-CNY7739X",
     status: 2, // 已作废
     userId: "",
     feedbackId: "",
@@ -477,8 +603,8 @@ let prizes = [
   },
   {
     id: "4",
-    name: "系统会员 30 天激活码",
-    prizeCode: "SYS-VIP30-8849-2019",
+    name: "简约皮质本子",
+    prizeCode: "ITEM-NOTEBOOK-8849-2019",
     status: 0, // 可用
     userId: "",
     feedbackId: "",
@@ -489,15 +615,30 @@ let prizes = [
 ];
 
 for (let i = 5; i <= 30; i++) {
-  const prizeNames = ["京东卡 10 元", "系统积分 100 额度", "精美保温杯兑换卡", "系统 VIP 7天体验卡"];
+  const prizeNames = [
+    "支付宝 1元红包", 
+    "支付宝 2元红包", 
+    "支付宝 5元红包", 
+    "精美中性笔", 
+    "简约皮质本子", 
+    "创意金属书签"
+  ];
   const statuses = [0, 0, 1]; // 可用概率更高
   const name = prizeNames[i % prizeNames.length];
   const status = statuses[i % statuses.length];
   
+  let prefix = "ITEM";
+  if (name.includes("1元")) prefix = "ALIPAY-1";
+  else if (name.includes("2元")) prefix = "ALIPAY-2";
+  else if (name.includes("5元")) prefix = "ALIPAY-5";
+  else if (name.includes("笔")) prefix = "ITEM-PEN";
+  else if (name.includes("本子")) prefix = "ITEM-NOTEBOOK";
+  else if (name.includes("书签")) prefix = "ITEM-BOOKMARK";
+
   prizes.push({
     id: i.toString(),
     name: name,
-    prizeCode: `${name.startsWith("京东") ? "JD" : "SYS"}-CODE-${100000 + i}-${Date.now().toString().slice(-4)}`,
+    prizeCode: `${prefix}-CODE-${100000 + i}-${Date.now().toString().slice(-4)}`,
     status: status,
     userId: status === 1 ? (2000 + i).toString() : "",
     feedbackId: status === 1 ? (10 + i).toString() : "",
@@ -654,7 +795,23 @@ export async function handleAdminMock(config: any): Promise<any> {
       feedback.replyContent = data.replyContent || '';
       feedback.replyTime = new Date().toISOString();
       
-      // 如果采纳为优质建议，自动增加发放卡密的可用库存计数
+      // 如果采纳为优质建议，自动从未发放的奖品库中分发一个卡密
+      if (Number(data.status) === 5) {
+        const availablePrize = prizes.find(p => p.status === 0);
+        if (availablePrize) {
+          availablePrize.status = 1; // 已发放
+          availablePrize.userId = "1001"; // 模拟分配给当前用户
+          availablePrize.feedbackId = feedback.id;
+          availablePrize.feedbackTitle = feedback.content.length > 22 ? feedback.content.slice(0, 22) + '...' : feedback.content;
+          availablePrize.allocateTime = new Date().toISOString();
+          
+          // 联动追加到回复内容中，供前端直观展示
+          feedback.replyContent = (data.replyContent || '') + `\n【系统发放奖品：${availablePrize.name}，兑换码：${availablePrize.prizeCode}】`;
+        } else {
+          feedback.replyContent = (data.replyContent || '') + `\n【系统提醒：当前可用奖品库存不足，未能自动发放奖品，请尽快录入卡密】`;
+        }
+      }
+      
       return createCompatibleMock(feedback);
     }
     return { code: 500, message: "未找到该反馈记录" };
