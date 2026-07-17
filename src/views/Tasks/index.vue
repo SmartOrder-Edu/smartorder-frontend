@@ -1,234 +1,276 @@
 <template>
   <AppLayout>
     <div class="tasks-page">
-      <!-- 页面标题 -->
-      <div class="page-header">
-        <div class="header-left">
-          <h1 class="page-title">任务日程</h1>
-          <p class="page-desc">管理今日计划、本周安排和所有学习任务，按学习空间和路径节点推进</p>
-        </div>
-        <div class="header-right">
-          <el-button-group>
-            <el-button :type="activeTab === 'today' ? 'primary' : ''" @click="activeTab = 'today'">
-              今日任务
-            </el-button>
-            <el-button :type="activeTab === 'week' ? 'primary' : ''" @click="activeTab = 'week'">
-              本周任务
-            </el-button>
-            <el-button :type="activeTab === 'all' ? 'primary' : ''" @click="activeTab = 'all'">
-              全部任务
-            </el-button>
-          </el-button-group>
-          <el-button type="primary" @click="showGenerateDialog = true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M12 2a10 10 0 1 0 10 10H12V2z"/>
-              <path d="M12 2a10 10 0 0 1 10 10"/>
-            </svg>
-            生成今日任务
-          </el-button>
-        </div>
-      </div>
-
-      <section class="weekly-report-card">
-        <div class="report-card-main">
-          <div class="report-card-icon">
+      <header class="task-hero">
+        <div class="hero-copy">
+          <h1>任务日程</h1>
+          <p>管理今日计划、本周安排和所有学习任务，按学习空间和路径节点推进</p>
+          <div class="date-card" aria-label="今日日期与学习提示">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 3v18h18" />
-              <path d="m7 14 4-4 3 3 5-7" />
-              <circle cx="7" cy="14" r="1" />
-              <circle cx="11" cy="10" r="1" />
-              <circle cx="14" cy="13" r="1" />
-              <circle cx="19" cy="6" r="1" />
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <path d="M16 2v4M8 2v4M3 10h18" />
             </svg>
-          </div>
-          <div class="report-card-copy">
-            <div class="report-card-title-row">
-              <span class="report-card-label">AI 学习周报已生成</span>
-              <span class="report-card-range">07/10 - 07/16</span>
+            <div>
+              <strong>{{ todayHeader }}</strong>
+              <span>{{ greetingText }}</span>
             </div>
-            <h2>最近 7 天你完成 18 个任务，链表基础掌握明显提升</h2>
-            <p>递归调用栈仍存在步骤缺失问题，系统已为下周前两天安排补弱与验证练习。</p>
           </div>
         </div>
-        <div class="report-card-actions">
-          <button class="report-primary-btn" @click="openWeeklyReport">
-            查看学习周报
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="9,18 15,12 9,6" />
+
+        <div class="hero-actions">
+          <div class="segment-control" role="tablist" aria-label="任务范围">
+            <button
+              v-for="tab in tabs"
+              :key="tab.value"
+              type="button"
+              :class="{ active: activeTab === tab.value }"
+              @click="activeTab = tab.value"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+          <button class="primary-action" type="button" :disabled="generating" @click="showGenerateDialog = true">
+            <svg v-if="!generating" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 3l1.7 4.4L18 9l-4.3 1.6L12 15l-1.7-4.4L6 9l4.3-1.6L12 3z" />
+              <path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z" />
             </svg>
+            <span v-else class="loading-dot"></span>
+            {{ generating ? '生成中' : '生成今日任务' }}
           </button>
-          <button class="report-secondary-btn" @click="activeTab = 'week'">查看本周任务</button>
         </div>
+      </header>
+
+      <section class="stats-grid" aria-label="任务数据概览">
+        <article v-for="item in statCards" :key="item.key" class="stat-card" :class="item.key">
+          <div class="stat-icon" v-html="item.icon"></div>
+          <div class="stat-copy">
+            <strong>{{ item.value }}</strong>
+            <span>{{ item.label }}</span>
+            <small>{{ item.hint }}</small>
+          </div>
+          <svg class="trend-line" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+            <path :d="item.trend" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </article>
+
+        <article class="stat-card focus-card">
+          <div class="focus-ring" :style="{ '--progress': `${focusProgress}%` }">
+            <span>{{ focusProgress }}</span>
+            <small>%</small>
+          </div>
+          <div class="stat-copy">
+            <strong>今日专注进度</strong>
+            <span>目标 {{ completedTodayCount }}/{{ visibleTodayCount }} 任务</span>
+            <small>{{ totalPlannedMinutes }} 分钟计划学习</small>
+          </div>
+        </article>
       </section>
 
-      <!-- 任务统计 -->
-      <section class="section stats-row">
-        <div class="stat-card">
-          <div class="stat-icon review-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ taskStats.review }}</span>
-            <span class="stat-label">复习任务</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon practice-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 11l3 3L22 4"/>
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ taskStats.practice }}</span>
-            <span class="stat-label">练习任务</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon resource-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14,2 14,8 20,8"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ taskStats.resource }}</span>
-            <span class="stat-label">资源任务</span>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon done-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-              <polyline points="22,4 12,14.01 9,11.01"/>
-            </svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">{{ taskStats.completed }}</span>
-            <span class="stat-label">已完成</span>
-          </div>
-        </div>
-      </section>
+      <div class="content-grid">
+        <main class="task-main">
+          <section class="task-toolbar" aria-label="任务搜索与筛选">
+            <label class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
+              </svg>
+              <input v-model="searchKeyword" type="search" placeholder="搜索任务、学习空间或说明..." />
+              <button v-if="searchKeyword" type="button" aria-label="清空搜索" @click="searchKeyword = ''">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </label>
 
-      <!-- 任务筛选 -->
-      <div class="filter-bar">
-        <el-input v-model="searchKeyword" placeholder="搜索任务..." prefix-icon="Search" clearable style="max-width: 300px;" />
-        <div class="filter-tags">
-          <span
-            v-for="filter in filters"
-            :key="filter.value"
-            class="filter-chip"
-            :class="{ active: activeFilter === filter.value }"
-            @click="activeFilter = filter.value"
-          >
-            {{ filter.label }}
-          </span>
-        </div>
+            <div class="filter-group" aria-label="任务状态筛选">
+              <button
+                v-for="filter in filters"
+                :key="filter.value"
+                type="button"
+                class="filter-chip"
+                :class="{ active: activeFilter === filter.value }"
+                @click="activeFilter = filter.value"
+              >
+                {{ filter.label }}
+              </button>
+            </div>
+
+            <div class="toolbar-tail">
+              <button class="sort-button" type="button" @click="toggleSort">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 4v16" />
+                </svg>
+                {{ sortMode === 'time_asc' ? '按时间排序' : '按优先级排序' }}
+              </button>
+              <div class="view-switch" aria-label="视图切换">
+                <button type="button" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'" aria-label="列表视图">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+                  </svg>
+                </button>
+                <button type="button" :class="{ active: viewMode === 'card' }" @click="viewMode = 'card'" aria-label="卡片视图">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section class="tasks-panel" v-loading="loading">
+            <div v-if="loadError" class="state-box error-state">
+              <strong>任务加载失败</strong>
+              <p>{{ loadError }}</p>
+              <button type="button" @click="loadTasks">重新加载</button>
+            </div>
+
+            <div v-else-if="!loading && filteredTasks.length === 0" class="state-box empty-state">
+              <div class="empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                  <rect x="8" y="2" width="8" height="4" rx="1" />
+                  <path d="m9 14 2 2 4-5" />
+                </svg>
+              </div>
+              <strong>{{ searchKeyword ? '没有匹配的任务' : '暂无任务' }}</strong>
+              <p>{{ searchKeyword ? '换个关键词或清空筛选后再试。' : '点击生成今日任务，系统会从活跃学习空间中安排下一步。' }}</p>
+              <button type="button" @click="showGenerateDialog = true">生成任务</button>
+            </div>
+
+            <div v-else class="task-list" :class="{ 'card-view': viewMode === 'card' }">
+              <article
+                v-for="task in filteredTasks"
+                :key="task.id"
+                class="learning-task-card"
+                :class="[`type-${actionClass(task)}`, { completed: task.status === 'completed' }]"
+              >
+                <div class="task-time-axis">
+                  <span class="axis-dot" :class="taskStatusClass(task)"></span>
+                  <strong>{{ deadlineLabel(task) }}</strong>
+                  <span>{{ formatTaskTime(task) }}</span>
+                </div>
+
+                <button
+                  class="task-check"
+                  type="button"
+                  :class="taskStatusClass(task)"
+                  :disabled="isTaskBusy(task.id) || task.status === 'completed' || task.status === 'cancelled'"
+                  aria-label="完成任务"
+                  @click="toggleTask(task)"
+                >
+                  <svg v-if="task.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <path d="m20 6-11 11-5-5" />
+                  </svg>
+                </button>
+
+                <div class="task-type-icon" v-html="typeIcon(task)"></div>
+
+                <div class="task-body">
+                  <div class="task-meta">
+                    <span class="type-badge" :class="actionClass(task)">{{ actionTypeLabel(task) }}</span>
+                    <span class="meta-item">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 6v6l4 2" />
+                      </svg>
+                      {{ deadlineLabel(task) }} · {{ task.estimatedDurationMinutes || 25 }}分钟
+                    </span>
+                  </div>
+
+                  <h2>{{ task.title || '未命名学习任务' }}</h2>
+                  <p>{{ taskReason(task) }}</p>
+
+                  <div class="task-bottom">
+                    <span class="space-pill">{{ spaceLabel(task) }}</span>
+                    <div class="task-progress">
+                      <span class="progress-track"><i :style="{ width: `${taskProgress(task)}%` }"></i></span>
+                      <strong>{{ taskProgress(task) }}%</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="task-side">
+                  <span class="status-pill" :class="taskStatusClass(task)">{{ statusLabel(task.status) }}</span>
+                  <button
+                    v-if="task.status !== 'completed' && task.status !== 'cancelled'"
+                    class="start-button"
+                    type="button"
+                    :disabled="isTaskBusy(task.id)"
+                    @click="startTask(task)"
+                  >
+                    {{ isTaskBusy(task.id) ? '处理中' : startButtonLabel(task) }}
+                  </button>
+                  <button v-else-if="task.status === 'completed'" class="ghost-button" type="button" @click="startTask(task)">
+                    回顾
+                  </button>
+                  <el-dropdown trigger="click">
+                    <button class="more-button" type="button" aria-label="更多操作">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1" />
+                        <circle cx="12" cy="5" r="1" />
+                        <circle cx="12" cy="19" r="1" />
+                      </svg>
+                    </button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item v-if="task.status !== 'completed'" @click="completeTask(task)">标记完成</el-dropdown-item>
+                        <el-dropdown-item @click="startTask(task)">进入学习</el-dropdown-item>
+                        <el-dropdown-item
+                          v-if="task.status !== 'completed' && task.status !== 'cancelled'"
+                          divided
+                          @click="cancelTask(task)"
+                        >
+                          删除任务
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
+              </article>
+            </div>
+          </section>
+        </main>
+
+        <aside class="assist-rail">
+          <section class="rail-card rhythm-card">
+            <div class="rail-header">
+              <strong>今日学习节奏</strong>
+              <button type="button" @click="activeTab = 'today'">查看完整日程</button>
+            </div>
+            <div class="rhythm-list">
+              <div v-for="item in todayRhythm" :key="item.id" class="rhythm-item" :class="item.status">
+                <span class="rhythm-time">{{ item.time }}</span>
+                <span class="rhythm-dot"></span>
+                <span class="rhythm-title">{{ item.title }}</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="rail-card streak-card">
+            <div>
+              <strong>学习连续打卡</strong>
+              <p><span>{{ streakDays }}</span> 天</p>
+              <small>{{ streakMessage }}</small>
+            </div>
+            <div class="medal" aria-hidden="true">
+              <svg viewBox="0 0 80 80" fill="none">
+                <circle cx="40" cy="40" r="24" fill="url(#medalGradient)" />
+                <path d="M40 24l5 10 11 1.6-8 7.8 1.9 11-9.9-5.2-9.9 5.2 1.9-11-8-7.8L35 34l5-10z" fill="#fff" />
+                <defs>
+                  <linearGradient id="medalGradient" x1="16" y1="16" x2="64" y2="64">
+                    <stop stop-color="#f59e0b" />
+                    <stop offset="1" stop-color="#7c3aed" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+          </section>
+        </aside>
       </div>
 
-      <!-- 任务列表 -->
-      <section class="section tasks-list-section" v-loading="loading">
-        <div class="tasks-list">
-          <div
-            v-for="task in filteredTasks"
-            :key="task.id"
-            class="task-item"
-            :class="[`type-${actionClass(task)}`, { completed: task.status === 'completed' }]"
-          >
-            <div class="task-check" @click="toggleTask(task)">
-              <div class="check-circle" :class="taskStatusClass(task)">
-                <svg v-if="task.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <polyline points="20,6 9,17 4,12"/>
-                </svg>
-              </div>
-            </div>
-
-            <div class="task-body">
-              <div class="task-meta">
-                <span class="type-badge" :class="actionClass(task)">{{ actionTypeLabel(task) }}</span>
-                <span class="task-date">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <polyline points="12,6 12,12 16,14"/>
-                  </svg>
-                  {{ deadlineLabel(task) }}
-                </span>
-                <span class="task-duration">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  </svg>
-                  {{ task.estimatedDurationMinutes || '-' }}分钟
-                </span>
-              </div>
-
-              <h3 class="task-title">{{ task.title }}</h3>
-              <p class="task-reason">{{ taskReason(task) }}</p>
-
-              <div class="task-footer">
-                <div class="task-progress">
-                  <div class="progress-bar">
-                    <div class="progress-fill" :style="{ width: taskProgress(task) + '%' }"></div>
-                  </div>
-                  <span class="progress-text">{{ taskProgress(task) }}%</span>
-                </div>
-                <div class="task-tags">
-                  <span v-for="tag in taskTags(task)" :key="tag" class="task-tag">{{ tag }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="task-actions">
-              <el-button
-                v-if="task.status !== 'completed' && task.status !== 'cancelled'"
-                type="primary"
-                size="small"
-                @click="startTask(task)"
-              >
-                {{ startButtonLabel(task) }}
-              </el-button>
-              <el-button
-                v-if="task.status === 'in_progress' || task.status === 'doing'"
-                size="small"
-                @click="completeTask(task)"
-              >
-                完成
-              </el-button>
-              <el-button v-else-if="task.status === 'completed'" size="small" @click="startTask(task)">
-                回顾
-              </el-button>
-              <el-button
-                v-if="task.status !== 'completed' && task.status !== 'cancelled'"
-                size="small"
-                text
-                @click="cancelTask(task)"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                  <polyline points="3,6 5,6 21,6"/>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
-              </el-button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 空状态 -->
-        <div class="empty-state" v-if="filteredTasks.length === 0">
-          <div class="empty-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-            </svg>
-          </div>
-          <h3>暂无任务</h3>
-          <p>点击"生成今日任务"，系统会从活跃学习空间中安排下一步</p>
-          <el-button type="primary" @click="showGenerateDialog = true">生成任务</el-button>
-        </div>
-      </section>
-
-      <!-- Agent 生成任务对话框 -->
       <el-dialog
         v-model="showGenerateDialog"
         title="Agent 生成今日任务"
@@ -319,12 +361,7 @@
 
             <div class="process-divider"></div>
 
-            <div
-              v-for="step in generationSteps"
-              :key="step.key"
-              class="process-step"
-              :class="step.status"
-            >
+            <div v-for="step in generationSteps" :key="step.key" class="process-step" :class="step.status">
               <span class="process-dot"></span>
               <div class="process-copy">
                 <span class="process-label">{{ step.label }}</span>
@@ -335,7 +372,7 @@
 
           <section v-if="scheduleResult" class="agent-schedule-result">
             <div class="result-header">
-              <span class="result-label">Agent 编排说明</span>
+              <span>Agent 编排说明</span>
               <strong>{{ scheduleResult.summary }}</strong>
             </div>
 
@@ -364,28 +401,9 @@
                 <li v-for="item in scheduleResult.evidence.decisionBasis" :key="item">{{ item }}</li>
               </ul>
             </div>
-
-            <div class="result-block" v-if="scheduleResult.evidence.weakSignals?.length">
-              <h4>最近学习信号</h4>
-              <div class="weak-signal-list">
-                <span v-for="signal in scheduleResult.evidence.weakSignals" :key="signal">{{ signal }}</span>
-              </div>
-            </div>
-
-            <div class="result-block" v-if="scheduleResult.taskReasons?.length">
-              <h4>任务安排理由</h4>
-              <div class="task-reason-list">
-                <div v-for="item in scheduleResult.taskReasons" :key="item.taskId" class="task-reason-card">
-                  <strong>{{ item.title }}</strong>
-                  <p>{{ item.reason }}</p>
-                  <div class="reason-tags">
-                    <span v-for="tag in item.evidenceTags" :key="tag">{{ tag }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </section>
         </el-form>
+
         <template #footer>
           <el-button :disabled="generating" @click="closeGenerateDialog">
             {{ scheduleResult ? '完成' : '取消' }}
@@ -400,9 +418,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { computed, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import {
   agentScheduleApi,
@@ -414,12 +431,25 @@ import {
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import type { TaskActionType, TaskStatus, TaskVO } from '@/types/learningSpace'
 
-const activeTab = ref('today')
-const activeFilter = ref('all')
+type TabValue = 'today' | 'week' | 'all'
+type FilterValue = 'all' | 'in_progress' | 'pending' | 'completed'
+type SortMode = 'time_asc' | 'priority_desc'
+
+interface AgentAnalysisCard {
+  label: string
+  value: string
+  detail: string
+}
+
+const activeTab = ref<TabValue>('today')
+const activeFilter = ref<FilterValue>('all')
 const searchKeyword = ref('')
+const sortMode = ref<SortMode>('time_asc')
+const viewMode = ref<'list' | 'card'>('list')
 const showGenerateDialog = ref(false)
 const generating = ref(false)
 const loading = ref(false)
+const loadError = ref('')
 const generateCount = ref(3)
 const generateMinutes = ref(90)
 const generateStrategy = ref<'deadline_first' | 'weakness_first' | 'balanced'>('deadline_first')
@@ -432,16 +462,22 @@ const scheduleResult = ref<PlanTodayScheduleResult | null>(null)
 const todayTasks = ref<TaskVO[]>([])
 const pendingTasks = ref<TaskVO[]>([])
 const overdueTasks = ref<TaskVO[]>([])
+const busyTaskIds = ref<Set<string>>(new Set())
 let generationStepTimers: number[] = []
 
 const { enterTask } = useStudyEntry()
-const router = useRouter()
 
-const filters = [
+const tabs: Array<{ label: string; value: TabValue }> = [
+  { label: '今日任务', value: 'today' },
+  { label: '本周任务', value: 'week' },
+  { label: '全部任务', value: 'all' },
+]
+
+const filters: Array<{ label: string; value: FilterValue }> = [
   { label: '全部', value: 'all' },
   { label: '进行中', value: 'in_progress' },
   { label: '待开始', value: 'pending' },
-  { label: '已完成', value: 'completed' }
+  { label: '已完成', value: 'completed' },
 ]
 
 const allTasks = computed<TaskVO[]>(() => {
@@ -452,6 +488,13 @@ const allTasks = computed<TaskVO[]>(() => {
   return Array.from(taskMap.values())
 })
 
+const visibleTodayCount = computed(() => todayTasks.value.filter(task => task.status !== 'cancelled').length)
+const completedTodayCount = computed(() => todayTasks.value.filter(task => task.status === 'completed').length)
+const focusProgress = computed(() => {
+  if (!visibleTodayCount.value) return 0
+  return Math.round((completedTodayCount.value / visibleTodayCount.value) * 100)
+})
+
 const taskStats = computed(() => ({
   review: allTasks.value.filter(task => task.taskType === 'review' || task.actionType === 'mistake_review').length,
   practice: allTasks.value.filter(task => task.actionType === 'practice_set' || task.actionType === 'assessment').length,
@@ -459,11 +502,44 @@ const taskStats = computed(() => ({
   completed: allTasks.value.filter(task => task.status === 'completed').length,
 }))
 
-interface AgentAnalysisCard {
-  label: string
-  value: string
-  detail: string
-}
+const totalPlannedMinutes = computed(() =>
+  todayTasks.value.reduce((sum, task) => sum + Number(task.estimatedDurationMinutes || 0), 0)
+)
+
+const statCards = computed(() => [
+  {
+    key: 'review',
+    value: taskStats.value.review,
+    label: '复习任务',
+    hint: taskStats.value.review ? '巩固薄弱节点' : '今日暂无复习',
+    trend: 'M4 22 C20 12 30 20 42 14 S64 8 78 13 98 6 116 10',
+    icon: bookIcon,
+  },
+  {
+    key: 'practice',
+    value: taskStats.value.practice,
+    label: '练习任务',
+    hint: taskStats.value.practice ? '用测评校准掌握度' : '等待生成练习',
+    trend: 'M4 24 C18 18 26 21 38 12 S62 17 72 9 94 15 116 7',
+    icon: checkIcon,
+  },
+  {
+    key: 'resource',
+    value: taskStats.value.resource,
+    label: '资源任务',
+    hint: taskStats.value.resource ? '补齐学习材料' : '资源队列为空',
+    trend: 'M4 22 C18 18 28 23 38 16 S60 10 72 17 88 5 116 12',
+    icon: folderIcon,
+  },
+  {
+    key: 'completed',
+    value: taskStats.value.completed,
+    label: '已完成',
+    hint: `完成率 ${localRecentCompletionRate.value}%`,
+    trend: 'M4 24 C20 24 26 18 40 18 S62 12 76 10 92 14 116 8',
+    icon: doneIcon,
+  },
+])
 
 const localUnfinishedCount = computed(() =>
   allTasks.value.filter(task => task.status !== 'completed' && task.status !== 'cancelled').length
@@ -480,6 +556,35 @@ const localTodayExistingCount = computed(() =>
 const localRecentCompletionRate = computed(() => {
   if (!allTasks.value.length) return 0
   return Math.round((taskStats.value.completed / allTasks.value.length) * 100)
+})
+
+const todayHeader = computed(() => {
+  const formatter = new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  })
+  return formatter.format(new Date())
+})
+
+const greetingText = computed(() => {
+  const hour = new Date().getHours()
+  if (hour < 12) return '上午好，先完成最小的一步'
+  if (hour < 18) return '下午好，继续保持专注'
+  return '晚上好，收个漂亮的尾'
+})
+
+const streakDays = computed(() => Math.max(1, Math.min(7 + taskStats.value.completed, 30)))
+const streakMessage = computed(() => (focusProgress.value >= 60 ? '节奏很好，继续推进。' : '再完成一项，今日进度会更稳。'))
+
+const todayRhythm = computed(() => {
+  const source = todayTasks.value.length ? todayTasks.value : filteredTasks.value
+  return source.slice(0, 5).map((task, index) => ({
+    id: String(task.id),
+    time: task.dueTime || defaultRhythmTimes[index] || '--:--',
+    title: task.status === 'completed' ? `完成：${task.title}` : task.title,
+    status: task.status === 'completed' ? 'completed' : task.status === 'in_progress' || task.status === 'doing' ? 'current' : 'pending',
+  }))
 })
 
 const scheduleCompositionText = computed(() => {
@@ -548,12 +653,12 @@ const agentWeaknessItems = computed(() => {
   if (localUnfinishedCount.value > localTodayExistingCount.value) {
     signals.push(`任务消化不足：仍有 ${localUnfinishedCount.value} 个未完成任务`)
   }
-  const reviewTasks = allTasks.value
+  allTasks.value
     .filter(task => task.actionType === 'mistake_review' || task.taskType === 'review')
     .slice(0, 2)
-  reviewTasks.forEach(task => signals.push(`待复习巩固：${task.title}`))
+    .forEach(task => signals.push(`待复习巩固：${task.title}`))
   if (createPracticeTasks.value) {
-    signals.push(`需要验证掌握：将通过${evaluationTaskType.value === 'assessment' ? '阶段测评' : '即时练习'}检查学习效果`)
+    signals.push(`需要验证掌握：将通过${evaluationTaskTypeLabel(evaluationTaskType.value)}检查学习效果`)
   }
   if (!signals.length) {
     signals.push('暂无明确薄弱信号，Agent 会优先依据学习路径下一节点推进')
@@ -604,28 +709,27 @@ const agentDecisionBasis = computed(() => {
 })
 
 const filteredTasks = computed(() => {
-  let result = activeTab.value === 'today'
-    ? todayTasks.value
-    : allTasks.value
+  let result = activeTab.value === 'today' ? [...todayTasks.value] : [...allTasks.value]
 
   if (activeTab.value === 'week') {
     result = result.filter(task => task.isToday || isWithinWeek(task.dueDate) || task.isOverdue)
   }
 
   if (activeFilter.value !== 'all') {
-    result = result.filter(task => task.status === activeFilter.value)
+    result = result.filter(task => normalizeStatus(task.status) === activeFilter.value)
   }
 
-  if (searchKeyword.value) {
-    const keyword = searchKeyword.value.trim().toLowerCase()
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  if (keyword) {
     result = result.filter(task =>
-      task.title.toLowerCase().includes(keyword) ||
-      task.description?.toLowerCase().includes(keyword) ||
+      String(task.title || '').toLowerCase().includes(keyword) ||
+      String(task.description || '').toLowerCase().includes(keyword) ||
+      String(task.agentReason || '').toLowerCase().includes(keyword) ||
       taskTags(task).some(tag => tag.toLowerCase().includes(keyword))
     )
   }
 
-  return result
+  return sortTasks(result)
 })
 
 onMounted(() => {
@@ -634,6 +738,7 @@ onMounted(() => {
 
 async function loadTasks() {
   loading.value = true
+  loadError.value = ''
   try {
     const [today, pending, overdue] = await Promise.all([
       taskApi.listToday(),
@@ -643,6 +748,9 @@ async function loadTasks() {
     todayTasks.value = today
     pendingTasks.value = pending
     overdueTasks.value = overdue
+  } catch (error) {
+    loadError.value = error instanceof Error ? error.message : '请稍后重试'
+    ElMessage.error('任务加载失败')
   } finally {
     loading.value = false
   }
@@ -672,8 +780,9 @@ async function generateTasks() {
     } else {
       ElMessage.success(`Agent 已生成 ${result.createdTaskCount} 个今日任务`)
     }
-  } catch (error) {
+  } catch {
     markCurrentGenerationStepFailed()
+    ElMessage.error('生成任务失败，请稍后重试')
   } finally {
     clearGenerationTimers()
     generating.value = false
@@ -691,6 +800,84 @@ function resetGenerateDialog() {
   clearGenerationTimers()
 }
 
+async function startTask(task: TaskVO) {
+  await withTaskBusy(task.id, async () => {
+    const current = task.status === 'pending'
+      ? await taskApi.updateStatus(String(task.id), 'in_progress')
+      : task
+    if (task.status === 'pending') {
+      await loadTasks()
+    }
+    enterTask(current, {
+      spaceId: current.spaceId,
+      source: 'task_card',
+    })
+  })
+}
+
+async function completeTask(task: TaskVO) {
+  if (task.status === 'completed' || task.status === 'cancelled') return
+  await withTaskBusy(task.id, async () => {
+    await taskApi.complete(String(task.id), {
+      actualDurationMinutes: task.estimatedDurationMinutes || 0,
+    })
+    ElMessage.success('任务已完成')
+    await loadTasks()
+  })
+}
+
+async function cancelTask(task: TaskVO) {
+  await ElMessageBox.confirm(`确认删除「${task.title || '该任务'}」吗？删除后任务会从当前列表移除。`, '删除任务', {
+    confirmButtonText: '删除',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+  await withTaskBusy(task.id, async () => {
+    await taskApi.updateStatus(String(task.id), 'cancelled')
+    ElMessage.success('任务已删除')
+    await loadTasks()
+  })
+}
+
+function toggleTask(task: TaskVO) {
+  completeTask(task)
+}
+
+function toggleSort() {
+  sortMode.value = sortMode.value === 'time_asc' ? 'priority_desc' : 'time_asc'
+}
+
+function sortTasks(items: TaskVO[]) {
+  const sorted = [...items]
+  if (sortMode.value === 'priority_desc') {
+    return sorted.sort((a, b) => Number(a.priority || 0) - Number(b.priority || 0))
+  }
+  return sorted.sort((a, b) => taskTimeValue(a) - taskTimeValue(b))
+}
+
+function taskTimeValue(task: TaskVO) {
+  const datePart = task.dueDate || new Date().toISOString().slice(0, 10)
+  const timePart = task.dueTime || '23:59:59'
+  return new Date(`${datePart}T${timePart}`).getTime() || Number.MAX_SAFE_INTEGER
+}
+
+function isTaskBusy(taskId: string) {
+  return busyTaskIds.value.has(String(taskId))
+}
+
+async function withTaskBusy(taskId: string, runner: () => Promise<void>) {
+  const next = new Set(busyTaskIds.value)
+  next.add(String(taskId))
+  busyTaskIds.value = next
+  try {
+    await runner()
+  } finally {
+    const done = new Set(busyTaskIds.value)
+    done.delete(String(taskId))
+    busyTaskIds.value = done
+  }
+}
+
 function buildEvidenceAnalysisCards(evidence: AgentScheduleEvidence): AgentAnalysisCard[] {
   const plannedTotal = evidence.recentPlannedTasks || 0
   const completedDetail = plannedTotal > 0
@@ -699,12 +886,12 @@ function buildEvidenceAnalysisCards(evidence: AgentScheduleEvidence): AgentAnaly
 
   return [
     {
-      label: '可用时间',
-      value: `${evidence.availableMinutes || generateMinutes.value} 分钟`,
-      detail: `目标生成 ${generateCount.value} 个任务`,
+      label: '最近学习',
+      value: `${evidence.recentStudyMinutes} 分钟`,
+      detail: `覆盖最近 ${evidence.recentDays} 天`,
     },
     {
-      label: '近期完成率',
+      label: '完成率',
       value: `${evidence.recentCompletionRate}%`,
       detail: completedDetail,
     },
@@ -714,134 +901,56 @@ function buildEvidenceAnalysisCards(evidence: AgentScheduleEvidence): AgentAnaly
       detail: `未完成 ${evidence.unfinishedTaskCount} 个，逾期 ${evidence.overdueTaskCount} 个`,
     },
     {
-      label: '编排倾向',
-      value: strategyLabel(evidence.strategy),
-      detail: scheduleCompositionText.value,
+      label: '可用时间',
+      value: `${evidence.availableMinutes} 分钟`,
+      detail: `策略：${strategyLabel(evidence.strategy)}`,
     },
-  ]
-}
-
-function strategyLabel(strategy?: string) {
-  const labels: Record<string, string> = {
-    deadline_first: '截止时间优先',
-    weakness_first: '薄弱点优先',
-    balanced: '均衡分配',
-  }
-  return labels[strategy || ''] || '智能均衡'
-}
-
-function normalizeInsightList(items: Array<string | null | undefined>, fallback: string) {
-  const normalized = items
-    .map(item => item?.trim())
-    .filter((item): item is string => !!item)
-  return normalized.length ? normalized.slice(0, 5) : [fallback]
-}
-
-function resourceTypeLabels(types: string[]) {
-  const labels: Record<string, string> = {
-    doc: '文档',
-    mind_map: '思维导图',
-    bilibili_video: 'B站视频入口',
-  }
-  const result = types.map(type => labels[type] || type).filter(Boolean)
-  return result.length ? result : ['默认资料']
-}
-
-function evaluationTaskTypeLabel(type: 'practice_set' | 'assessment') {
-  return type === 'assessment' ? '阶段测评' : '即时练习'
-}
-
-function defaultGenerationSteps(): AgentScheduleProcessStep[] {
-  return [
-    { key: 'analyze_recent_learning', label: '分析最近学习记录', status: 'running', detail: '正在读取最近学习记录和今日已有任务' },
-    { key: 'identify_focus', label: '识别编排重点', status: 'pending', detail: '等待分析风险信号和薄弱项' },
-    { key: 'match_learning_path', label: '匹配学习路径', status: 'pending', detail: '等待选择学习空间和路径节点' },
-    { key: 'create_tasks', label: '创建学习任务', status: 'pending', detail: '等待写入今日任务' },
-    { key: 'finalize_schedule', label: '整理今日任务说明', status: 'pending', detail: '等待生成编排依据和任务理由' },
   ]
 }
 
 function beginLocalGenerationSteps() {
   clearGenerationTimers()
-  generationSteps.value = defaultGenerationSteps()
-  generationStepTimers = [
-    window.setTimeout(() => advanceGenerationStep(0, 1), 500),
-    window.setTimeout(() => advanceGenerationStep(1, 2), 1100),
-    window.setTimeout(() => advanceGenerationStep(2, 3), 1700),
-    window.setTimeout(() => advanceGenerationStep(3, 4), 2300),
+  generationSteps.value = [
+    { key: 'collect', label: '读取学习记录', status: 'running', detail: '汇总近期学习时长、完成率和任务状态' },
+    { key: 'diagnose', label: '识别薄弱点', status: 'pending', detail: '分析逾期、复习和测评相关信号' },
+    { key: 'compose', label: '编排任务组合', status: 'pending', detail: '平衡学习、资源和练习任务' },
+    { key: 'create', label: '写入今日计划', status: 'pending', detail: '生成可执行任务并刷新列表' },
   ]
+
+  generationSteps.value.forEach((_, index) => {
+    if (index === 0) return
+    const timer = window.setTimeout(() => {
+      generationSteps.value = generationSteps.value.map((step, stepIndex) => {
+        if (stepIndex < index) return { ...step, status: 'completed' }
+        if (stepIndex === index) return { ...step, status: 'running' }
+        return step
+      })
+    }, index * 450)
+    generationStepTimers.push(timer)
+  })
 }
 
-function advanceGenerationStep(doneIndex: number, runningIndex: number) {
-  if (!generating.value || !generationSteps.value[doneIndex]) return
-  generationSteps.value[doneIndex] = {
-    ...generationSteps.value[doneIndex],
-    status: 'completed',
+function applyServerProcessSteps(steps?: AgentScheduleProcessStep[]) {
+  if (steps?.length) {
+    generationSteps.value = steps
+    return
   }
-  if (generationSteps.value[runningIndex]) {
-    generationSteps.value[runningIndex] = {
-      ...generationSteps.value[runningIndex],
-      status: 'running',
-    }
-  }
-}
-
-function applyServerProcessSteps(steps: AgentScheduleProcessStep[] = []) {
-  clearGenerationTimers()
-  generationSteps.value = steps.length
-    ? steps.map(step => ({ ...step, status: step.status || 'completed' }))
-    : generationSteps.value.map(step => ({ ...step, status: 'completed' }))
+  generationSteps.value = generationSteps.value.map(step => ({ ...step, status: 'completed' }))
 }
 
 function markCurrentGenerationStepFailed() {
   const runningIndex = generationSteps.value.findIndex(step => step.status === 'running')
-  const targetIndex = runningIndex >= 0 ? runningIndex : generationSteps.value.length - 1
-  if (targetIndex >= 0) {
-    generationSteps.value[targetIndex] = {
-      ...generationSteps.value[targetIndex],
-      status: 'failed',
-      detail: 'Agent 编排失败，请稍后重试或检查学习空间配置',
+  generationSteps.value = generationSteps.value.map((step, index) => {
+    if (index === runningIndex || (runningIndex < 0 && index === generationSteps.value.length - 1)) {
+      return { ...step, status: 'failed', detail: '生成失败，请检查网络或稍后重试' }
     }
-  }
+    return step
+  })
 }
 
 function clearGenerationTimers() {
   generationStepTimers.forEach(timer => window.clearTimeout(timer))
   generationStepTimers = []
-}
-
-async function startTask(task: TaskVO) {
-  const current = task.status === 'pending'
-    ? await taskApi.updateStatus(String(task.id), 'in_progress')
-    : task
-  if (task.status === 'pending') {
-    await loadTasks()
-  }
-  enterTask(current, {
-    spaceId: current.spaceId,
-    source: 'task_card',
-  })
-}
-
-async function completeTask(task: TaskVO) {
-  await taskApi.complete(String(task.id), {
-    actualDurationMinutes: task.estimatedDurationMinutes || 0,
-  })
-  ElMessage.success('任务已完成')
-  await loadTasks()
-}
-
-async function cancelTask(task: TaskVO) {
-  await taskApi.updateStatus(String(task.id), 'cancelled')
-  ElMessage.success('任务已取消')
-  await loadTasks()
-}
-
-function toggleTask(task: TaskVO) {
-  if (task.status === 'completed' || task.status === 'cancelled') {
-    return
-  }
-  completeTask(task)
 }
 
 function actionClass(task: TaskVO) {
@@ -852,10 +961,23 @@ function actionClass(task: TaskVO) {
   return 'review'
 }
 
+function typeIcon(task: TaskVO) {
+  const type = actionClass(task)
+  if (type === 'practice') return checkIcon
+  if (type === 'resource') return folderIcon
+  if (type === 'project') return projectIcon
+  return codeIcon
+}
+
 function taskStatusClass(task: TaskVO) {
   if (task.status === 'completed') return 'done'
   if (task.status === 'in_progress' || task.status === 'doing') return 'doing'
   return 'todo'
+}
+
+function normalizeStatus(status: TaskStatus): FilterValue | 'cancelled' | 'overdue' {
+  if (status === 'doing') return 'in_progress'
+  return status
 }
 
 function actionTypeLabel(task: TaskVO) {
@@ -873,15 +995,22 @@ function actionTypeLabel(task: TaskVO) {
 }
 
 function deadlineLabel(task: TaskVO) {
-  if (task.isOverdue) return '已逾期'
+  if (task.isOverdue || task.status === 'overdue') return '已逾期'
   if (task.isToday) return '今天'
   if (!task.dueDate) return '未排期'
   const dueDate = new Date(`${task.dueDate}T00:00:00`)
   const today = startOfToday()
   const diff = Math.round((dueDate.getTime() - today.getTime()) / 86400000)
+  if (diff === 0) return '今天'
   if (diff === 1) return '明天'
   if (diff > 1 && diff <= 7) return '本周'
   return task.dueDate
+}
+
+function formatTaskTime(task: TaskVO) {
+  if (task.dueTime) return task.dueTime.slice(0, 5)
+  if (task.status === 'completed') return '已完成'
+  return '待安排'
 }
 
 function taskReason(task: TaskVO) {
@@ -890,22 +1019,27 @@ function taskReason(task: TaskVO) {
 
 function taskProgress(task: TaskVO) {
   if (task.status === 'completed') return 100
-  if (task.status === 'in_progress' || task.status === 'doing') return 50
+  if (task.status === 'in_progress' || task.status === 'doing') return 55
   return 0
 }
 
 function taskTags(task: TaskVO) {
-  const tags = [actionTypeLabel(task), statusLabel(task.status)]
+  const tags = [actionTypeLabel(task), statusLabel(task.status), spaceLabel(task)]
   if (task.isOverdue) tags.push('逾期')
   if (task.priority <= 2) tags.push('高优先级')
-  return tags
+  return tags.filter(Boolean)
+}
+
+function spaceLabel(task: TaskVO) {
+  const metadata = readMetadata(task)
+  return String(metadata.spaceName || metadata.learningSpaceName || metadata.subjectName || `学习空间 ${task.spaceId || '-'}`)
 }
 
 function startButtonLabel(task: TaskVO) {
-  if (task.status === 'in_progress' || task.status === 'doing') return '继续'
-  if (task.actionType === 'practice_set') return '做题'
-  if (task.actionType === 'assessment') return '测评'
-  return '开始'
+  if (task.status === 'in_progress' || task.status === 'doing') return '继续学习'
+  if (task.actionType === 'practice_set') return '开始练习'
+  if (task.actionType === 'assessment') return '开始测评'
+  return '开始学习'
 }
 
 function statusLabel(status: TaskStatus) {
@@ -915,7 +1049,7 @@ function statusLabel(status: TaskStatus) {
     doing: '进行中',
     completed: '已完成',
     overdue: '已逾期',
-    cancelled: '已取消',
+    cancelled: '已删除',
   }
   return labels[status]
 }
@@ -934,825 +1068,1317 @@ function startOfToday() {
   return today
 }
 
-function openWeeklyReport() {
-  router.push('/learning-report/weekly')
+function strategyLabel(strategy: string) {
+  const labels: Record<string, string> = {
+    deadline_first: '截止时间优先',
+    weakness_first: '薄弱点优先',
+    balanced: '均衡分配',
+  }
+  return labels[strategy] || strategy
 }
+
+function evaluationTaskTypeLabel(type: string) {
+  return type === 'assessment' ? '阶段测评' : '即时练习'
+}
+
+function resourceTypeLabels(types: string[]) {
+  const labels: Record<string, string> = {
+    doc: '文档',
+    mind_map: '思维导图',
+    bilibili_video: 'B站视频',
+  }
+  return (types.length ? types : ['doc']).map(type => labels[type] || type)
+}
+
+function normalizeInsightList(items: Array<string | null | undefined>, fallback: string) {
+  const normalized = items.map(item => String(item || '').trim()).filter(Boolean)
+  return normalized.length ? normalized.slice(0, 4) : [fallback]
+}
+
+function readMetadata(task: TaskVO) {
+  if (!task.metadata) return {} as Record<string, unknown>
+  if (typeof task.metadata === 'string') {
+    try {
+      return JSON.parse(task.metadata) as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  }
+  return task.metadata as Record<string, unknown>
+}
+
+const defaultRhythmTimes = ['09:00', '10:30', '13:30', '15:00', '17:00']
+
+const bookIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'
+const checkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>'
+const folderIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h5"/></svg>'
+const doneIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m22 4-10 10.01-3-3"/></svg>'
+const codeIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/></svg>'
+const projectIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8h8M8 12h5M8 16h7"/></svg>'
+</script>
+
+<script lang="ts">
+export default { name: 'TasksPage' }
 </script>
 
 <style scoped>
 .tasks-page {
+  /* 复用全局薄荷主题，避免任务页覆盖产品主色。 */
+  --primary: var(--primary-color);
+  --primary-violet: var(--primary-hover);
+  --success: #14b8a6;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --page-bg: #f6f8fc;
+  --card-bg: var(--panel-bg, #ffffff);
+  --text-primary-local: var(--text-dark, #17233d);
+  --text-secondary-local: var(--text-secondary, #667085);
+  --border-color-local: var(--border-color, #e6eaf2);
+  --card-radius: 16px;
+  --control-radius: 10px;
   width: 100%;
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
+  color: var(--text-primary-local);
 }
 
-.page-header {
+.task-hero {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: var(--spacing-xl);
-  gap: var(--spacing-lg);
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.hero-copy h1 {
+  margin: 0 0 8px;
+  color: var(--text-primary-local);
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.hero-copy p {
+  margin: 0 0 16px;
+  color: var(--text-secondary-local);
+  font-size: 0.92rem;
+}
+
+.date-card {
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color-local);
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+}
+
+.date-card svg {
+  width: 20px;
+  height: 20px;
+  color: var(--primary);
+}
+
+.date-card div {
+  display: grid;
+  gap: 2px;
+}
+
+.date-card strong {
+  font-size: 0.86rem;
+}
+
+.date-card span {
+  color: var(--text-secondary-local);
+  font-size: 0.82rem;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.page-title {
-  font-size: 1.5rem;
+.segment-control,
+.view-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border: 1px solid var(--border-color-local);
+  border-radius: 14px;
+  background: var(--card-bg);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+
+.segment-control button,
+.filter-chip,
+.sort-button,
+.view-switch button,
+.primary-action,
+.start-button,
+.ghost-button,
+.more-button,
+.state-box button,
+.rail-header button {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.segment-control button {
+  min-width: 94px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 10px;
+  color: var(--text-secondary-local);
+  background: transparent;
+  font-size: 0.86rem;
   font-weight: 700;
-  color: var(--text-dark);
-  margin: 0 0 var(--spacing-xs);
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
-.page-desc {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0;
+.segment-control button.active,
+.filter-chip.active,
+.view-switch button.active {
+  color: #ffffff;
+  background: var(--primary);
+  box-shadow: 0 10px 18px rgba(11, 183, 170, 0.2);
 }
 
-.header-right {
-  display: flex;
-  gap: var(--spacing-md);
+.primary-action {
+  height: 44px;
+  display: inline-flex;
   align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  border-radius: 12px;
+  color: #ffffff;
+  background: var(--gradient-primary);
+  font-size: 0.9rem;
+  font-weight: 800;
+  box-shadow: 0 14px 26px rgba(11, 183, 170, 0.24);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
 }
 
-.header-right .el-button {
+.primary-action:hover,
+.start-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 30px rgba(11, 183, 170, 0.28);
+}
+
+.primary-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.primary-action svg {
+  width: 18px;
+  height: 18px;
+}
+
+.loading-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #ffffff;
+  animation: spin 0.8s linear infinite;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.stat-card,
+.rail-card,
+.tasks-panel,
+.task-toolbar {
+  border: 1px solid var(--border-color-local);
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.045);
+}
+
+.stat-card {
+  position: relative;
+  min-height: 128px;
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: 14px;
+  padding: 20px;
+  overflow: hidden;
 }
 
-.weekly-report-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-xl);
-  padding: var(--spacing-xl);
-  margin-bottom: var(--spacing-xl);
-  border: 1px solid rgba(11, 183, 170, 0.14);
-  border-radius: var(--radius-xl);
-  background:
-    linear-gradient(135deg, rgba(11, 183, 170, 0.1), rgba(59, 130, 246, 0.06)),
-    var(--panel-bg);
-  box-shadow: var(--shadow-sm);
-}
-
-.report-card-main {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-lg);
-  min-width: 0;
-}
-
-.report-card-icon {
-  width: 54px;
-  height: 54px;
-  display: flex;
+.stat-icon,
+.task-type-icon {
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  border-radius: 16px;
   flex-shrink: 0;
-  border-radius: var(--radius-lg);
-  background: #0bb7aa;
-  color: #ffffff;
-  box-shadow: 0 12px 26px rgba(11, 183, 170, 0.24);
 }
 
-.report-card-icon svg {
+.stat-icon svg,
+.task-type-icon svg {
   width: 26px;
   height: 26px;
 }
 
-.report-card-copy {
+.stat-card.review { color: var(--primary); }
+.stat-card.practice { color: var(--success); }
+.stat-card.resource { color: var(--warning); }
+.stat-card.completed { color: var(--primary-violet); }
+
+.stat-card.review .stat-icon,
+.task-type-icon {
+  background: rgba(11, 183, 170, 0.11);
+}
+
+.stat-card.practice .stat-icon {
+  background: rgba(20, 184, 166, 0.12);
+}
+
+.stat-card.resource .stat-icon {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.stat-card.completed .stat-icon {
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.stat-copy {
   min-width: 0;
-}
-
-.report-card-title-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  flex-wrap: wrap;
-  margin-bottom: var(--spacing-xs);
-}
-
-.report-card-label {
-  color: var(--primary-color);
-  font-size: 0.8125rem;
-  font-weight: 700;
-}
-
-.report-card-range {
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
-  font-size: 0.6875rem;
-  font-weight: 700;
-}
-
-.report-card-copy h2 {
-  margin: 0 0 var(--spacing-xs);
-  color: var(--text-dark);
-  font-size: 1.125rem;
-  line-height: 1.4;
-}
-
-.report-card-copy p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.8125rem;
-  line-height: 1.7;
-}
-
-.report-card-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  flex-shrink: 0;
-}
-
-.report-primary-btn,
-.report-secondary-btn {
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: var(--radius-full);
-  padding: 0 16px;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.report-primary-btn {
-  border: 0;
-  background: var(--primary-color);
-  color: #ffffff;
-  box-shadow: 0 10px 20px rgba(11, 183, 170, 0.2);
-}
-
-.report-primary-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 24px rgba(11, 183, 170, 0.24);
-}
-
-.report-primary-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.report-secondary-btn {
-  border: 1px solid var(--border-color);
-  background: var(--button-bg);
-  color: var(--text-secondary);
-}
-
-.report-secondary-btn:hover {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-  background: var(--button-hover-bg);
-}
-
-/* 统计行 */
-.stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
+  gap: 4px;
 }
 
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--background-color-base);
-  border-radius: var(--radius-lg);
-}
-
-.stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.stat-icon svg {
-  width: 22px;
-  height: 22px;
-}
-
-.review-icon { background: rgba(11, 183, 170, 0.1); color: var(--primary-color); }
-.practice-icon { background: rgba(18, 184, 134, 0.1); color: var(--accent-color); }
-.resource-icon { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); }
-.done-icon { background: rgba(11, 183, 170, 0.06); color: var(--text-secondary); }
-
-.stat-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-dark);
+.stat-copy strong {
+  color: var(--text-primary-local);
+  font-size: 1.65rem;
   line-height: 1;
 }
 
-.stat-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin-top: 4px;
+.focus-card .stat-copy strong {
+  font-size: 0.95rem;
 }
 
-/* 筛选栏 */
-.filter-bar {
+.stat-copy span {
+  color: var(--text-primary-local);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.stat-copy small {
+  color: var(--text-secondary-local);
+  font-size: 0.76rem;
+}
+
+.trend-line {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: 76px;
+  height: 24px;
+  opacity: 0.55;
+}
+
+.focus-card {
+  justify-content: space-between;
+  color: var(--success);
+}
+
+.focus-ring {
+  --progress: 0%;
+  width: 82px;
+  height: 82px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at center, var(--card-bg) 0 55%, transparent 56%),
+    conic-gradient(var(--success) var(--progress), rgba(20, 184, 166, 0.14) 0);
+}
+
+.focus-ring span {
+  color: var(--text-primary-local);
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.focus-ring small {
+  color: var(--text-secondary-local);
+  font-size: 0.72rem;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+}
+
+.task-main {
+  min-width: 0;
+}
+
+.task-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
+  gap: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.search-box {
+  flex: 1 1 260px;
+  min-width: 220px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid var(--border-color-local);
+  border-radius: 12px;
+  background: var(--bg-card, #ffffff);
+  color: var(--text-secondary-local);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.search-box:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+}
+
+.search-box svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.search-box input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-primary-local);
+  font: inherit;
+}
+
+.search-box button,
+.view-switch button,
+.more-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-secondary-local);
+}
+
+.search-box button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.filter-group {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.filter-tags {
-  display: flex;
-  gap: var(--spacing-sm);
+.filter-chip,
+.sort-button {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color-local);
+  background: var(--bg-card, #ffffff);
+  color: var(--text-secondary-local);
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 
-.filter-chip {
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--radius-full);
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-  background: var(--background-color-base);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  border: 1px solid transparent;
+.filter-chip:hover,
+.sort-button:hover,
+.view-switch button:hover {
+  border-color: rgba(11, 183, 170, 0.35);
+  color: var(--primary);
 }
 
-.filter-chip:hover {
-  background: white;
-  border-color: var(--border-light);
-}
-
-.filter-chip.active {
-  background: var(--primary-color);
-  color: white;
-}
-
-/* 任务列表 */
-.tasks-list-section {
-  padding: var(--spacing-lg);
-}
-
-.tasks-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.task-item {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-lg);
-  background: var(--background-color-base);
-  border-radius: var(--radius-xl);
-  border-left: 4px solid var(--border-light);
-  transition: all var(--transition-base);
-}
-
-.task-item:hover {
-  background: white;
-  box-shadow: var(--shadow-md);
-}
-
-.task-item.type-review { border-left-color: var(--primary-color); }
-.task-item.type-practice { border-left-color: var(--accent-color); }
-.task-item.type-resource { border-left-color: var(--warning-color); }
-.task-item.type-project { border-left-color: #a855f7; }
-.task-item.completed { opacity: 0.6; }
-
-.task-check {
-  padding-top: 4px;
-  cursor: pointer;
-}
-
-.check-circle {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid var(--border-light);
+.toolbar-tail {
   display: flex;
   align-items: center;
-  justify-content: center;
-  transition: all var(--transition-base);
+  gap: 10px;
+  margin-left: auto;
 }
 
-.check-circle.todo:hover {
-  border-color: var(--primary-color);
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px;
 }
 
-.check-circle.doing {
-  border-color: var(--primary-color);
-  background: rgba(11, 183, 170, 0.1);
+.sort-button svg {
+  width: 16px;
+  height: 16px;
 }
 
-.check-circle.done {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
-  color: white;
+.view-switch {
+  height: 38px;
+  padding: 3px;
+  border-radius: 12px;
 }
 
-.check-circle svg {
+.view-switch button {
+  width: 32px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.view-switch svg {
+  width: 17px;
+  height: 17px;
+}
+
+.tasks-panel {
+  min-height: 280px;
+  padding: 4px;
+}
+
+.task-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+}
+
+.task-list.card-view {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.learning-task-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 72px 28px 56px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid var(--border-color-local);
+  border-radius: 16px;
+  background: var(--card-bg);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.learning-task-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: 18px;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: var(--primary);
+}
+
+.learning-task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+  border-color: rgba(11, 183, 170, 0.22);
+}
+
+.learning-task-card.type-practice::before { background: var(--success); }
+.learning-task-card.type-resource::before { background: var(--warning); }
+.learning-task-card.type-project::before { background: var(--primary-violet); }
+.learning-task-card.completed {
+  opacity: 0.68;
+}
+
+.task-time-axis {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  color: var(--text-secondary-local);
+  font-size: 0.76rem;
+}
+
+.task-time-axis::after {
+  content: '';
+  position: absolute;
+  left: -22px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--border-color-local);
+}
+
+.axis-dot {
+  position: absolute;
+  left: -28px;
+  top: 3px;
   width: 12px;
   height: 12px;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+  z-index: 1;
 }
 
-.task-body { flex: 1; }
+.axis-dot.done {
+  background: var(--success);
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
+}
+
+.axis-dot.todo {
+  background: var(--border-color-local);
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.12);
+}
+
+.task-time-axis strong {
+  color: var(--text-primary-local);
+  font-size: 0.82rem;
+}
+
+.task-check {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  border: 1.5px solid var(--border-color-local);
+  background: var(--bg-card, #ffffff);
+  color: #ffffff;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.task-check:hover {
+  border-color: var(--primary);
+  transform: scale(1.04);
+}
+
+.task-check.done {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.task-check.doing {
+  border-color: var(--primary);
+  background: rgba(11, 183, 170, 0.12);
+}
+
+.task-check svg {
+  width: 16px;
+  height: 16px;
+}
+
+.learning-task-card.type-practice .task-type-icon {
+  color: var(--success);
+  background: rgba(20, 184, 166, 0.12);
+}
+
+.learning-task-card.type-resource .task-type-icon {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.learning-task-card.type-project .task-type-icon {
+  color: var(--primary-violet);
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.task-body {
+  min-width: 0;
+}
 
 .task-meta {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-sm);
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.type-badge,
+.space-pill,
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .type-badge {
-  padding: 2px 10px;
-  border-radius: var(--radius-full);
-  font-size: 0.6875rem;
-  font-weight: 600;
+  padding: 5px 10px;
 }
 
-.type-badge.review { background: rgba(11, 183, 170, 0.1); color: var(--primary-color); }
-.type-badge.practice { background: rgba(18, 184, 134, 0.1); color: var(--accent-color); }
-.type-badge.resource { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); }
-.type-badge.project { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
+.type-badge.review {
+  color: var(--primary);
+  background: rgba(11, 183, 170, 0.1);
+}
 
-.task-date, .task-duration {
-  display: flex;
+.type-badge.practice {
+  color: var(--success);
+  background: rgba(20, 184, 166, 0.1);
+}
+
+.type-badge.resource {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.type-badge.project {
+  color: var(--primary-violet);
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.meta-item {
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-}
-
-.task-date svg, .task-duration svg {
-  width: 12px;
-  height: 12px;
-}
-
-.task-title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  margin: 0 0 var(--spacing-xs);
-}
-
-.task-reason {
+  color: var(--text-secondary-local);
   font-size: 0.75rem;
-  color: var(--text-secondary);
-  margin: 0 0 var(--spacing-sm);
 }
 
-.task-footer {
+.meta-item svg {
+  width: 13px;
+  height: 13px;
+}
+
+.task-body h2 {
+  display: -webkit-box;
+  margin: 0 0 6px;
+  overflow: hidden;
+  color: var(--text-primary-local);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.task-body p {
+  display: -webkit-box;
+  margin: 0 0 14px;
+  overflow: hidden;
+  color: var(--text-secondary-local);
+  font-size: 0.82rem;
+  line-height: 1.65;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.task-bottom {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-md);
+  gap: 16px;
+}
+
+.space-pill {
+  max-width: 240px;
+  padding: 6px 10px;
+  overflow: hidden;
+  color: #0f766e;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(20, 184, 166, 0.12);
 }
 
 .task-progress {
+  min-width: 140px;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: 8px;
 }
 
-.progress-bar {
-  width: 80px;
-  height: 4px;
-  background: var(--border-light);
-  border-radius: var(--radius-full);
+.progress-track {
+  flex: 1;
+  height: 5px;
   overflow: hidden;
+  border-radius: 999px;
+  background: var(--border-color-local);
 }
 
-.progress-fill {
+.progress-track i {
+  display: block;
   height: 100%;
-  background: linear-gradient(90deg, #3b5bdb, #12b886);
-  border-radius: var(--radius-full);
-  transition: width 0.5s ease;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), var(--success));
+  transition: width 0.24s ease;
 }
 
-.progress-text {
-  font-size: 0.625rem;
-  color: var(--text-muted);
+.task-progress strong {
+  color: var(--text-secondary-local);
+  font-size: 0.72rem;
 }
 
-.task-tags {
-  display: flex;
-  gap: 4px;
-}
-
-.task-tag {
-  padding: 1px 8px;
-  background: rgba(11, 183, 170, 0.06);
-  border-radius: var(--radius-sm);
-  font-size: 0.5625rem;
-  color: var(--primary-color);
-}
-
-.task-actions {
-  display: flex;
-  gap: var(--spacing-sm);
+.task-side {
+  min-width: 150px;
+  display: grid;
+  grid-template-columns: 1fr 28px;
+  gap: 10px;
   align-items: center;
+  justify-items: end;
 }
 
-/* 空状态 */
-.empty-state {
+.status-pill {
+  grid-column: 1 / -1;
+  padding: 6px 10px;
+}
+
+.status-pill.todo {
+  color: var(--text-secondary-local);
+  background: var(--background-color-base, #f1f5f9);
+}
+
+.status-pill.doing {
+  color: var(--primary);
+  background: rgba(11, 183, 170, 0.1);
+}
+
+.status-pill.done {
+  color: var(--success);
+  background: rgba(20, 184, 166, 0.12);
+}
+
+.start-button,
+.ghost-button {
+  height: 38px;
+  min-width: 96px;
+  padding: 0 16px;
+  border-radius: 11px;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.start-button {
+  color: #ffffff;
+  background: var(--gradient-primary);
+  box-shadow: 0 12px 22px rgba(11, 183, 170, 0.2);
+}
+
+.start-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.ghost-button {
+  color: var(--primary);
+  border: 1px solid rgba(11, 183, 170, 0.24);
+  background: rgba(11, 183, 170, 0.08);
+}
+
+.more-button {
+  width: 28px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.more-button:hover {
+  color: var(--primary);
+  background: rgba(11, 183, 170, 0.08);
+}
+
+.more-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.state-box {
+  min-height: 280px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 36px;
   text-align: center;
-  padding: var(--spacing-3xl);
+}
+
+.state-box strong {
+  color: var(--text-primary-local);
+  font-size: 1rem;
+}
+
+.state-box p {
+  max-width: 420px;
+  margin: 0;
+  color: var(--text-secondary-local);
+  font-size: 0.88rem;
+}
+
+.state-box button {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 11px;
+  color: #ffffff;
+  background: var(--gradient-primary);
+  font-weight: 800;
 }
 
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  margin-bottom: var(--spacing-md);
-  color: var(--text-muted);
-  opacity: 0.5;
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: var(--primary);
+  background: rgba(11, 183, 170, 0.1);
 }
 
 .empty-icon svg {
-  width: 100%;
-  height: 100%;
+  width: 34px;
+  height: 34px;
 }
 
-.empty-state h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  margin: 0 0 var(--spacing-sm);
+.assist-rail {
+  display: grid;
+  gap: 18px;
 }
 
-.empty-state p {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0 0 var(--spacing-lg);
+.rail-card {
+  padding: 20px;
 }
 
-/* 生成表单 */
+.rail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.rail-header strong,
+.streak-card strong {
+  color: var(--text-primary-local);
+  font-size: 0.96rem;
+}
+
+.rail-header button {
+  color: var(--primary);
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.rhythm-list {
+  display: grid;
+  gap: 0;
+}
+
+.rhythm-item {
+  display: grid;
+  grid-template-columns: 48px 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  min-height: 36px;
+  color: var(--text-secondary-local);
+  font-size: 0.8rem;
+}
+
+.rhythm-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.rhythm-dot {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 999px;
+  border: 2px solid var(--border-color-local);
+  background: var(--card-bg);
+}
+
+.rhythm-dot::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 10px;
+  width: 1px;
+  height: 28px;
+  background: var(--border-color-local);
+}
+
+.rhythm-item:last-child .rhythm-dot::after {
+  display: none;
+}
+
+.rhythm-item.completed .rhythm-dot {
+  border-color: var(--success);
+  background: var(--success);
+}
+
+.rhythm-item.current {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+.rhythm-item.current .rhythm-dot {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+}
+
+.rhythm-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.streak-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 150px;
+  background:
+    radial-gradient(circle at 92% 20%, rgba(245, 158, 11, 0.16), transparent 32%),
+    var(--card-bg);
+}
+
+.streak-card p {
+  margin: 14px 0 2px;
+  color: var(--text-primary-local);
+}
+
+.streak-card p span {
+  color: var(--primary);
+  font-size: 2.2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.streak-card small {
+  color: var(--text-secondary-local);
+}
+
+.medal {
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+}
+
+.generate-form,
+.generate-process {
+  color: var(--text-primary-local);
+}
+
 .generate-tip {
-  margin: 0 0 var(--spacing-lg);
-  color: var(--text-secondary);
-  font-size: 0.875rem;
+  margin: 0 0 18px;
+  color: var(--text-secondary-local);
+  font-size: 0.88rem;
   line-height: 1.7;
 }
 
-.generate-grid {
+.generate-grid,
+.analysis-grid,
+.evidence-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-md) var(--spacing-lg);
+  gap: 14px 18px;
 }
 
-.generate-options {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--spacing-lg);
-  padding: var(--spacing-sm) 0 var(--spacing-md);
-}
-
+.generate-options,
 .resource-type-group {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-sm) var(--spacing-lg);
+  gap: 12px 18px;
+  margin-bottom: 12px;
 }
 
-.generation-process {
+.generation-process,
+.agent-schedule-result {
   display: grid;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  margin: var(--spacing-md) 0;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
-  background: var(--background-color-base);
+  gap: 14px;
+  padding: 16px;
+  margin-top: 16px;
+  border: 1px solid var(--border-color-local);
+  border-radius: 14px;
+  background: var(--background-color-base, #f1f5f9);
 }
 
-.generation-analysis {
+.generation-analysis,
+.analysis-header,
+.analysis-item,
+.analysis-panel,
+.result-header,
+.result-block,
+.evidence-item {
   display: grid;
-  gap: var(--spacing-sm);
+  gap: 6px;
 }
 
-.analysis-header {
-  display: grid;
-  gap: 3px;
+.analysis-header span,
+.result-header span {
+  color: var(--primary);
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
-.analysis-header span {
-  color: var(--primary-color);
-  font-size: 0.75rem;
-  font-weight: 700;
-}
-
-.analysis-header strong {
-  color: var(--text-dark);
-  font-size: 0.875rem;
+.analysis-header strong,
+.result-header strong {
+  color: var(--text-primary-local);
+  font-size: 0.9rem;
   line-height: 1.5;
 }
 
-.analysis-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--spacing-sm);
+.analysis-item,
+.analysis-panel,
+.evidence-item {
+  padding: 12px;
+  border: 1px solid var(--border-color-local);
+  border-radius: 12px;
+  background: var(--card-bg);
 }
 
-.analysis-item {
-  min-width: 0;
-  display: grid;
-  gap: 3px;
-  padding: var(--spacing-sm);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  background: var(--panel-bg);
+.analysis-item span,
+.evidence-item span {
+  color: var(--text-secondary-local);
+  font-size: 0.72rem;
 }
 
-.analysis-item span {
-  color: var(--text-secondary);
-  font-size: 0.6875rem;
-}
-
-.analysis-item strong {
-  color: var(--text-dark);
-  font-size: 0.9375rem;
-  line-height: 1.35;
+.analysis-item strong,
+.evidence-item strong {
+  color: var(--text-primary-local);
+  font-size: 0.96rem;
 }
 
 .analysis-item small {
-  color: var(--text-muted);
-  font-size: 0.6875rem;
-  line-height: 1.5;
-}
-
-.process-divider {
-  height: 1px;
-  background: var(--border-light);
+  color: var(--text-secondary-local);
+  font-size: 0.72rem;
 }
 
 .analysis-panels {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--spacing-sm);
+  gap: 12px;
 }
 
-.analysis-panel {
-  min-width: 0;
-  display: grid;
-  align-content: flex-start;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-sm);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
-  background: var(--panel-bg);
-}
-
-.analysis-panel h4 {
+.analysis-panel h4,
+.result-block h4 {
   margin: 0;
-  color: var(--text-dark);
-  font-size: 0.75rem;
-  font-weight: 700;
+  color: var(--text-primary-local);
+  font-size: 0.82rem;
 }
 
-.analysis-panel ul {
+.analysis-panel ul,
+.result-block ul {
   display: grid;
-  gap: 5px;
+  gap: 6px;
   margin: 0;
-  padding: 0;
-  list-style: none;
+  padding-left: 18px;
+  color: var(--text-secondary-local);
+  font-size: 0.76rem;
+  line-height: 1.6;
 }
 
-.analysis-panel li {
-  position: relative;
-  padding-left: 12px;
-  color: var(--text-secondary);
-  font-size: 0.6875rem;
-  line-height: 1.55;
-}
-
-.analysis-panel li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.65em;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--primary-color);
-}
-
-.weakness-panel li::before {
-  background: var(--warning-color);
-}
-
-.basis-panel li::before {
-  background: var(--accent-color);
+.process-divider {
+  height: 1px;
+  background: var(--border-color-local);
 }
 
 .process-step {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr);
-  align-items: flex-start;
-  gap: var(--spacing-sm);
+  gap: 10px;
 }
 
 .process-dot {
   width: 10px;
   height: 10px;
   margin-top: 6px;
-  border-radius: 50%;
-  background: var(--border-color);
+  border-radius: 999px;
+  background: var(--border-color-local);
 }
 
 .process-step.running .process-dot {
-  background: var(--primary-color);
+  background: var(--primary);
   box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
 }
 
 .process-step.completed .process-dot {
-  background: var(--accent-color);
+  background: var(--success);
 }
 
 .process-step.failed .process-dot {
-  background: var(--danger-color);
+  background: var(--danger);
 }
 
 .process-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 2px;
 }
 
 .process-label {
-  color: var(--text-dark);
-  font-size: 0.8125rem;
-  font-weight: 700;
+  color: var(--text-primary-local);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .process-detail {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.5;
+  color: var(--text-secondary-local);
+  font-size: 0.76rem;
 }
 
-.agent-schedule-result {
-  display: grid;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  margin-top: var(--spacing-md);
-  border: 1px solid rgba(11, 183, 170, 0.18);
-  border-radius: var(--radius-lg);
-  background: rgba(11, 183, 170, 0.04);
+:deep(.el-dialog),
+:deep(.el-popper),
+:deep(.el-dropdown__popper) {
+  background: var(--card-bg);
+  color: var(--text-primary-local);
 }
 
-.result-header {
-  display: grid;
-  gap: 4px;
+:global(html[data-theme='dark']) .tasks-page {
+  --card-bg: #171e2a;
+  --text-primary-local: #f4f7fb;
+  --text-secondary-local: #b5c0ce;
+  --border-color-local: #2b3645;
+  --primary: var(--primary-color);
+  --primary-violet: var(--primary-hover);
 }
 
-.result-label {
-  color: var(--primary-color);
-  font-size: 0.75rem;
-  font-weight: 700;
+:global(html[data-theme='dark']) .search-box,
+:global(html[data-theme='dark']) .filter-chip,
+:global(html[data-theme='dark']) .sort-button,
+:global(html[data-theme='dark']) .task-check {
+  background: #131a24;
 }
 
-.result-header strong {
-  color: var(--text-dark);
-  font-size: 0.9375rem;
-  line-height: 1.5;
+:global(html[data-theme='dark']) .space-pill {
+  color: #5eead4;
+  background: rgba(20, 184, 166, 0.14);
 }
 
-.evidence-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--spacing-sm);
+:global(html[data-theme='dark']) .learning-task-card,
+:global(html[data-theme='dark']) .stat-card,
+:global(html[data-theme='dark']) .rail-card,
+:global(html[data-theme='dark']) .tasks-panel,
+:global(html[data-theme='dark']) .task-toolbar {
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
 }
 
-.evidence-item {
-  display: grid;
-  gap: 4px;
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-md);
-  background: var(--panel-bg);
-  border: 1px solid var(--border-light);
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid rgba(11, 183, 170, 0.6);
+  outline-offset: 2px;
 }
 
-.evidence-item span {
-  color: var(--text-secondary);
-  font-size: 0.6875rem;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.evidence-item strong {
-  color: var(--text-dark);
-  font-size: 0.9375rem;
-}
-
-.result-block {
-  display: grid;
-  gap: var(--spacing-sm);
-}
-
-.result-block h4 {
-  margin: 0;
-  color: var(--text-dark);
-  font-size: 0.8125rem;
-}
-
-.result-block ul {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.7;
-}
-
-.weak-signal-list,
-.reason-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-xs);
-}
-
-.weak-signal-list span,
-.reason-tags span {
-  padding: 3px 8px;
-  border-radius: var(--radius-full);
-  background: rgba(245, 158, 11, 0.1);
-  color: #b45309;
-  font-size: 0.6875rem;
-  line-height: 1.4;
-}
-
-.task-reason-list {
-  display: grid;
-  gap: var(--spacing-sm);
-}
-
-.task-reason-card {
-  display: grid;
-  gap: 6px;
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-md);
-  background: var(--panel-bg);
-  border: 1px solid var(--border-light);
-}
-
-.task-reason-card strong {
-  color: var(--text-dark);
-  font-size: 0.8125rem;
-}
-
-.task-reason-card p {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  line-height: 1.6;
-}
-
-.generate-form :deep(.el-form-item) {
-  margin-bottom: var(--spacing-lg);
-}
-
-.generate-form :deep(.el-form-item__label) {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  line-height: 1.4;
-  margin-bottom: var(--spacing-xs);
-}
-
-.generate-task-dialog :deep(.el-dialog__body) {
-  padding-top: var(--spacing-sm);
-}
-
-@media (max-width: 768px) {
-  .stats-row {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 1280px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
   }
 
-  .weekly-report-card,
-  .report-card-main,
-  .report-card-actions {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assist-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .task-hero,
+  .task-toolbar {
     align-items: stretch;
     flex-direction: column;
   }
 
+  .hero-actions,
+  .toolbar-tail {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .learning-task-card,
+  .task-list.card-view {
+    grid-template-columns: 1fr;
+  }
+
+  .learning-task-card {
+    gap: 12px;
+  }
+
+  .task-time-axis::after,
+  .axis-dot {
+    display: none;
+  }
+
+  .task-side {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: 1fr auto;
+    justify-items: stretch;
+  }
+
+  .status-pill {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .stats-grid,
+  .assist-rail,
   .generate-grid,
   .analysis-grid,
   .analysis-panels,
   .evidence-grid {
     grid-template-columns: 1fr;
+  }
+
+  .segment-control,
+  .primary-action,
+  .search-box,
+  .sort-button {
+    width: 100%;
+  }
+
+  .segment-control button {
+    flex: 1;
+    min-width: 0;
+    padding: 0 8px;
+  }
+
+  .task-bottom,
+  .toolbar-tail {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .task-progress,
+  .start-button,
+  .ghost-button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }
 </style>

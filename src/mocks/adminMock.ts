@@ -65,7 +65,7 @@ let toolExecutions = [
   },
   {
     id: "1002",
-    userName: "李美华",
+    userName: "脆皮大学生",
     toolName: "pdf_parser",
     status: "SUCCESS",
     durationMs: 2580,
@@ -104,7 +104,7 @@ let toolExecutions = [
   },
   {
     id: "1005",
-    userName: "张三锋",
+    userName: "默默的学习",
     toolName: "image_generator",
     status: "TIMEOUT",
     durationMs: 15000,
@@ -117,7 +117,7 @@ let toolExecutions = [
   },
   {
     id: "1006",
-    userName: "李四光",
+    userName: "编码启动",
     toolName: "ppt_builder",
     status: "SUCCESS",
     durationMs: 4890,
@@ -145,7 +145,7 @@ let toolExecutions = [
 
 // 补齐到25条以供分页展示
 for (let i = 8; i <= 25; i++) {
-  const users = ["赵铁柱", "李美华", "王小明", "张三锋", "李四光", "钱七七"];
+  const users = ["赵铁柱", "脆皮大学生", "默默的学习", "编码启动", "我最爱学习了", "高数必须过", "vibe-coder", "李美华", "求求给个A", "摸鱼艺术家", "王小明"];
   const tools = ["web_search", "pdf_parser", "code_executor", "rag_retriever", "ppt_builder"];
   const statuses = ["SUCCESS", "SUCCESS", "SUCCESS", "FAILED"];
   const duration = Math.floor(Math.random() * 3000) + 150;
@@ -199,7 +199,7 @@ let resourceLogs = [
   {
     id: "res-log-2003",
     spaceId: "space-102",
-    userName: "李美华",
+    userName: "我最爱学习了",
     resourceType: "DOC",
     title: "扫码点餐微服务拆分与架构设计方案",
     status: "GENERATING",
@@ -241,7 +241,7 @@ let resourceLogs = [
 ];
 
 for (let i = 6; i <= 25; i++) {
-  const users = ["赵铁柱", "李美华", "王小明", "张三锋", "钱七七"];
+  const users = ["赵铁柱", "vibe-coder", "王小明", "脆皮大学生", "摸鱼艺术家", "编码启动", "求求给个A", "李美华"];
   const types = ["PPT", "DOC", "QUIZ", "EXAM", "MINDMAP"];
   const statuses = ["COMPLETED", "COMPLETED", "COMPLETED", "FAILED"];
   const resType = types[i % types.length];
@@ -289,7 +289,7 @@ let ragJobs = [
     progress: 68,
     currentStep: "正在切分段落并调用 text-embedding-v3 进行嵌入 (45/66)",
     retryCount: 0,
-    userName: "李美华",
+    userName: "高数必须过",
     createdAt: "2026-07-17T10:51:30.000Z",
     updatedAt: "2026-07-17T10:52:45.000Z",
     fileId: "file-302",
@@ -319,7 +319,7 @@ let ragJobs = [
     progress: 0,
     currentStep: "等待执行 (排队等待 RAG 解析线程池调度)",
     retryCount: 0,
-    userName: "张三锋",
+    userName: "默默的学习",
     createdAt: "2026-07-17T10:52:20.000Z",
     updatedAt: "2026-07-17T10:52:20.000Z",
     fileId: "file-304",
@@ -570,7 +570,18 @@ let feedbacks = [
 function getMockUsername(userId: string): string {
   if (userId === "1001" || userId === "1111111111111111111") return "1";
   if (userId === "2005" || userId === "2056418990037258240") return "vibe-coder";
-  if (userId === "2008" || userId === "2077386505944932352") return "845473457";
+  if (userId === "2008" || userId === "2077386505944932352") return "编码启动";
+  
+  const collegeUsernames = [
+    "默默的学习", "我最爱学习了", "高数必须过", "求求给个A", "四六级必过", 
+    "脆皮大学生", "秃头小宝贝", "猫咪老师", "摸鱼艺术家", "代码缝合怪", 
+    "修仙老祖", "Java从入门到入土", "今晚必不熬夜", "考研上岸酱", "李美华", "钱七七"
+  ];
+  
+  const idNum = parseInt(userId);
+  if (!isNaN(idNum)) {
+    return collegeUsernames[idNum % collegeUsernames.length];
+  }
   return "测试用户_" + userId;
 }
 

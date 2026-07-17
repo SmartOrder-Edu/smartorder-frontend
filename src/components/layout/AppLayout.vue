@@ -469,14 +469,12 @@ const handleLogout = async () => {
   left: 0;
   bottom: 0;
   width: var(--sidebar-width);
-  padding: var(--spacing-sm) var(--spacing-lg);
+  padding: 10px 16px;
   display: flex;
   flex-direction: column;
   background: var(--panel-bg);
   border-right: 1px solid var(--border-color);
-  box-shadow:
-    4px 0 30px rgba(139, 92, 246, 0.1),
-    inset -1px 0 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 4px 0 24px rgba(15, 23, 42, 0.06);
   overflow: visible;
   transition: width var(--transition-base), padding var(--transition-base), background-color 0.2s ease, border-color 0.2s ease;
   z-index: 90;
@@ -666,12 +664,13 @@ const handleLogout = async () => {
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: 12px;
+  min-height: 48px;
   padding: 10px 14px;
-  border-radius: var(--radius-xl);
+  border-radius: 14px;
   color: var(--text-regular);
   text-decoration: none;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
   white-space: nowrap;
   font-weight: 500;
   overflow: hidden;
@@ -686,14 +685,14 @@ const handleLogout = async () => {
 }
 
 .nav-item:hover {
-  background: rgba(139, 92, 246, 0.12);
-  color: #8b5cf6;
-  transform: translateX(4px);
+  background: rgba(11, 183, 170, 0.08);
+  color: var(--primary-color);
+  transform: translateX(3px);
 }
 
 .nav-item:hover .nav-icon {
-  background: rgba(139, 92, 246, 0.2);
-  box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+  background: rgba(11, 183, 170, 0.16);
+  box-shadow: 0 0 15px rgba(11, 183, 170, 0.24);
 }
 
 .nav-item:hover .nav-icon svg {
@@ -701,20 +700,20 @@ const handleLogout = async () => {
 }
 
 .nav-item.active {
-  background: rgba(139, 92, 246, 0.12);
-  color: #8b5cf6;
+  background: var(--gradient-primary);
+  color: #ffffff;
   font-weight: 600;
-  box-shadow: none;
+  box-shadow: 0 12px 24px rgba(11, 183, 170, 0.22);
 }
 
 /* 选中态下图标跟随文字颜色，不强制变白 */
 .nav-item.active :deep(.animated-icon.active) svg,
 .nav-item.active :deep(.animated-icon.active) svg * {
-  stroke: currentColor !important;
+  stroke: #ffffff !important;
 }
 
 .nav-item.active :deep(.animated-icon.active) svg circle[fill="currentColor"] {
-  fill: currentColor !important;
+  fill: #ffffff !important;
 }
 
 .nav-item.active .nav-icon {
@@ -756,12 +755,12 @@ const handleLogout = async () => {
 .space-workspace {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 8px;
+  gap: 8px;
+  padding: 12px;
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  background: var(--panel-bg);
-  box-shadow: 0 6px 16px var(--shadow-color);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(11, 183, 170, 0.035), transparent), var(--panel-bg);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
 }
 
 .space-workspace-header {
@@ -888,7 +887,7 @@ const handleLogout = async () => {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 36px;
+  min-height: 34px;
   gap: 8px;
   padding: 7px 8px;
   border-radius: 9px;
