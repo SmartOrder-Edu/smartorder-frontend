@@ -29,6 +29,38 @@
         </div>
       </div>
 
+      <section class="weekly-report-card">
+        <div class="report-card-main">
+          <div class="report-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 3v18h18" />
+              <path d="m7 14 4-4 3 3 5-7" />
+              <circle cx="7" cy="14" r="1" />
+              <circle cx="11" cy="10" r="1" />
+              <circle cx="14" cy="13" r="1" />
+              <circle cx="19" cy="6" r="1" />
+            </svg>
+          </div>
+          <div class="report-card-copy">
+            <div class="report-card-title-row">
+              <span class="report-card-label">AI 学习周报已生成</span>
+              <span class="report-card-range">07/10 - 07/16</span>
+            </div>
+            <h2>最近 7 天你完成 18 个任务，链表基础掌握明显提升</h2>
+            <p>递归调用栈仍存在步骤缺失问题，系统已为下周前两天安排补弱与验证练习。</p>
+          </div>
+        </div>
+        <div class="report-card-actions">
+          <button class="report-primary-btn" @click="openWeeklyReport">
+            查看学习周报
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9,18 15,12 9,6" />
+            </svg>
+          </button>
+          <button class="report-secondary-btn" @click="activeTab = 'week'">查看本周任务</button>
+        </div>
+      </section>
+
       <!-- 任务统计 -->
       <section class="section stats-row">
         <div class="stat-card">
@@ -196,19 +228,170 @@
         </div>
       </section>
 
-      <!-- 生成任务对话框 -->
-      <el-dialog v-model="showGenerateDialog" title="生成今日学习任务" width="520px">
-        <div class="generate-form">
-          <p class="generate-tip">系统会读取你的活跃学习空间，沿学习路径选择尚未安排的下一节点，生成可直接开始的今日学习任务。</p>
-          <div class="form-item">
-            <label>任务数量</label>
-            <el-slider v-model="generateCount" :min="1" :max="8" show-stops />
+      <!-- Agent 生成任务对话框 -->
+      <el-dialog
+        v-model="showGenerateDialog"
+        title="Agent 生成今日任务"
+        width="min(720px, calc(100vw - 32px))"
+        append-to-body
+        destroy-on-close
+        :close-on-click-modal="!generating"
+        class="generate-task-dialog"
+        @closed="resetGenerateDialog"
+      >
+        <el-form class="generate-form" label-position="top">
+          <p class="generate-tip">
+            Agent 会读取最近学习记录、今日已有任务、未完成任务和学习路径，再生成可执行的今日任务。
+          </p>
+          <div class="generate-grid">
+            <el-form-item label="任务数量">
+              <el-input-number v-model="generateCount" :min="1" :max="8" :step="1" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="今日可用时间（分钟）">
+              <el-input-number v-model="generateMinutes" :min="5" :max="600" :step="15" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="编排策略">
+              <el-select v-model="generateStrategy" style="width: 100%">
+                <el-option label="截止时间优先" value="deadline_first" />
+                <el-option label="薄弱点优先" value="weakness_first" />
+                <el-option label="均衡分配" value="balanced" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="练习测评">
+              <el-select v-model="evaluationTaskType" :disabled="!createPracticeTasks" style="width: 100%">
+                <el-option label="即时练习" value="practice_set" />
+                <el-option label="阶段测评" value="assessment" />
+              </el-select>
+            </el-form-item>
           </div>
-        </div>
+
+          <div class="generate-options">
+            <el-checkbox v-model="createResourceTasks">补充学习资源</el-checkbox>
+            <el-checkbox v-model="createPracticeTasks">追加练习测评</el-checkbox>
+          </div>
+
+          <el-form-item v-if="createResourceTasks" label="资源类型">
+            <el-checkbox-group v-model="resourceTypes" class="resource-type-group">
+              <el-checkbox label="doc">文档</el-checkbox>
+              <el-checkbox label="mind_map">思维导图</el-checkbox>
+              <el-checkbox label="bilibili_video">B站视频入口</el-checkbox>
+            </el-checkbox-group>
+          </el-form-item>
+
+          <div v-if="generating || generationSteps.length" class="generation-process">
+            <div class="generation-analysis">
+              <div class="analysis-header">
+                <span>AI 分析情况</span>
+                <strong>{{ agentAnalysisTitle }}</strong>
+              </div>
+
+              <div class="analysis-grid">
+                <div v-for="item in agentAnalysisCards" :key="item.label" class="analysis-item">
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
+                  <small>{{ item.detail }}</small>
+                </div>
+              </div>
+
+              <div class="analysis-panels">
+                <div class="analysis-panel weakness-panel">
+                  <h4>学习薄弱点</h4>
+                  <ul>
+                    <li v-for="item in agentWeaknessItems" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+
+                <div class="analysis-panel">
+                  <h4>相关学习信息</h4>
+                  <ul>
+                    <li v-for="item in agentRelatedInfo" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+
+                <div class="analysis-panel basis-panel">
+                  <h4>Agent 编排依据</h4>
+                  <ul>
+                    <li v-for="item in agentDecisionBasis" :key="item">{{ item }}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="process-divider"></div>
+
+            <div
+              v-for="step in generationSteps"
+              :key="step.key"
+              class="process-step"
+              :class="step.status"
+            >
+              <span class="process-dot"></span>
+              <div class="process-copy">
+                <span class="process-label">{{ step.label }}</span>
+                <span class="process-detail">{{ step.detail }}</span>
+              </div>
+            </div>
+          </div>
+
+          <section v-if="scheduleResult" class="agent-schedule-result">
+            <div class="result-header">
+              <span class="result-label">Agent 编排说明</span>
+              <strong>{{ scheduleResult.summary }}</strong>
+            </div>
+
+            <div class="evidence-grid">
+              <div class="evidence-item">
+                <span>最近学习</span>
+                <strong>{{ scheduleResult.evidence.recentStudyMinutes }} 分钟</strong>
+              </div>
+              <div class="evidence-item">
+                <span>完成率</span>
+                <strong>{{ scheduleResult.evidence.recentCompletionRate }}%</strong>
+              </div>
+              <div class="evidence-item">
+                <span>未完成</span>
+                <strong>{{ scheduleResult.evidence.unfinishedTaskCount }} 个</strong>
+              </div>
+              <div class="evidence-item">
+                <span>逾期</span>
+                <strong>{{ scheduleResult.evidence.overdueTaskCount }} 个</strong>
+              </div>
+            </div>
+
+            <div class="result-block">
+              <h4>Agent 参考依据</h4>
+              <ul>
+                <li v-for="item in scheduleResult.evidence.decisionBasis" :key="item">{{ item }}</li>
+              </ul>
+            </div>
+
+            <div class="result-block" v-if="scheduleResult.evidence.weakSignals?.length">
+              <h4>最近学习信号</h4>
+              <div class="weak-signal-list">
+                <span v-for="signal in scheduleResult.evidence.weakSignals" :key="signal">{{ signal }}</span>
+              </div>
+            </div>
+
+            <div class="result-block" v-if="scheduleResult.taskReasons?.length">
+              <h4>任务安排理由</h4>
+              <div class="task-reason-list">
+                <div v-for="item in scheduleResult.taskReasons" :key="item.taskId" class="task-reason-card">
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.reason }}</p>
+                  <div class="reason-tags">
+                    <span v-for="tag in item.evidenceTags" :key="tag">{{ tag }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </el-form>
         <template #footer>
-          <el-button @click="showGenerateDialog = false">取消</el-button>
+          <el-button :disabled="generating" @click="closeGenerateDialog">
+            {{ scheduleResult ? '完成' : '取消' }}
+          </el-button>
           <el-button type="primary" :loading="generating" @click="generateTasks">
-            {{ generating ? '生成中...' : '开始生成' }}
+            {{ generating ? 'Agent 编排中...' : scheduleResult ? '重新生成' : '开始生成' }}
           </el-button>
         </template>
       </el-dialog>
@@ -218,9 +401,16 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { taskApi } from '@/api/spaceDashboard'
+import {
+  agentScheduleApi,
+  taskApi,
+  type AgentScheduleEvidence,
+  type AgentScheduleProcessStep,
+  type PlanTodayScheduleResult,
+} from '@/api/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import type { TaskActionType, TaskStatus, TaskVO } from '@/types/learningSpace'
 
@@ -231,11 +421,21 @@ const showGenerateDialog = ref(false)
 const generating = ref(false)
 const loading = ref(false)
 const generateCount = ref(3)
+const generateMinutes = ref(90)
+const generateStrategy = ref<'deadline_first' | 'weakness_first' | 'balanced'>('deadline_first')
+const createResourceTasks = ref(true)
+const createPracticeTasks = ref(true)
+const resourceTypes = ref<string[]>(['doc', 'mind_map'])
+const evaluationTaskType = ref<'practice_set' | 'assessment'>('practice_set')
+const generationSteps = ref<AgentScheduleProcessStep[]>([])
+const scheduleResult = ref<PlanTodayScheduleResult | null>(null)
 const todayTasks = ref<TaskVO[]>([])
 const pendingTasks = ref<TaskVO[]>([])
 const overdueTasks = ref<TaskVO[]>([])
+let generationStepTimers: number[] = []
 
 const { enterTask } = useStudyEntry()
+const router = useRouter()
 
 const filters = [
   { label: '全部', value: 'all' },
@@ -258,6 +458,150 @@ const taskStats = computed(() => ({
   resource: allTasks.value.filter(task => task.actionType === 'read_resource' || task.actionType === 'watch_video').length,
   completed: allTasks.value.filter(task => task.status === 'completed').length,
 }))
+
+interface AgentAnalysisCard {
+  label: string
+  value: string
+  detail: string
+}
+
+const localUnfinishedCount = computed(() =>
+  allTasks.value.filter(task => task.status !== 'completed' && task.status !== 'cancelled').length
+)
+
+const localOverdueCount = computed(() =>
+  allTasks.value.filter(task => task.isOverdue || task.status === 'overdue').length
+)
+
+const localTodayExistingCount = computed(() =>
+  todayTasks.value.filter(task => task.status !== 'cancelled').length
+)
+
+const localRecentCompletionRate = computed(() => {
+  if (!allTasks.value.length) return 0
+  return Math.round((taskStats.value.completed / allTasks.value.length) * 100)
+})
+
+const scheduleCompositionText = computed(() => {
+  const result = scheduleResult.value
+  if (result) {
+    const parts = [
+      result.learningTaskCount ? `学习 ${result.learningTaskCount}` : '',
+      result.resourceTaskCount ? `资源 ${result.resourceTaskCount}` : '',
+      result.practiceTaskCount ? `练习 ${result.practiceTaskCount}` : '',
+    ].filter(Boolean)
+    return parts.length ? parts.join(' / ') : '暂无新增任务'
+  }
+
+  const parts = ['学习任务优先']
+  if (createResourceTasks.value) parts.push(`资源 ${resourceTypes.value.length || 1} 类`)
+  if (createPracticeTasks.value) parts.push(evaluationTaskType.value === 'assessment' ? '阶段测评' : '即时练习')
+  return parts.join(' / ')
+})
+
+const agentAnalysisTitle = computed(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) {
+    return `已基于最近 ${evidence.recentDays} 天学习数据完成编排判断`
+  }
+  return `正在按「${strategyLabel(generateStrategy.value)}」分析今日任务负载`
+})
+
+const agentAnalysisCards = computed<AgentAnalysisCard[]>(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) return buildEvidenceAnalysisCards(evidence)
+
+  return [
+    {
+      label: '可用时间',
+      value: `${generateMinutes.value} 分钟`,
+      detail: `目标生成 ${generateCount.value} 个任务`,
+    },
+    {
+      label: '当前完成率',
+      value: `${localRecentCompletionRate.value}%`,
+      detail: `${taskStats.value.completed}/${allTasks.value.length || 0} 个任务已完成`,
+    },
+    {
+      label: '今日负载',
+      value: `${localTodayExistingCount.value} 个`,
+      detail: `未完成 ${localUnfinishedCount.value} 个，逾期 ${localOverdueCount.value} 个`,
+    },
+    {
+      label: '编排倾向',
+      value: strategyLabel(generateStrategy.value),
+      detail: scheduleCompositionText.value,
+    },
+  ]
+})
+
+const agentWeaknessItems = computed(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) {
+    return normalizeInsightList(evidence.weakSignals, '未发现明显薄弱点，按学习路径稳定推进')
+  }
+
+  const signals: string[] = []
+  if (localOverdueCount.value > 0) {
+    signals.push(`学习节奏风险：当前有 ${localOverdueCount.value} 个逾期任务`)
+  }
+  if (localUnfinishedCount.value > localTodayExistingCount.value) {
+    signals.push(`任务消化不足：仍有 ${localUnfinishedCount.value} 个未完成任务`)
+  }
+  const reviewTasks = allTasks.value
+    .filter(task => task.actionType === 'mistake_review' || task.taskType === 'review')
+    .slice(0, 2)
+  reviewTasks.forEach(task => signals.push(`待复习巩固：${task.title}`))
+  if (createPracticeTasks.value) {
+    signals.push(`需要验证掌握：将通过${evaluationTaskType.value === 'assessment' ? '阶段测评' : '即时练习'}检查学习效果`)
+  }
+  if (!signals.length) {
+    signals.push('暂无明确薄弱信号，Agent 会优先依据学习路径下一节点推进')
+  }
+  return signals.slice(0, 4)
+})
+
+const agentRelatedInfo = computed(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) {
+    const info = [
+      `最近 ${evidence.recentDays} 天学习记录 ${evidence.recentRecordCount} 条，累计 ${evidence.recentStudyMinutes} 分钟`,
+      `近期任务完成 ${evidence.recentCompletedTasks}/${evidence.recentPlannedTasks || 0}，完成率 ${evidence.recentCompletionRate}%`,
+      evidence.averageFocusLevel != null ? `平均专注度 ${evidence.averageFocusLevel}` : '',
+      evidence.averageSelfRating != null ? `平均自评掌握度 ${evidence.averageSelfRating}` : '',
+      evidence.recentSpaces?.length ? `涉及空间：${evidence.recentSpaces.slice(0, 3).join('、')}` : '',
+    ]
+    return normalizeInsightList(info, '最近暂无足够学习记录，主要参考任务状态和学习路径')
+  }
+
+  return [
+    `今日已有任务 ${localTodayExistingCount.value} 个，未完成 ${localUnfinishedCount.value} 个`,
+    `本次可用时间 ${generateMinutes.value} 分钟，计划生成 ${generateCount.value} 个任务`,
+    `资源补充：${createResourceTasks.value ? resourceTypeLabels(resourceTypes.value).join('、') : '未开启'}`,
+    `练习测评：${createPracticeTasks.value ? evaluationTaskTypeLabel(evaluationTaskType.value) : '未开启'}`,
+  ]
+})
+
+const agentDecisionBasis = computed(() => {
+  const evidence = scheduleResult.value?.evidence
+  if (evidence) {
+    const basis = [
+      ...evidence.decisionBasis,
+      ...(scheduleResult.value?.taskReasons?.slice(0, 2).map(item => `${item.title}：${item.reason}`) || []),
+    ]
+    return normalizeInsightList(basis, 'Agent 已完成任务编排，但暂无额外依据说明')
+  }
+
+  const basis = [
+    `按「${strategyLabel(generateStrategy.value)}」选择学习空间和路径节点`,
+    localOverdueCount.value > 0
+      ? '先处理逾期和高优先级任务，避免继续堆积'
+      : '优先推进当前学习路径中的下一步任务',
+    createResourceTasks.value ? '为薄弱点补充配套资源，降低回看成本' : '',
+    createPracticeTasks.value ? '追加练习/测评，用结果验证是否真正掌握' : '',
+  ]
+  return normalizeInsightList(basis, '等待 Agent 读取学习记录和路径节点')
+})
 
 const filteredTasks = computed(() => {
   let result = activeTab.value === 'today'
@@ -306,18 +650,164 @@ async function loadTasks() {
 
 async function generateTasks() {
   generating.value = true
+  scheduleResult.value = null
+  beginLocalGenerationSteps()
   try {
-    const created = await taskApi.planToday({ maxTasks: generateCount.value })
-    showGenerateDialog.value = false
+    const result = await agentScheduleApi.planToday({
+      maxTasks: generateCount.value,
+      totalAvailableMinutes: generateMinutes.value,
+      strategy: generateStrategy.value,
+      createResourceTasks: createResourceTasks.value,
+      createPracticeTasks: createPracticeTasks.value,
+      resourceTypes: createResourceTasks.value ? resourceTypes.value : [],
+      evaluationTaskType: evaluationTaskType.value,
+      practiceTaskCount: createPracticeTasks.value ? 1 : undefined,
+      practiceQuestionCount: createPracticeTasks.value ? 5 : undefined,
+    })
+    scheduleResult.value = result
+    applyServerProcessSteps(result.processSteps)
     await loadTasks()
-    if (created.length === 0) {
+    if (result.createdTaskCount === 0) {
       ElMessage.info('当前没有可新生成的今日任务，可能已有待完成任务或学习路径暂未生成')
     } else {
-      ElMessage.success(`已生成 ${created.length} 个今日任务`)
+      ElMessage.success(`Agent 已生成 ${result.createdTaskCount} 个今日任务`)
     }
+  } catch (error) {
+    markCurrentGenerationStepFailed()
   } finally {
+    clearGenerationTimers()
     generating.value = false
   }
+}
+
+function closeGenerateDialog() {
+  showGenerateDialog.value = false
+}
+
+function resetGenerateDialog() {
+  if (generating.value) return
+  scheduleResult.value = null
+  generationSteps.value = []
+  clearGenerationTimers()
+}
+
+function buildEvidenceAnalysisCards(evidence: AgentScheduleEvidence): AgentAnalysisCard[] {
+  const plannedTotal = evidence.recentPlannedTasks || 0
+  const completedDetail = plannedTotal > 0
+    ? `${evidence.recentCompletedTasks}/${plannedTotal} 个任务完成`
+    : `${evidence.recentRecordCount} 条学习记录`
+
+  return [
+    {
+      label: '可用时间',
+      value: `${evidence.availableMinutes || generateMinutes.value} 分钟`,
+      detail: `目标生成 ${generateCount.value} 个任务`,
+    },
+    {
+      label: '近期完成率',
+      value: `${evidence.recentCompletionRate}%`,
+      detail: completedDetail,
+    },
+    {
+      label: '今日负载',
+      value: `${evidence.todayExistingTaskCount} 个`,
+      detail: `未完成 ${evidence.unfinishedTaskCount} 个，逾期 ${evidence.overdueTaskCount} 个`,
+    },
+    {
+      label: '编排倾向',
+      value: strategyLabel(evidence.strategy),
+      detail: scheduleCompositionText.value,
+    },
+  ]
+}
+
+function strategyLabel(strategy?: string) {
+  const labels: Record<string, string> = {
+    deadline_first: '截止时间优先',
+    weakness_first: '薄弱点优先',
+    balanced: '均衡分配',
+  }
+  return labels[strategy || ''] || '智能均衡'
+}
+
+function normalizeInsightList(items: Array<string | null | undefined>, fallback: string) {
+  const normalized = items
+    .map(item => item?.trim())
+    .filter((item): item is string => !!item)
+  return normalized.length ? normalized.slice(0, 5) : [fallback]
+}
+
+function resourceTypeLabels(types: string[]) {
+  const labels: Record<string, string> = {
+    doc: '文档',
+    mind_map: '思维导图',
+    bilibili_video: 'B站视频入口',
+  }
+  const result = types.map(type => labels[type] || type).filter(Boolean)
+  return result.length ? result : ['默认资料']
+}
+
+function evaluationTaskTypeLabel(type: 'practice_set' | 'assessment') {
+  return type === 'assessment' ? '阶段测评' : '即时练习'
+}
+
+function defaultGenerationSteps(): AgentScheduleProcessStep[] {
+  return [
+    { key: 'analyze_recent_learning', label: '分析最近学习记录', status: 'running', detail: '正在读取最近学习记录和今日已有任务' },
+    { key: 'identify_focus', label: '识别编排重点', status: 'pending', detail: '等待分析风险信号和薄弱项' },
+    { key: 'match_learning_path', label: '匹配学习路径', status: 'pending', detail: '等待选择学习空间和路径节点' },
+    { key: 'create_tasks', label: '创建学习任务', status: 'pending', detail: '等待写入今日任务' },
+    { key: 'finalize_schedule', label: '整理今日任务说明', status: 'pending', detail: '等待生成编排依据和任务理由' },
+  ]
+}
+
+function beginLocalGenerationSteps() {
+  clearGenerationTimers()
+  generationSteps.value = defaultGenerationSteps()
+  generationStepTimers = [
+    window.setTimeout(() => advanceGenerationStep(0, 1), 500),
+    window.setTimeout(() => advanceGenerationStep(1, 2), 1100),
+    window.setTimeout(() => advanceGenerationStep(2, 3), 1700),
+    window.setTimeout(() => advanceGenerationStep(3, 4), 2300),
+  ]
+}
+
+function advanceGenerationStep(doneIndex: number, runningIndex: number) {
+  if (!generating.value || !generationSteps.value[doneIndex]) return
+  generationSteps.value[doneIndex] = {
+    ...generationSteps.value[doneIndex],
+    status: 'completed',
+  }
+  if (generationSteps.value[runningIndex]) {
+    generationSteps.value[runningIndex] = {
+      ...generationSteps.value[runningIndex],
+      status: 'running',
+    }
+  }
+}
+
+function applyServerProcessSteps(steps: AgentScheduleProcessStep[] = []) {
+  clearGenerationTimers()
+  generationSteps.value = steps.length
+    ? steps.map(step => ({ ...step, status: step.status || 'completed' }))
+    : generationSteps.value.map(step => ({ ...step, status: 'completed' }))
+}
+
+function markCurrentGenerationStepFailed() {
+  const runningIndex = generationSteps.value.findIndex(step => step.status === 'running')
+  const targetIndex = runningIndex >= 0 ? runningIndex : generationSteps.value.length - 1
+  if (targetIndex >= 0) {
+    generationSteps.value[targetIndex] = {
+      ...generationSteps.value[targetIndex],
+      status: 'failed',
+      detail: 'Agent 编排失败，请稍后重试或检查学习空间配置',
+    }
+  }
+}
+
+function clearGenerationTimers() {
+  generationStepTimers.forEach(timer => window.clearTimeout(timer))
+  generationStepTimers = []
 }
 
 async function startTask(task: TaskVO) {
@@ -443,6 +933,10 @@ function startOfToday() {
   today.setHours(0, 0, 0, 0)
   return today
 }
+
+function openWeeklyReport() {
+  router.push('/learning-report/weekly')
+}
 </script>
 
 <style scoped>
@@ -484,6 +978,137 @@ function startOfToday() {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
+}
+
+.weekly-report-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-xl);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+  border: 1px solid rgba(11, 183, 170, 0.14);
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(135deg, rgba(11, 183, 170, 0.1), rgba(59, 130, 246, 0.06)),
+    var(--panel-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+.report-card-main {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  min-width: 0;
+}
+
+.report-card-icon {
+  width: 54px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+  background: #0bb7aa;
+  color: #ffffff;
+  box-shadow: 0 12px 26px rgba(11, 183, 170, 0.24);
+}
+
+.report-card-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.report-card-copy {
+  min-width: 0;
+}
+
+.report-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-xs);
+}
+
+.report-card-label {
+  color: var(--primary-color);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.report-card-range {
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.report-card-copy h2 {
+  margin: 0 0 var(--spacing-xs);
+  color: var(--text-dark);
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+
+.report-card-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+}
+
+.report-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.report-primary-btn,
+.report-secondary-btn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-full);
+  padding: 0 16px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.report-primary-btn {
+  border: 0;
+  background: var(--primary-color);
+  color: #ffffff;
+  box-shadow: 0 10px 20px rgba(11, 183, 170, 0.2);
+}
+
+.report-primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 24px rgba(11, 183, 170, 0.24);
+}
+
+.report-primary-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.report-secondary-btn {
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
+  color: var(--text-secondary);
+}
+
+.report-secondary-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: var(--button-hover-bg);
 }
 
 /* 统计行 */
@@ -785,21 +1410,349 @@ function startOfToday() {
   line-height: 1.7;
 }
 
-.generate-form .form-item {
+.generate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md) var(--spacing-lg);
+}
+
+.generate-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-sm) 0 var(--spacing-md);
+}
+
+.resource-type-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm) var(--spacing-lg);
+}
+
+.generation-process {
+  display: grid;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  margin: var(--spacing-md) 0;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--background-color-base);
+}
+
+.generation-analysis {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.analysis-header {
+  display: grid;
+  gap: 3px;
+}
+
+.analysis-header span {
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.analysis-header strong {
+  color: var(--text-dark);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.analysis-item {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+}
+
+.analysis-item span {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+}
+
+.analysis-item strong {
+  color: var(--text-dark);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+
+.analysis-item small {
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+}
+
+.process-divider {
+  height: 1px;
+  background: var(--border-light);
+}
+
+.analysis-panels {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.analysis-panel {
+  min-width: 0;
+  display: grid;
+  align-content: flex-start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+}
+
+.analysis-panel h4 {
+  margin: 0;
+  color: var(--text-dark);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.analysis-panel ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-panel li {
+  position: relative;
+  padding-left: 12px;
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+  line-height: 1.55;
+}
+
+.analysis-panel li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.65em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--primary-color);
+}
+
+.weakness-panel li::before {
+  background: var(--warning-color);
+}
+
+.basis-panel li::before {
+  background: var(--accent-color);
+}
+
+.process-step {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.process-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--border-color);
+}
+
+.process-step.running .process-dot {
+  background: var(--primary-color);
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+}
+
+.process-step.completed .process-dot {
+  background: var(--accent-color);
+}
+
+.process-step.failed .process-dot {
+  background: var(--danger-color);
+}
+
+.process-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.process-label {
+  color: var(--text-dark);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.process-detail {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.agent-schedule-result {
+  display: grid;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  margin-top: var(--spacing-md);
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  border-radius: var(--radius-lg);
+  background: rgba(11, 183, 170, 0.04);
+}
+
+.result-header {
+  display: grid;
+  gap: 4px;
+}
+
+.result-label {
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.result-header strong {
+  color: var(--text-dark);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.evidence-item {
+  display: grid;
+  gap: 4px;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-light);
+}
+
+.evidence-item span {
+  color: var(--text-secondary);
+  font-size: 0.6875rem;
+}
+
+.evidence-item strong {
+  color: var(--text-dark);
+  font-size: 0.9375rem;
+}
+
+.result-block {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.result-block h4 {
+  margin: 0;
+  color: var(--text-dark);
+  font-size: 0.8125rem;
+}
+
+.result-block ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+
+.weak-signal-list,
+.reason-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.weak-signal-list span,
+.reason-tags span {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.task-reason-list {
+  display: grid;
+  gap: var(--spacing-sm);
+}
+
+.task-reason-card {
+  display: grid;
+  gap: 6px;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-light);
+}
+
+.task-reason-card strong {
+  color: var(--text-dark);
+  font-size: 0.8125rem;
+}
+
+.task-reason-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.generate-form :deep(.el-form-item) {
   margin-bottom: var(--spacing-lg);
 }
 
-.generate-form label {
-  display: block;
+.generate-form :deep(.el-form-item__label) {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-dark);
-  margin-bottom: var(--spacing-sm);
+  line-height: 1.4;
+  margin-bottom: var(--spacing-xs);
+}
+
+.generate-task-dialog :deep(.el-dialog__body) {
+  padding-top: var(--spacing-sm);
 }
 
 @media (max-width: 768px) {
   .stats-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .weekly-report-card,
+  .report-card-main,
+  .report-card-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .generate-grid,
+  .analysis-grid,
+  .analysis-panels,
+  .evidence-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
