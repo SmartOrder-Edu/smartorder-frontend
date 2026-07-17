@@ -472,13 +472,16 @@ function onQuizAnswer(_quizId: string, answer: string) {
 
 .temporary-board-note {
   position: relative;
-  padding: 15px 18px 16px;
+  padding: 16px 18px 18px;
   border-radius: 12px;
-  border: 1px solid rgba(11, 183, 170, 0.18);
+  border: 1px solid rgba(15, 23, 42, 0.08);
   background:
-    linear-gradient(180deg, rgba(240, 253, 250, 0.82), rgba(255, 255, 255, 0.96)),
-    repeating-linear-gradient(0deg, rgba(14, 165, 233, 0.05) 0, rgba(14, 165, 233, 0.05) 1px, transparent 1px, transparent 30px);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.98)),
+    radial-gradient(circle at 18px 18px, rgba(14, 165, 233, 0.1) 1px, transparent 1.5px);
+  background-size: 100% 100%, 26px 26px;
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.07),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
   animation: boardNoteIn 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 
   :deep(.markdown-renderer) {
@@ -511,14 +514,27 @@ function onQuizAnswer(_quizId: string, answer: string) {
 }
 
 .temporary-board-note--diagram {
-  border-color: rgba(14, 165, 233, 0.24);
+  padding: 0;
+  overflow: hidden;
+  border-color: rgba(14, 165, 233, 0.18);
   background:
-    linear-gradient(180deg, rgba(240, 249, 255, 0.9), rgba(255, 255, 255, 0.98)),
-    repeating-linear-gradient(90deg, rgba(14, 165, 233, 0.055) 0, rgba(14, 165, 233, 0.055) 1px, transparent 1px, transparent 34px),
-    repeating-linear-gradient(0deg, rgba(11, 183, 170, 0.05) 0, rgba(11, 183, 170, 0.05) 1px, transparent 1px, transparent 34px);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98)),
+    #fff;
+  box-shadow:
+    0 22px 54px rgba(14, 165, 233, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+
+  .temporary-board-head {
+    margin: 0;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+    background:
+      linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.92));
+  }
 
   .temporary-board-head h3 {
     color: #0369a1;
+    font-size: 13px;
   }
 
   .temporary-board-dot {
@@ -526,10 +542,32 @@ function onQuizAnswer(_quizId: string, answer: string) {
     box-shadow: 0 0 0 5px rgba(14, 165, 233, 0.12);
   }
 
+  .temporary-board-question {
+    margin: 12px 16px 0;
+    padding: 7px 10px;
+    border-radius: 8px;
+    background: rgba(14, 165, 233, 0.06);
+    color: #475569;
+  }
+
+  :deep(.markdown-renderer) {
+    padding: 14px 16px 16px;
+  }
+
+  :deep(.markdown-renderer > p:first-child) {
+    margin-top: 0;
+  }
+
   :deep(.markdown-renderer .mermaid-block) {
-    margin-top: 10px;
-    border-color: rgba(14, 165, 233, 0.18);
-    box-shadow: 0 12px 28px rgba(14, 165, 233, 0.08);
+    margin: 12px 0 0;
+    border-color: rgba(14, 165, 233, 0.2);
+    box-shadow:
+      0 18px 42px rgba(14, 165, 233, 0.1),
+      0 1px 0 rgba(255, 255, 255, 0.92) inset;
+  }
+
+  :deep(.markdown-renderer .mermaid-diagram-body) {
+    max-height: 620px;
   }
 }
 
