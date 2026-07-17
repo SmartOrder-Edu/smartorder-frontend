@@ -149,7 +149,7 @@ async function sendMessage() {
 }
 
 .quick-agent-form {
-  width: min(430px, calc(100vw - 42px));
+  width: min(580px, calc(100vw - 42px));
   height: 56px;
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr) 34px 28px;
@@ -252,7 +252,7 @@ async function sendMessage() {
     transform: translateY(6px) scale(0.96);
   }
   to {
-    width: min(430px, calc(100vw - 42px));
+    width: min(580px, calc(100vw - 42px));
     opacity: 1;
     transform: translateY(0) scale(1);
   }
