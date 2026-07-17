@@ -502,13 +502,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       chatMessages.value.push(assistantMessage)
       const streamOk = await streamStudyAgentReply(question, assistantMessage)
       if (!streamOk || !assistantMessage.text.trim()) {
-        const reply = buildMockCustomReply(question)
-        assistantMessage.text = reply.chat
-        appendTemporaryBoardNote({
-          title: '临时补充板书',
-          content: reply.board,
-          sourceQuestion: question,
-        })
+        assistantMessage.text = 'Agent 对话暂时没有连上后端，请检查登录状态、后端服务和 `/agent/chat/stream` 接口。'
+        ElMessage.error('Agent 对话接口未返回有效内容')
         return
       }
       appendTemporaryBoardNote({
@@ -579,7 +574,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       })
       return true
     } catch (error) {
-      console.warn('[StudyAgent] 流式对话失败，回退本地回答。', error)
+      console.warn('[StudyAgent] 流式对话失败。', error)
       return false
     }
   }
