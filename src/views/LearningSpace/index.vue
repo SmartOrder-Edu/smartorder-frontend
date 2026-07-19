@@ -710,6 +710,10 @@
             </div>
             <el-empty v-else description="暂无学习记录" :image-size="80" />
           </div>
+          <!-- Tab: Insight -->
+          <div v-show="activeTab === 'insight'" class="tab-content">
+            <InsightTab />
+          </div>
         </div>
 
         <!-- Agent Sidebar -->
@@ -738,6 +742,7 @@ import PathTimeline from '@/components/PathTimeline.vue'
 import LearningPathMindMap from '@/components/LearningPathMindMap.vue'
 import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import LearningContributionCalendar from './components/LearningContributionCalendar.vue'
+import InsightTab from './components/InsightTab.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
@@ -821,6 +826,7 @@ const tabs = computed(() => [
   { id: 'path', label: '路径', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>', badge: dashboard.value?.pathProgress?.totalNodes || 0 },
   { id: 'resources', label: '资源与测评', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>', badge: dashboard.value?.resources.length || 0 },
   { id: 'records', label: '记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>', badge: displayRecords.value.length },
+  { id: 'insight', label: '学情洞察', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>', badge: 6 },
 ])
 
 const fallbackWeaknesses = ['洛必达法则适用条件', '无穷小阶数比较', '间断点分类']
@@ -1753,7 +1759,7 @@ function loadDashboard() {
 
 function syncActiveTabFromRoute() {
   const tab = String(route.query.tab || '')
-  if (['today', 'plan', 'path', 'resources', 'records'].includes(tab)) {
+  if (['today', 'plan', 'path', 'resources', 'records', 'insight'].includes(tab)) {
     activeTab.value = tab
   }
 }
