@@ -360,7 +360,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { userApi } from '@/api/user'
@@ -481,6 +481,20 @@ const handleGithubLogin = async () => {
     return
   }
   try {
+    await ElMessageBox.confirm(
+      '系统需要读取您 <span style="color: #1890ff; font-weight: 500;">Github</span> 的 <span style="color: #1890ff; font-weight: 500;">用户名</span> 以及 <span style="color: #1890ff; font-weight: 500;">邮箱</span> 进行第三方登录，是否同意并继续？',
+      '授权确认',
+      {
+        dangerouslyUseHTMLString: true,
+        confirmButtonText: '同意',
+        cancelButtonText: '取消',
+        type: 'info',
+      }
+    )
+  } catch {
+    return
+  }
+  try {
     // 先获取 state 防 CSRF 参数，再由后端校验
     const state = await userApi.getGithubOAuthState()
     const authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=read:user%20user:email&state=${encodeURIComponent(state)}`
@@ -497,6 +511,20 @@ const GITEE_REDIRECT_URI = import.meta.env.VITE_GITEE_REDIRECT_URI || `${window.
 const handleGiteeLogin = async () => {
   if (!GITEE_CLIENT_ID) {
     ElMessage.error('系统未配置 Gitee 登录参数')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      '系统需要读取您 <span style="color: #1890ff; font-weight: 500;">Gitee</span> 的 <span style="color: #1890ff; font-weight: 500;">用户名</span> 以及 <span style="color: #1890ff; font-weight: 500;">邮箱</span> 进行第三方登录，是否同意并继续？',
+      '授权确认',
+      {
+        dangerouslyUseHTMLString: true,
+        confirmButtonText: '同意',
+        cancelButtonText: '取消',
+        type: 'info',
+      }
+    )
+  } catch {
     return
   }
   try {
