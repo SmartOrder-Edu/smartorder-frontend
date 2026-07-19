@@ -683,31 +683,17 @@
           <div v-show="activeTab === 'records'" class="tab-content">
             <div class="section-header">
               <h3>学习记录</h3>
-              <span class="task-count">近 7 天</span>
+              <span class="task-count">{{ recordRangeLabel }}</span>
             </div>
 
-            <div class="records-chart" v-if="dashboard.recentRecords.length">
-              <div class="chart-bars">
-                <div
-                  v-for="rec in dashboard.recentRecords"
-                  :key="rec.id"
-                  class="chart-bar-col"
-                >
-                  <div class="bar-wrapper">
-                    <div
-                      class="bar-fill"
-                      :style="{ height: (rec.studyDurationMinutes / maxDuration * 100) + '%' }"
-                    ></div>
-                  </div>
-                  <span class="bar-label">{{ formatDateShort(rec.recordDate) }}</span>
-                  <span class="bar-value">{{ rec.studyDurationMinutes }}m</span>
-                </div>
-              </div>
-            </div>
+            <LearningContributionCalendar
+              v-if="displayRecords.length"
+              :records="displayRecords"
+            />
 
-            <div class="records-table" v-if="dashboard.recentRecords.length">
+            <div class="records-table" v-if="displayRecords.length">
               <div
-                v-for="rec in [...dashboard.recentRecords].reverse()"
+                v-for="rec in [...displayRecords].reverse()"
                 :key="rec.id"
                 class="record-row"
               >
@@ -751,6 +737,7 @@ import TaskCard from '@/components/TaskCard.vue'
 import PathTimeline from '@/components/PathTimeline.vue'
 import LearningPathMindMap from '@/components/LearningPathMindMap.vue'
 import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
+import LearningContributionCalendar from './components/LearningContributionCalendar.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
 import { useStudyEntry } from '@/composables/useStudyEntry'
 import { agentApi } from '@/api/agent'
@@ -772,6 +759,7 @@ import type {
   ResourceVO,
   RiskStatus,
   TaskVO,
+  LearningRecordVO,
 } from '@/types/learningSpace'
 import type { LearningPlanDraft, PhaseInfo, ResourceInfo, KnowledgeNode } from '@/types/planExecute'
 import type { LearningAlgorithmState } from '@/api/algorithm'
@@ -818,13 +806,21 @@ const agentPanelRef = ref<InstanceType<typeof SpaceAgentPanel> | null>(null)
 
 const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
+const mockLearningRecords = computed<LearningRecordVO[]>(() => buildMockLearningRecords())
+const displayRecords = computed(() => {
+  const records = dashboard.value?.recentRecords || []
+  return records.length ? records : mockLearningRecords.value
+})
+const recordRangeLabel = computed(() => (
+  dashboard.value?.recentRecords?.length ? '近 7 天' : 'Mock 近 4 周'
+))
 
 const tabs = computed(() => [
   { id: 'today', label: '今日', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>', badge: dashboard.value?.todayTasks.length || 0 },
   { id: 'plan', label: '计划', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>', badge: planDraft.value?.phases?.length || 0 },
   { id: 'path', label: '路径', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>', badge: dashboard.value?.pathProgress?.totalNodes || 0 },
   { id: 'resources', label: '资源与测评', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>', badge: dashboard.value?.resources.length || 0 },
-  { id: 'records', label: '记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>', badge: dashboard.value?.recentRecords.length || 0 },
+  { id: 'records', label: '记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>', badge: displayRecords.value.length },
 ])
 
 const fallbackWeaknesses = ['洛必达法则适用条件', '无穷小阶数比较', '间断点分类']
@@ -872,6 +868,53 @@ const resourceStatusSortOrder: Record<ResourceStatus, number> = {
   generated: 3,
 }
 
+function buildMockLearningRecords(): LearningRecordVO[] {
+  const records = [
+    { daysAgo: 27, minutes: 35, completed: 1, planned: 2, focus: 3, mood: 'normal', rating: 3, reflection: '完成基础概念回顾，开始建立学习节奏。' },
+    { daysAgo: 26, minutes: 50, completed: 2, planned: 2, focus: 4, mood: 'focused', rating: 4, reflection: '专注度提升，例题理解更稳定。' },
+    { daysAgo: 24, minutes: 18, completed: 1, planned: 2, focus: 2, mood: 'tired', rating: 2, reflection: '学习时间偏短，建议拆成更小任务。' },
+    { daysAgo: 23, minutes: 72, completed: 3, planned: 3, focus: 5, mood: 'motivated', rating: 5, reflection: '高强度学习日，关键概念掌握明显提升。' },
+    { daysAgo: 21, minutes: 42, completed: 2, planned: 3, focus: 3, mood: 'normal', rating: 3, reflection: '完成练习，但错题需要二次复盘。' },
+    { daysAgo: 20, minutes: 95, completed: 4, planned: 4, focus: 5, mood: 'focused', rating: 5, reflection: '进入稳定输出状态，可以推进下一节。' },
+    { daysAgo: 18, minutes: 28, completed: 1, planned: 2, focus: 3, mood: 'normal', rating: 3, reflection: '保持最低学习量，避免中断。' },
+    { daysAgo: 17, minutes: 64, completed: 2, planned: 3, focus: 4, mood: 'focused', rating: 4, reflection: '专项练习效果较好，继续巩固薄弱点。' },
+    { daysAgo: 16, minutes: 88, completed: 3, planned: 3, focus: 4, mood: 'motivated', rating: 4, reflection: '任务完成质量较高，可增加综合题。' },
+    { daysAgo: 13, minutes: 22, completed: 1, planned: 2, focus: 2, mood: 'low', rating: 2, reflection: '状态偏低，建议减少新知识输入。' },
+    { daysAgo: 12, minutes: 55, completed: 2, planned: 3, focus: 4, mood: 'normal', rating: 4, reflection: '恢复正常节奏，错题回顾有效。' },
+    { daysAgo: 10, minutes: 76, completed: 3, planned: 3, focus: 5, mood: 'focused', rating: 5, reflection: '今天适合推进核心知识点。' },
+    { daysAgo: 9, minutes: 46, completed: 2, planned: 2, focus: 4, mood: 'normal', rating: 4, reflection: '复习任务完成，保持当前节奏。' },
+    { daysAgo: 6, minutes: 31, completed: 1, planned: 2, focus: 3, mood: 'normal', rating: 3, reflection: '开始新一轮复习，先处理基础题。' },
+    { daysAgo: 5, minutes: 67, completed: 2, planned: 3, focus: 4, mood: 'focused', rating: 4, reflection: '薄弱点练习有效，建议明天继续。' },
+    { daysAgo: 4, minutes: 104, completed: 4, planned: 4, focus: 5, mood: 'motivated', rating: 5, reflection: '本周最高活跃日，学习效率很好。' },
+    { daysAgo: 3, minutes: 44, completed: 2, planned: 3, focus: 3, mood: 'normal', rating: 3, reflection: '完成主要任务，留一个复盘尾巴。' },
+    { daysAgo: 2, minutes: 58, completed: 2, planned: 2, focus: 4, mood: 'focused', rating: 4, reflection: '连续学习状态稳定。' },
+    { daysAgo: 1, minutes: 39, completed: 1, planned: 2, focus: 3, mood: 'normal', rating: 3, reflection: '轻量复习，适合作为过渡。' },
+    { daysAgo: 0, minutes: 82, completed: 3, planned: 3, focus: 5, mood: 'focused', rating: 5, reflection: '今天状态集中，可以继续完成高优任务。' },
+  ]
+
+  return records.map((record, index) => ({
+    id: 9000 + index,
+    recordDate: formatMockDate(record.daysAgo),
+    studyDurationMinutes: record.minutes,
+    tasksCompleted: record.completed,
+    tasksPlanned: record.planned,
+    focusLevel: record.focus,
+    mood: record.mood,
+    selfRating: record.rating,
+    aiReflection: record.reflection,
+  }))
+}
+
+function formatMockDate(daysAgo: number) {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  date.setDate(date.getDate() - daysAgo)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const spaceCoverThemes: Record<string, string> = {
   course: 'linear-gradient(135deg, #2563eb 0%, #38bdf8 100%)',
   exam: 'linear-gradient(135deg, #059669 0%, #34d399 100%)',
@@ -890,11 +933,6 @@ const heroBackgroundStyle = computed(() => {
   return {
     background: spaceCoverThemes[dashboard.value?.space.type || 'course'] || spaceCoverThemes.course,
   }
-})
-
-const maxDuration = computed(() => {
-  if (!dashboard.value?.recentRecords.length) return 60
-  return Math.max(...dashboard.value.recentRecords.map(r => r.studyDurationMinutes), 30)
 })
 
 const nextTodayTask = computed(() => {
@@ -1377,10 +1415,6 @@ function findPhaseByText(phases: PhaseInfo[], text: string | null | undefined) {
       || (!!phaseName && normalized.includes(phaseName))
       || points.some(point => point === normalized || point.includes(normalized) || normalized.includes(point))
   }) || null
-}
-
-function formatDateShort(date: string) {
-  return date.slice(5)
 }
 
 function togglePackageType(type: ResourceType) {
@@ -2904,56 +2938,6 @@ watch(
   border: 1px solid #fecaca;
 }
 
-/* ========== Records ========== */
-.records-chart { margin-bottom: 16px; }
-
-.chart-bars {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  height: 120px;
-  padding: 0 8px;
-  justify-content: space-around;
-}
-
-.chart-bar-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-}
-
-.bar-wrapper {
-  width: 100%;
-  max-width: 40px;
-  height: 100px;
-  background: #f3f4f6;
-  border-radius: 8px 8px 0 0;
-  overflow: hidden;
-  display: flex;
-  align-items: flex-end;
-}
-
-.bar-fill {
-  width: 100%;
-  background: linear-gradient(to top, #3b82f6, #60a5fa);
-  border-radius: 8px 8px 0 0;
-  min-height: 4px;
-  transition: height 0.5s ease;
-}
-
-.bar-label {
-  font-size: 0.625rem;
-  color: #9ca3af;
-}
-
-.bar-value {
-  font-size: 0.625rem;
-  color: #6b7280;
-  font-weight: 600;
-}
-
 .records-table {
   display: flex;
   flex-direction: column;
@@ -3660,21 +3644,6 @@ watch(
 .resource-card:hover {
   border-color: rgba(11, 183, 170, 0.24);
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
-}
-
-.records-chart {
-  padding: 18px 14px 12px;
-  border-radius: 16px;
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-.bar-wrapper {
-  background: #e2e8f0;
-}
-
-.bar-fill {
-  background: linear-gradient(to top, #0bb7aa, #38bdf8);
 }
 
 @media (max-width: 1200px) {
