@@ -414,19 +414,12 @@ import EmailEditDialog from './components/EmailEditDialog.vue'
 // 组合式函数
 import { useScrollSpy } from './composables/useScrollSpy'
 
-// Mock 数据
-import {
-  mockKnowledgeDistribution,
-  mockLearningSuggestions,
-  mockCurrentStatus,
-  mockPeerRadarData,
-  mockSubjectBarData,
-  mockMistakeList,
-  mockPreferenceItems,
-  mockWeakKnowledgeList,
-  mockMetacognitions,
-  mockRadarDimensions,
-} from './mocks/profileMockData'
+import type {
+  CurrentStatus,
+  KnowledgeDistribution,
+  LearningSuggestion,
+  PreferenceItem,
+} from './types/profile'
 
 // ==================== Store & State ====================
 const userStore = useUserStore()
@@ -483,13 +476,36 @@ const resourceTypeLabels: Record<string, string> = {
   CODE_TRACE: '代码追踪', INTERACTIVE: '交互式', QUIZ: '测验',
 }
 
-const overallAbilityKeywordMap: Record<string, string[]> = {
-  编程实现: ['编程', '代码', '实现', '实践', '开发', 'program', 'code'],
-  算法思维: ['算法', '逻辑', '思维', '推理', 'algorithm', 'logic'],
-  调试排错: ['调试', '排错', '错误', '诊断', 'debug', 'bug'],
-  系统设计: ['系统', '架构', '设计', '工程', 'system', 'design'],
-  协作沟通: ['协作', '沟通', '表达', '合作', '团队', 'communication'],
-  学习迁移: ['迁移', '应用', '举一反三', '知识理解', '学习', 'transfer'],
+const learningStatusLabels: Record<string, string> = {
+  NOT_STARTED: '待开始',
+  LEARNING: '学习中',
+  BLOCKED: '遇到卡点',
+  REVIEWING: '复习中',
+  COMPLETED: '阶段完成',
+}
+
+const defaultKnowledgeDistribution: KnowledgeDistribution = {
+  mastered: 0,
+  basic: 0,
+  weak: 0,
+  unlearned: 0,
+  total: 0,
+}
+
+// 将后端可能返回的小数比例或百分制分数统一压到 0~100，避免图表出现越界值。
+const toPercent = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 0
+  const normalized = value > 0 && value <= 1 ? value * 100 : value
+  return Math.max(0, Math.min(100, Math.round(normalized)))
+}
+
+// 学科画像里可能有多个 currentLearningState，这里选第一个有内容的状态给“当前学习状态”卡片使用。
+const getPrimaryCurrentLearningState = () => {
+  const profiles = profileData.value?.subjectProfiles?.profiles
+  if (!profiles) return null
+  return Object.values(profiles)
+    .map((subject) => subject.currentLearningState)
+    .find((state) => state && Object.keys(state).length > 0) ?? null
 }
 
 // ==================== Hero 数据（始终有值） ====================
@@ -504,7 +520,7 @@ const heroData = computed(() => {
     UNDERGRADUATE: '本科生', GRADUATE: '研究生', DOCTORAL: '博士生', SELF_TAUGHT: '自学者',
   }
 
-  let goalText = u?.bio || '系统学习计算机核心课程，提升编程与算法能力'
+  let goalText = u?.bio || profileData.value?.profileSummary || '暂无学习目标'
   if (goals?.primaryGoalId && goals.goals?.[goals.primaryGoalId]) {
     goalText = goals.goals[goals.primaryGoalId].title || goalText
   }
@@ -512,13 +528,13 @@ const heroData = computed(() => {
   return {
     name: u?.username || '学习者',
     avatar: u?.avatarUrl || '',
-    identity: eduLevelLabels[bg?.education?.educationLevel || ''] || (u?.role === 1 ? '教师' : '本科生'),
-    direction: bg?.education?.majorName || '计算机科学与技术',
-    level: bg?.currentLevelDetail || '大二',
+    identity: eduLevelLabels[bg?.education?.educationLevel || ''] || (u?.role === 1 ? '教师' : '待完善'),
+    direction: bg?.education?.majorName || '待完善',
+    level: bg?.currentLevelDetail || '待评估',
     goal: goalText,
-    weeklyMinutes: constraints?.weeklyAvailableMinutes ?? 750,
-    overallMastery: ability?.overallScore != null ? Math.round(ability.overallScore) : 71,
-    overallLevel: ability?.overallLevel ? levelLabels[ability.overallLevel] || ability.overallLevel : '发展中',
+    weeklyMinutes: constraints?.weeklyAvailableMinutes ?? 0,
+    overallMastery: ability?.overallScore != null ? toPercent(ability.overallScore) : 0,
+    overallLevel: ability?.overallLevel ? levelLabels[ability.overallLevel] || ability.overallLevel : '待评估',
   }
 })
 
@@ -535,44 +551,44 @@ const heroMetrics = computed(() => {
       label: '每周学习时长',
       value: constraints?.weeklyAvailableMinutes
         ? `${(constraints.weeklyAvailableMinutes / 60).toFixed(1)}h`
-        : '12.5h',
+        : '暂无',
       icon: '⏱',
       color: '#2563eb',
       bg: '#eff6ff',
-      trend: '+2.5h',
-      trendUp: true,
+      trend: undefined,
+      trendUp: null,
     },
     {
       key: 'mastery',
       label: '综合掌握度',
-      value: ability?.overallScore != null ? `${Math.round(ability.overallScore)}%` : '71%',
+      value: ability?.overallScore != null ? `${toPercent(ability.overallScore)}%` : '暂无',
       icon: '📊',
       color: '#10b981',
       bg: '#ecfdf5',
-      trend: '+5%',
-      trendUp: true,
+      trend: undefined,
+      trendUp: null,
     },
     {
       key: 'metacog',
       label: '元认知水平',
       value: metacog?.overallLevel
         ? (levelLabels[metacog.overallLevel] || metacog.overallLevel)
-        : '良好',
+        : '暂无',
       icon: '🧠',
       color: '#f59e0b',
       bg: '#fffbeb',
-      trend: '稳定',
+      trend: undefined,
       trendUp: null,
     },
     {
       key: 'streak',
       label: '连续学习天数',
-      value: '5天',
+      value: '暂无',
       icon: '⚡',
       color: '#8b5cf6',
       bg: '#f5f3ff',
-      trend: '连续 5 天',
-      trendUp: true,
+      trend: undefined,
+      trendUp: null,
     },
   ]
 })
@@ -594,85 +610,45 @@ const goalProgressItems = computed(() => {
     }))
   }
 
-  return [
-    {
-      id: 'mock-goal-1',
-      name: '数据结构与算法精通',
-      description: '掌握高频算法模型与复杂度分析',
-      percent: 78,
-      color: '#2563eb',
-      status: 'IN_PROGRESS',
-      priority: 'HIGH',
-    },
-    {
-      id: 'mock-goal-2',
-      name: '计算机组成原理',
-      description: '理解 CPU、存储层级与指令执行过程',
-      percent: 62,
-      color: '#10b981',
-      status: 'IN_PROGRESS',
-      priority: 'MEDIUM',
-    },
-    {
-      id: 'mock-goal-3',
-      name: '项目实战能力提升',
-      description: '完成 2 个完整项目并沉淀复盘',
-      percent: 41,
-      color: '#8b5cf6',
-      status: 'IN_PROGRESS',
-      priority: 'MEDIUM',
-    },
-    {
-      id: 'mock-goal-4',
-      name: '算法竞赛入门',
-      description: '单周完成 30 道基础训练题',
-      percent: 28,
-      color: '#f97316',
-      status: 'IN_PROGRESS',
-      priority: 'LOW',
-    },
-  ]
+  return []
 })
 
 // ==================== 雷达图数据 ====================
 const radarDimensions = computed(() => {
   const abilities = profileData.value?.abilityProfile?.abilities
-  const fallbackDimensions = mockRadarDimensions()
-  if (!abilities || Object.keys(abilities).length === 0) return fallbackDimensions
+  if (!abilities || Object.keys(abilities).length === 0) return []
 
-  const abilityItems = Object.values(abilities)
-
-  // 综合雷达固定展示学生总体能力六维，避免后端学科名直接进入雷达图。
-  return fallbackDimensions.map((dimension) => {
-    const keywords = overallAbilityKeywordMap[dimension.name] || []
-    const matchedScores = abilityItems
-      .filter((item) => {
-        const text = `${item.abilityName || ''}${item.abilityCode || ''}`.toLowerCase()
-        return keywords.some((keyword) => text.includes(keyword.toLowerCase()))
-      })
-      .map((item) => Math.max(0, Math.min(100, item.score ?? dimension.score)))
-
-    if (matchedScores.length === 0) return dimension
-
-    const averageScore = matchedScores.reduce((sum, score) => sum + score, 0) / matchedScores.length
-    return {
-      name: dimension.name,
-      score: Math.round(averageScore),
-    }
-  })
+  return Object.values(abilities).slice(0, 6).map((item) => ({
+    name: item.abilityName || item.abilityCode || '未命名能力',
+    score: toPercent(item.score),
+  }))
 })
 
 const peerRadarDimensions = computed(() => {
-  return mockPeerRadarData(radarDimensions.value.map((d) => d.name))
+  return []
 })
 
 // ==================== 学习偏好环形图 ====================
-const preferenceChartItems = computed(() => {
-  // 当前学习偏好模块按设计稿固定展示 mock 画像数据，避免接口数据缺失导致版式不稳定。
-  return mockPreferenceItems()
+const preferenceChartItems = computed<PreferenceItem[]>(() => {
+  const preferences = profileData.value?.learningPreference?.resourcePreferences
+  if (!preferences) return []
+
+  // 学习偏好只使用后端已观测的资源偏好指标，暂无有效占比时交给组件显示空状态。
+  return Object.entries(preferences)
+    .map(([type, item]) => ({
+      name: resourceTypeLabels[item.resourceType || type] || item.resourceType || type,
+      value: toPercent(
+        item.selectionRate
+        || item.completionRate
+        || item.postLearningAccuracyRate
+        || item.observedEffectivenessScore
+      ),
+    }))
+    .filter((item) => item.value > 0)
+    .slice(0, 5)
 })
 
-// ==================== 学科数据（API + mock fallback） ====================
+// ==================== 学科数据（API） ====================
 const subjectBarData = computed(() => {
   const apiData = buildSubjectProfileList(profileData.value, resourceTypeLabels)
     .map((s) => ({
@@ -681,13 +657,13 @@ const subjectBarData = computed(() => {
       lastTestTime: '',
       trend: 'stable' as const,
     }))
-  return apiData.length > 0 ? apiData : mockSubjectBarData()
+  return apiData.slice(0, 6)
 })
 
-// ==================== 高频错题（API + mock fallback） ====================
+// ==================== 高频错题（API） ====================
 const mistakeList = computed(() => {
   const patterns = profileData.value?.commonMisconceptions?.patterns
-  if (!patterns || Object.keys(patterns).length === 0) return mockMistakeList()
+  if (!patterns || Object.keys(patterns).length === 0) return []
   const colorMap = ['#ef4444', '#f59e0b', '#10b981', '#2563eb', '#8b5cf6']
   const list = Object.values(patterns).slice(0, 5).map((p, i) => ({
     id: p.misconceptionId || String(i),
@@ -702,42 +678,58 @@ const mistakeList = computed(() => {
     lastObserved: p.occurrenceStatistics?.lastObservedAt,
     recommendation: p.intervention?.recommendedActions?.[0] || '',
   }))
-  return list.length > 0 ? list : mockMistakeList()
+  return list
 })
 
 // ==================== 元认知数据 ====================
 // ==================== 元认知数据 ====================
 const metacognitions = computed(() => {
   const dims = profileData.value?.metacognitiveProfile?.dimensions
-  if (!dims || Object.keys(dims).length === 0) return mockMetacognitions()
-  const list = Object.values(dims).map((d) => ({
+  if (!dims || Object.keys(dims).length === 0) return []
+  return Object.values(dims).slice(0, 4).map((d) => ({
     name: d.dimensionName || d.dimensionCode || '',
-    value: d.score ?? 0,
+    value: toPercent(d.score),
     level: levelLabels[d.level || ''] || d.level || '',
     description: d.description || '',
     trend: d.trend || 'STABLE',
   }))
-  return list.length > 0 ? list : mockMetacognitions()
 })
 
 // ==================== 知识点分布 ====================
-const knowledgeDistribution = computed(() => {
-  return mockKnowledgeDistribution()
+const knowledgeDistribution = computed<KnowledgeDistribution>(() => {
+  const profiles = profileData.value?.subjectProfiles?.profiles
+  if (!profiles) return defaultKnowledgeDistribution
+
+  const distribution = { ...defaultKnowledgeDistribution }
+  for (const subject of Object.values(profiles)) {
+    const points = subject.knowledgeMastery?.knowledgePoints
+    if (!points) continue
+
+    for (const point of Object.values(points)) {
+      const score = toPercent(point.masteryScore)
+      distribution.total += 1
+      if (score >= 80) distribution.mastered += 1
+      else if (score >= 60) distribution.basic += 1
+      else if (score > 0) distribution.weak += 1
+      else distribution.unlearned += 1
+    }
+  }
+  return distribution
 })
 
-const knowledgeTrend = ref<number | null>(6)
+const knowledgeTrend = ref<number | null>(null)
 
-// ==================== 薄弱知识点（API + mock fallback） ====================
+// ==================== 薄弱知识点（API） ====================
 const weakKnowledgeList = computed(() => {
   const profiles = profileData.value?.subjectProfiles?.profiles
-  if (!profiles || Object.keys(profiles).length === 0) return mockWeakKnowledgeList()
+  if (!profiles || Object.keys(profiles).length === 0) return []
   const result: Array<{ id: string; name: string; subject: string; percent: number }> = []
   const entries = Object.entries(profiles)
   for (const [, sp] of entries) {
     const kps = sp.knowledgeMastery?.knowledgePoints
     if (kps) {
       for (const [kpId, kp] of Object.entries(kps)) {
-        const score = kp.masteryScore ?? 100
+        const score = toPercent(kp.masteryScore ?? 100)
         if (score < 60) {
           result.push({
             id: kpId,
@@ -749,12 +741,66 @@ const weakKnowledgeList = computed(() => {
       }
     }
   }
-  return result.length > 0 ? result.slice(0, 5) : mockWeakKnowledgeList()
+  return result
+    .sort((a, b) => a.percent - b.percent)
+    .slice(0, 5)
 })
 
-// ==================== Mock 数据引用 ====================
-const currentStatus = computed(() => mockCurrentStatus())
-const learningSuggestions = computed(() => mockLearningSuggestions())
+// ==================== 当前学习状态与建议（API） ====================
+const currentStatus = computed<CurrentStatus>(() => {
+  const state = getPrimaryCurrentLearningState()
+  const preferredPeriods = profileData.value?.learningBackground?.learningConstraints?.preferredStudyPeriods
+  const performance = state?.recentPerformance ?? {}
+  const focusLevel = toPercent(
+    Number(performance.focusLevel ?? performance.accuracyRate ?? profileData.value?.abilityProfile?.overallScore ?? 0)
+  )
+
+  return {
+    icon: 'shield',
+    name: learningStatusLabels[state?.learningStatus || ''] || state?.learningStatus || '暂无学习状态',
+    description:
+      String(state?.currentTask?.description || state?.currentTask?.title || profileData.value?.profileSummary || '后端暂无当前学习状态数据。'),
+    focusLevel,
+    bestStudyTime: preferredPeriods?.length ? preferredPeriods.join('、') : '待观察',
+  }
+})
+
+const learningSuggestions = computed<LearningSuggestion[]>(() => {
+  const state = getPrimaryCurrentLearningState()
+  const suggestions: LearningSuggestion[] = []
+
+  // 优先渲染后端 currentLearningState.nextActions 给出的下一步动作。
+  for (const action of state?.nextActions ?? []) {
+    suggestions.push({
+      icon: '▶',
+      title: String(action.title || action.actionName || action.type || '下一步学习动作'),
+      description: String(action.description || action.reason || action.target || '按当前学习状态继续推进。'),
+      actionLabel: String(action.actionLabel || '查看'),
+    })
+  }
+
+  for (const item of profileData.value?.metacognitiveProfile?.recommendedSupport?.recommendedInterventions ?? []) {
+    suggestions.push({
+      icon: '🧠',
+      title: '元认知支持',
+      description: item,
+      actionLabel: '查看',
+    })
+  }
+
+  const misconceptionActions = Object.values(profileData.value?.commonMisconceptions?.patterns ?? {})
+    .flatMap((pattern) => pattern.intervention?.recommendedActions ?? [])
+  for (const action of misconceptionActions) {
+    suggestions.push({
+      icon: '!',
+      title: '错因改进建议',
+      description: action,
+      actionLabel: '查看',
+    })
+  }
+
+  return suggestions.slice(0, 3)
+})
 
 // ==================== 用户信息（复用现有逻辑） ====================
 const userInfoHeaderData = computed(() => ({
