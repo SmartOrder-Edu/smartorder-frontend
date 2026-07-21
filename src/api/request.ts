@@ -1,9 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import JSONBig from 'json-bigint'
-import { handleAdminMock } from '@/mocks/adminMock'
-
-const ENABLE_ADMIN_MOCK = true
 
 
 const JSONBigString = JSONBig({ storeAsString: true })
@@ -201,12 +198,6 @@ class Request {
   }
 
   public async request<T = any>(config: RequestConfig): Promise<T> {
-    if (ENABLE_ADMIN_MOCK && config.url && config.url.includes('/admin/')) {
-      const mockResult = await handleAdminMock(config)
-      if (mockResult !== null) {
-        return mockResult as T
-      }
-    }
     return this.instance.request(config)
   }
 

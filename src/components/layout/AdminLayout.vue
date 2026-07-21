@@ -79,6 +79,7 @@ import {
   Odometer,
   Cpu,
   Connection,
+  UserFilled,
   ChatLineRound,
   Present,
   Back,
@@ -106,6 +107,7 @@ const menuItems = [
   { id: 'dashboard', label: '系统全局大盘', path: '/admin/dashboard', icon: Odometer },
   { id: 'agent', label: '智能体观测中心', path: '/admin/agent', icon: Cpu },
   { id: 'rag', label: 'RAG 引擎监控', path: '/admin/rag', icon: Connection },
+  { id: 'users', label: '用户管理', path: '/admin/users', icon: UserFilled },
   { id: 'feedback', label: '用户反馈管理', path: '/admin/feedback', icon: ChatLineRound },
   { id: 'prize', label: '反馈奖品管理', path: '/admin/prize', icon: Present }
 ]

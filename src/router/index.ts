@@ -203,6 +203,12 @@ const routes: Array<RouteRecordRaw> = [
         meta: { title: 'RAG 引擎监控 - 知序智学', requiresAuth: true }
       },
       {
+        path: 'users',
+        name: 'AdminUserManagement',
+        component: () => import('@/views/admin/UserManagement.vue'),
+        meta: { title: '用户管理 - 知序智学', requiresAuth: true }
+      },
+      {
         path: 'feedback',
         name: 'FeedbackReviewList',
         component: () => import('@/views/feedback/FeedbackReviewList.vue'),
