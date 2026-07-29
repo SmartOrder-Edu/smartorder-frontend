@@ -122,6 +122,20 @@
             </div>
           </div>
 
+          <div class="learning-cockpit">
+            <div
+              v-for="(item, index) in cockpitItems"
+              :key="item.label"
+              class="cockpit-card"
+              :class="item.tone"
+              :style="{ '--cockpit-delay': `${index * 90}ms` }"
+            >
+              <span class="cockpit-label">{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+              <p>{{ item.detail }}</p>
+            </div>
+          </div>
+
           <div class="agent-decision-panel">
             <div class="decision-copy">
               <span class="decision-eyebrow">Agent 决策依据</span>
@@ -130,6 +144,9 @@
               <div class="decision-evidence">
                 <span v-for="item in agentDecisionEvidence" :key="item">{{ item }}</span>
               </div>
+              <button class="decision-adjust-btn" type="button" @click="playAgentAdjustment">
+                演示 Agent 调整计划
+              </button>
             </div>
             <div class="decision-flow" aria-label="Agent 推理流程">
               <div
@@ -143,6 +160,31 @@
                 <div>
                   <strong>{{ step.label }}</strong>
                   <em>{{ step.detail }}</em>
+                </div>
+              </div>
+            </div>
+            <div class="adjustment-preview" :class="{ running: agentAdjustmentRunning }">
+              <div class="adjustment-preview-head">
+                <span>动态调度演示</span>
+                <strong>{{ agentAdjustmentRunning ? '正在重排今日计划' : '点击左侧按钮查看调整过程' }}</strong>
+              </div>
+              <div class="adjustment-track">
+                <span
+                  v-for="(step, index) in agentAdjustmentSteps"
+                  :key="step"
+                  :class="{ active: agentAdjustmentRunning && index <= agentAdjustmentStepIndex }"
+                >
+                  {{ step }}
+                </span>
+              </div>
+              <div class="adjustment-result">
+                <div>
+                  <em>调整前</em>
+                  <strong>{{ adjustmentBeforeText }}</strong>
+                </div>
+                <div>
+                  <em>调整后</em>
+                  <strong>{{ adjustmentAfterText }}</strong>
                 </div>
               </div>
             </div>
@@ -234,6 +276,7 @@
                 :key="task.id"
                 :task="task"
                 class="stagger-card"
+                :class="{ linked: isTaskLinkedToSelectedPath(task) }"
                 :style="{ '--stagger-delay': `${Math.min(index, 5) * 90}ms` }"
                 @start="handleStartTask"
                 @complete="handleCompleteTask"
@@ -252,6 +295,7 @@
                 :key="task.id"
                 :task="task"
                 class="stagger-card"
+                :class="{ linked: isTaskLinkedToSelectedPath(task) }"
                 :style="{ '--stagger-delay': `${Math.min(index, 5) * 90}ms` }"
                 @start="handleStartTask"
                 @complete="handleCompleteTask"
@@ -448,6 +492,9 @@
                 :progress="dashboard.progress"
                 :weak-points="algorithmWeakPoints"
                 :next-action="algorithmNextAction"
+                @select-node="handlePathNodeSelect"
+                @start-task="handleStartTask"
+                @open-resource="goResourceDetail"
               />
               <PathTimeline
                 v-show="pathViewMode === 'timeline'"
@@ -457,6 +504,12 @@
               />
             </template>
             <el-empty v-else description="学习路径即将由 Agent 生成" :image-size="100" />
+            <div v-if="selectedPathNode" class="path-linked-focus">
+              <span>已聚焦节点</span>
+              <strong>{{ selectedPathNode.title }}</strong>
+              <p>{{ selectedPathLinkedSummary }}</p>
+              <button type="button" @click="activeTab = 'resources'">查看关联资源</button>
+            </div>
           </div>
 
           <!-- Tab: Resources -->
@@ -573,7 +626,7 @@
                     v-for="r in visibleGroupResources(group)"
                     :key="r.id"
                     class="resource-card"
-                    :class="{ disabled: isResourceBusy(r) }"
+                    :class="{ disabled: isResourceBusy(r), linked: isResourceLinkedToSelectedPath(r) }"
                     @click="handleResourceCardClick(r)"
                   >
                     <div class="res-icon" :class="resourceIconClass(r)">
@@ -771,7 +824,21 @@
           </div>
           <span class="celebration-kicker">任务已完成</span>
           <strong>{{ celebrationTaskTitle }}</strong>
-          <p>Agent 已记录本次学习表现，进度和后续建议会同步更新。</p>
+          <div v-if="completionReport" class="completion-report">
+            <div>
+              <span>本次学习</span>
+              <strong>{{ completionReport.minutes }} 分钟</strong>
+            </div>
+            <div>
+              <span>进度变化</span>
+              <strong>{{ completionReport.before }}% → {{ completionReport.after }}%</strong>
+            </div>
+            <div>
+              <span>下一步</span>
+              <strong>{{ completionReport.nextStep }}</strong>
+            </div>
+          </div>
+          <p v-else>Agent 已记录本次学习表现，进度和后续建议会同步更新。</p>
         </div>
       </div>
     </div>
@@ -810,6 +877,7 @@ import type {
   ResourceStatus,
   ResourceType,
   ResourceVO,
+  PathNodeVO,
   RiskStatus,
   TaskVO,
   LearningRecordVO,
@@ -859,6 +927,11 @@ const agentPanelRef = ref<InstanceType<typeof SpaceAgentPanel> | null>(null)
 const animatedHeroProgress = ref(0)
 const celebrationVisible = ref(false)
 const celebrationTaskTitle = ref('')
+const completionReport = ref<{ minutes: number; before: number; after: number; nextStep: string } | null>(null)
+const selectedPathNodeId = ref('')
+const agentAdjustmentRunning = ref(false)
+const agentAdjustmentStepIndex = ref(-1)
+let agentAdjustmentTimer: ReturnType<typeof setInterval> | null = null
 let progressAnimationFrame = 0
 let celebrationTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -959,6 +1032,64 @@ const agentDecisionSteps = computed(() => [
     status: nextTodayTask.value ? 'active' : 'pending',
   },
 ])
+const cockpitItems = computed(() => {
+  const weakName = weaknesses.value[0] || '暂无明显薄弱点'
+  const currentTask = nextTodayTask.value
+  const latestRecord = displayRecords.value[displayRecords.value.length - 1]
+  const estimatedLift = currentTask?.priority ? Math.min(8, Math.max(2, currentTask.priority + 1)) : 3
+  return [
+    {
+      label: '今日目标',
+      value: currentTask?.title || algorithmNextActionTitle.value,
+      detail: currentTask?.estimatedDurationMinutes ? `建议投入 ${currentTask.estimatedDurationMinutes} 分钟` : '先建立今日学习证据',
+      tone: 'primary',
+    },
+    {
+      label: '薄弱预警',
+      value: weakName,
+      detail: algorithmWeakCount.value ? '优先进入补弱任务池' : '保持验证和复盘节奏',
+      tone: algorithmWeakCount.value ? 'warn' : 'success',
+    },
+    {
+      label: '预计收益',
+      value: `+${estimatedLift}%`,
+      detail: '完成今日任务后的掌握度提升预估',
+      tone: 'info',
+    },
+    {
+      label: '状态依据',
+      value: latestRecord ? `${latestRecord.focusLevel}/5 专注` : `${dashboard.value?.streakDays || 0} 天连续`,
+      detail: latestRecord?.aiReflection || '结合连续学习和任务完成情况判断',
+      tone: 'neutral',
+    },
+  ]
+})
+const agentAdjustmentSteps = ['读取学习记录', '发现薄弱知识点', '降低新课难度', '插入补弱练习', '更新今日任务']
+const adjustmentBeforeText = computed(() => nextTodayTask.value?.title || '按原计划推进新知识点')
+const adjustmentAfterText = computed(() => {
+  const weakName = weaknesses.value[0] || algorithmNextAction.value?.knowledgeName || '当前薄弱点'
+  return `先补「${weakName}」+ 5 题验证`
+})
+const selectedPathNode = computed(() => {
+  const nodes = dashboard.value?.pathNodes || []
+  if (!selectedPathNodeId.value) return null
+  return nodes.find(node => node.id === selectedPathNodeId.value) || null
+})
+const selectedPathChildIds = computed(() => {
+  const nodes = dashboard.value?.pathNodes || []
+  if (!selectedPathNodeId.value) return new Set<string>()
+  const ids = new Set<string>([selectedPathNodeId.value])
+  nodes.forEach(node => {
+    if (node.parentNodeId === selectedPathNodeId.value) ids.add(node.id)
+  })
+  return ids
+})
+const selectedPathLinkedSummary = computed(() => {
+  if (!selectedPathNode.value) return ''
+  const taskCount = allTasks.value.filter(isTaskLinkedToSelectedPath).length
+  const resourceCount = visibleResources.value.filter(isResourceLinkedToSelectedPath).length
+  return `关联 ${taskCount} 个任务、${resourceCount} 项资源，切到资源页会自动高亮。`
+})
 const packageTypeOptions: { value: ResourceType; label: string }[] = [
   { value: 'doc', label: '文档' },
   { value: 'html', label: 'HTML' },
@@ -1743,8 +1874,9 @@ async function handleCompleteTask(task: TaskVO) {
       inputValue: String(task.estimatedDurationMinutes || 20),
     })
     const minutes = Number((document.querySelector('.el-message-box__input input') as HTMLInputElement)?.value || task.estimatedDurationMinutes || 20)
+    const beforeProgress = Math.round(dashboard.value?.progress || 0)
     await dashStore.completeTask(task.id, minutes)
-    showCompletionCelebration(task.title)
+    showCompletionCelebration(task.title, minutes, beforeProgress)
     ElMessage.success('任务完成！')
   } catch {
     // cancelled
@@ -1882,13 +2014,54 @@ function animateHeroProgress(targetValue: number) {
   progressAnimationFrame = window.requestAnimationFrame(tick)
 }
 
-function showCompletionCelebration(title: string) {
+function showCompletionCelebration(title: string, minutes: number, beforeProgress: number) {
+  const afterProgress = Math.round(dashboard.value?.progress || Math.min(beforeProgress + 3, 100))
   celebrationTaskTitle.value = title
+  completionReport.value = {
+    minutes,
+    before: beforeProgress,
+    after: Math.max(afterProgress, beforeProgress),
+    nextStep: algorithmNextAction.value?.knowledgeName
+      ? `下一步验证「${algorithmNextAction.value.knowledgeName}」`
+      : nextTodayTask.value?.title
+        ? `继续「${nextTodayTask.value.title}」`
+        : '等待 Agent 生成明日计划',
+  }
   celebrationVisible.value = true
   if (celebrationTimer) clearTimeout(celebrationTimer)
   celebrationTimer = setTimeout(() => {
     celebrationVisible.value = false
-  }, 2200)
+  }, 3200)
+}
+
+function handlePathNodeSelect(node: PathNodeVO) {
+  selectedPathNodeId.value = node.id
+}
+
+function isTaskLinkedToSelectedPath(task: TaskVO) {
+  if (!selectedPathChildIds.value.size || !task.pathNodeId) return false
+  return selectedPathChildIds.value.has(task.pathNodeId)
+}
+
+function isResourceLinkedToSelectedPath(resource: ResourceVO) {
+  if (!selectedPathChildIds.value.size || !resource.pathNodeId) return false
+  return selectedPathChildIds.value.has(resource.pathNodeId)
+}
+
+function playAgentAdjustment() {
+  agentAdjustmentRunning.value = true
+  agentAdjustmentStepIndex.value = -1
+  if (agentAdjustmentTimer) clearInterval(agentAdjustmentTimer)
+  agentAdjustmentTimer = setInterval(() => {
+    agentAdjustmentStepIndex.value += 1
+    if (agentAdjustmentStepIndex.value >= agentAdjustmentSteps.length - 1 && agentAdjustmentTimer) {
+      clearInterval(agentAdjustmentTimer)
+      agentAdjustmentTimer = null
+      setTimeout(() => {
+        agentAdjustmentRunning.value = false
+      }, 900)
+    }
+  }, 420)
 }
 
 function syncActiveTabFromRoute() {
@@ -1909,6 +2082,7 @@ onUnmounted(() => {
     window.cancelAnimationFrame(progressAnimationFrame)
   }
   if (celebrationTimer) clearTimeout(celebrationTimer)
+  if (agentAdjustmentTimer) clearInterval(agentAdjustmentTimer)
 })
 watch(() => route.params.spaceId, () => {
   abortPackageStream()
@@ -1917,6 +2091,7 @@ watch(() => route.params.spaceId, () => {
   streamingResources.value = {}
   optimisticPackageResources.value = []
   resetResourceFilters()
+  selectedPathNodeId.value = ''
   loadDashboard()
   syncActiveTabFromRoute()
   if (!route.query.tab) activeTab.value = 'today'
@@ -2836,6 +3011,7 @@ watch(
 }
 
 .resource-card {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -3510,7 +3686,7 @@ watch(
 
 .agent-decision-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.95fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1fr);
   gap: 16px;
   align-items: stretch;
   margin-top: 16px;
@@ -3522,6 +3698,57 @@ watch(
     #ffffff;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.045);
   animation: decisionEnter 0.48s ease both;
+}
+
+.learning-cockpit {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.cockpit-card {
+  min-width: 0;
+  padding: 13px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.035);
+  animation: cockpitEnter 0.42s ease both;
+  animation-delay: var(--cockpit-delay);
+
+  &.primary { border-color: rgba(11, 183, 170, 0.18); }
+  &.warn { border-color: rgba(245, 158, 11, 0.22); background: rgba(255, 251, 235, 0.76); }
+  &.success { border-color: rgba(16, 185, 129, 0.2); background: rgba(236, 253, 245, 0.74); }
+  &.info { border-color: rgba(14, 165, 233, 0.2); background: rgba(240, 249, 255, 0.78); }
+
+  strong {
+    display: block;
+    overflow: hidden;
+    margin-top: 5px;
+    color: #0f172a;
+    font-size: 0.9rem;
+    line-height: 1.32;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  p {
+    display: -webkit-box;
+    margin: 5px 0 0;
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.7rem;
+    line-height: 1.42;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+}
+
+.cockpit-label {
+  color: #0a9e94;
+  font-size: 0.66rem;
+  font-weight: 900;
 }
 
 .decision-copy {
@@ -3563,6 +3790,26 @@ watch(
     font-size: 0.7rem;
     font-weight: 800;
     box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+  }
+}
+
+.decision-adjust-btn {
+  min-height: 32px;
+  margin-top: 12px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  color: #ffffff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(11, 183, 170, 0.18);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgba(11, 183, 170, 0.24);
   }
 }
 
@@ -3643,6 +3890,102 @@ watch(
   color: #0a9e94;
   font-size: 0.68rem;
   font-weight: 900;
+}
+
+.adjustment-preview {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 0.55fr) minmax(320px, 1fr) minmax(0, 0.7fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+
+  &.running {
+    border-color: rgba(11, 183, 170, 0.26);
+    box-shadow: inset 0 0 0 1px rgba(11, 183, 170, 0.08);
+  }
+}
+
+.adjustment-preview-head {
+  min-width: 0;
+
+  span {
+    color: #0284c7;
+    font-size: 0.66rem;
+    font-weight: 900;
+  }
+
+  strong {
+    display: block;
+    margin-top: 3px;
+    color: #0f172a;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+}
+
+.adjustment-track {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+
+  span {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    padding: 7px 8px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #94a3b8;
+    font-size: 0.64rem;
+    font-weight: 900;
+    text-align: center;
+    white-space: nowrap;
+    transition: background 0.22s ease, color 0.22s ease, transform 0.22s ease;
+
+    &.active {
+      background: #ecfdfb;
+      color: #0a9e94;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(11, 183, 170, 0.1);
+    }
+  }
+}
+
+.adjustment-result {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+
+  div {
+    min-width: 0;
+    padding: 8px 9px;
+    border-radius: 11px;
+    background: #f8fafc;
+  }
+
+  em {
+    display: block;
+    color: #94a3b8;
+    font-size: 0.62rem;
+    font-style: normal;
+    font-weight: 900;
+  }
+
+  strong {
+    display: block;
+    overflow: hidden;
+    margin-top: 3px;
+    color: #334155;
+    font-size: 0.68rem;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 /* 继续学习 hero 区块 */
@@ -3818,6 +4161,11 @@ watch(
 .stagger-card {
   animation: taskLayerEnter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--stagger-delay);
+
+  &.linked {
+    border-color: rgba(11, 183, 170, 0.42);
+    box-shadow: 0 14px 30px rgba(11, 183, 170, 0.13);
+  }
 }
 
 .completion-celebration {
@@ -3863,6 +4211,39 @@ watch(
   }
 }
 
+.completion-report {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+
+  div {
+    min-width: 0;
+    padding: 9px 8px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  span {
+    display: block;
+    color: #94a3b8;
+    font-size: 0.66rem;
+    font-weight: 900;
+  }
+
+  strong {
+    display: block;
+    overflow: hidden;
+    margin-top: 4px;
+    color: #0f172a;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
 .celebration-kicker {
   display: inline-flex;
   padding: 4px 11px;
@@ -3895,6 +4276,11 @@ watch(
 @keyframes decisionEnter {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cockpitEnter {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes flowStepEnter {
@@ -4065,6 +4451,71 @@ watch(
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
 }
 
+.resource-card.linked {
+  border-color: rgba(11, 183, 170, 0.42);
+  box-shadow: 0 14px 30px rgba(11, 183, 170, 0.12);
+
+  &::after {
+    content: '路径关联';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #ecfdfb;
+    color: #0a9e94;
+    font-size: 0.64rem;
+    font-weight: 900;
+  }
+}
+
+.path-linked-focus {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  background: linear-gradient(135deg, #ecfdfb, #f8fafc);
+
+  span {
+    color: #0a9e94;
+    font-size: 0.68rem;
+    font-weight: 900;
+  }
+
+  strong {
+    overflow: hidden;
+    color: #0f172a;
+    font-size: 0.82rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  p {
+    margin: 0;
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.74rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  button {
+    min-height: 30px;
+    padding: 0 11px;
+    border-radius: 10px;
+    border: 1px solid rgba(11, 183, 170, 0.22);
+    background: #ffffff;
+    color: #0a9e94;
+    font-size: 0.72rem;
+    font-weight: 900;
+    cursor: pointer;
+  }
+}
+
 @media (max-width: 1200px) {
   .page-body {
     flex-direction: column;
@@ -4079,6 +4530,14 @@ watch(
   .hero-main-grid,
   .hero-support-row,
   .agent-decision-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .learning-cockpit {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .adjustment-preview {
     grid-template-columns: 1fr;
   }
 
@@ -4097,6 +4556,16 @@ watch(
 
   .decision-flow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .path-linked-focus {
+    grid-template-columns: 1fr;
+    align-items: flex-start;
+  }
+
+  .path-linked-focus p,
+  .path-linked-focus strong {
+    white-space: normal;
   }
 }
 
@@ -4283,6 +4752,16 @@ watch(
 
   .decision-flow-step::after {
     display: none;
+  }
+
+  .learning-cockpit,
+  .completion-report {
+    grid-template-columns: 1fr;
+  }
+
+  .adjustment-track {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .resource-filter-controls {

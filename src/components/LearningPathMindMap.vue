@@ -48,14 +48,14 @@
               v-for="stage in stageLayouts"
               :key="`root-${stage.node.id}`"
               class="mind-line main-line"
-              :class="stage.node.status"
+              :class="[stage.node.status, { active: isLineActive(stage.node), weak: isWeakNode(stage.node) }]"
               :d="rootPath(stage)"
             />
             <path
               v-for="child in childLayouts"
               :key="`child-${child.node.id}`"
               class="mind-line child-line"
-              :class="child.node.status"
+              :class="[child.node.status, { active: isLineActive(child.node), weak: isWeakNode(child.node) }]"
               :d="childPath(child)"
             />
           </svg>
@@ -75,10 +75,10 @@
             v-for="stage in stageLayouts"
             :key="stage.node.id"
             class="mind-node stage-node"
-            :class="[stage.node.status, { selected: selectedNodeId === stage.node.id }]"
+            :class="[stage.node.status, { selected: selectedNodeId === stage.node.id, weak: isWeakNode(stage.node) }]"
             type="button"
             :style="nodeStyle(stage)"
-            @click="selectedNodeId = stage.node.id"
+            @click="selectNode(stage.node)"
           >
             <span class="node-kicker">阶段 {{ stage.index + 1 }}</span>
             <strong>{{ stage.node.title }}</strong>
@@ -92,10 +92,10 @@
             v-for="child in childLayouts"
             :key="child.node.id"
             class="mind-node child-node"
-            :class="[child.node.status, { selected: selectedNodeId === child.node.id }]"
+            :class="[child.node.status, { selected: selectedNodeId === child.node.id, weak: isWeakNode(child.node) }]"
             type="button"
             :style="nodeStyle(child)"
-            @click="selectedNodeId = child.node.id"
+            @click="selectNode(child.node)"
           >
             <span class="child-dot"></span>
             <strong>{{ child.node.title }}</strong>
@@ -134,13 +134,25 @@
       <div v-if="selectedTasks.length || selectedResources.length" class="detail-linked">
         <div v-if="selectedTasks.length" class="linked-group">
           <span>关联任务</span>
-          <strong v-for="task in selectedTasks.slice(0, 3)" :key="task.id">{{ task.title }}</strong>
+          <button
+            v-for="task in selectedTasks.slice(0, 3)"
+            :key="task.id"
+            type="button"
+            @click="emit('startTask', task)"
+          >
+            {{ task.title }}
+          </button>
         </div>
         <div v-if="selectedResources.length" class="linked-group">
           <span>关联资源</span>
-          <strong v-for="resource in selectedResources.slice(0, 3)" :key="resource.id">
+          <button
+            v-for="resource in selectedResources.slice(0, 3)"
+            :key="resource.id"
+            type="button"
+            @click="emit('openResource', resource)"
+          >
             {{ resourceTypeLabel(resource.resourceType) }} · {{ resource.title }}
-          </strong>
+          </button>
         </div>
       </div>
     </div>
@@ -184,6 +196,12 @@ const props = defineProps<{
   progress?: number
   weakPoints?: WeakPointLike[]
   nextAction?: NextActionLike | null
+}>()
+
+const emit = defineEmits<{
+  selectNode: [node: PathNodeVO]
+  startTask: [task: TaskVO]
+  openResource: [resource: ResourceVO]
 }>()
 
 const canvasWidth = 1360
@@ -364,7 +382,9 @@ watch(
   () => props.nodes.map(node => `${node.id}:${node.status}`).join('|'),
   () => {
     const current = props.nodes.find(node => node.status === 'current')
-    selectedNodeId.value = current?.id || stageNodes.value[0]?.id || ''
+    const node = current || stageNodes.value[0]
+    selectedNodeId.value = node?.id || ''
+    if (node) emit('selectNode', node)
     nextTick(centerSelectedNode)
   },
   { immediate: true }
@@ -425,8 +445,15 @@ function childPath(child: LayoutNode) {
 }
 
 function selectRoot() {
-  selectedNodeId.value = stageNodes.value.find(node => node.status === 'current')?.id || stageNodes.value[0]?.id || ''
+  const node = stageNodes.value.find(item => item.status === 'current') || stageNodes.value[0]
+  selectedNodeId.value = node?.id || ''
+  if (node) emit('selectNode', node)
   nextTick(centerSelectedNode)
+}
+
+function selectNode(node: PathNodeVO) {
+  selectedNodeId.value = node.id
+  emit('selectNode', node)
 }
 
 function clampZoom(value: number) {
@@ -536,6 +563,20 @@ function centerSelectedNode() {
 function statusLabel(status: string) {
   const map: Record<string, string> = { completed: '已完成', current: '学习中', locked: '未解锁' }
   return map[status] || status
+}
+
+function isLineActive(node: PathNodeVO) {
+  if (selectedNodeId.value === node.id) return true
+  const selected = selectedNode.value
+  return Boolean(selected?.parentNodeId && selected.parentNodeId === node.id)
+}
+
+function isWeakNode(node: PathNodeVO) {
+  const titleText = normalizeText(node.title)
+  return (props.weakPoints || []).some(point => {
+    const nameText = normalizeText(point.name)
+    return nameText === titleText || nameText.includes(titleText) || titleText.includes(nameText)
+  })
 }
 
 function normalizeText(text: string | null | undefined) {
@@ -732,6 +773,16 @@ function resourceTypeLabel(type: ResourceType) {
     stroke-width: 3.2;
   }
 
+  &.active {
+    stroke: rgba(11, 183, 170, 0.95);
+    stroke-width: 4;
+    filter: drop-shadow(0 0 8px rgba(11, 183, 170, 0.28));
+  }
+
+  &.weak {
+    stroke: rgba(245, 158, 11, 0.86);
+  }
+
   &.locked {
     stroke: rgba(148, 163, 184, 0.28);
   }
@@ -819,6 +870,11 @@ function resourceTypeLabel(type: ResourceType) {
 
   &.completed {
     border-color: rgba(16, 185, 129, 0.28);
+  }
+
+  &.weak {
+    border-color: rgba(245, 158, 11, 0.34);
+    animation: weakNodePulse 2.4s ease-in-out infinite;
   }
 }
 
@@ -1053,14 +1109,24 @@ function resourceTypeLabel(type: ResourceType) {
     font-weight: 800;
   }
 
-  strong {
+  button {
     display: block;
     overflow: hidden;
+    width: 100%;
+    padding: 3px 0;
+    border: 0;
+    background: transparent;
     color: #334155;
     font-size: 0.76rem;
     line-height: 1.55;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      color: #0a9e94;
+    }
   }
 }
 
@@ -1102,6 +1168,16 @@ function resourceTypeLabel(type: ResourceType) {
   50% {
     opacity: 0.9;
     transform: scale(1.035);
+  }
+}
+
+@keyframes weakNodePulse {
+  0%,
+  100% {
+    box-shadow: 0 12px 28px rgba(245, 158, 11, 0.08);
+  }
+  50% {
+    box-shadow: 0 18px 38px rgba(245, 158, 11, 0.2);
   }
 }
 

@@ -34,7 +34,11 @@
           v-for="item in actionableSuggestions"
           :key="item.title"
           class="action-suggestion"
-          :class="item.tone"
+          :class="[item.tone, { active: selectedInsightKey === item.key }]"
+          role="button"
+          tabindex="0"
+          @click="selectedInsightKey = item.key"
+          @keydown.enter="selectedInsightKey = item.key"
         >
           <span>{{ item.kicker }}</span>
           <strong>{{ item.title }}</strong>
@@ -43,10 +47,27 @@
       </div>
     </div>
 
+    <div class="insight-drilldown">
+      <div class="drilldown-main">
+        <span class="insight-eyebrow">下钻解释</span>
+        <h4>{{ selectedInsight.title }}</h4>
+        <p>{{ selectedInsight.reason }}</p>
+      </div>
+      <div class="drilldown-evidence">
+        <div v-for="item in selectedInsight.evidence" :key="item.label">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+      </div>
+      <div class="drilldown-actions">
+        <span v-for="action in selectedInsight.actions" :key="action">{{ action }}</span>
+      </div>
+    </div>
+
     <!-- 图表网格 -->
     <div class="insight-grid">
       <!-- 1. 7日学习时长趋势 -->
-      <section class="insight-card">
+      <section class="insight-card" :class="{ active: selectedInsightKey === 'time' }" @click="selectedInsightKey = 'time'">
         <header class="insight-card-head">
           <div>
             <h4>7 日学习时长趋势</h4>
@@ -58,7 +79,7 @@
       </section>
 
       <!-- 2. 能力雷达图 -->
-      <section class="insight-card">
+      <section class="insight-card" :class="{ active: selectedInsightKey === 'ability' }" @click="selectedInsightKey = 'ability'">
         <header class="insight-card-head">
           <div>
             <h4>能力雷达</h4>
@@ -70,7 +91,7 @@
       </section>
 
       <!-- 3. 知识点掌握分布 -->
-      <section class="insight-card">
+      <section class="insight-card" :class="{ active: selectedInsightKey === 'knowledge' }" @click="selectedInsightKey = 'knowledge'">
         <header class="insight-card-head">
           <div>
             <h4>知识点掌握分布</h4>
@@ -82,7 +103,7 @@
       </section>
 
       <!-- 4. 资源类型分布 -->
-      <section class="insight-card">
+      <section class="insight-card" :class="{ active: selectedInsightKey === 'resource' }" @click="selectedInsightKey = 'resource'">
         <header class="insight-card-head">
           <div>
             <h4>资源类型分布</h4>
@@ -94,7 +115,7 @@
       </section>
 
       <!-- 5. 日均专注度趋势 -->
-      <section class="insight-card">
+      <section class="insight-card" :class="{ active: selectedInsightKey === 'focus' }" @click="selectedInsightKey = 'focus'">
         <header class="insight-card-head">
           <div>
             <h4>近 14 日专注度趋势</h4>
@@ -106,7 +127,7 @@
       </section>
 
       <!-- 6. 任务完成率仪表盘 -->
-      <section class="insight-card">
+      <section class="insight-card" :class="{ active: selectedInsightKey === 'task' }" @click="selectedInsightKey = 'task'">
         <header class="insight-card-head">
           <div>
             <h4>任务完成率</h4>
@@ -121,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { EChartsOption } from 'echarts'
 import BaseChart from '@/views/Profile/components/BaseChart.vue'
 
@@ -138,6 +159,8 @@ const props = defineProps<{
   nextActionReason?: string
   todayTaskTitle?: string
 }>()
+
+const selectedInsightKey = ref('knowledge')
 
 /* ---------------- Mock 数据 ---------------- */
 
@@ -262,24 +285,94 @@ const actionableSuggestions = computed(() => {
   const second = weak[1]
   return [
     {
+      key: 'knowledge',
       kicker: '补弱',
       title: first ? `${first.name} 掌握度 ${first.mastery}%` : '完成一次诊断测评',
       detail: first ? '建议先完成 2 个基础例题，再看 1 份图解资源。' : '用 10 道题快速建立知识点证据。',
       tone: first && first.mastery < 45 ? 'danger' : 'warn',
     },
     {
+      key: 'resource',
       kicker: '资源',
       title: second ? `为「${second.name}」补齐资料包` : '生成今日任务资料包',
       detail: '组合讲义、思维导图、专项练习和视频推荐，控制在 30 分钟内。',
       tone: 'info',
     },
     {
+      key: 'task',
       kicker: '验证',
       title: props.todayTaskTitle || '完成今日高优任务',
       detail: '学习后做一次 5 题验证，答错题会进入下一轮复盘。',
       tone: 'success',
     },
   ]
+})
+
+const selectedInsight = computed(() => {
+  const first = primaryWeakPoint.value
+  const weakText = first ? `「${first.name}」当前掌握度 ${first.mastery}%` : '当前缺少明确薄弱点证据'
+  const map: Record<string, {
+    title: string
+    reason: string
+    evidence: { label: string; value: string }[]
+    actions: string[]
+  }> = {
+    time: {
+      title: '学习时长是否稳定',
+      reason: 'Agent 会比较最近一周前后半段投入变化，判断今天适合推进新内容还是安排轻量复盘。',
+      evidence: [
+        { label: '7日累计', value: `${summary.value.totalMinutes}h` },
+        { label: '趋势', value: weeklyTrendTag.value.label },
+      ],
+      actions: ['低时长日拆小任务', '高时长日安排综合题', '保持每日最小学习量'],
+    },
+    ability: {
+      title: '能力雷达差距',
+      reason: '当前学生在综合分析和应用能力上低于基础概念，说明不能只看讲义，需要增加场景题和错题复盘。',
+      evidence: [
+        { label: '最低维度', value: '综合分析 2.9/5' },
+        { label: '优势维度', value: '基础概念 4.2/5' },
+      ],
+      actions: ['增加综合题讲解', '保留基础概念复盘', '用同类题验证迁移能力'],
+    },
+    knowledge: {
+      title: weakText,
+      reason: props.nextActionReason || first?.reason || '薄弱知识点会优先进入今日任务和资料包生成队列，避免学生继续堆新内容。',
+      evidence: [
+        { label: '薄弱点', value: first?.name || '待诊断' },
+        { label: '掌握度', value: first ? `${first.mastery}%` : `${summary.value.masteryPercent}%` },
+      ],
+      actions: ['先做 2 个基础例题', '看 1 份图解资源', '完成 5 题验证'],
+    },
+    resource: {
+      title: '资源是否覆盖当前薄弱点',
+      reason: '资源不只是数量展示，Agent 会检查讲义、图解、练习和视频是否能覆盖当前学习动作。',
+      evidence: [
+        { label: '资源总量', value: `${resourceTotal.value} 项` },
+        { label: '练习资源', value: `${resourceBreakdown.find(item => item.name === '练习')?.value || 0} 项` },
+      ],
+      actions: ['补齐图解资源', '生成专项练习', '筛选 1 个短视频讲解'],
+    },
+    focus: {
+      title: '专注度决定任务粒度',
+      reason: '当专注度波动时，Agent 会把大任务拆小，优先安排低负担但能产生证据的学习动作。',
+      evidence: [
+        { label: '平均专注', value: summary.value.avgFocus },
+        { label: '趋势', value: focusTrendTag.value.label },
+      ],
+      actions: ['拆成 15 分钟任务', '减少新知识输入', '保留验证题'],
+    },
+    task: {
+      title: '任务完成率驱动下一轮计划',
+      reason: '完成率高时推进新节点，完成率低或逾期时先压缩任务量并补弱。',
+      evidence: [
+        { label: '完成率', value: `${taskSummary.rate}%` },
+        { label: '已完成', value: `${taskSummary.completed}/${taskSummary.total}` },
+      ],
+      actions: ['完成后触发验证', '错题进入复盘', '明日计划自动微调'],
+    },
+  }
+  return map[selectedInsightKey.value] || map.knowledge
 })
 
 /* ---------------- 通用 tooltip 风格 ---------------- */
@@ -809,6 +902,15 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
   border-radius: 13px;
   background: #ffffff;
   border: 1px solid rgba(148, 163, 184, 0.16);
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+
+  &:hover,
+  &.active {
+    transform: translateY(-1px);
+    border-color: rgba(11, 183, 170, 0.28);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+  }
 
   span {
     display: inline-flex;
@@ -863,6 +965,80 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
   }
 }
 
+.insight-drilldown {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(220px, 0.55fr);
+  gap: 14px;
+  align-items: center;
+  padding: 15px 16px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+  animation: drilldownEnter 0.36s ease both;
+}
+
+.drilldown-main {
+  min-width: 0;
+
+  h4 {
+    margin: 5px 0 6px;
+    color: #07172f;
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  p {
+    margin: 0;
+    color: #526079;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+}
+
+.drilldown-evidence {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(86px, 1fr));
+  gap: 8px;
+
+  div {
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: #f8fafc;
+  }
+
+  span {
+    display: block;
+    color: #98a2b3;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  strong {
+    display: block;
+    margin-top: 3px;
+    color: #172033;
+    font-size: 12px;
+    line-height: 1.3;
+  }
+}
+
+.drilldown-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+
+  span {
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: #ecfdfb;
+    color: #0a9e94;
+    font-size: 11px;
+    font-weight: 800;
+  }
+}
+
 /* 图表网格 */
 .insight-grid {
   display: grid;
@@ -880,6 +1056,15 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
   border: 1px solid #dfe7f1;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.045);
   animation: chartCardEnter 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+
+  &:hover,
+  &.active {
+    transform: translateY(-2px);
+    border-color: rgba(11, 183, 170, 0.28);
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.075);
+  }
 }
 
 .insight-card:nth-child(1) { animation-delay: 80ms; }
@@ -897,6 +1082,11 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
 @keyframes chartCardEnter {
   from { opacity: 0; transform: translateY(14px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes drilldownEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .insight-card-head {
@@ -976,6 +1166,14 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
 
   .action-suggestion-list {
     grid-template-columns: 1fr;
+  }
+
+  .insight-drilldown {
+    grid-template-columns: 1fr;
+  }
+
+  .drilldown-evidence {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .insight-intro {
