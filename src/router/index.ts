@@ -37,6 +37,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '学习画像引导 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/space-launch',
+    name: 'SpaceLaunch',
+    component: () => import('@/views/SpaceLaunch/index.vue'),
+    meta: { title: '学习空间生成中 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard/index.vue'),
