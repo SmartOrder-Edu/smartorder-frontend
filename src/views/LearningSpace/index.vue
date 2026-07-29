@@ -144,8 +144,8 @@
               <div class="decision-evidence">
                 <span v-for="item in agentDecisionEvidence" :key="item">{{ item }}</span>
               </div>
-              <button class="decision-adjust-btn" type="button" @click="playAgentAdjustment">
-                演示 Agent 调整计划
+              <button class="decision-adjust-btn" type="button" @click="goPlanAdjustment()">
+                进入 Agent 调整计划
               </button>
             </div>
             <div class="decision-flow" aria-label="Agent 推理流程">
@@ -167,6 +167,7 @@
               <div class="adjustment-preview-head">
                 <span>动态调度演示</span>
                 <strong>{{ agentAdjustmentRunning ? '正在重排今日计划' : '点击左侧按钮查看调整过程' }}</strong>
+                <button type="button" @click="playAgentAdjustment">播放预览</button>
               </div>
               <div class="adjustment-track">
                 <span
@@ -495,6 +496,7 @@
                 @select-node="handlePathNodeSelect"
                 @start-task="handleStartTask"
                 @open-resource="goResourceDetail"
+                @open-knowledge-detail="goKnowledgeDetail"
               />
               <PathTimeline
                 v-show="pathViewMode === 'timeline'"
@@ -508,6 +510,7 @@
               <span>已聚焦节点</span>
               <strong>{{ selectedPathNode.title }}</strong>
               <p>{{ selectedPathLinkedSummary }}</p>
+              <button type="button" @click="goKnowledgeDetail(selectedPathNode)">查看知识点详情</button>
               <button type="button" @click="activeTab = 'resources'">查看关联资源</button>
             </div>
           </div>
@@ -801,6 +804,7 @@
               :weak-points="algorithmWeakPoints"
               :next-action-reason="algorithmNextActionReason"
               :today-task-title="nextTodayTask?.title"
+              @open-report="goInsightReport"
             />
           </div>
         </div>
@@ -824,20 +828,25 @@
           </div>
           <span class="celebration-kicker">任务已完成</span>
           <strong>{{ celebrationTaskTitle }}</strong>
-          <div v-if="completionReport" class="completion-report">
-            <div>
-              <span>本次学习</span>
-              <strong>{{ completionReport.minutes }} 分钟</strong>
+          <template v-if="completionReport">
+            <div class="completion-report">
+              <div>
+                <span>本次学习</span>
+                <strong>{{ completionReport.minutes }} 分钟</strong>
+              </div>
+              <div>
+                <span>进度变化</span>
+                <strong>{{ completionReport.before }}% → {{ completionReport.after }}%</strong>
+              </div>
+              <div>
+                <span>下一步</span>
+                <strong>{{ completionReport.nextStep }}</strong>
+              </div>
             </div>
-            <div>
-              <span>进度变化</span>
-              <strong>{{ completionReport.before }}% → {{ completionReport.after }}%</strong>
-            </div>
-            <div>
-              <span>下一步</span>
-              <strong>{{ completionReport.nextStep }}</strong>
-            </div>
-          </div>
+            <button class="completion-report-link" type="button" @click="goInsightReport">
+              查看今日学习报告
+            </button>
+          </template>
           <p v-else>Agent 已记录本次学习表现，进度和后续建议会同步更新。</p>
         </div>
       </div>
@@ -2046,6 +2055,23 @@ function isTaskLinkedToSelectedPath(task: TaskVO) {
 function isResourceLinkedToSelectedPath(resource: ResourceVO) {
   if (!selectedPathChildIds.value.size || !resource.pathNodeId) return false
   return selectedPathChildIds.value.has(resource.pathNodeId)
+}
+
+function goKnowledgeDetail(node: PathNodeVO | null) {
+  if (!node?.id) return
+  router.push(`/space/${spaceId.value}/knowledge/${node.id}`)
+}
+
+function goPlanAdjustment(node?: PathNodeVO | null) {
+  const targetNode = node || selectedPathNode.value
+  router.push({
+    path: `/space/${spaceId.value}/plan-adjustment`,
+    query: targetNode?.id ? { nodeId: targetNode.id } : undefined,
+  })
+}
+
+function goInsightReport() {
+  router.push(`/space/${spaceId.value}/insight-report`)
 }
 
 function playAgentAdjustment() {
@@ -3925,6 +3951,19 @@ watch(
     font-size: 0.78rem;
     line-height: 1.35;
   }
+
+  button {
+    min-height: 28px;
+    margin-top: 8px;
+    padding: 0 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(11, 183, 170, 0.2);
+    background: #ffffff;
+    color: #0a9e94;
+    font-size: 0.68rem;
+    font-weight: 900;
+    cursor: pointer;
+  }
 }
 
 .adjustment-track {
@@ -4187,6 +4226,7 @@ watch(
   padding: 26px 24px 22px;
   border-radius: 20px;
   overflow: hidden;
+  pointer-events: auto;
   background:
     radial-gradient(circle at 50% 0%, rgba(11, 183, 170, 0.2), transparent 45%),
     #ffffff;
@@ -4242,6 +4282,19 @@ watch(
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+
+.completion-report-link {
+  min-height: 34px;
+  margin-top: 14px;
+  padding: 0 13px;
+  border: 1px solid rgba(11, 183, 170, 0.24);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0a9e94;
+  font-size: 0.76rem;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .celebration-kicker {
@@ -4471,7 +4524,7 @@ watch(
 
 .path-linked-focus {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.2fr) auto auto;
   gap: 10px;
   align-items: center;
   margin-top: 14px;

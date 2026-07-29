@@ -21,6 +21,9 @@
           <span>平均掌握</span>
         </div>
       </div>
+      <button class="report-entry-btn" type="button" @click="emit('openReport')">
+        查看完整报告
+      </button>
     </div>
 
     <div class="insight-action-strip">
@@ -158,6 +161,10 @@ const props = defineProps<{
   weakPoints?: WeakPointLike[]
   nextActionReason?: string
   todayTaskTitle?: string
+}>()
+
+const emit = defineEmits<{
+  openReport: []
 }>()
 
 const selectedInsightKey = ref('knowledge')
@@ -855,6 +862,26 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
     font-size: 11px;
     color: #8d99ad;
     font-weight: 600;
+  }
+}
+
+.report-entry-btn {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid rgba(11, 183, 170, 0.24);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0a9e94;
+  font-size: 0.76rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgba(11, 183, 170, 0.42);
+    box-shadow: 0 8px 18px rgba(11, 183, 170, 0.1);
   }
 }
 

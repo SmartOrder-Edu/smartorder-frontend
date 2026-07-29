@@ -130,6 +130,13 @@
         <div class="action-chip-row">
           <span v-for="chip in selectedAction.chips" :key="chip">{{ chip }}</span>
         </div>
+        <button
+          class="detail-primary-action"
+          type="button"
+          @click="emit('openKnowledgeDetail', selectedNode)"
+        >
+          查看知识点详情
+        </button>
       </div>
       <div v-if="selectedTasks.length || selectedResources.length" class="detail-linked">
         <div v-if="selectedTasks.length" class="linked-group">
@@ -202,6 +209,7 @@ const emit = defineEmits<{
   selectNode: [node: PathNodeVO]
   startTask: [task: TaskVO]
   openResource: [resource: ResourceVO]
+  openKnowledgeDetail: [node: PathNodeVO]
 }>()
 
 const canvasWidth = 1360
@@ -1085,6 +1093,26 @@ function resourceTypeLabel(type: ResourceType) {
     font-size: 0.68rem;
     font-weight: 800;
     box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+  }
+}
+
+.detail-primary-action {
+  min-height: 32px;
+  margin-top: 12px;
+  padding: 0 13px;
+  border: 1px solid rgba(11, 183, 170, 0.24);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0a9e94;
+  font-size: 0.74rem;
+  font-weight: 900;
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: rgba(11, 183, 170, 0.42);
+    box-shadow: 0 8px 18px rgba(11, 183, 170, 0.1);
   }
 }
 

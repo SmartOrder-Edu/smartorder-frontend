@@ -59,6 +59,24 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '学习空间 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/space/:spaceId/knowledge/:nodeId',
+    name: 'LearningSpaceKnowledgeDetail',
+    component: () => import('@/views/LearningSpace/KnowledgeDetail.vue'),
+    meta: { title: '知识点详情 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/space/:spaceId/plan-adjustment',
+    name: 'LearningSpacePlanAdjustment',
+    component: () => import('@/views/LearningSpace/PlanAdjustment.vue'),
+    meta: { title: 'Agent 调整计划 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/space/:spaceId/insight-report',
+    name: 'LearningSpaceInsightReport',
+    component: () => import('@/views/LearningSpace/InsightReport.vue'),
+    meta: { title: '学情报告详情 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/ai-tutor',
     name: 'AITutor',
     component: () => import('@/views/AITutor/index.vue'),
