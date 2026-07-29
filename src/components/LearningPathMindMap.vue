@@ -109,12 +109,27 @@
         <span class="detail-status" :class="selectedNode.status">{{ statusLabel(selectedNode.status) }}</span>
         <h4>{{ selectedNode.title }}</h4>
         <p>{{ selectedNode.description || '暂无节点说明，后续可由 Agent 补充学习重点和验收标准。' }}</p>
+        <div class="detail-progress">
+          <span>掌握度</span>
+          <div class="detail-progress-track">
+            <i :style="{ width: `${selectedMastery}%` }"></i>
+          </div>
+          <strong>{{ selectedMastery }}%</strong>
+        </div>
       </div>
       <div class="detail-rail">
         <span v-if="selectedNode.plannedDurationDays">计划 {{ selectedNode.plannedDurationDays }} 天</span>
         <span v-else-if="selectedNode.estimatedDurationMinutes">{{ selectedNode.estimatedDurationMinutes }} 分钟</span>
         <span v-if="selectedTasks.length">任务 {{ selectedTasks.length }}</span>
         <span v-if="selectedResources.length">资源 {{ selectedResources.length }}</span>
+      </div>
+      <div class="detail-action-panel">
+        <span class="action-panel-eyebrow">Agent 推荐动作</span>
+        <strong>{{ selectedAction.title }}</strong>
+        <p>{{ selectedAction.reason }}</p>
+        <div class="action-chip-row">
+          <span v-for="chip in selectedAction.chips" :key="chip">{{ chip }}</span>
+        </div>
       </div>
       <div v-if="selectedTasks.length || selectedResources.length" class="detail-linked">
         <div v-if="selectedTasks.length" class="linked-group">
@@ -136,6 +151,20 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import type { PathNodeVO, ResourceType, ResourceVO, TaskVO } from '@/types/learningSpace'
 
+interface WeakPointLike {
+  name: string
+  mastery?: number
+  confidence?: number
+  assessmentCount?: number
+  explanationFacts?: string | null
+}
+
+interface NextActionLike {
+  type?: string
+  knowledgeName?: string
+  reason?: string
+}
+
 interface LayoutNode {
   node: PathNodeVO
   x: number
@@ -153,6 +182,8 @@ const props = defineProps<{
   resources: ResourceVO[]
   title?: string
   progress?: number
+  weakPoints?: WeakPointLike[]
+  nextAction?: NextActionLike | null
 }>()
 
 const canvasWidth = 1360
@@ -266,6 +297,64 @@ const selectedResources = computed(() => {
   const childIds = childNodes(node.id).map(child => child.id)
   const ids = new Set([node.id, ...childIds])
   return props.resources.filter(resource => resource.pathNodeId && ids.has(resource.pathNodeId))
+})
+
+const selectedWeakPoint = computed(() => {
+  const node = selectedNode.value
+  if (!node) return null
+  const titleText = normalizeText(node.title)
+  return (props.weakPoints || []).find(point => {
+    const nameText = normalizeText(point.name)
+    return nameText === titleText || nameText.includes(titleText) || titleText.includes(nameText)
+  }) || null
+})
+
+const selectedMastery = computed(() => {
+  const weakMastery = selectedWeakPoint.value?.mastery
+  if (weakMastery != null) return Math.round(clampNumber(weakMastery, 0, 1) * 100)
+  if (selectedNode.value?.status === 'completed') return 92
+  if (selectedNode.value?.status === 'current') return Math.max(45, Math.round(props.progress || 0))
+  return 18
+})
+
+const selectedAction = computed(() => {
+  const node = selectedNode.value
+  const titleText = node?.title || '当前知识点'
+  const weakPoint = selectedWeakPoint.value
+  const nextAction = props.nextAction
+  const matchedNextAction = nextAction?.knowledgeName && normalizeText(titleText).includes(normalizeText(nextAction.knowledgeName))
+  const chips = [
+    selectedTasks.value.length ? `${selectedTasks.value.length} 个任务` : '生成任务',
+    selectedResources.value.length ? `${selectedResources.value.length} 项资源` : '补齐资源',
+    `${selectedMastery.value}% 掌握`,
+  ]
+
+  if (weakPoint || selectedMastery.value < 60) {
+    return {
+      title: `先补弱「${titleText}」`,
+      reason: weakPoint?.explanationFacts || nextAction?.reason || '该节点掌握度偏低，建议先完成基础例题，再用图解资源建立概念框架。',
+      chips,
+    }
+  }
+  if (matchedNextAction) {
+    return {
+      title: actionTypeLabel(nextAction?.type),
+      reason: nextAction?.reason || '该节点是当前计划的关键推进点，适合安排一次验证练习。',
+      chips,
+    }
+  }
+  if (node?.status === 'completed') {
+    return {
+      title: '用 5 分钟做一次间隔复盘',
+      reason: '节点已完成，建议用错题或闪卡保持记忆稳定，不需要占用今日主学习时间。',
+      chips,
+    }
+  }
+  return {
+    title: `推进「${titleText}」的下一步学习`,
+    reason: selectedTasks.value[0]?.aiSuggestion || '建议先看一份结构化讲义，再完成小题组验证理解。',
+    chips,
+  }
 })
 
 const title = computed(() => props.title || '当前学习路径')
@@ -447,6 +536,26 @@ function centerSelectedNode() {
 function statusLabel(status: string) {
   const map: Record<string, string> = { completed: '已完成', current: '学习中', locked: '未解锁' }
   return map[status] || status
+}
+
+function normalizeText(text: string | null | undefined) {
+  return String(text || '').trim().toLowerCase()
+}
+
+function clampNumber(value: unknown, min: number, max: number) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return min
+  return Math.min(Math.max(num, min), max)
+}
+
+function actionTypeLabel(type?: string) {
+  const map: Record<string, string> = {
+    diagnostic_quiz: '先做诊断题',
+    weakness_practice: '安排补弱练习',
+    verification_quiz: '做一次验证测评',
+    advance_or_review: '推进新内容或轻量复习',
+  }
+  return map[type || ''] || '执行下一步学习动作'
 }
 
 function resourceTypeLabel(type: ResourceType) {
@@ -696,6 +805,16 @@ function resourceTypeLabel(type: ResourceType) {
   &.current {
     border-color: rgba(14, 165, 233, 0.42);
     animation: nodeBreath 3s ease-in-out infinite;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -5px;
+      border-radius: inherit;
+      border: 1px solid rgba(14, 165, 233, 0.22);
+      animation: nodeRing 2.4s ease-in-out infinite;
+      pointer-events: none;
+    }
   }
 
   &.completed {
@@ -829,6 +948,90 @@ function resourceTypeLabel(type: ResourceType) {
   }
 }
 
+.detail-progress {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  max-width: 360px;
+  margin-top: 12px;
+
+  span,
+  strong {
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 900;
+  }
+
+  strong {
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.detail-progress-track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+
+  i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #0bb7aa, #38bdf8, #8b5cf6);
+    transition: width 0.45s ease;
+  }
+}
+
+.detail-action-panel {
+  grid-column: 1 / -1;
+  padding: 13px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(14, 165, 233, 0.18);
+  background:
+    linear-gradient(135deg, rgba(240, 249, 255, 0.96), rgba(236, 253, 251, 0.82)),
+    #ffffff;
+
+  strong {
+    display: block;
+    margin-top: 4px;
+    color: #0f172a;
+    font-size: 0.88rem;
+    line-height: 1.35;
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: #475569;
+    font-size: 0.76rem;
+    line-height: 1.5;
+  }
+}
+
+.action-panel-eyebrow {
+  color: #0284c7;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.action-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+
+  span {
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.86);
+    color: #334155;
+    font-size: 0.68rem;
+    font-weight: 800;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+  }
+}
+
 .detail-linked {
   display: grid;
   grid-column: 1 / -1;
@@ -887,6 +1090,18 @@ function resourceTypeLabel(type: ResourceType) {
   }
   50% {
     box-shadow: 0 18px 42px rgba(14, 165, 233, 0.24);
+  }
+}
+
+@keyframes nodeRing {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.035);
   }
 }
 

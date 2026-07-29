@@ -23,6 +23,26 @@
       </div>
     </div>
 
+    <div class="insight-action-strip">
+      <div class="action-strip-main">
+        <span class="insight-eyebrow">可行动建议</span>
+        <h4>{{ primaryActionTitle }}</h4>
+        <p>{{ primaryActionReason }}</p>
+      </div>
+      <div class="action-suggestion-list">
+        <div
+          v-for="item in actionableSuggestions"
+          :key="item.title"
+          class="action-suggestion"
+          :class="item.tone"
+        >
+          <span>{{ item.kicker }}</span>
+          <strong>{{ item.title }}</strong>
+          <p>{{ item.detail }}</p>
+        </div>
+      </div>
+    </div>
+
     <!-- 图表网格 -->
     <div class="insight-grid">
       <!-- 1. 7日学习时长趋势 -->
@@ -104,6 +124,20 @@
 import { computed } from 'vue'
 import type { EChartsOption } from 'echarts'
 import BaseChart from '@/views/Profile/components/BaseChart.vue'
+
+interface WeakPointLike {
+  name: string
+  mastery?: number
+  confidence?: number
+  assessmentCount?: number
+  explanationFacts?: string | null
+}
+
+const props = defineProps<{
+  weakPoints?: WeakPointLike[]
+  nextActionReason?: string
+  todayTaskTitle?: string
+}>()
 
 /* ---------------- Mock 数据 ---------------- */
 
@@ -197,6 +231,56 @@ const knowledgeTag = computed(() => {
 })
 
 const resourceTotal = computed(() => resourceBreakdown.reduce((a, b) => a + b.value, 0))
+
+const mergedWeakPoints = computed(() => {
+  const runtimeWeakPoints = (props.weakPoints || []).map(point => ({
+    name: point.name,
+    mastery: point.mastery == null ? 0 : Math.round(Math.min(Math.max(Number(point.mastery), 0), 1) * 100),
+    reason: point.explanationFacts || '',
+  }))
+  if (runtimeWeakPoints.length) return runtimeWeakPoints.slice(0, 3)
+  return knowledgePoints
+    .filter(point => point.mastery < 60)
+    .sort((a, b) => a.mastery - b.mastery)
+    .slice(0, 3)
+    .map(point => ({ name: point.name, mastery: point.mastery, reason: '' }))
+})
+
+const primaryWeakPoint = computed(() => mergedWeakPoints.value[0] || null)
+const primaryActionTitle = computed(() => {
+  if (primaryWeakPoint.value) return `先处理「${primaryWeakPoint.value.name}」`
+  return props.todayTaskTitle ? `继续完成「${props.todayTaskTitle}」` : '保持当前学习节奏'
+})
+const primaryActionReason = computed(() =>
+  props.nextActionReason
+  || primaryWeakPoint.value?.reason
+  || 'Agent 会优先把薄弱知识点拆成讲义、图解和小题组，让学生马上知道下一步该做什么。'
+)
+const actionableSuggestions = computed(() => {
+  const weak = mergedWeakPoints.value
+  const first = weak[0]
+  const second = weak[1]
+  return [
+    {
+      kicker: '补弱',
+      title: first ? `${first.name} 掌握度 ${first.mastery}%` : '完成一次诊断测评',
+      detail: first ? '建议先完成 2 个基础例题，再看 1 份图解资源。' : '用 10 道题快速建立知识点证据。',
+      tone: first && first.mastery < 45 ? 'danger' : 'warn',
+    },
+    {
+      kicker: '资源',
+      title: second ? `为「${second.name}」补齐资料包` : '生成今日任务资料包',
+      detail: '组合讲义、思维导图、专项练习和视频推荐，控制在 30 分钟内。',
+      tone: 'info',
+    },
+    {
+      kicker: '验证',
+      title: props.todayTaskTitle || '完成今日高优任务',
+      detail: '学习后做一次 5 题验证，答错题会进入下一轮复盘。',
+      tone: 'success',
+    },
+  ]
+})
 
 /* ---------------- 通用 tooltip 风格 ---------------- */
 
@@ -647,6 +731,14 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
   }
 }
 
+.insight-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: #0f766e;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
 .insight-intro-stats {
   display: flex;
   gap: 28px;
@@ -673,6 +765,104 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
   }
 }
 
+.insight-action-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.25fr);
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(59, 130, 246, 0.16);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(20, 184, 166, 0.12), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 249, 255, 0.9));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+  animation: actionStripEnter 0.42s ease both;
+}
+
+.action-strip-main {
+  min-width: 0;
+
+  h4 {
+    margin: 5px 0 6px;
+    color: #07172f;
+    font-size: 16px;
+    line-height: 1.35;
+  }
+
+  p {
+    margin: 0;
+    color: #526079;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+}
+
+.action-suggestion-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.action-suggestion {
+  min-width: 0;
+  padding: 11px 12px;
+  border-radius: 13px;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+
+  span {
+    display: inline-flex;
+    margin-bottom: 6px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #526079;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  strong {
+    display: block;
+    overflow: hidden;
+    color: #07172f;
+    font-size: 12px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  p {
+    display: -webkit-box;
+    margin: 5px 0 0;
+    overflow: hidden;
+    color: #667085;
+    font-size: 11px;
+    line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  &.danger {
+    border-color: rgba(239, 68, 68, 0.2);
+    span { background: #fef2f2; color: #b91c1c; }
+  }
+
+  &.warn {
+    border-color: rgba(245, 158, 11, 0.22);
+    span { background: #fffbeb; color: #b45309; }
+  }
+
+  &.info {
+    border-color: rgba(59, 130, 246, 0.18);
+    span { background: #eff6ff; color: #1d4ed8; }
+  }
+
+  &.success {
+    border-color: rgba(16, 185, 129, 0.2);
+    span { background: #ecfdf5; color: #047857; }
+  }
+}
+
 /* 图表网格 */
 .insight-grid {
   display: grid;
@@ -689,6 +879,24 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
   background: #ffffff;
   border: 1px solid #dfe7f1;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.045);
+  animation: chartCardEnter 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.insight-card:nth-child(1) { animation-delay: 80ms; }
+.insight-card:nth-child(2) { animation-delay: 180ms; }
+.insight-card:nth-child(3) { animation-delay: 280ms; }
+.insight-card:nth-child(4) { animation-delay: 380ms; }
+.insight-card:nth-child(5) { animation-delay: 480ms; }
+.insight-card:nth-child(6) { animation-delay: 580ms; }
+
+@keyframes actionStripEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes chartCardEnter {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .insight-card-head {
@@ -759,6 +967,14 @@ const taskGaugeOptions = computed<EChartsOption>(() => ({
 /* 窄屏单列 */
 @media (max-width: 960px) {
   .insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .insight-action-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .action-suggestion-list {
     grid-template-columns: 1fr;
   }
 

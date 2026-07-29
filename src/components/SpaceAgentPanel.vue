@@ -44,6 +44,22 @@
         <p>{{ insight }}</p>
       </div>
 
+      <div class="panel-thinking-flow" v-if="decisionSteps && decisionSteps.length">
+        <div
+          v-for="(step, index) in decisionSteps"
+          :key="step.label"
+          class="thinking-step"
+          :class="step.status"
+          :style="{ '--thinking-delay': `${index * 95}ms` }"
+        >
+          <span class="thinking-dot"></span>
+          <div>
+            <strong>{{ step.label }}</strong>
+            <em>{{ step.detail }}</em>
+          </div>
+        </div>
+      </div>
+
       <!-- Quick actions -->
       <div class="panel-quick-actions">
         <button class="quick-action-btn" v-for="q in quickActions" :key="q.label" @click="$emit('quickAction', q.label)">
@@ -119,10 +135,17 @@ interface ChatMessage {
   actions?: { label: string; variant?: string }[]
 }
 
+interface DecisionStep {
+  label: string
+  detail: string
+  status: string
+}
+
 const props = defineProps<{
   spaceName?: string
   insight?: string
   agentActions?: AgentActionVO[]
+  decisionSteps?: DecisionStep[]
 }>()
 
 const emit = defineEmits<{
@@ -344,6 +367,83 @@ export default { name: 'SpaceAgentPanel' }
   padding: 0 16px;
 }
 
+.panel-thinking-flow {
+  display: grid;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.thinking-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  animation: thinkingStepIn 0.38s ease both;
+  animation-delay: var(--thinking-delay);
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 18px;
+    top: 26px;
+    bottom: -10px;
+    width: 1px;
+    background: linear-gradient(180deg, rgba(11, 183, 170, 0.32), transparent);
+  }
+
+  &:last-child::before {
+    display: none;
+  }
+
+  strong {
+    display: block;
+    color: #0f172a;
+    font-size: 0.74rem;
+    line-height: 1.3;
+  }
+
+  em {
+    display: -webkit-box;
+    margin-top: 2px;
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.66rem;
+    font-style: normal;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  &.active {
+    background: linear-gradient(135deg, #ecfdfb, #f0f9ff);
+    border-color: rgba(11, 183, 170, 0.2);
+  }
+
+  &.warn .thinking-dot {
+    background: #f59e0b;
+    box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.12);
+  }
+
+  &.pending {
+    opacity: 0.72;
+  }
+}
+
+.thinking-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: #0bb7aa;
+  box-shadow: 0 0 0 5px rgba(11, 183, 170, 0.12);
+}
+
 .quick-action-btn {
   display: flex;
   align-items: center;
@@ -362,6 +462,11 @@ export default { name: 'SpaceAgentPanel' }
     color: #0a9e94;
     background: #ecfdfb;
   }
+}
+
+@keyframes thinkingStepIn {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .panel-chat {

@@ -75,7 +75,7 @@
               <div class="progress-panel">
                 <div class="progress-ring" :style="heroProgressStyle">
                   <div class="progress-ring-inner">
-                    <strong>{{ Math.round(dashboard.progress) }}%</strong>
+                    <strong>{{ animatedHeroProgress }}%</strong>
                     <span>总进度</span>
                   </div>
                 </div>
@@ -118,6 +118,32 @@
                   bg-color="#f5f3ff"
                   value-color="#7c3aed"
                 />
+              </div>
+            </div>
+          </div>
+
+          <div class="agent-decision-panel">
+            <div class="decision-copy">
+              <span class="decision-eyebrow">Agent 决策依据</span>
+              <h3>{{ agentDecisionTitle }}</h3>
+              <p>{{ agentDecisionReason }}</p>
+              <div class="decision-evidence">
+                <span v-for="item in agentDecisionEvidence" :key="item">{{ item }}</span>
+              </div>
+            </div>
+            <div class="decision-flow" aria-label="Agent 推理流程">
+              <div
+                v-for="(step, index) in agentDecisionSteps"
+                :key="step.label"
+                class="decision-flow-step"
+                :class="step.status"
+                :style="{ '--step-delay': `${index * 120}ms` }"
+              >
+                <span class="flow-index">{{ index + 1 }}</span>
+                <div>
+                  <strong>{{ step.label }}</strong>
+                  <em>{{ step.detail }}</em>
+                </div>
               </div>
             </div>
           </div>
@@ -204,9 +230,11 @@
 
             <div class="task-list" v-if="dashboard.todayTasks.length">
               <TaskCard
-                v-for="task in dashboard.todayTasks"
+                v-for="(task, index) in dashboard.todayTasks"
                 :key="task.id"
                 :task="task"
+                class="stagger-card"
+                :style="{ '--stagger-delay': `${Math.min(index, 5) * 90}ms` }"
                 @start="handleStartTask"
                 @complete="handleCompleteTask"
               />
@@ -220,9 +248,11 @@
             </div>
             <div class="task-list" v-if="dashboard.overdueTasks.length">
               <TaskCard
-                v-for="task in dashboard.overdueTasks"
+                v-for="(task, index) in dashboard.overdueTasks"
                 :key="task.id"
                 :task="task"
+                class="stagger-card"
+                :style="{ '--stagger-delay': `${Math.min(index, 5) * 90}ms` }"
                 @start="handleStartTask"
                 @complete="handleCompleteTask"
               />
@@ -416,6 +446,8 @@
                 :resources="dashboard.resources"
                 :title="dashboard.space.name"
                 :progress="dashboard.progress"
+                :weak-points="algorithmWeakPoints"
+                :next-action="algorithmNextAction"
               />
               <PathTimeline
                 v-show="pathViewMode === 'timeline'"
@@ -712,7 +744,11 @@
           </div>
           <!-- Tab: Insight -->
           <div v-show="activeTab === 'insight'" class="tab-content">
-            <InsightTab />
+            <InsightTab
+              :weak-points="algorithmWeakPoints"
+              :next-action-reason="algorithmNextActionReason"
+              :today-task-title="nextTodayTask?.title"
+            />
           </div>
         </div>
 
@@ -722,9 +758,21 @@
           :space-name="dashboard.space.name"
           :insight="dashboard.agentInsight"
           :agent-actions="dashboard.recentAgentActions"
+          :decision-steps="agentDecisionSteps"
           @quick-action="handleAgentQuickAction"
           @send-message="handleAgentMessage"
         />
+      </div>
+
+      <div v-if="celebrationVisible" class="completion-celebration" aria-live="polite">
+        <div class="celebration-card">
+          <div class="celebration-burst">
+            <span v-for="i in 14" :key="i" :style="{ '--burst-index': i }"></span>
+          </div>
+          <span class="celebration-kicker">任务已完成</span>
+          <strong>{{ celebrationTaskTitle }}</strong>
+          <p>Agent 已记录本次学习表现，进度和后续建议会同步更新。</p>
+        </div>
       </div>
     </div>
   </AppLayout>
@@ -808,6 +856,11 @@ const algorithmState = ref<LearningAlgorithmState | null>(null)
 const algorithmLoading = ref(false)
 const algorithmError = ref('')
 const agentPanelRef = ref<InstanceType<typeof SpaceAgentPanel> | null>(null)
+const animatedHeroProgress = ref(0)
+const celebrationVisible = ref(false)
+const celebrationTaskTitle = ref('')
+let progressAnimationFrame = 0
+let celebrationTimer: ReturnType<typeof setTimeout> | null = null
 
 const spaceId = computed(() => String(route.params.spaceId || ''))
 const dashboard = computed(() => dashStore.dashboard)
@@ -858,6 +911,54 @@ const algorithmNextActionTitle = computed(() => {
 const algorithmNextActionReason = computed(() =>
   algorithmNextAction.value?.reason || '当前证据不足，建议先完成一次诊断测评。'
 )
+const agentDecisionTitle = computed(() => {
+  if (nextTodayTask.value?.title) return `推荐今日先做「${nextTodayTask.value.title}」`
+  if (algorithmNextAction.value?.knowledgeName) return `先补齐「${algorithmNextAction.value.knowledgeName}」`
+  return '先完成一次轻量诊断，建立学习证据'
+})
+const agentDecisionReason = computed(() => {
+  if (nextTodayTask.value?.agentReason) return nextTodayTask.value.agentReason
+  if (nextTodayTask.value?.aiSuggestion) return nextTodayTask.value.aiSuggestion
+  return algorithmNextActionReason.value
+})
+const agentDecisionEvidence = computed(() => {
+  const records = displayRecords.value
+  const latest = records[records.length - 1]
+  const evidence = [
+    `${algorithmAssessedCount.value}/${algorithmKnowledgeCount.value || Math.max(algorithmAssessedCount.value, 1)} 个知识点已评估`,
+    `${algorithmWeakCount.value || weaknesses.value.length} 个薄弱点待处理`,
+    `平均掌握度 ${algorithmMasteryPercent.value}%`,
+  ]
+  if (nextTodayTask.value?.estimatedDurationMinutes) {
+    evidence.push(`今日任务约 ${nextTodayTask.value.estimatedDurationMinutes} 分钟`)
+  }
+  if (latest) {
+    evidence.push(`最近一次专注度 ${latest.focusLevel}/5`)
+  }
+  return evidence.slice(0, 5)
+})
+const agentDecisionSteps = computed(() => [
+  {
+    label: '读取测评',
+    detail: algorithmAssessedCount.value ? `已评估 ${algorithmAssessedCount.value} 个知识点` : '等待诊断题补充证据',
+    status: algorithmAssessedCount.value ? 'done' : 'pending',
+  },
+  {
+    label: '识别薄弱点',
+    detail: weaknesses.value.length ? weaknesses.value.slice(0, 2).join(' / ') : '当前没有明显薄弱项',
+    status: algorithmWeakCount.value ? 'warn' : 'done',
+  },
+  {
+    label: '匹配资源',
+    detail: `${visibleResources.value.length} 项资料可用于当前空间`,
+    status: visibleResources.value.length ? 'done' : 'pending',
+  },
+  {
+    label: '生成今日任务',
+    detail: nextTodayTask.value?.title || '等待 Agent 编排任务',
+    status: nextTodayTask.value ? 'active' : 'pending',
+  },
+])
 const packageTypeOptions: { value: ResourceType; label: string }[] = [
   { value: 'doc', label: '文档' },
   { value: 'html', label: 'HTML' },
@@ -1643,6 +1744,7 @@ async function handleCompleteTask(task: TaskVO) {
     })
     const minutes = Number((document.querySelector('.el-message-box__input input') as HTMLInputElement)?.value || task.estimatedDurationMinutes || 20)
     await dashStore.completeTask(task.id, minutes)
+    showCompletionCelebration(task.title)
     ElMessage.success('任务完成！')
   } catch {
     // cancelled
@@ -1757,6 +1859,38 @@ function loadDashboard() {
   }
 }
 
+function animateHeroProgress(targetValue: number) {
+  if (typeof window === 'undefined') {
+    animatedHeroProgress.value = Math.round(targetValue)
+    return
+  }
+  window.cancelAnimationFrame(progressAnimationFrame)
+  const startValue = animatedHeroProgress.value
+  const target = Math.round(clampNumber(targetValue, 0, 100))
+  const startTime = performance.now()
+  const duration = 850
+
+  const tick = (now: number) => {
+    const progress = Math.min((now - startTime) / duration, 1)
+    const eased = 1 - Math.pow(1 - progress, 3)
+    animatedHeroProgress.value = Math.round(startValue + (target - startValue) * eased)
+    if (progress < 1) {
+      progressAnimationFrame = window.requestAnimationFrame(tick)
+    }
+  }
+
+  progressAnimationFrame = window.requestAnimationFrame(tick)
+}
+
+function showCompletionCelebration(title: string) {
+  celebrationTaskTitle.value = title
+  celebrationVisible.value = true
+  if (celebrationTimer) clearTimeout(celebrationTimer)
+  celebrationTimer = setTimeout(() => {
+    celebrationVisible.value = false
+  }, 2200)
+}
+
 function syncActiveTabFromRoute() {
   const tab = String(route.query.tab || '')
   if (['today', 'plan', 'path', 'resources', 'records', 'insight'].includes(tab)) {
@@ -1771,6 +1905,10 @@ onMounted(() => {
 onUnmounted(() => {
   abortPackageStream()
   stopResourceGenerationPolling()
+  if (typeof window !== 'undefined') {
+    window.cancelAnimationFrame(progressAnimationFrame)
+  }
+  if (celebrationTimer) clearTimeout(celebrationTimer)
 })
 watch(() => route.params.spaceId, () => {
   abortPackageStream()
@@ -1800,6 +1938,11 @@ watch(
   () => {
     expandedResourceGroupKeys.value = []
   }
+)
+watch(
+  () => dashboard.value?.progress || 0,
+  value => animateHeroProgress(Number(value) || 0),
+  { immediate: true }
 )
 </script>
 
@@ -3092,6 +3235,7 @@ watch(
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
+  animation: riskPulse 1.9s ease-in-out infinite;
 }
 
 .hero-badge.good,
@@ -3105,12 +3249,14 @@ watch(
   background: #fffbeb;
   color: #d97706;
   border-color: rgba(245, 158, 11, 0.22);
+  animation: riskGlowWarning 2.8s ease-in-out infinite;
 }
 
 .hero-badge.danger {
   background: #fef2f2;
   color: #dc2626;
   border-color: rgba(239, 68, 68, 0.2);
+  animation: riskGlowDanger 2.2s ease-in-out infinite;
 }
 
 .hero-primary-action {
@@ -3362,6 +3508,143 @@ watch(
   }
 }
 
+.agent-decision-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.95fr);
+  gap: 16px;
+  align-items: stretch;
+  margin-top: 16px;
+  padding: 15px;
+  border-radius: 16px;
+  border: 1px solid rgba(11, 183, 170, 0.18);
+  background:
+    linear-gradient(135deg, rgba(236, 253, 251, 0.9), rgba(240, 249, 255, 0.82)),
+    #ffffff;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.045);
+  animation: decisionEnter 0.48s ease both;
+}
+
+.decision-copy {
+  min-width: 0;
+
+  h3 {
+    margin: 4px 0 5px;
+    color: #0f172a;
+    font-size: 0.98rem;
+    line-height: 1.35;
+  }
+
+  p {
+    margin: 0;
+    color: #475569;
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+}
+
+.decision-eyebrow {
+  color: #0a9e94;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.decision-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+
+  span {
+    min-height: 24px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.82);
+    color: #334155;
+    font-size: 0.7rem;
+    font-weight: 800;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+  }
+}
+
+.decision-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.decision-flow-step {
+  position: relative;
+  min-width: 0;
+  padding: 10px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  animation: flowStepEnter 0.42s ease both;
+  animation-delay: var(--step-delay);
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 20px;
+    right: -8px;
+    width: 8px;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(11, 183, 170, 0.35), rgba(14, 165, 233, 0.65));
+  }
+
+  &:last-child::after {
+    display: none;
+  }
+
+  strong {
+    display: block;
+    color: #0f172a;
+    font-size: 0.76rem;
+    line-height: 1.3;
+  }
+
+  em {
+    display: -webkit-box;
+    margin-top: 4px;
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.66rem;
+    font-style: normal;
+    line-height: 1.35;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  &.active {
+    border-color: rgba(14, 165, 233, 0.3);
+    box-shadow: 0 8px 18px rgba(14, 165, 233, 0.1);
+  }
+
+  &.warn .flow-index {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  &.pending {
+    opacity: 0.7;
+  }
+}
+
+.flow-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 7px;
+  border-radius: 50%;
+  background: #ecfdfb;
+  color: #0a9e94;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
 /* 继续学习 hero 区块 */
 .continue-study-block {
   display: flex;
@@ -3529,6 +3812,136 @@ watch(
   background: var(--color-card-bg-secondary);
   border: 1px solid rgba(148, 163, 184, 0.16);
   box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
+  animation: tabContentEnter 0.32s ease both;
+}
+
+.stagger-card {
+  animation: taskLayerEnter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--stagger-delay);
+}
+
+.completion-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(2px);
+  animation: celebrationBackdrop 2.2s ease both;
+}
+
+.celebration-card {
+  position: relative;
+  width: min(380px, calc(100vw - 32px));
+  padding: 26px 24px 22px;
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(11, 183, 170, 0.2), transparent 45%),
+    #ffffff;
+  border: 1px solid rgba(11, 183, 170, 0.22);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+  text-align: center;
+  animation: celebrationPop 2.2s ease both;
+
+  strong {
+    display: block;
+    margin-top: 7px;
+    color: #0f172a;
+    font-size: 1.05rem;
+    line-height: 1.4;
+  }
+
+  p {
+    margin: 8px 0 0;
+    color: #64748b;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+}
+
+.celebration-kicker {
+  display: inline-flex;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: #ecfdfb;
+  color: #0a9e94;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.celebration-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+
+  span {
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    width: 7px;
+    height: 12px;
+    border-radius: 3px;
+    background: hsl(calc(var(--burst-index) * 28), 76%, 56%);
+    transform: rotate(calc(var(--burst-index) * 26deg)) translateY(-8px);
+    animation: confettiBurst 1.35s ease-out both;
+    animation-delay: calc(var(--burst-index) * 18ms);
+  }
+}
+
+@keyframes decisionEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes flowStepEnter {
+  from { opacity: 0; transform: translateX(10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes tabContentEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes taskLayerEnter {
+  from { opacity: 0; transform: translateY(12px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes riskPulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent); }
+  50% { box-shadow: 0 0 0 8px color-mix(in srgb, currentColor 4%, transparent); }
+}
+
+@keyframes riskGlowWarning {
+  0%, 100% { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+  50% { box-shadow: 0 8px 20px rgba(245, 158, 11, 0.14); }
+}
+
+@keyframes riskGlowDanger {
+  0%, 100% { box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+  50% { box-shadow: 0 8px 22px rgba(239, 68, 68, 0.18); }
+}
+
+@keyframes celebrationBackdrop {
+  0%, 100% { opacity: 0; }
+  12%, 82% { opacity: 1; }
+}
+
+@keyframes celebrationPop {
+  0% { opacity: 0; transform: translateY(12px) scale(0.92); }
+  16%, 78% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.98); }
+}
+
+@keyframes confettiBurst {
+  0% { opacity: 0; transform: rotate(calc(var(--burst-index) * 26deg)) translateY(-8px) scale(0.4); }
+  18% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(calc(var(--burst-index) * 26deg)) translateY(-150px) translateX(calc((var(--burst-index) - 7) * 14px)) scale(1); }
 }
 
 .section-header {
@@ -3664,7 +4077,8 @@ watch(
 
 @media (max-width: 980px) {
   .hero-main-grid,
-  .hero-support-row {
+  .hero-support-row,
+  .agent-decision-panel {
     grid-template-columns: 1fr;
   }
 
@@ -3679,6 +4093,10 @@ watch(
   .hero-actions {
     align-items: flex-end;
     flex-direction: column;
+  }
+
+  .decision-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -3857,6 +4275,14 @@ watch(
 
   .adb-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .decision-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-flow-step::after {
+    display: none;
   }
 
   .resource-filter-controls {
