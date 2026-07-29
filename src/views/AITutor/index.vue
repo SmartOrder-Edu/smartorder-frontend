@@ -445,7 +445,8 @@
               <div class="composer-body">
                 <textarea
                   v-model="inputMessage"
-                  :placeholder="inputPlaceholder"
+                  :placeholder="isListening ? '正在聆听…' : inputPlaceholder"
+                  :disabled="isListening"
                   rows="1"
                   @keydown.enter.exact.prevent="sendMessage"
                   @keydown.enter.shift.exact.stop
@@ -453,6 +454,25 @@
                   ref="inputRef"
                 ></textarea>
                 <div class="composer-actions">
+                  <button
+                    v-if="!voiceUnsupported"
+                    class="action-btn mic-action"
+                    :class="{ listening: isListening }"
+                    :title="isListening ? '停止录音' : '语音输入'"
+                    :aria-label="isListening ? '停止录音' : '语音输入'"
+                    :disabled="agentStore.loading"
+                    @click="toggleVoice"
+                  >
+                    <svg v-if="!isListening" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                      <line x1="12" y1="19" x2="12" y2="23"/>
+                      <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="6" y="6" width="12" height="12" rx="2"/>
+                    </svg>
+                  </button>
                   <button
                     v-if="agentStore.loading"
                     class="action-btn stop-action"
@@ -637,6 +657,7 @@ import MindMapCard from '@/components/agent/MindMapCard.vue'
 import LearningSpaceCards from '@/components/agent/LearningSpaceCards.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
+import { useVoiceInput } from '@/composables/useVoiceInput'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
 import type { RagReference } from '@/composables/useAgentChat'
 import AssistantPanel from '@/components/AssistantPanel.vue'
@@ -938,8 +959,14 @@ const autoResize = () => {
   }
 }
 
+const { isListening, voiceUnsupported, toggleVoice, stopVoice } = useVoiceInput(inputMessage, {
+  onUpdate: autoResize,
+  onEnd: () => nextTick(() => inputRef.value?.focus()),
+})
+
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || agentStore.loading) return
+  if (isListening.value) stopVoice()
   if (attachments.value.some(a => a.status === 'processing' || a.status === 'uploading')) {
     ElMessage.warning('附件仍在解析中，请稍后再提问')
     return
@@ -2402,6 +2429,33 @@ watch(windowWidth, (newWidth, oldWidth) => {
 .stop-action:hover {
   background: #dc2626;
   transform: scale(1.05);
+}
+
+.mic-action {
+  background: transparent;
+  color: #64748b;
+  margin-right: 6px;
+}
+
+.mic-action:hover:not(:disabled) {
+  color: var(--primary-color);
+  background: rgba(11, 183, 170, 0.1);
+}
+
+.mic-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mic-action.listening {
+  color: white;
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  animation: micPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
 }
 
 .composer-footer {
