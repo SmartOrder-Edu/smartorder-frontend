@@ -122,7 +122,10 @@ export default { name: 'TaskCard' }
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    opacity 0.3s ease;
   overflow: hidden;
 
   &::before {
@@ -134,6 +137,22 @@ export default { name: 'TaskCard' }
     width: 3px;
     border-radius: 0 999px 999px 0;
     background: #cbd5e1;
+    transition: background 0.3s ease;
+  }
+
+  /* 进度光环 — 进行中 */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+    background: transparent;
+    transition: background 0.35s ease, opacity 0.35s ease;
+    opacity: 0;
+    pointer-events: none;
   }
 
   &:hover {
@@ -143,15 +162,57 @@ export default { name: 'TaskCard' }
   }
 
   &.status-completed { opacity: 0.7; }
+
   &.status-overdue {
     border-color: rgba(248, 113, 113, 0.34);
     background: linear-gradient(135deg, #fff, #fff7f7);
+    animation: overduePulse 2.4s ease-in-out infinite;
   }
 
-  &.status-in_progress::before,
-  &.status-doing::before { background: #0bb7aa; }
+  &.status-in_progress,
+  &.status-doing {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgba(11, 183, 170, 0.08);
+
+    &::before { background: #0bb7aa; }
+
+    &::after {
+      opacity: 1;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        #0bb7aa 20%,
+        #38bdf8 50%,
+        #0bb7aa 80%,
+        transparent 100%
+      );
+      background-size: 200% 100%;
+      animation: progressBarShimmer 2s ease-in-out infinite;
+    }
+
+    &:hover {
+      box-shadow: 0 16px 34px rgba(11, 183, 170, 0.12);
+      transform: translateY(-2px);
+    }
+  }
+
   &.status-completed::before { background: #10b981; }
   &.status-overdue::before { background: #ef4444; }
+}
+
+@keyframes progressBarShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes overduePulse {
+  0%, 100% {
+    border-color: rgba(248, 113, 113, 0.34);
+    box-shadow: 0 8px 22px rgba(248, 113, 113, 0.06);
+  }
+  50% {
+    border-color: rgba(248, 113, 113, 0.55);
+    box-shadow: 0 8px 26px rgba(248, 113, 113, 0.14);
+  }
 }
 
 .task-status-indicator {
@@ -163,6 +224,7 @@ export default { name: 'TaskCard' }
   justify-content: center;
   flex-shrink: 0;
   margin-top: 2px;
+  transition: all 0.3s ease;
 
   &.pending {
     border: 2px solid #cbd5e1;
@@ -174,6 +236,7 @@ export default { name: 'TaskCard' }
     background: #ecfdfb;
     border: 2px solid #0bb7aa;
     color: #0a9e94;
+    animation: indicatorBreathe 2s ease-in-out infinite;
   }
   &.completed {
     background: #10b981;
@@ -184,7 +247,18 @@ export default { name: 'TaskCard' }
     background: #fef2f2;
     border: 2px solid #ef4444;
     color: #ef4444;
+    animation: indicatorPulse 2.4s ease-in-out infinite;
   }
+}
+
+@keyframes indicatorBreathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(11, 183, 170, 0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(11, 183, 170, 0); }
+}
+
+@keyframes indicatorPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
 }
 
 .task-body {

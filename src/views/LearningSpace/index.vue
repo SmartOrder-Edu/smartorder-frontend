@@ -24,6 +24,7 @@
           :style="heroBackgroundStyle"
         ></div>
         <div class="hero-content">
+          <!-- Layer 1: Identity -->
           <div class="hero-top">
             <button class="back-btn" @click="$router.push('/spaces')">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -43,8 +44,8 @@
             </div>
           </div>
 
+          <!-- Layer 2: Core Dashboard -->
           <div class="hero-main-grid">
-            <!-- 继续学习 hero 区块：本空间主入口 -->
             <div class="continue-study-block">
               <div class="csb-head">
                 <span class="csb-eyebrow">
@@ -65,9 +66,7 @@
                 <button class="csb-btn primary" @click="nextTodayTask ? handleStartFromHero() : handleContinueToday()">
                   {{ nextTodayTask ? '开始学习' : '规划今日任务' }}
                 </button>
-                <button class="csb-btn" @click="handleAdjustDuration">调整时长</button>
-                <button class="csb-btn" @click="handleSimplerExplain">换个更基础的讲解</button>
-                <button class="csb-btn" @click="handleAssessFirst">先测一下</button>
+                <button class="csb-btn" @click="goPlanAdjustment()">调整计划</button>
               </div>
             </div>
 
@@ -86,7 +85,6 @@
                 </div>
               </div>
 
-              <!-- Stats Row -->
               <div class="stats-row">
                 <SpaceStatCard
                   :value="dashboard.progress"
@@ -111,137 +109,40 @@
                   bg-color="#ecfdf5"
                   value-color="#059669"
                 />
-                <SpaceStatCard
-                  :value="riskLabel(dashboard.riskStatus)"
-                  label="风险状态"
-                  :icon="ZapIcon"
-                  bg-color="#f5f3ff"
-                  value-color="#7c3aed"
-                />
               </div>
             </div>
           </div>
 
-          <div class="learning-cockpit">
-            <div
-              v-for="(item, index) in cockpitItems"
-              :key="item.label"
-              class="cockpit-card"
-              :class="item.tone"
-              :style="{ '--cockpit-delay': `${index * 90}ms` }"
-            >
-              <span class="cockpit-label">{{ item.label }}</span>
-              <strong>{{ item.value }}</strong>
-              <p>{{ item.detail }}</p>
-            </div>
-          </div>
-
-          <div class="agent-decision-panel">
-            <div class="decision-copy">
-              <span class="decision-eyebrow">Agent 决策依据</span>
+          <!-- Layer 3: Agent Decision Summary -->
+          <div class="agent-decision-summary">
+            <div class="ads-main">
+              <span class="ads-eyebrow">Agent 决策</span>
               <h3>{{ agentDecisionTitle }}</h3>
               <p>{{ agentDecisionReason }}</p>
-              <div class="decision-evidence">
+              <div class="ads-evidence">
                 <span v-for="item in agentDecisionEvidence" :key="item">{{ item }}</span>
               </div>
-              <button class="decision-adjust-btn" type="button" @click="goPlanAdjustment()">
-                进入 Agent 调整计划
-              </button>
             </div>
-            <div class="decision-flow" aria-label="Agent 推理流程">
-              <div
-                v-for="(step, index) in agentDecisionSteps"
-                :key="step.label"
-                class="decision-flow-step"
-                :class="step.status"
-                :style="{ '--step-delay': `${index * 120}ms` }"
-              >
-                <span class="flow-index">{{ index + 1 }}</span>
-                <div>
-                  <strong>{{ step.label }}</strong>
-                  <em>{{ step.detail }}</em>
-                </div>
-              </div>
+            <div class="ads-weakness" v-if="weaknesses.length">
+              <span class="ads-weakness-label">薄弱预警</span>
+              <span class="ads-weakness-item" v-for="name in weaknesses.slice(0, 3)" :key="name">{{ name }}</span>
             </div>
-            <div class="adjustment-preview" :class="{ running: agentAdjustmentRunning }">
-              <div class="adjustment-preview-head">
-                <span>动态调度演示</span>
-                <strong>{{ agentAdjustmentRunning ? '正在重排今日计划' : '点击左侧按钮查看调整过程' }}</strong>
-                <button type="button" @click="playAgentAdjustment">播放预览</button>
-              </div>
-              <div class="adjustment-track">
-                <span
-                  v-for="(step, index) in agentAdjustmentSteps"
-                  :key="step"
-                  :class="{ active: agentAdjustmentRunning && index <= agentAdjustmentStepIndex }"
-                >
-                  {{ step }}
-                </span>
-              </div>
-              <div class="adjustment-result">
-                <div>
-                  <em>调整前</em>
-                  <strong>{{ adjustmentBeforeText }}</strong>
-                </div>
-                <div>
-                  <em>调整后</em>
-                  <strong>{{ adjustmentAfterText }}</strong>
-                </div>
-              </div>
+            <div class="ads-actions">
+              <button class="ads-btn primary" @click="goPlanAdjustment()">进入 Agent 调整计划</button>
+              <button class="ads-btn" @click="commandBarRef?.focus?.()">查看 Agent 分析</button>
             </div>
           </div>
 
-          <div
-            v-if="dashboard.agentInsight || algorithmLoading || algorithmState || algorithmError"
-            class="hero-support-row"
-          >
-            <!-- Agent Insight Banner -->
-            <div class="agent-insight-banner" v-if="dashboard.agentInsight" @click="agentPanelRef?.open?.()">
-              <div class="insight-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
-                  <line x1="12" y1="8" x2="12.01" y2="8"/>
-                </svg>
-              </div>
-              <span class="insight-text">{{ dashboard.agentInsight }}</span>
-              <span class="insight-link">查看建议 →</span>
+          <!-- Agent Insight Banner -->
+          <div class="agent-insight-banner" v-if="dashboard.agentInsight" @click="commandBarRef?.focus?.()">
+            <div class="insight-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
             </div>
-
-            <div
-              v-if="algorithmLoading || algorithmState || algorithmError"
-              class="algorithm-diagnosis-band"
-              :class="{ muted: algorithmError }"
-            >
-              <div class="adb-main">
-                <span class="adb-eyebrow">学习诊断</span>
-                <template v-if="algorithmLoading">
-                  <h3>正在读取当前空间的掌握度证据</h3>
-                  <p>会优先使用测评结果、题目知识点映射和近期答题证据。</p>
-                </template>
-                <template v-else-if="algorithmError">
-                  <h3>诊断暂不可用</h3>
-                  <p>{{ algorithmError }}</p>
-                </template>
-                <template v-else>
-                  <h3>{{ algorithmNextActionTitle }}</h3>
-                  <p>{{ algorithmNextActionReason }}</p>
-                </template>
-              </div>
-              <div class="adb-stats" v-if="algorithmState">
-                <div>
-                  <strong>{{ algorithmAssessedCount }}/{{ algorithmKnowledgeCount }}</strong>
-                  <span>已评估知识点</span>
-                </div>
-                <div>
-                  <strong>{{ algorithmWeakCount }}</strong>
-                  <span>薄弱点</span>
-                </div>
-                <div>
-                  <strong>{{ algorithmMasteryPercent }}%</strong>
-                  <span>平均掌握度</span>
-                </div>
-              </div>
-            </div>
+            <span class="insight-text">{{ dashboard.agentInsight }}</span>
+            <span class="insight-link">查看建议 →</span>
           </div>
         </div>
       </section>
@@ -271,7 +172,12 @@
               <span class="task-count">{{ dashboard.todayTasks.length }} 项</span>
             </div>
 
-            <div class="task-list" v-if="dashboard.todayTasks.length">
+            <TransitionGroup
+              name="task-list"
+              tag="div"
+              class="task-list"
+              v-if="dashboard.todayTasks.length"
+            >
               <TaskCard
                 v-for="(task, index) in dashboard.todayTasks"
                 :key="task.id"
@@ -282,7 +188,7 @@
                 @start="handleStartTask"
                 @complete="handleCompleteTask"
               />
-            </div>
+            </TransitionGroup>
             <el-empty v-else description="今日暂无任务" :image-size="80" />
 
             <!-- Overdue tasks -->
@@ -290,7 +196,12 @@
               <h3 class="text-danger">已逾期任务</h3>
               <span class="task-count danger">{{ dashboard.overdueTasks.length }} 项</span>
             </div>
-            <div class="task-list" v-if="dashboard.overdueTasks.length">
+            <TransitionGroup
+              name="task-list"
+              tag="div"
+              class="task-list"
+              v-if="dashboard.overdueTasks.length"
+            >
               <TaskCard
                 v-for="(task, index) in dashboard.overdueTasks"
                 :key="task.id"
@@ -301,7 +212,7 @@
                 @start="handleStartTask"
                 @complete="handleCompleteTask"
               />
-            </div>
+            </TransitionGroup>
 
             <!-- Quick actions -->
             <div class="quick-actions-row">
@@ -550,15 +461,115 @@
               </div>
             </div>
 
-            <div v-if="packageRunningSteps.length" class="resource-progress">
-              <div
-                v-for="step in packageRunningSteps"
-                :key="step.reason"
-                class="resource-progress-step"
-                :class="step.status"
-              >
-                <span class="step-dot"></span>
-                <span>{{ step.reason }}</span>
+            <!-- Agent 协同生成面板 -->
+            <div v-if="agentCollabActive" class="agent-collab-panel">
+              <div class="acp-header">
+                <div class="acp-avatar">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                    <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                    <line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
+                  </svg>
+                </div>
+                <div class="acp-header-text">
+                  <strong>Agent 正在协同生成学习资源包</strong>
+                  <span>{{ agentCollabPhaseLabel }}</span>
+                </div>
+                <button class="acp-cancel-btn" @click="handleCancelAgentCollab" :disabled="agentCollabPhase === 'done'">
+                  取消
+                </button>
+              </div>
+
+              <!-- Phase 1: 分析薄弱点 -->
+              <div class="acp-phase" :class="{ active: agentCollabPhase === 'analysis', done: agentCollabPhase !== 'analysis' }">
+                <div class="acp-phase-head">
+                  <span class="acp-phase-icon">{{ agentCollabPhase === 'analysis' ? '⏳' : '✅' }}</span>
+                  <strong>分析学习薄弱点</strong>
+                </div>
+                <div class="acp-phase-body" v-if="agentCollabPhase === 'analysis' || agentCollabPhase !== 'analysis'">
+                  <div class="acp-evidence-list">
+                    <div class="acp-evidence-item done">
+                      <span class="acp-evidence-dot"></span>
+                      <span>读取学习诊断数据：已评估 {{ algorithmAssessedCount }}/{{ algorithmKnowledgeCount || '?' }} 个知识点</span>
+                    </div>
+                    <div class="acp-evidence-item done">
+                      <span class="acp-evidence-dot"></span>
+                      <span>识别薄弱点：{{ weaknesses.slice(0, 3).join('、') || '暂无明显薄弱项' }}</span>
+                    </div>
+                    <div class="acp-evidence-item done">
+                      <span class="acp-evidence-dot"></span>
+                      <span>当前平均掌握度 {{ algorithmMasteryPercent }}%，确定优先级：薄弱点优先 + 巩固已有知识</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Phase 2: 匹配资源类型 -->
+              <div class="acp-phase" :class="{ active: agentCollabPhase === 'matching', done: agentCollabPhase === 'generating' || agentCollabPhase === 'done' }">
+                <div class="acp-phase-head">
+                  <span class="acp-phase-icon">{{ agentCollabPhase === 'analysis' ? '🔒' : agentCollabPhase === 'matching' ? '⏳' : '✅' }}</span>
+                  <strong>匹配最佳资源类型</strong>
+                </div>
+                <div class="acp-phase-body" v-if="agentCollabPhase !== 'analysis'">
+                  <div class="acp-match-grid">
+                    <div
+                      v-for="r in agentCollabResources"
+                      :key="r.id"
+                      class="acp-match-item"
+                    >
+                      <span class="acp-match-type" v-html="resourceIcon(r.type)"></span>
+                      <div>
+                        <strong>{{ r.title }}</strong>
+                        <p>{{ r.reason }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Phase 3: 生成进度 -->
+              <div class="acp-phase" :class="{ active: agentCollabPhase === 'generating', done: agentCollabPhase === 'done' }">
+                <div class="acp-phase-head">
+                  <span class="acp-phase-icon">{{ agentCollabPhase === 'analysis' || agentCollabPhase === 'matching' ? '🔒' : agentCollabPhase === 'generating' ? '⏳' : '✅' }}</span>
+                  <strong>生成进度</strong>
+                  <span class="acp-phase-count">{{ agentCollabResources.filter(r => r.status === 'done').length }}/{{ agentCollabResources.length }}</span>
+                </div>
+                <div class="acp-phase-body" v-if="agentCollabPhase === 'generating' || agentCollabPhase === 'done'">
+                  <div class="acp-progress-list">
+                    <div
+                      v-for="r in agentCollabResources"
+                      :key="r.id"
+                      class="acp-progress-item"
+                      :class="r.status"
+                    >
+                      <span class="acp-progress-icon">
+                        <template v-if="r.status === 'done'">✅</template>
+                        <template v-else-if="r.status === 'failed'">❌</template>
+                        <template v-else-if="r.status === 'generating'">
+                          <span class="acp-spinner"></span>
+                        </template>
+                        <template v-else>⏳</template>
+                      </span>
+                      <div class="acp-progress-body">
+                        <strong>{{ resourceTypeLabel(r.type) }}：《{{ r.title }}》</strong>
+                        <em v-if="r.status === 'generating'">生成中...</em>
+                        <em v-else-if="r.status === 'pending'">排队中...</em>
+                        <em v-else-if="r.status === 'done'" class="done-text">已完成</em>
+                        <em v-else-if="r.status === 'failed'" class="failed-text">生成失败</em>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Phase 4: Agent 建议 -->
+              <div class="acp-phase suggestion" v-if="agentCollabSuggestion">
+                <div class="acp-phase-head">
+                  <span class="acp-phase-icon">💡</span>
+                  <strong>Agent 学习建议</strong>
+                </div>
+                <div class="acp-phase-body">
+                  <p class="acp-suggestion-text">"{{ agentCollabSuggestion }}"</p>
+                </div>
               </div>
             </div>
 
@@ -816,6 +827,7 @@
           :insight="dashboard.agentInsight"
           :agent-actions="dashboard.recentAgentActions"
           :decision-steps="agentDecisionSteps"
+          :active-tab="activeTab"
           @quick-action="handleAgentQuickAction"
           @send-message="handleAgentMessage"
         />
@@ -850,6 +862,13 @@
           <p v-else>Agent 已记录本次学习表现，进度和后续建议会同步更新。</p>
         </div>
       </div>
+
+      <!-- Natural Language Command Bar -->
+      <AgentCommandBar
+        ref="commandBarRef"
+        :active-tab="activeTab"
+        @send="handleCommandSend"
+      />
     </div>
   </AppLayout>
 </template>
@@ -860,11 +879,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SpaceStatCard from '@/components/SpaceStatCard.vue'
-import { BarChartIcon, FlameIcon, CalendarIcon, ZapIcon } from '@/assets/icons'
+import { BarChartIcon, FlameIcon, CalendarIcon } from '@/assets/icons'
 import TaskCard from '@/components/TaskCard.vue'
 import PathTimeline from '@/components/PathTimeline.vue'
 import LearningPathMindMap from '@/components/LearningPathMindMap.vue'
 import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
+import AgentCommandBar from '@/components/AgentCommandBar.vue'
 import LearningContributionCalendar from './components/LearningContributionCalendar.vue'
 import InsightTab from './components/InsightTab.vue'
 import { useSpaceDashboardStore } from '@/stores/spaceDashboard'
@@ -929,18 +949,20 @@ const optimisticPackageResources = ref<ResourceVO[]>([])
 const resourceGenerationJobs = ref<ResourceGenerationJobVO[]>([])
 const resourcePollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
 const resourcePollingInFlight = ref(false)
+const agentCollabActive = ref(false)
+const agentCollabPhase = ref<'analysis' | 'matching' | 'generating' | 'done'>('analysis')
+const agentCollabResources = ref<{ id: string; title: string; type: ResourceType; status: 'pending' | 'generating' | 'done' | 'failed'; reason: string }[]>([])
+const agentCollabSuggestion = ref('')
 const algorithmState = ref<LearningAlgorithmState | null>(null)
 const algorithmLoading = ref(false)
 const algorithmError = ref('')
 const agentPanelRef = ref<InstanceType<typeof SpaceAgentPanel> | null>(null)
+const commandBarRef = ref<InstanceType<typeof AgentCommandBar> | null>(null)
 const animatedHeroProgress = ref(0)
 const celebrationVisible = ref(false)
 const celebrationTaskTitle = ref('')
 const completionReport = ref<{ minutes: number; before: number; after: number; nextStep: string } | null>(null)
 const selectedPathNodeId = ref('')
-const agentAdjustmentRunning = ref(false)
-const agentAdjustmentStepIndex = ref(-1)
-let agentAdjustmentTimer: ReturnType<typeof setInterval> | null = null
 let progressAnimationFrame = 0
 let celebrationTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -1041,44 +1063,6 @@ const agentDecisionSteps = computed(() => [
     status: nextTodayTask.value ? 'active' : 'pending',
   },
 ])
-const cockpitItems = computed(() => {
-  const weakName = weaknesses.value[0] || '暂无明显薄弱点'
-  const currentTask = nextTodayTask.value
-  const latestRecord = displayRecords.value[displayRecords.value.length - 1]
-  const estimatedLift = currentTask?.priority ? Math.min(8, Math.max(2, currentTask.priority + 1)) : 3
-  return [
-    {
-      label: '今日目标',
-      value: currentTask?.title || algorithmNextActionTitle.value,
-      detail: currentTask?.estimatedDurationMinutes ? `建议投入 ${currentTask.estimatedDurationMinutes} 分钟` : '先建立今日学习证据',
-      tone: 'primary',
-    },
-    {
-      label: '薄弱预警',
-      value: weakName,
-      detail: algorithmWeakCount.value ? '优先进入补弱任务池' : '保持验证和复盘节奏',
-      tone: algorithmWeakCount.value ? 'warn' : 'success',
-    },
-    {
-      label: '预计收益',
-      value: `+${estimatedLift}%`,
-      detail: '完成今日任务后的掌握度提升预估',
-      tone: 'info',
-    },
-    {
-      label: '状态依据',
-      value: latestRecord ? `${latestRecord.focusLevel}/5 专注` : `${dashboard.value?.streakDays || 0} 天连续`,
-      detail: latestRecord?.aiReflection || '结合连续学习和任务完成情况判断',
-      tone: 'neutral',
-    },
-  ]
-})
-const agentAdjustmentSteps = ['读取学习记录', '发现薄弱知识点', '降低新课难度', '插入补弱练习', '更新今日任务']
-const adjustmentBeforeText = computed(() => nextTodayTask.value?.title || '按原计划推进新知识点')
-const adjustmentAfterText = computed(() => {
-  const weakName = weaknesses.value[0] || algorithmNextAction.value?.knowledgeName || '当前薄弱点'
-  return `先补「${weakName}」+ 5 题验证`
-})
 const selectedPathNode = computed(() => {
   const nodes = dashboard.value?.pathNodes || []
   if (!selectedPathNodeId.value) return null
@@ -1261,6 +1245,16 @@ const allTasks = computed<TaskVO[]>(() => {
   ;[...(d.todayTasks || []), ...(d.pendingTasks || []), ...(d.overdueTasks || [])]
     .forEach(t => map.set(t.id, t))
   return [...map.values()]
+})
+
+const agentCollabPhaseLabel = computed(() => {
+  const m: Record<string, string> = {
+    analysis: '正在分析学习数据，定位薄弱点...',
+    matching: '正在为每个薄弱点匹配最佳资源类型...',
+    generating: '正在逐项生成学习资料...',
+    done: '全部资料已生成完毕',
+  }
+  return m[agentCollabPhase.value] || ''
 })
 
 const resourcePackageTarget = computed(() => {
@@ -1779,6 +1773,8 @@ function handleResourcePackageStreamEvent(eventName: ResourcePackageStreamEventN
   if (eventName === 'resource-start' && payload.resource) {
     upsertOptimisticResource(payload.resource)
     setStreamingState(payload.resource, 'generating', '内容正在实时返回，生成完成后会自动保存。')
+    // Update collab resource status
+    updateCollabResourceStatus(payload.resource, 'generating')
     return
   }
 
@@ -1797,6 +1793,9 @@ function handleResourcePackageStreamEvent(eventName: ResourcePackageStreamEventN
       }
     }
     updateOptimisticResourceStatus(payload.resourceId, 'generated')
+    updateCollabResourceByResourceId(payload.resourceId, 'done')
+    // Advance next pending resource
+    advanceNextCollabResource()
     return
   }
 
@@ -1830,6 +1829,46 @@ function handleResourcePackageStreamEvent(eventName: ResourcePackageStreamEventN
   }
 }
 
+function initAgentCollabResources() {
+  const target = resourcePackageTarget.value
+  const types = selectedPackageTypes.value
+  const weakNames = weaknesses.value.slice(0, 3)
+  const reasons: Record<string, string> = {
+    doc: weakNames.length ? `梳理「${weakNames[0]}」的知识框架和重点` : '整理学习文档',
+    html: weakNames.length ? `将「${weakNames[0]}」的核心概念做成互动页面` : '互动式学习内容',
+    mind_map: weakNames.length ? `建立「${weakNames[0] || target.knowledgePoint}」的思维导图框架` : '建立知识框架',
+    quiz: weakNames.length ? `针对薄弱点生成诊断题，检测掌握程度` : '生成诊断练习',
+    case_study: weakNames.length ? `提供「${weakNames[0]}」的典型应用案例` : '提供应用案例',
+    flashcard_set: '关键概念速记卡片，方便碎片时间复习',
+    image: weakNames.length ? `对比「${weakNames.slice(0, 2).join('、')}」的直观图示` : '知识图解',
+    link: '匹配B站优质讲解，多角度理解概念',
+  }
+  return types.map((type, i) => ({
+    id: `agent-collab-${type}-${i}`,
+    title: resourceTypeLabel(type),
+    type,
+    status: 'pending' as const,
+    reason: reasons[type] || `为「${target.knowledgePoint}」生成${resourceTypeLabel(type)}`,
+  }))
+}
+
+function buildAgentCollabSuggestion() {
+  const types = selectedPackageTypes.value
+  if (types.includes('mind_map') && types.includes('case_study') && types.includes('quiz')) {
+    return '我建议你先看思维导图建立概念框架，再用案例理解应用场景，最后用测验验证掌握程度。这样从框架到应用再到检测，形成完整的学习闭环。'
+  }
+  if (types.includes('mind_map') && types.includes('quiz')) {
+    return '建议先看思维导图快速建立框架，再用测验题检测理解。如果测验结果不理想，回头重点看薄弱部分。'
+  }
+  if (types.includes('doc') && types.includes('quiz')) {
+    return '建议先通读文档掌握知识点，然后做测验验证。做错的题目回到文档中找到对应章节再巩固。'
+  }
+  if (types.includes('video') || types.includes('link')) {
+    return '视频是很好的入门方式，看完后建议配合文档或练习来巩固。我推荐观看顺序已按难度从低到高排列。'
+  }
+  return '按照资料排列顺序学习即可。每完成一项，我会根据你的表现动态调整后续推荐。'
+}
+
 async function handleGenerateResourcePackage() {
   if (!spaceId.value) return
   abortPackageStream()
@@ -1839,11 +1878,25 @@ async function handleGenerateResourcePackage() {
   packagePreviewVisible.value = false
   streamingResources.value = {}
   optimisticPackageResources.value = []
-  packageRunningSteps.value = [
-    { reason: '资源 Agent 正在分析当前任务和知识点', status: 'running' },
-    { reason: '正在生成资料内容并实时返回片段', status: 'running' },
-    { reason: 'Supervisor Agent 正在检查资料来源和使用场景', status: 'running' },
-  ]
+  packageRunningSteps.value = []
+
+  // Initialize Agent collaboration state
+  agentCollabActive.value = true
+  agentCollabPhase.value = 'analysis'
+  agentCollabResources.value = initAgentCollabResources()
+  agentCollabSuggestion.value = ''
+
+  // Phase transition animation
+  await new Promise(resolve => setTimeout(resolve, 800))
+  agentCollabPhase.value = 'matching'
+  await new Promise(resolve => setTimeout(resolve, 600))
+  agentCollabPhase.value = 'generating'
+
+  // Mark first resource as generating
+  if (agentCollabResources.value.length > 0) {
+    agentCollabResources.value[0].status = 'generating'
+  }
+
   try {
     await streamGenerateResourcePackage(spaceId.value, buildPackagePayload(), {
       signal: controller.signal,
@@ -1852,17 +1905,65 @@ async function handleGenerateResourcePackage() {
     await dashStore.fetchDashboard(spaceId.value)
     await refreshResourceGenerationJobs()
     optimisticPackageResources.value = []
+    agentCollabPhase.value = 'done'
+    agentCollabSuggestion.value = buildAgentCollabSuggestion()
     if (hasActiveResourceGeneration()) startResourceGenerationPolling()
     ElMessage.success('资料包已生成并保存')
+
+    // Auto-dismiss after 6s
+    setTimeout(() => {
+      if (agentCollabPhase.value === 'done') {
+        agentCollabActive.value = false
+      }
+    }, 6000)
   } catch (e: any) {
     if (controller.signal.aborted) return
-    packageRunningSteps.value = packageRunningSteps.value.map(step => ({ ...step, status: 'failed' }))
+    agentCollabResources.value = agentCollabResources.value.map(r =>
+      r.status === 'generating' ? { ...r, status: 'failed' } : r
+    )
+    agentCollabPhase.value = 'done'
     ElMessage.error(e?.message || '资料包生成失败')
   } finally {
     if (packageStreamAbortController.value === controller) {
       packageStreamAbortController.value = null
     }
     packageGenerating.value = false
+  }
+}
+
+function handleCancelAgentCollab() {
+  abortPackageStream()
+  agentCollabActive.value = false
+  agentCollabResources.value = []
+  agentCollabSuggestion.value = ''
+  packageGenerating.value = false
+  ElMessage.info('已取消生成')
+}
+
+function updateCollabResourceStatus(resource: ResourceVO, status: 'generating' | 'done' | 'failed') {
+  agentCollabResources.value = agentCollabResources.value.map(r => {
+    const matches = r.type === resource.resourceType && r.status === 'pending'
+    if (matches) return { ...r, status, title: resource.title || r.title }
+    if (r.type === resource.resourceType && r.status === 'generating') {
+      return { ...r, status, title: resource.title || r.title }
+    }
+    return r
+  })
+}
+
+function updateCollabResourceByResourceId(resourceId: string, status: 'generating' | 'done' | 'failed') {
+  // Update the currently generating resource
+  agentCollabResources.value = agentCollabResources.value.map(r =>
+    r.status === 'generating' ? { ...r, status } : r
+  )
+}
+
+function advanceNextCollabResource() {
+  const nextPending = agentCollabResources.value.find(r => r.status === 'pending')
+  if (nextPending) {
+    agentCollabResources.value = agentCollabResources.value.map(r =>
+      r.id === nextPending.id ? { ...r, status: 'generating' } : r
+    )
   }
 }
 
@@ -1921,29 +2022,6 @@ function handleStartFromHero() {
   enterTask(task, { spaceId: spaceId.value, source: 'space_hero' })
 }
 
-function handleAdjustDuration() {
-  ElMessage.info('Agent 已记录你的时长偏好，下次会话将据此调整（mock）。')
-}
-
-function handleSimplerExplain() {
-  const task = nextTodayTask.value
-  if (!task) {
-    ElMessage.info('暂无可调整的学习会话。')
-    return
-  }
-  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero', mode: 'learn' })
-  ElMessage.success('已为你切换到更基础的讲解节奏。')
-}
-
-function handleAssessFirst() {
-  const task = nextTodayTask.value
-  if (!task) {
-    ElMessage.info('暂无可测评的学习会话。')
-    return
-  }
-  enterStudy(task.id, { spaceId: spaceId.value, source: 'space_hero', mode: 'assessment' })
-}
-
 function handleAgentQuickAction(label: string) {
   // Navigate to AI Tutor with the question pre-filled, or open agent panel
   router.push({ path: '/ai-tutor', query: { message: label, spaceId: spaceId.value } })
@@ -1952,6 +2030,11 @@ function handleAgentQuickAction(label: string) {
 function handleAgentMessage(text: string) {
   // The SpaceAgentPanel handles local echo; for real SSE, post to /agent/chat/stream
   console.log('Agent message:', text, 'spaceId:', spaceId.value)
+}
+
+function handleCommandSend(text: string) {
+  // Route to AI Tutor with the natural language command
+  router.push({ path: '/ai-tutor', query: { message: text, spaceId: spaceId.value } })
 }
 
 async function loadLearningPlan(id: string) {
@@ -2074,22 +2157,6 @@ function goInsightReport() {
   router.push(`/space/${spaceId.value}/insight-report`)
 }
 
-function playAgentAdjustment() {
-  agentAdjustmentRunning.value = true
-  agentAdjustmentStepIndex.value = -1
-  if (agentAdjustmentTimer) clearInterval(agentAdjustmentTimer)
-  agentAdjustmentTimer = setInterval(() => {
-    agentAdjustmentStepIndex.value += 1
-    if (agentAdjustmentStepIndex.value >= agentAdjustmentSteps.length - 1 && agentAdjustmentTimer) {
-      clearInterval(agentAdjustmentTimer)
-      agentAdjustmentTimer = null
-      setTimeout(() => {
-        agentAdjustmentRunning.value = false
-      }, 900)
-    }
-  }, 420)
-}
-
 function syncActiveTabFromRoute() {
   const tab = String(route.query.tab || '')
   if (['today', 'plan', 'path', 'resources', 'records', 'insight'].includes(tab)) {
@@ -2108,7 +2175,6 @@ onUnmounted(() => {
     window.cancelAnimationFrame(progressAnimationFrame)
   }
   if (celebrationTimer) clearTimeout(celebrationTimer)
-  if (agentAdjustmentTimer) clearInterval(agentAdjustmentTimer)
 })
 watch(() => route.params.spaceId, () => {
   abortPackageStream()
@@ -2155,6 +2221,7 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 20px;
+  padding-bottom: 100px; /* room for fixed command bar */
 }
 
 /* ========== Loading / Error ========== */
@@ -2387,6 +2454,30 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* TransitionGroup: task card enter/leave */
+.task-list-enter-active {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.task-list-leave-active {
+  transition: all 0.3s ease-in;
+  position: absolute;
+}
+
+.task-list-enter-from {
+  opacity: 0;
+  transform: translateY(16px) scale(0.96);
+}
+
+.task-list-leave-to {
+  opacity: 0;
+  transform: translateY(-12px);
+}
+
+.task-list-move {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .quick-actions-row {
@@ -2912,35 +3003,284 @@ watch(
   white-space: nowrap;
 }
 
-.resource-progress {
-  display: grid;
-  gap: 8px;
-  margin: 0 0 16px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: #f8fafc;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+/* ========== Agent 协同生成面板 ========== */
+.agent-collab-panel {
+  margin: 0 0 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(11, 183, 170, 0.2);
+  background: linear-gradient(135deg, rgba(236, 253, 251, 0.82), rgba(255, 255, 255, 0.96));
+  box-shadow: 0 16px 40px rgba(11, 183, 170, 0.08);
+  overflow: hidden;
+  animation: collabEnter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.resource-progress-step {
+@keyframes collabEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.acp-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.acp-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 8px 18px rgba(11, 183, 170, 0.2);
+  flex-shrink: 0;
+}
+
+.acp-header-text {
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    display: block;
+    color: #0f172a;
+    font-size: 0.9rem;
+    line-height: 1.3;
+  }
+
+  span {
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+}
+
+.acp-cancel-btn {
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: white;
+  color: #64748b;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) { border-color: #ef4444; color: #ef4444; }
+  &:disabled { opacity: 0.4; cursor: default; }
+}
+
+/* Phases */
+.acp-phase {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  transition: all 0.3s;
+
+  &:last-of-type { border-bottom: none; }
+
+  &.done { opacity: 0.7; }
+  &.suggestion {
+    background: linear-gradient(135deg, rgba(254, 243, 199, 0.3), rgba(255, 255, 255, 0.5));
+    border-bottom: none;
+  }
+}
+
+.acp-phase-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #64748b;
-  font-size: 0.75rem;
+  margin-bottom: 10px;
 
-  &.success { color: #059669; }
-  &.running { color: #0284c7; }
-  &.failed { color: #dc2626; }
-  &.waiting_user_confirm { color: #d97706; }
+  strong {
+    flex: 1;
+    font-size: 0.82rem;
+    color: #0f172a;
+  }
 }
 
-.step-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 14%, transparent);
+.acp-phase-icon {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.acp-phase-count {
+  font-size: 0.7rem;
+  color: #0a9e94;
+  font-weight: 800;
+  background: #ecfdfb;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.acp-phase-body {
+  padding-left: 30px;
+}
+
+/* Phase 1: Evidence list */
+.acp-evidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.acp-evidence-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #475569;
+  line-height: 1.45;
+
+  &.done {
+    .acp-evidence-dot { background: #10b981; }
+    color: #334155;
+  }
+}
+
+.acp-evidence-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+/* Phase 2: Match grid */
+.acp-match-grid {
+  display: grid;
+  gap: 6px;
+}
+
+.acp-match-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+
+  strong {
+    display: block;
+    font-size: 0.78rem;
+    color: #0f172a;
+    line-height: 1.3;
+  }
+
+  p {
+    margin: 2px 0 0;
+    font-size: 0.7rem;
+    color: #64748b;
+    line-height: 1.4;
+  }
+}
+
+.acp-match-type {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #ecfdfb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0a9e94;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Phase 3: Progress list */
+.acp-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.acp-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  transition: all 0.2s;
+
+  &.done {
+    background: rgba(16, 185, 129, 0.06);
+  }
+
+  &.generating {
+    background: rgba(11, 183, 170, 0.06);
+    border: 1px dashed rgba(11, 183, 170, 0.25);
+  }
+
+  &.failed {
+    background: rgba(239, 68, 68, 0.06);
+  }
+
+  &.pending {
+    opacity: 0.55;
+  }
+}
+
+.acp-progress-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.acp-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #0bb7aa;
+  border-radius: 50%;
+  animation: acpSpin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes acpSpin {
+  to { transform: rotate(360deg); }
+}
+
+.acp-progress-body {
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    display: block;
+    font-size: 0.78rem;
+    color: #0f172a;
+    line-height: 1.3;
+  }
+
+  em {
+    font-size: 0.68rem;
+    font-style: normal;
+    color: #64748b;
+
+    &.done-text { color: #059669; }
+    &.failed-text { color: #dc2626; }
+  }
+}
+
+/* Phase 4: Suggestion */
+.acp-suggestion-text {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.6;
+  font-style: italic;
 }
 
 .resource-management-toolbar {
@@ -3573,8 +3913,8 @@ watch(
 
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
   margin-bottom: 0;
 }
 
@@ -3597,12 +3937,11 @@ watch(
 }
 
 .agent-insight-banner {
-  min-height: 100%;
-  margin-top: 0;
-  padding: 13px 14px;
-  border-radius: 14px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
   background: var(--color-card-bg-secondary);
-  border-color: rgba(11, 183, 170, 0.15);
+  border: 1px solid rgba(11, 183, 170, 0.15);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.03);
 }
 
@@ -3625,165 +3964,27 @@ watch(
   font-weight: 700;
 }
 
-.algorithm-diagnosis-band {
+/* ========== Agent Decision Summary ========== */
+.agent-decision-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
-  align-items: center;
-  margin-top: 0;
-  padding: 13px 14px;
+  gap: 16px 20px;
+  align-items: start;
+  margin-top: 16px;
+  padding: 16px 18px;
   border-radius: 14px;
-  border: 1px solid rgba(14, 165, 233, 0.2);
-  background: linear-gradient(135deg, rgba(240, 249, 255, 0.88), rgba(236, 253, 245, 0.72));
-
-  &.muted {
-    border-color: rgba(148, 163, 184, 0.2);
-    background: #f8fafc;
-  }
+  border: 1px solid rgba(11, 183, 170, 0.16);
+  background: linear-gradient(135deg, rgba(236, 253, 251, 0.82), rgba(240, 249, 255, 0.72));
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.035);
 }
 
-.adb-eyebrow {
-  display: inline-flex;
-  margin-bottom: 3px;
-  color: #0284c7;
-  font-size: 0.68rem;
-  font-weight: 800;
-}
-
-.hero-support-row {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 14px;
-  margin-top: 16px;
-}
-
-.hero-support-row > :only-child {
-  grid-column: 1 / -1;
-}
-
-.adb-main {
-  min-width: 0;
-
-  h3 {
-    margin: 0;
-    color: #0f172a;
-    font-size: 0.88rem;
-    line-height: 1.32;
-  }
-
-  p {
-    margin: 3px 0 0;
-    color: #475569;
-    font-size: 0.76rem;
-    line-height: 1.4;
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-  }
-}
-
-.adb-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(78px, 1fr));
-  gap: 6px;
-
-  div {
-    min-width: 0;
-    padding: 7px 9px;
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.78);
-    border: 1px solid rgba(148, 163, 184, 0.14);
-  }
-
-  strong {
-    display: block;
-    color: #0f172a;
-    font-size: 0.86rem;
-    line-height: 1.2;
-  }
-
-  span {
-    color: #64748b;
-    font-size: 0.66rem;
-    font-weight: 700;
-  }
-}
-
-.agent-decision-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 1fr);
-  gap: 16px;
-  align-items: stretch;
-  margin-top: 16px;
-  padding: 15px;
-  border-radius: 16px;
-  border: 1px solid rgba(11, 183, 170, 0.18);
-  background:
-    linear-gradient(135deg, rgba(236, 253, 251, 0.9), rgba(240, 249, 255, 0.82)),
-    #ffffff;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.045);
-  animation: decisionEnter 0.48s ease both;
-}
-
-.learning-cockpit {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.cockpit-card {
-  min-width: 0;
-  padding: 13px 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.035);
-  animation: cockpitEnter 0.42s ease both;
-  animation-delay: var(--cockpit-delay);
-
-  &.primary { border-color: rgba(11, 183, 170, 0.18); }
-  &.warn { border-color: rgba(245, 158, 11, 0.22); background: rgba(255, 251, 235, 0.76); }
-  &.success { border-color: rgba(16, 185, 129, 0.2); background: rgba(236, 253, 245, 0.74); }
-  &.info { border-color: rgba(14, 165, 233, 0.2); background: rgba(240, 249, 255, 0.78); }
-
-  strong {
-    display: block;
-    overflow: hidden;
-    margin-top: 5px;
-    color: #0f172a;
-    font-size: 0.9rem;
-    line-height: 1.32;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  p {
-    display: -webkit-box;
-    margin: 5px 0 0;
-    overflow: hidden;
-    color: #64748b;
-    font-size: 0.7rem;
-    line-height: 1.42;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
-}
-
-.cockpit-label {
-  color: #0a9e94;
-  font-size: 0.66rem;
-  font-weight: 900;
-}
-
-.decision-copy {
+.ads-main {
   min-width: 0;
 
   h3 {
     margin: 4px 0 5px;
     color: #0f172a;
-    font-size: 0.98rem;
+    font-size: 0.95rem;
     line-height: 1.35;
   }
 
@@ -3792,16 +3993,20 @@ watch(
     color: #475569;
     font-size: 0.78rem;
     line-height: 1.5;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 }
 
-.decision-eyebrow {
+.ads-eyebrow {
   color: #0a9e94;
   font-size: 0.68rem;
   font-weight: 900;
 }
 
-.decision-evidence {
+.ads-evidence {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
@@ -3819,211 +4024,68 @@ watch(
   }
 }
 
-.decision-adjust-btn {
-  min-height: 32px;
-  margin-top: 12px;
-  padding: 0 13px;
-  border: 0;
-  border-radius: 11px;
-  background: linear-gradient(135deg, #0bb7aa, #0284c7);
-  color: #ffffff;
-  font-size: 0.74rem;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 8px 18px rgba(11, 183, 170, 0.18);
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
-
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 12px 24px rgba(11, 183, 170, 0.24);
-  }
+.ads-weakness {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(245, 158, 11, 0.18);
 }
 
-.decision-flow {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  min-width: 0;
-}
-
-.decision-flow-step {
-  position: relative;
-  min-width: 0;
-  padding: 10px;
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  animation: flowStepEnter 0.42s ease both;
-  animation-delay: var(--step-delay);
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 20px;
-    right: -8px;
-    width: 8px;
-    height: 2px;
-    background: linear-gradient(90deg, rgba(11, 183, 170, 0.35), rgba(14, 165, 233, 0.65));
-  }
-
-  &:last-child::after {
-    display: none;
-  }
-
-  strong {
-    display: block;
-    color: #0f172a;
-    font-size: 0.76rem;
-    line-height: 1.3;
-  }
-
-  em {
-    display: -webkit-box;
-    margin-top: 4px;
-    overflow: hidden;
-    color: #64748b;
-    font-size: 0.66rem;
-    font-style: normal;
-    line-height: 1.35;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-  }
-
-  &.active {
-    border-color: rgba(14, 165, 233, 0.3);
-    box-shadow: 0 8px 18px rgba(14, 165, 233, 0.1);
-  }
-
-  &.warn .flow-index {
-    background: #fef3c7;
-    color: #b45309;
-  }
-
-  &.pending {
-    opacity: 0.7;
-  }
-}
-
-.flow-index {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  margin-bottom: 7px;
-  border-radius: 50%;
-  background: #ecfdfb;
-  color: #0a9e94;
-  font-size: 0.68rem;
+.ads-weakness-label {
+  color: #b45309;
+  font-size: 0.66rem;
   font-weight: 900;
 }
 
-.adjustment-preview {
+.ads-weakness-item {
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: rgba(254, 243, 199, 0.5);
+  color: #92400e;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.ads-actions {
   grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(0, 0.55fr) minmax(320px, 1fr) minmax(0, 0.7fr);
-  gap: 12px;
-  align-items: center;
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-
-  &.running {
-    border-color: rgba(11, 183, 170, 0.26);
-    box-shadow: inset 0 0 0 1px rgba(11, 183, 170, 0.08);
-  }
-}
-
-.adjustment-preview-head {
-  min-width: 0;
-
-  span {
-    color: #0284c7;
-    font-size: 0.66rem;
-    font-weight: 900;
-  }
-
-  strong {
-    display: block;
-    margin-top: 3px;
-    color: #0f172a;
-    font-size: 0.78rem;
-    line-height: 1.35;
-  }
-
-  button {
-    min-height: 28px;
-    margin-top: 8px;
-    padding: 0 10px;
-    border-radius: 9px;
-    border: 1px solid rgba(11, 183, 170, 0.2);
-    background: #ffffff;
-    color: #0a9e94;
-    font-size: 0.68rem;
-    font-weight: 900;
-    cursor: pointer;
-  }
-}
-
-.adjustment-track {
   display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 6px;
-
-  span {
-    position: relative;
-    flex: 1;
-    min-width: 0;
-    padding: 7px 8px;
-    border-radius: 999px;
-    background: #f1f5f9;
-    color: #94a3b8;
-    font-size: 0.64rem;
-    font-weight: 900;
-    text-align: center;
-    white-space: nowrap;
-    transition: background 0.22s ease, color 0.22s ease, transform 0.22s ease;
-
-    &.active {
-      background: #ecfdfb;
-      color: #0a9e94;
-      transform: translateY(-1px);
-      box-shadow: 0 6px 14px rgba(11, 183, 170, 0.1);
-    }
-  }
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.adjustment-result {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+.ads-btn {
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
 
-  div {
-    min-width: 0;
-    padding: 8px 9px;
-    border-radius: 11px;
-    background: #f8fafc;
+  &:hover {
+    border-color: #0bb7aa;
+    color: #0bb7aa;
+    transform: translateY(-1px);
   }
 
-  em {
-    display: block;
-    color: #94a3b8;
-    font-size: 0.62rem;
-    font-style: normal;
-    font-weight: 900;
-  }
+  &.primary {
+    background: linear-gradient(135deg, #0bb7aa, #0284c7);
+    color: #fff;
+    border-color: transparent;
+    font-weight: 700;
+    box-shadow: 0 6px 16px rgba(11, 183, 170, 0.2);
 
-  strong {
-    display: block;
-    overflow: hidden;
-    margin-top: 3px;
-    color: #334155;
-    font-size: 0.68rem;
-    line-height: 1.35;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    &:hover {
+      color: #fff;
+      opacity: 0.92;
+    }
   }
 }
 
@@ -4326,21 +4388,6 @@ watch(
   }
 }
 
-@keyframes decisionEnter {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes cockpitEnter {
-  from { opacity: 0; transform: translateY(10px) scale(0.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes flowStepEnter {
-  from { opacity: 0; transform: translateX(10px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
 @keyframes tabContentEnter {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4580,17 +4627,11 @@ watch(
 }
 
 @media (max-width: 980px) {
-  .hero-main-grid,
-  .hero-support-row,
-  .agent-decision-panel {
+  .hero-main-grid {
     grid-template-columns: 1fr;
   }
 
-  .learning-cockpit {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .adjustment-preview {
+  .agent-decision-summary {
     grid-template-columns: 1fr;
   }
 
@@ -4605,10 +4646,6 @@ watch(
   .hero-actions {
     align-items: flex-end;
     flex-direction: column;
-  }
-
-  .decision-flow {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .path-linked-focus {
@@ -4661,11 +4698,6 @@ watch(
 
   .stats-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .hero-support-row {
-    gap: 12px;
-    margin-top: 14px;
   }
 
   .continue-study-block .csb-actions {
@@ -4791,30 +4823,17 @@ watch(
     grid-template-columns: 1fr;
   }
 
-  .algorithm-diagnosis-band {
+  .agent-decision-summary {
     grid-template-columns: 1fr;
   }
 
-  .adb-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .ads-weakness {
+    width: 100%;
+    min-width: 0;
   }
 
-  .decision-flow {
-    grid-template-columns: 1fr;
-  }
-
-  .decision-flow-step::after {
-    display: none;
-  }
-
-  .learning-cockpit,
   .completion-report {
     grid-template-columns: 1fr;
-  }
-
-  .adjustment-track {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .resource-filter-controls {
