@@ -272,13 +272,25 @@ watch(() => [route.params.spaceId, route.params.nodeId], loadPage)
 .back-btn {
   width: 38px;
   height: 38px;
-  border: 0;
-  border-radius: 12px;
-  background: #0f172a;
-  color: #ffffff;
-  font-size: 30px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 24px;
   line-height: 1;
   cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.back-btn:hover,
+.back-btn:focus-visible {
+  border-color: rgba(10, 158, 148, 0.35);
+  color: #0a9e94;
+  outline: none;
 }
 
 .eyebrow {
