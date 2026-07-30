@@ -823,14 +823,67 @@
         <!-- Agent Sidebar -->
         <SpaceAgentPanel
           ref="agentPanelRef"
+          :space-id="spaceId"
           :space-name="dashboard.space.name"
           :insight="dashboard.agentInsight"
           :agent-actions="dashboard.recentAgentActions"
           :decision-steps="agentDecisionSteps"
           :active-tab="activeTab"
           @quick-action="handleAgentQuickAction"
+          @agent-reply="handleAgentReply"
         />
       </div>
+
+      <Transition name="agent-answer-preview">
+        <div
+          v-if="agentAnswerPreviewVisible && agentAnswerPreview"
+          class="agent-answer-preview"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="aap-card">
+            <button class="aap-close" type="button" aria-label="关闭 Agent 回答" @click="dismissAgentAnswerPreview">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="15" height="15">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+            <div class="aap-head">
+              <span class="aap-avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                  <line x1="9" y1="9" x2="9.01" y2="9"/>
+                  <line x1="15" y1="9" x2="15.01" y2="9"/>
+                </svg>
+              </span>
+              <div>
+                <span class="aap-kicker">Agent 回答</span>
+                <strong>{{ agentAnswerPreviewTitle }}</strong>
+              </div>
+            </div>
+            <div
+              class="aap-text-wrap"
+              :class="{ streaming: agentAnswerPreview.streaming }"
+              ref="agentAnswerPreviewBodyRef"
+            >
+              <MarkdownRenderer class="aap-markdown" :content="agentAnswerPreview.text || '正在思考...'" />
+            </div>
+            <div class="aap-actions">
+              <button
+                v-for="action in agentAnswerPreview.streaming ? [] : (agentAnswerPreview.actions || [])"
+                :key="action.label"
+                type="button"
+                class="aap-action"
+                :class="action.variant || 'default'"
+                @click="handleAgentAnswerAction(action)"
+              >
+                {{ action.label }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
 
       <div v-if="celebrationVisible" class="completion-celebration" aria-live="polite">
         <div class="celebration-card">
@@ -866,6 +919,7 @@
       <AgentCommandBar
         ref="commandBarRef"
         :active-tab="activeTab"
+        @open-agent-panel="handleOpenAgentPanel"
         @send="handleCommandSend"
       />
     </div>
@@ -873,7 +927,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -882,6 +936,7 @@ import { BarChartIcon, FlameIcon, CalendarIcon } from '@/assets/icons'
 import TaskCard from '@/components/TaskCard.vue'
 import PathTimeline from '@/components/PathTimeline.vue'
 import LearningPathMindMap from '@/components/LearningPathMindMap.vue'
+import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import SpaceAgentPanel from '@/components/SpaceAgentPanel.vue'
 import AgentCommandBar from '@/components/AgentCommandBar.vue'
 import LearningContributionCalendar from './components/LearningContributionCalendar.vue'
@@ -961,6 +1016,15 @@ const animatedHeroProgress = ref(0)
 const celebrationVisible = ref(false)
 const celebrationTaskTitle = ref('')
 const completionReport = ref<{ minutes: number; before: number; after: number; nextStep: string } | null>(null)
+const agentAnswerPreviewVisible = ref(false)
+const agentAnswerPreview = ref<{
+  text: string
+  actions?: { label: string; variant?: string }[]
+  replyId?: string
+  streaming?: boolean
+} | null>(null)
+const agentAnswerPreviewBodyRef = ref<HTMLElement | null>(null)
+const dismissedAgentAnswerPreviewId = ref('')
 const selectedPathNodeId = ref('')
 let progressAnimationFrame = 0
 let celebrationTimer: ReturnType<typeof setTimeout> | null = null
@@ -984,6 +1048,18 @@ const tabs = computed(() => [
   { id: 'records', label: '记录', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>', badge: displayRecords.value.length },
   { id: 'insight', label: '学情洞察', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg>', badge: 6 },
 ])
+
+const agentAnswerPreviewTitle = computed(() => {
+  const labels: Record<string, string> = {
+    today: '今日任务建议',
+    plan: '学习计划建议',
+    path: '学习路径建议',
+    resources: '资源与测评建议',
+    records: '学习记录分析',
+    insight: '学情洞察建议',
+  }
+  return labels[activeTab.value] || '学习建议'
+})
 
 const fallbackWeaknesses = ['洛必达法则适用条件', '无穷小阶数比较', '间断点分类']
 const algorithmWeakPoints = computed(() => algorithmState.value?.weakPoints || [])
@@ -2022,13 +2098,65 @@ function handleStartFromHero() {
 }
 
 function handleAgentQuickAction(label: string) {
-  // Navigate to AI Tutor with the question pre-filled, or open agent panel
-  router.push({ path: '/ai-tutor', query: { message: label, spaceId: spaceId.value } })
+  agentPanelRef.value?.receiveMessage?.(label)
 }
 
 function handleCommandSend(text: string) {
   // Send directly to the Agent sidebar panel for in-place response
   agentPanelRef.value?.receiveMessage?.(text)
+}
+
+function handleOpenAgentPanel() {
+  agentPanelRef.value?.focusPanel?.()
+}
+
+function scrollAgentAnswerPreviewToBottom() {
+  nextTick(() => {
+    const body = agentAnswerPreviewBodyRef.value
+    if (body) body.scrollTop = body.scrollHeight
+  })
+}
+
+function handleAgentReply(message: {
+  text: string
+  actions?: { label: string; variant?: string }[]
+  replyId?: string
+  streaming?: boolean
+}) {
+  agentAnswerPreview.value = message
+  if (!message.replyId || dismissedAgentAnswerPreviewId.value !== message.replyId) {
+    agentAnswerPreviewVisible.value = true
+  }
+  scrollAgentAnswerPreviewToBottom()
+}
+
+function dismissAgentAnswerPreview() {
+  if (agentAnswerPreview.value?.replyId) {
+    dismissedAgentAnswerPreviewId.value = agentAnswerPreview.value.replyId
+  }
+  agentAnswerPreviewVisible.value = false
+}
+
+function handleAgentAnswerAction(action: { label: string; variant?: string }) {
+  dismissAgentAnswerPreview()
+  const label = action.label
+  if (label.includes('练习') || label.includes('测试')) {
+    activeTab.value = 'resources'
+    return
+  }
+  if (label.includes('报告')) {
+    goInsightReport()
+    return
+  }
+  if (label.includes('计划') || label.includes('任务')) {
+    goPlanAdjustment()
+    return
+  }
+  if (label.includes('资源')) {
+    activeTab.value = 'resources'
+    return
+  }
+  handleOpenAgentPanel()
 }
 
 async function loadLearningPlan(id: string) {
@@ -2183,6 +2311,9 @@ watch(() => route.params.spaceId, () => {
   if (!route.query.tab) activeTab.value = 'today'
 })
 watch(() => route.query.tab, syncActiveTabFromRoute)
+watch(() => agentAnswerPreview.value?.text, () => {
+  scrollAgentAnswerPreviewToBottom()
+})
 watch(currentPlanPhaseKey, key => {
   if (key && !expandedPhaseKeys.value.includes(key)) {
     expandedPhaseKeys.value = [key, ...expandedPhaseKeys.value]
@@ -4607,6 +4738,226 @@ watch(
     font-size: 0.72rem;
     font-weight: 900;
     cursor: pointer;
+  }
+}
+
+.agent-answer-preview {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 108;
+  width: min(560px, calc(100vw - 32px));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.aap-card {
+  position: relative;
+  overflow: hidden;
+  padding: 18px 18px 16px;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(236, 253, 251, 0.94));
+  border: 1px solid rgba(11, 183, 170, 0.24);
+  box-shadow:
+    0 24px 70px rgba(15, 23, 42, 0.18),
+    0 8px 22px rgba(11, 183, 170, 0.1);
+  pointer-events: auto;
+}
+
+.aap-close {
+  position: absolute;
+  top: 11px;
+  right: 11px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(241, 245, 249, 0.82);
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  &:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+}
+
+.aap-head {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  padding-right: 34px;
+}
+
+.aap-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 8px 18px rgba(11, 183, 170, 0.2);
+}
+
+.aap-kicker {
+  display: block;
+  color: #0a9e94;
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.aap-head strong {
+  display: block;
+  margin-top: 2px;
+  color: #0f172a;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.aap-text-wrap {
+  margin: 14px 0 0;
+  max-height: min(240px, 34vh);
+  overflow-y: auto;
+  padding-right: 5px;
+  scroll-behavior: smooth;
+}
+
+.aap-text-wrap.streaming::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 2px;
+  border-radius: 2px;
+  background: #0bb7aa;
+  vertical-align: -0.15em;
+  animation: aapCaretBlink 0.82s steps(2, start) infinite;
+}
+
+.aap-markdown {
+  color: #334155;
+  font-size: 0.86rem;
+  line-height: 1.7;
+}
+
+.aap-markdown :deep(p) {
+  margin: 0 0 0.6em;
+}
+
+.aap-markdown :deep(p:last-child),
+.aap-markdown :deep(ul:last-child),
+.aap-markdown :deep(ol:last-child),
+.aap-markdown :deep(pre:last-child) {
+  margin-bottom: 0;
+}
+
+.aap-markdown :deep(ul),
+.aap-markdown :deep(ol) {
+  margin: 0.35em 0 0.75em;
+  padding-left: 1.2em;
+}
+
+.aap-markdown :deep(li) {
+  margin: 0.2em 0;
+}
+
+.aap-markdown :deep(code:not(pre code)) {
+  padding: 0.12em 0.38em;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f766e;
+  font-size: 0.84em;
+}
+
+.aap-markdown :deep(pre),
+.aap-markdown :deep(.code-block-wrapper) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.aap-markdown :deep(.markdown-renderer > :first-child) {
+  margin-top: 0;
+}
+
+@keyframes aapCaretBlink {
+  0%, 45% { opacity: 1; }
+  46%, 100% { opacity: 0; }
+}
+
+.aap-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 15px;
+}
+
+.aap-action {
+  min-height: 34px;
+  padding: 0 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.16s ease;
+
+  &:hover {
+    border-color: rgba(11, 183, 170, 0.32);
+    color: #0a9e94;
+    transform: translateY(-1px);
+  }
+
+  &.primary {
+    border-color: transparent;
+    background: linear-gradient(135deg, #0bb7aa, #0284c7);
+    color: #ffffff;
+    box-shadow: 0 7px 16px rgba(11, 183, 170, 0.2);
+
+    &:hover {
+      color: #ffffff;
+      opacity: 0.94;
+    }
+  }
+}
+
+.agent-answer-preview-enter-active,
+.agent-answer-preview-leave-active {
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.agent-answer-preview-enter-from,
+.agent-answer-preview-leave-to {
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + 14px)) scale(0.98);
+}
+
+@media (max-width: 640px) {
+  .agent-answer-preview {
+    top: auto;
+    bottom: 96px;
+    transform: translateX(-50%);
+  }
+
+  .agent-answer-preview-enter-from,
+  .agent-answer-preview-leave-to {
+    transform: translateX(-50%) translateY(14px) scale(0.98);
+  }
+
+  .aap-card {
+    padding: 16px 15px 14px;
+  }
+
+  .aap-action {
+    flex: 1 1 calc(50% - 4px);
   }
 }
 

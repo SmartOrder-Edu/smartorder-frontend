@@ -1,5 +1,5 @@
 <template>
-  <aside class="agent-sidebar">
+  <aside class="agent-sidebar" ref="panelRef" :class="{ highlighted: isHighlighted }">
     <!-- Header -->
     <div class="as-header">
       <div class="as-avatar">
@@ -16,7 +16,7 @@
       </div>
       <div class="as-header-info">
         <span class="as-agent-name">Space Agent</span>
-        <span class="as-agent-status">{{ contextLabel }}</span>
+        <span class="as-agent-status">{{ agentStatusLabel }}</span>
       </div>
     </div>
 
@@ -67,7 +67,8 @@
       <div class="as-chat-messages" v-if="messages.length">
         <div v-for="(msg, i) in messages" :key="i" class="as-chat-msg" :class="msg.role">
           <div class="as-msg-content">
-            <p>{{ msg.text }}</p>
+            <MarkdownRenderer v-if="msg.role === 'agent'" class="as-msg-markdown" :content="msg.text" />
+            <p v-else>{{ msg.text }}</p>
             <div class="as-msg-actions" v-if="msg.actions && msg.actions.length">
               <button
                 v-for="act in msg.actions"
@@ -104,14 +105,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { agentApi } from '@/api/agent'
+import { refreshAccessToken } from '@/api/request'
 import type { AgentActionVO } from '@/types/learningSpace'
+import MarkdownRenderer from './MarkdownRenderer.vue'
 import AgentActionLog from './AgentActionLog.vue'
 
 interface ChatMessage {
   role: 'user' | 'agent'
   text: string
   actions?: { label: string; variant?: string }[]
+  replyId?: string
+  streaming?: boolean
 }
 
 interface DecisionStep {
@@ -121,6 +128,7 @@ interface DecisionStep {
 }
 
 const props = defineProps<{
+  spaceId?: string
   spaceName?: string
   insight?: string
   agentActions?: AgentActionVO[]
@@ -131,11 +139,19 @@ const props = defineProps<{
 const emit = defineEmits<{
   quickAction: [label: string]
   agentAction: [action: { label: string; variant?: string }]
+  sendMessage: [text: string]
+  agentReply: [message: ChatMessage]
 }>()
 
 const messages = ref<ChatMessage[]>([])
+const panelRef = ref<HTMLElement>()
 const chatContainer = ref<HTMLElement>()
 const logExpanded = ref(false)
+const isHighlighted = ref(false)
+const isStreaming = ref(false)
+const conversationId = ref('')
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+let abortController: AbortController | null = null
 
 // Context-aware content
 const contextLabel = computed(() => {
@@ -148,6 +164,10 @@ const contextLabel = computed(() => {
     insight: '正在洞察学习数据',
   }
   return labels[props.activeTab || ''] || '在线 · 守护学习中'
+})
+
+const agentStatusLabel = computed(() => {
+  return isStreaming.value ? '正在生成回答...' : contextLabel.value
 })
 
 const contextMessage = computed(() => {
@@ -212,40 +232,158 @@ const currentQuickActions = computed(() => {
   return tabQuickActions[props.activeTab || ''] || tabQuickActions.today
 })
 
-function mockAgentResponse(question: string): string {
-  if (question.includes('薄弱')) return '根据最近的学习记录，你在**洛必达法则适用条件**上错误率较高（正确率42%），其次是**无穷小阶数比较**。建议优先完成洛必达法则专项练习。'
-  if (question.includes('测试') || question.includes('题')) return '已为你生成10道极限与连续的综合测试题，涵盖洛必达法则、极限运算、连续性判定。'
-  if (question.includes('计划') || question.includes('安排')) return '建议将今天的任务调整为：1.洛必达法则专项练习（25分钟）2.连续与间断预习（20分钟）。当前空间进度正常。'
-  if (question.includes('资源') || question.includes('导图') || question.includes('资料')) return '为你推荐3项资源：1.洛必达法则思维导图 2.无穷小阶数比较图解 3.B站相关讲解视频。需要我生成资源包吗？'
-  return '收到你的问题。我会结合学习数据和你的个人画像给出针对性建议。'
+function buildStudyContext(userMessage: string): Record<string, unknown> {
+  return {
+    source: 'learning_space_sidebar',
+    spaceId: props.spaceId,
+    spaceName: props.spaceName,
+    activeTab: props.activeTab,
+    activeTabLabel: contextLabel.value,
+    agentInsight: props.insight,
+    pageHint: contextMessage.value,
+    userMessage,
+  }
 }
 
-function receiveMessage(text: string) {
-  messages.value.push({ role: 'user', text })
-  emit('sendMessage', text)
+function buildAgentActions(question: string): ChatMessage['actions'] {
+  if (question.includes('薄弱') || question.includes('错题')) {
+    return [{ label: '开始练习', variant: 'primary' }, { label: '查看报告', variant: 'default' }]
+  }
+  if (question.includes('测试') || question.includes('题')) {
+    return [{ label: '开始测试', variant: 'primary' }]
+  }
+  if (question.includes('计划') || question.includes('安排')) {
+    return [{ label: '查看计划', variant: 'primary' }, { label: '调整任务', variant: 'default' }]
+  }
+  if (question.includes('资源') || question.includes('资料') || question.includes('导图')) {
+    return [{ label: '生成资源', variant: 'primary' }]
+  }
+  return undefined
+}
 
-  setTimeout(() => {
-    messages.value.push({
-      role: 'agent',
-      text: mockAgentResponse(text),
-      actions: text.includes('薄弱') || text.includes('错题')
-        ? [{ label: '开始练习', variant: 'primary' }, { label: '查看报告', variant: 'default' }]
-        : text.includes('测试') || text.includes('题')
-          ? [{ label: '开始测试', variant: 'primary' }]
-          : text.includes('计划') || text.includes('安排')
-            ? [{ label: '查看计划', variant: 'primary' }, { label: '调整任务', variant: 'default' }]
-            : text.includes('资源') || text.includes('资料') || text.includes('导图')
-              ? [{ label: '生成资源', variant: 'primary' }]
-              : undefined,
-    })
-    nextTick(() => {
-      if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-    })
-  }, 600)
-
+function scrollChatToBottom() {
   nextTick(() => {
     if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight
   })
+}
+
+async function receiveMessage(text: string) {
+  const trimmed = text.trim()
+  if (!trimmed || isStreaming.value) return
+
+  focusPanel()
+  messages.value.push({ role: 'user', text: trimmed })
+  const replyId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const agentMessage: ChatMessage = { role: 'agent', text: '正在思考...', replyId, streaming: true }
+  messages.value.push(agentMessage)
+  emit('sendMessage', trimmed)
+  emit('agentReply', { ...agentMessage })
+  scrollChatToBottom()
+
+  let token: string
+  try {
+    token = await refreshAccessToken()
+  } catch {
+    agentMessage.text = '登录状态已失效，请重新登录后再试。'
+    agentMessage.streaming = false
+    emit('agentReply', { ...agentMessage })
+    scrollChatToBottom()
+    return
+  }
+
+  isStreaming.value = true
+  abortController = new AbortController()
+  let answerText = ''
+
+  try {
+    await fetchEventSource(agentApi.chatStreamUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        message: trimmed,
+        conversationId: conversationId.value || undefined,
+        studyContext: buildStudyContext(trimmed),
+      }),
+      openWhenHidden: true,
+      signal: abortController.signal,
+
+      onmessage(event) {
+        if (!event.data) return
+
+        if (event.event === 'done') {
+          let donePayload: any = null
+          try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
+          if (donePayload?.conversationId) {
+            conversationId.value = donePayload.conversationId
+          }
+          const finalText = answerText.trim() || donePayload?.clarificationPayload?.question || '已处理完成。'
+          agentMessage.text = finalText
+          agentMessage.actions = buildAgentActions(trimmed)
+          agentMessage.streaming = false
+          isStreaming.value = false
+          abortController = null
+          emit('agentReply', { ...agentMessage })
+          scrollChatToBottom()
+          return
+        }
+
+        try {
+          const data = JSON.parse(event.data)
+          if (data?.conversationId) {
+            conversationId.value = data.conversationId
+          }
+          if (data?.payload?.text) {
+            answerText += data.payload.text
+            agentMessage.text = answerText
+            emit('agentReply', { ...agentMessage })
+            scrollChatToBottom()
+          }
+        } catch {
+          // ignore non-JSON SSE payloads
+        }
+      },
+
+      onerror(err) {
+        console.error('[SpaceAgentPanel] SSE error:', err)
+        agentMessage.text = answerText
+          ? `${answerText}\n\n*[连接中断]*`
+          : '*[连接中断，请重试]*'
+        agentMessage.streaming = false
+        isStreaming.value = false
+        abortController = null
+        emit('agentReply', { ...agentMessage })
+        scrollChatToBottom()
+        throw err
+      },
+    })
+  } catch (err: any) {
+    if (err?.name !== 'AbortError') {
+      console.error('[SpaceAgentPanel] fetch error:', err)
+      if (!answerText) {
+        agentMessage.text = '*[连接失败，请稍后重试]*'
+      }
+      agentMessage.streaming = false
+      emit('agentReply', { ...agentMessage })
+      scrollChatToBottom()
+    }
+    isStreaming.value = false
+    abortController = null
+  }
+}
+
+function focusPanel() {
+  panelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  isHighlighted.value = true
+  if (highlightTimer) {
+    clearTimeout(highlightTimer)
+  }
+  highlightTimer = setTimeout(() => {
+    isHighlighted.value = false
+    highlightTimer = null
+  }, 1200)
 }
 
 // Watch activeTab to reset context message display
@@ -253,8 +391,19 @@ watch(() => props.activeTab, () => {
   // messages stay - they're the conversation history
 })
 
+onUnmounted(() => {
+  if (highlightTimer) {
+    clearTimeout(highlightTimer)
+  }
+  if (abortController) {
+    abortController.abort()
+    abortController = null
+  }
+})
+
 defineExpose({
   receiveMessage,
+  focusPanel,
 })
 </script>
 
@@ -274,6 +423,13 @@ defineExpose({
   border: 1px solid rgba(148, 163, 184, 0.16);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
   overflow: hidden;
+}
+
+.agent-sidebar.highlighted {
+  border-color: rgba(11, 183, 170, 0.48);
+  box-shadow:
+    0 0 0 4px rgba(11, 183, 170, 0.1),
+    0 18px 46px rgba(11, 183, 170, 0.14);
 }
 
 /* ===== Header ===== */
@@ -506,6 +662,47 @@ defineExpose({
   line-height: 1.5;
 
   p { margin: 0; }
+}
+
+.as-msg-markdown {
+  color: inherit;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.as-msg-markdown :deep(p) {
+  margin: 0 0 0.55em;
+}
+
+.as-msg-markdown :deep(p:last-child),
+.as-msg-markdown :deep(ul:last-child),
+.as-msg-markdown :deep(ol:last-child),
+.as-msg-markdown :deep(pre:last-child) {
+  margin-bottom: 0;
+}
+
+.as-msg-markdown :deep(ul),
+.as-msg-markdown :deep(ol) {
+  margin: 0.3em 0 0.65em;
+  padding-left: 1.15em;
+}
+
+.as-msg-markdown :deep(li) {
+  margin: 0.16em 0;
+}
+
+.as-msg-markdown :deep(code:not(pre code)) {
+  padding: 0.1em 0.32em;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f766e;
+  font-size: 0.84em;
+}
+
+.as-msg-markdown :deep(pre),
+.as-msg-markdown :deep(.code-block-wrapper) {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .as-msg-actions {

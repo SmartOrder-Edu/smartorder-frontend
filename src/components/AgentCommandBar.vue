@@ -1,7 +1,7 @@
 <template>
   <div class="agent-command-bar" :class="{ focused: isFocused }">
     <!-- Shortcut hint when collapsed -->
-    <div class="acb-collapsed" v-if="!isFocused && !input" @click="focusInput">
+    <div class="acb-collapsed" v-if="!isFocused && !input" @click="handleCollapsedClick">
       <div class="acb-icon-wrap">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
           <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>
@@ -80,7 +80,6 @@ const input = ref('')
 const isFocused = ref(false)
 const isListening = ref(false)
 const inputRef = ref<HTMLInputElement>()
-const isHovering = ref(false)
 let recognition: any = null
 
 const props = defineProps<{
@@ -89,6 +88,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   send: [text: string]
+  openAgentPanel: []
 }>()
 
 // --- Voice Input ---
@@ -226,6 +226,11 @@ function focusInput() {
   setTimeout(() => inputRef.value?.focus(), 100)
 }
 
+function handleCollapsedClick() {
+  emit('openAgentPanel')
+  focusInput()
+}
+
 function handleBlur() {
   if (!input.value) {
     isFocused.value = false
@@ -240,6 +245,7 @@ function selectSuggestion(text: string) {
 function handleSend() {
   const text = input.value.trim()
   if (!text) return
+  emit('openAgentPanel')
   emit('send', text)
   input.value = ''
   isFocused.value = false
