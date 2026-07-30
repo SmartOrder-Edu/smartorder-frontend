@@ -7,7 +7,13 @@
 
     <div class="tree-scroll" v-if="layoutNodes.length">
       <div class="tree-stage" :style="{ width: `${stageSize.width}px`, height: `${stageSize.height}px` }">
-        <svg class="tree-lines" :viewBox="`0 0 ${stageSize.width} ${stageSize.height}`" aria-hidden="true">
+        <svg
+          class="tree-lines"
+          :width="stageSize.width"
+          :height="stageSize.height"
+          :viewBox="`0 0 ${stageSize.width} ${stageSize.height}`"
+          aria-hidden="true"
+        >
           <line
             v-for="edge in layoutEdges"
             :key="`${edge.from}-${edge.to}`"
@@ -78,6 +84,27 @@ interface LayoutEdge {
   toY: number
 }
 
+interface TreeGraph {
+  nodes: LayoutNode[]
+  edges: Array<{ from: string; to: string }>
+  layoutMode: 'binary' | 'tree'
+}
+
+interface TreeLayout {
+  stageSize: {
+    width: number
+    height: number
+  }
+  nodes: LayoutNode[]
+}
+
+const NODE_SIZE = 48
+const LEVEL_GAP = 86
+const NODE_SLOT_WIDTH = 96
+const MIN_STAGE_WIDTH = 560
+const STAGE_PADDING_X = 36
+const STAGE_PADDING_Y = 28
+
 const rawNodes = computed(() => readPayloadArray('nodes') || props.block.nodes || [])
 const rawEdges = computed(() => readPayloadArray('edges') || props.block.edges || [])
 const rawItems = computed(() => readPayloadArray('items') || props.block.items || [])
@@ -85,37 +112,9 @@ const activeIds = computed(() => normalizeStringArray(readPayloadArray('activeId
 const visitedIds = computed(() => normalizeStringArray(readPayloadArray('visitedIds') || props.block.visitedIds || []))
 const pathIds = computed(() => normalizeStringArray(readPayloadArray('pathIds') || props.block.pathIds || []))
 const graph = computed(() => buildTreeGraph(rawNodes.value, rawEdges.value, rawItems.value))
-const stageSize = computed(() => {
-  const maxDepth = Math.max(...graph.value.nodes.map((node) => node.depth), 0)
-  const maxWidth = Math.max(
-    ...Array.from({ length: maxDepth + 1 }, (_, depth) => graph.value.nodes.filter((node) => node.depth === depth).length),
-    1,
-  )
-  return {
-    width: Math.max(560, maxWidth * 110),
-    height: Math.max(180, (maxDepth + 1) * 86),
-  }
-})
-const layoutNodes = computed<LayoutNode[]>(() => {
-  const levels = new Map<number, LayoutNode[]>()
-  graph.value.nodes.forEach((node) => {
-    if (!levels.has(node.depth)) levels.set(node.depth, [])
-    levels.get(node.depth)!.push({ ...node, x: 0, y: 0 })
-  })
-
-  const result: LayoutNode[] = []
-  Array.from(levels.entries()).forEach(([depth, nodes]) => {
-    const sorted = nodes.sort((a, b) => a.order - b.order)
-    sorted.forEach((node, index) => {
-      result.push({
-        ...node,
-        x: ((index + 1) * stageSize.value.width) / (sorted.length + 1),
-        y: depth * 86 + 28,
-      })
-    })
-  })
-  return result
-})
+const treeLayout = computed<TreeLayout>(() => buildTreeLayout(graph.value))
+const stageSize = computed(() => treeLayout.value.stageSize)
+const layoutNodes = computed<LayoutNode[]>(() => treeLayout.value.nodes)
 const nodeById = computed(() => new Map(layoutNodes.value.map((node) => [node.id, node])))
 const layoutEdges = computed<LayoutEdge[]>(() =>
   graph.value.edges
@@ -123,13 +122,11 @@ const layoutEdges = computed<LayoutEdge[]>(() =>
       const from = nodeById.value.get(edge.from)
       const to = nodeById.value.get(edge.to)
       if (!from || !to) return null
+      const clipped = clipEdge(from, to)
       return {
         from: edge.from,
         to: edge.to,
-        fromX: from.x,
-        fromY: from.y + 23,
-        toX: to.x,
-        toY: to.y - 23,
+        ...clipped,
       }
     })
     .filter((edge): edge is LayoutEdge => !!edge),
@@ -140,12 +137,12 @@ const legendItems = computed(() => [
   ...(pathIds.value.length ? [{ key: 'path', label: '路径' }] : []),
 ])
 
-function buildTreeGraph(nodes: unknown[], edges: unknown[], items: unknown[]) {
+function buildTreeGraph(nodes: unknown[], edges: unknown[], items: unknown[]): TreeGraph {
   if (nodes.length) return buildNodeGraph(nodes, edges)
   return buildLevelOrderGraph(items)
 }
 
-function buildNodeGraph(nodes: unknown[], edges: unknown[]) {
+function buildNodeGraph(nodes: unknown[], edges: unknown[]): TreeGraph {
   const normalizedNodes = nodes.map((item, index) => {
     const record = toRecord(item)
     const id = stringValue(record.id ?? record.key ?? index)
@@ -166,10 +163,11 @@ function buildNodeGraph(nodes: unknown[], edges: unknown[]) {
       depth: node.depth >= 0 ? node.depth : depthById.get(node.id) ?? 0,
     })),
     edges: normalizedEdges,
+    layoutMode: 'tree',
   }
 }
 
-function buildLevelOrderGraph(items: unknown[]) {
+function buildLevelOrderGraph(items: unknown[]): TreeGraph {
   const nodes = items
     .map((item, index) => {
       if (item === null || item === undefined || item === '') return null
@@ -194,7 +192,144 @@ function buildLevelOrderGraph(items: unknown[]) {
       return nodeIds.has(parent) ? { from: parent, to: node.id } : null
     })
     .filter((edge): edge is { from: string; to: string } => !!edge)
-  return { nodes, edges }
+  return { nodes, edges, layoutMode: 'binary' }
+}
+
+function buildTreeLayout(graph: TreeGraph): TreeLayout {
+  if (!graph.nodes.length) {
+    return {
+      stageSize: { width: MIN_STAGE_WIDTH, height: 180 },
+      nodes: [],
+    }
+  }
+
+  return graph.layoutMode === 'binary'
+    ? buildBinaryTreeLayout(graph.nodes)
+    : buildRelationalTreeLayout(graph.nodes, graph.edges)
+}
+
+function buildBinaryTreeLayout(nodes: LayoutNode[]): TreeLayout {
+  const maxDepth = Math.max(...nodes.map((node) => node.depth), 0)
+  const bottomSlotCount = 2 ** maxDepth
+  const stageWidth = Math.max(MIN_STAGE_WIDTH, bottomSlotCount * NODE_SLOT_WIDTH + STAGE_PADDING_X * 2)
+  const innerWidth = stageWidth - STAGE_PADDING_X * 2
+  const layoutNodes = nodes.map((node) => {
+    const span = 2 ** (maxDepth - node.depth)
+    return {
+      ...node,
+      x: STAGE_PADDING_X + ((node.order * span + span / 2) * innerWidth) / bottomSlotCount,
+      y: STAGE_PADDING_Y + NODE_SIZE / 2 + node.depth * LEVEL_GAP,
+    }
+  })
+
+  return normalizeLayout(layoutNodes)
+}
+
+function buildRelationalTreeLayout(nodes: LayoutNode[], edges: Array<{ from: string; to: string }>): TreeLayout {
+  const nodeIds = new Set(nodes.map((node) => node.id))
+  const nodeById = new Map(nodes.map((node) => [node.id, node]))
+  const childrenById = new Map<string, string[]>()
+  const hasParent = new Set<string>()
+
+  edges.forEach((edge) => {
+    if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) return
+    if (!childrenById.has(edge.from)) childrenById.set(edge.from, [])
+    const children = childrenById.get(edge.from)!
+    if (!children.includes(edge.to)) children.push(edge.to)
+    hasParent.add(edge.to)
+  })
+
+  childrenById.forEach((children) => {
+    children.sort((left, right) => compareNodeOrder(nodeById.get(left), nodeById.get(right)))
+  })
+
+  const explicitRoot = stringValue(readPayloadValue('rootId') ?? props.block.rootId)
+  const rootIds = explicitRoot && nodeIds.has(explicitRoot)
+    ? [explicitRoot]
+    : nodes
+      .filter((node) => !hasParent.has(node.id))
+      .sort(compareNodeOrder)
+      .map((node) => node.id)
+  const orderedRoots = rootIds.length ? rootIds : [nodes.slice().sort(compareNodeOrder)[0].id]
+  const positioned = new Map<string, LayoutNode>()
+  const visiting = new Set<string>()
+  let cursor = 0
+
+  function placeNode(id: string, depth: number): number {
+    const source = nodeById.get(id)
+    if (!source) return cursor
+    if (positioned.has(id)) return positioned.get(id)!.x
+    if (visiting.has(id)) {
+      const fallbackX = cursor * NODE_SLOT_WIDTH
+      cursor += 1
+      return fallbackX
+    }
+
+    visiting.add(id)
+    const childXs = (childrenById.get(id) || [])
+      .filter((childId) => nodeIds.has(childId))
+      .map((childId) => placeNode(childId, depth + 1))
+    const x = childXs.length
+      ? (Math.min(...childXs) + Math.max(...childXs)) / 2
+      : cursor++ * NODE_SLOT_WIDTH
+    positioned.set(id, {
+      ...source,
+      depth,
+      x,
+      y: STAGE_PADDING_Y + NODE_SIZE / 2 + depth * LEVEL_GAP,
+    })
+    visiting.delete(id)
+    return x
+  }
+
+  orderedRoots.forEach((id) => placeNode(id, 0))
+  nodes
+    .slice()
+    .sort(compareNodeOrder)
+    .forEach((node) => {
+      if (!positioned.has(node.id)) placeNode(node.id, 0)
+    })
+
+  return normalizeLayout(Array.from(positioned.values()))
+}
+
+function normalizeLayout(nodes: LayoutNode[]): TreeLayout {
+  const minX = Math.min(...nodes.map((node) => node.x))
+  const maxX = Math.max(...nodes.map((node) => node.x))
+  const maxDepth = Math.max(...nodes.map((node) => node.depth), 0)
+  const centerSpan = Math.max(maxX - minX, 0)
+  const stageWidth = Math.max(MIN_STAGE_WIDTH, centerSpan + (STAGE_PADDING_X + NODE_SIZE) * 2)
+  const stageHeight = Math.max(180, STAGE_PADDING_Y * 2 + NODE_SIZE + maxDepth * LEVEL_GAP)
+  const xOffset = centerSpan <= 0 ? stageWidth / 2 : (stageWidth - centerSpan) / 2
+
+  return {
+    stageSize: {
+      width: Math.ceil(stageWidth),
+      height: Math.ceil(stageHeight),
+    },
+    nodes: nodes.map((node) => ({
+      ...node,
+      x: node.x - minX + xOffset,
+    })),
+  }
+}
+
+function clipEdge(from: LayoutNode, to: LayoutNode) {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const length = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
+  const offset = NODE_SIZE / 2
+  return {
+    fromX: from.x + (dx / length) * offset,
+    fromY: from.y + (dy / length) * offset,
+    toX: to.x - (dx / length) * offset,
+    toY: to.y - (dy / length) * offset,
+  }
+}
+
+function compareNodeOrder(left?: LayoutNode, right?: LayoutNode): number {
+  if (!left || !right) return left ? -1 : right ? 1 : 0
+  return left.depth - right.depth || left.order - right.order || left.id.localeCompare(right.id)
 }
 
 function normalizeEdges(edges: unknown[]): Array<{ from: string; to: string }> {
@@ -274,8 +409,12 @@ function normalizeStringArray(values: unknown[]): string[] {
   return values.map((value) => String(value)).filter(Boolean)
 }
 
+function readPayloadValue(key: string): unknown {
+  return props.sceneAction?.payload?.[key]
+}
+
 function readPayloadArray(key: string): unknown[] | null {
-  const value = props.sceneAction?.payload?.[key]
+  const value = readPayloadValue(key)
   return Array.isArray(value) ? value : null
 }
 </script>
