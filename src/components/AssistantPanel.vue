@@ -154,7 +154,7 @@ let avatarReconnectTimer: number | null = null;
 let lastAvatarMessageAt = 0;
 
 const avatarAuth = ref<AvatarAuthInfo>({ appId: '', wssUrl: '', sceneId: '' });
-const currentSpeechText = ref("您好，我是您的专属教研助理~");
+const currentSpeechText = ref("您好，我是您的专属学习助理~");
 
 const currentAvatarName = computed(() => {
   const avatar = avatarsList.find(a => a.id === currentAvatarId.value);
@@ -531,15 +531,15 @@ onBeforeUnmount(() => {
                <h3>知序 · {{ currentAvatarName }}</h3>
                <span v-if="isPlaying" class="speaking-badge">正在讲解...</span>
              </div>
-             <span class="p-type-tag">3D 教研智能大模型</span>
+             <span class="p-type-tag">3D AI 学习陪伴助手</span>
            </div>
         </div>
         <div class="identity-body">
-          <p class="identity-desc">您的专属 3D 教研助理，精通教材分析、课程设计与多维课件创作。</p>
+          <p class="identity-desc">您的专属 3D 学习助理，会结合学习空间、今日任务和学情证据陪您高效推进。</p>
           <div class="capability-chips">
-            <span class="cap-chip">PPT 生成</span>
-            <span class="cap-chip">教案编写</span>
-            <span class="cap-chip">备课咨询</span>
+            <span class="cap-chip">任务引导</span>
+            <span class="cap-chip">知识讲解</span>
+            <span class="cap-chip">错题复盘</span>
           </div>
         </div>
       </div>
