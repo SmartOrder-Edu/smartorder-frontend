@@ -95,6 +95,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '任务日程 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/next-week-plan',
+    name: 'NextWeekPlan',
+    component: () => import('@/views/NextWeekPlan/index.vue'),
+    meta: { title: '下周学习计划 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/learning-report/weekly',
     name: 'WeeklyLearningReport',
     component: () => import('@/views/LearningReport/index.vue'),
