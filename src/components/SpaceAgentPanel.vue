@@ -83,23 +83,8 @@
         </div>
       </div>
       <div class="as-chat-empty" v-else>
-        <p>向 Agent 提问以获取个性化建议</p>
+        <p>按 <kbd>Ctrl K</kbd> 或在底部命令栏向 Agent 提问</p>
       </div>
-    </div>
-
-    <!-- Chat input -->
-    <div class="as-input-row">
-      <input
-        v-model="input"
-        class="as-chat-input"
-        placeholder="输入你的问题..."
-        @keyup.enter="sendMessage"
-      />
-      <button class="as-send-btn" @click="sendMessage" :disabled="!input.trim()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15">
-          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/>
-        </svg>
-      </button>
     </div>
 
     <!-- Agent action log (collapsible) -->
@@ -146,10 +131,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   quickAction: [label: string]
   agentAction: [action: { label: string; variant?: string }]
-  sendMessage: [text: string]
 }>()
 
-const input = ref('')
 const messages = ref<ChatMessage[]>([])
 const chatContainer = ref<HTMLElement>()
 const logExpanded = ref(false)
@@ -229,11 +212,16 @@ const currentQuickActions = computed(() => {
   return tabQuickActions[props.activeTab || ''] || tabQuickActions.today
 })
 
-function sendMessage() {
-  const text = input.value.trim()
-  if (!text) return
+function mockAgentResponse(question: string): string {
+  if (question.includes('薄弱')) return '根据最近的学习记录，你在**洛必达法则适用条件**上错误率较高（正确率42%），其次是**无穷小阶数比较**。建议优先完成洛必达法则专项练习。'
+  if (question.includes('测试') || question.includes('题')) return '已为你生成10道极限与连续的综合测试题，涵盖洛必达法则、极限运算、连续性判定。'
+  if (question.includes('计划') || question.includes('安排')) return '建议将今天的任务调整为：1.洛必达法则专项练习（25分钟）2.连续与间断预习（20分钟）。当前空间进度正常。'
+  if (question.includes('资源') || question.includes('导图') || question.includes('资料')) return '为你推荐3项资源：1.洛必达法则思维导图 2.无穷小阶数比较图解 3.B站相关讲解视频。需要我生成资源包吗？'
+  return '收到你的问题。我会结合学习数据和你的个人画像给出针对性建议。'
+}
+
+function receiveMessage(text: string) {
   messages.value.push({ role: 'user', text })
-  input.value = ''
   emit('sendMessage', text)
 
   setTimeout(() => {
@@ -260,17 +248,13 @@ function sendMessage() {
   })
 }
 
-function mockAgentResponse(question: string): string {
-  if (question.includes('薄弱')) return '根据最近的学习记录，你在**洛必达法则适用条件**上错误率较高（正确率42%），其次是**无穷小阶数比较**。建议优先完成洛必达法则专项练习。'
-  if (question.includes('测试') || question.includes('题')) return '已为你生成10道极限与连续的综合测试题，涵盖洛必达法则、极限运算、连续性判定。'
-  if (question.includes('计划') || question.includes('安排')) return '建议将今天的任务调整为：1.洛必达法则专项练习（25分钟）2.连续与间断预习（20分钟）。当前空间进度正常。'
-  if (question.includes('资源') || question.includes('导图') || question.includes('资料')) return '为你推荐3项资源：1.洛必达法则思维导图 2.无穷小阶数比较图解 3.B站相关讲解视频。需要我生成资源包吗？'
-  return '收到你的问题。我会结合学习数据和你的个人画像给出针对性建议。'
-}
-
 // Watch activeTab to reset context message display
 watch(() => props.activeTab, () => {
   // messages stay - they're the conversation history
+})
+
+defineExpose({
+  receiveMessage,
 })
 </script>
 
@@ -562,55 +546,6 @@ watch(() => props.activeTab, () => {
     font-size: 0.75rem;
     color: #9ca3af;
     margin: 0;
-  }
-}
-
-/* ===== Chat Input ===== */
-.as-input-row {
-  display: flex;
-  gap: 6px;
-}
-
-.as-chat-input {
-  flex: 1;
-  padding: 8px 12px;
-  border-radius: 11px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  font-size: 0.78rem;
-  color: #334155;
-  background: #f8fafc;
-  outline: none;
-  transition: all 0.18s;
-  min-width: 0;
-
-  &::placeholder { color: #b0b8c4; }
-
-  &:focus {
-    border-color: #0bb7aa;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
-  }
-}
-
-.as-send-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
-  border: none;
-  background: linear-gradient(135deg, #0bb7aa, #0284c7);
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.15s;
-
-  &:disabled { opacity: 0.4; cursor: default; }
-
-  &:not(:disabled):hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(11, 183, 170, 0.22);
   }
 }
 

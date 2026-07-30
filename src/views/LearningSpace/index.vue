@@ -829,7 +829,6 @@
           :decision-steps="agentDecisionSteps"
           :active-tab="activeTab"
           @quick-action="handleAgentQuickAction"
-          @send-message="handleAgentMessage"
         />
       </div>
 
@@ -2027,14 +2026,9 @@ function handleAgentQuickAction(label: string) {
   router.push({ path: '/ai-tutor', query: { message: label, spaceId: spaceId.value } })
 }
 
-function handleAgentMessage(text: string) {
-  // The SpaceAgentPanel handles local echo; for real SSE, post to /agent/chat/stream
-  console.log('Agent message:', text, 'spaceId:', spaceId.value)
-}
-
 function handleCommandSend(text: string) {
-  // Route to AI Tutor with the natural language command
-  router.push({ path: '/ai-tutor', query: { message: text, spaceId: spaceId.value } })
+  // Send directly to the Agent sidebar panel for in-place response
+  agentPanelRef.value?.receiveMessage?.(text)
 }
 
 async function loadLearningPlan(id: string) {
