@@ -140,7 +140,10 @@
       </div>
       <div v-if="selectedTasks.length || selectedResources.length" class="detail-linked">
         <div v-if="selectedTasks.length" class="linked-group">
-          <span>关联任务</span>
+          <span class="linked-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+            关联任务
+          </span>
           <button
             v-for="task in selectedTasks.slice(0, 3)"
             :key="task.id"
@@ -151,7 +154,10 @@
           </button>
         </div>
         <div v-if="selectedResources.length" class="linked-group">
-          <span>关联资源</span>
+          <span class="linked-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            关联资源
+          </span>
           <button
             v-for="resource in selectedResources.slice(0, 3)"
             :key="resource.id"
@@ -1135,6 +1141,17 @@ function resourceTypeLabel(type: ResourceType) {
     color: #0a9e94;
     font-size: 0.68rem;
     font-weight: 800;
+  }
+
+  .linked-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    svg {
+      flex-shrink: 0;
+      opacity: 0.8;
+    }
   }
 
   button {

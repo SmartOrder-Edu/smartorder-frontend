@@ -267,6 +267,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCountUp } from '@/composables/useCountUp'
+import { useLearningSpaceStore } from '@/stores/learningSpace'
 
 interface LaunchProfile {
   goal: string
@@ -649,7 +650,13 @@ function readProfile(): LaunchProfile {
 }
 
 function goDashboard() {
-  router.push('/dashboard')
+  const spaceStore = useLearningSpaceStore()
+  const firstSpace = spaceStore.activeSpaces[0]
+  if (firstSpace) {
+    router.push(`/space/${firstSpace.id}`)
+  } else {
+    router.push('/dashboard')
+  }
 }
 
 // ===== 打字机日志 =====
