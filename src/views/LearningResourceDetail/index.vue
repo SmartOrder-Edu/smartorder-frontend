@@ -97,11 +97,11 @@
               />
 
               <!-- HTML -->
-              <div
+              <MarkdownRenderer
                 v-else-if="renderMode === 'html'"
                 class="html-content"
-                v-html="detail.content?.content || ''"
-              ></div>
+                :content="htmlContent"
+              />
 
               <!-- PPT -->
               <DocmeePptViewer
@@ -289,6 +289,7 @@ const renderMode = computed(() => {
 })
 
 const markdownContent = computed(() => detail.value?.content?.content || '')
+const htmlContent = computed(() => detail.value?.content?.content || '')
 const resourceStatus = computed(() => {
   const jobStatus = generationJob.value?.status
   if (jobStatus === 'pending' || jobStatus === 'generating') return 'generating'
