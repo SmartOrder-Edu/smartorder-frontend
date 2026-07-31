@@ -360,12 +360,16 @@ export interface TeachingStructureBoardBlock extends TeachingBaseBoardBlock {
   sortedRange?: [number, number]
   rootId?: string
   directed?: boolean
+  hashFormula?: string
+  formula?: string
+  columns?: number
+  colCount?: number
   layout?: 'tree' | 'heap' | 'circle' | 'layered' | string
   animation?: TeachingStructureAnimation
 }
 
 export interface TeachingStructureAnimation {
-  action?: 'enqueue' | 'dequeue' | 'push' | 'pop' | 'peek' | 'compare' | 'swap' | string
+  action?: 'insert' | 'delete' | 'enqueue' | 'dequeue' | 'push' | 'pop' | 'peek' | 'compare' | 'swap' | 'search' | 'probe' | 'hash' | 'visit' | 'update' | 'sift_up' | 'sift_down' | 'heapify' | 'extract' | string
   durationMs?: number
   movingItem?: unknown
   from?: string | number
@@ -387,11 +391,25 @@ export interface TeachingStructureAnimationPhase {
   name: 'before' | 'moving' | 'after' | 'done' | string
   startRatio?: number
   items?: unknown[]
+  nodes?: unknown[]
+  edges?: unknown[]
   pointers?: Record<string, number | string>
   movingItem?: unknown
   targetIndex?: number
   sourceIndex?: number
   highlightPointers?: string[]
+  activeIndices?: number[]
+  activeIds?: string[]
+  visitedIds?: string[]
+  frontierIds?: string[]
+  pathIds?: string[]
+  compareIds?: string[]
+  parentIndex?: number
+  childIndices?: number[]
+  swapIndices?: number[]
+  violationIndices?: number[]
+  sortedRange?: [number, number]
+  heapSize?: number
   narrationHint?: string
 }
 

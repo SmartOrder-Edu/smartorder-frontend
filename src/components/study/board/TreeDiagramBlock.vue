@@ -1,5 +1,5 @@
 <template>
-  <section class="tree-block">
+  <section class="tree-block" :class="`tree-action-${operationAction}`">
     <div class="lesson-block-header" v-if="block.title">
       <div class="lesson-block-title">{{ block.title }}</div>
       <span class="structure-label">树</span>
@@ -45,21 +45,38 @@
 
     <div v-else class="empty-structure">暂无树节点</div>
 
+    <div v-if="phaseDots.length" class="tree-phase-strip">
+      <span
+        v-for="phase in phaseDots"
+        :key="phase.name"
+        class="phase-dot"
+        :class="{ active: phase.name === currentPhase.name }"
+      >
+        {{ phase.label }}
+      </span>
+    </div>
+
     <div v-if="legendItems.length" class="tree-legend">
       <span v-for="item in legendItems" :key="item.key" class="legend-item" :class="item.key">
         {{ item.label }}
       </span>
     </div>
 
-    <p v-if="block.caption || block.content" class="lesson-block-caption">
+    <p v-if="phaseNarration" class="tree-narration">{{ phaseNarration }}</p>
+    <p v-else-if="block.caption || block.content" class="lesson-block-caption">
       {{ block.caption || block.content }}
     </p>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { LessonSceneAction, TeachingStructureBoardBlock } from '@/types/study'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import type {
+  LessonSceneAction,
+  TeachingStructureAnimation,
+  TeachingStructureAnimationPhase,
+  TeachingStructureBoardBlock,
+} from '@/types/study'
 
 const props = defineProps<{
   block: TeachingStructureBoardBlock
@@ -105,12 +122,38 @@ const MIN_STAGE_WIDTH = 560
 const STAGE_PADDING_X = 36
 const STAGE_PADDING_Y = 28
 
-const rawNodes = computed(() => readPayloadArray('nodes') || props.block.nodes || [])
-const rawEdges = computed(() => readPayloadArray('edges') || props.block.edges || [])
-const rawItems = computed(() => readPayloadArray('items') || props.block.items || [])
-const activeIds = computed(() => normalizeStringArray(readPayloadArray('activeIds') || props.block.activeIds || []))
-const visitedIds = computed(() => normalizeStringArray(readPayloadArray('visitedIds') || props.block.visitedIds || []))
-const pathIds = computed(() => normalizeStringArray(readPayloadArray('pathIds') || props.block.pathIds || []))
+const currentPhaseName = ref('after')
+let timers: Array<ReturnType<typeof setTimeout>> = []
+
+const animation = computed<TeachingStructureAnimation>(() => {
+  const payloadAnimation = readPayloadValue('animation')
+  return (payloadAnimation && typeof payloadAnimation === 'object' && !Array.isArray(payloadAnimation)
+    ? payloadAnimation as TeachingStructureAnimation
+    : props.block.animation) || {}
+})
+const durationMs = computed(() => Math.max(Number(animation.value.durationMs || props.sceneAction?.durationMs) || 1800, 720))
+const phaseDefinitions = computed<TeachingStructureAnimationPhase[]>(() => {
+  if (animation.value.phases?.length) return normalizePhases(animation.value.phases)
+  return [{ name: 'after', startRatio: 0 }]
+})
+const currentPhase = computed<TeachingStructureAnimationPhase>(() => (
+  phaseDefinitions.value.find((phase) => phase.name === currentPhaseName.value)
+  || phaseDefinitions.value[0]
+  || { name: 'after', startRatio: 0 }
+))
+const rawNodes = computed(() => currentPhase.value.nodes || readPayloadArray('nodes') || props.block.nodes || [])
+const rawEdges = computed(() => currentPhase.value.edges || readPayloadArray('edges') || props.block.edges || [])
+const rawItems = computed(() => currentPhase.value.items || readPayloadArray('items') || props.block.items || [])
+const activeIds = computed(() => normalizeStringArray(currentPhase.value.activeIds || readPayloadArray('activeIds') || props.block.activeIds || []))
+const visitedIds = computed(() => normalizeStringArray(currentPhase.value.visitedIds || readPayloadArray('visitedIds') || props.block.visitedIds || []))
+const pathIds = computed(() => normalizeStringArray(currentPhase.value.pathIds || readPayloadArray('pathIds') || props.block.pathIds || []))
+const operationAction = computed(() => {
+  const animation = readPayloadValue('animation')
+  const record = animation && typeof animation === 'object' && !Array.isArray(animation)
+    ? animation as Record<string, unknown>
+    : {}
+  return stringValue(record.action ?? readPayloadValue('action') ?? '').toLowerCase().replace(/[-\s]/g, '_') || 'state'
+})
 const graph = computed(() => buildTreeGraph(rawNodes.value, rawEdges.value, rawItems.value))
 const treeLayout = computed<TreeLayout>(() => buildTreeLayout(graph.value))
 const stageSize = computed(() => treeLayout.value.stageSize)
@@ -136,6 +179,61 @@ const legendItems = computed(() => [
   ...(visitedIds.value.length ? [{ key: 'visited', label: '已访问' }] : []),
   ...(pathIds.value.length ? [{ key: 'path', label: '路径' }] : []),
 ])
+const phaseDots = computed(() => phaseDefinitions.value.length > 1
+  ? phaseDefinitions.value.map((phase) => ({ name: phase.name, label: phaseLabel(phase.name) }))
+  : [])
+const phaseNarration = computed(() => currentPhase.value.narrationHint || '')
+
+watch(
+  () => animationSignature(animation.value, props.sceneAction?.actionId || ''),
+  () => restartAnimation(),
+)
+
+onMounted(restartAnimation)
+onUnmounted(clearTimers)
+
+function restartAnimation() {
+  clearTimers()
+  const phases = phaseDefinitions.value
+  currentPhaseName.value = phases[0]?.name || 'after'
+  phases.slice(1).forEach((phase) => {
+    const delay = Math.max(0, Math.round((phase.startRatio ?? 0) * durationMs.value))
+    timers.push(setTimeout(() => {
+      currentPhaseName.value = phase.name
+    }, delay))
+  })
+}
+
+function clearTimers() {
+  timers.forEach((timer) => clearTimeout(timer))
+  timers = []
+}
+
+function normalizePhases(phases: TeachingStructureAnimationPhase[]): TeachingStructureAnimationPhase[] {
+  return phases
+    .filter((phase) => !!phase?.name)
+    .map((phase, index) => ({
+      ...phase,
+      startRatio: phase.startRatio ?? (index === 0 ? 0 : index / phases.length),
+    }))
+    .sort((a, b) => (a.startRatio ?? 0) - (b.startRatio ?? 0))
+}
+
+function phaseLabel(name: string): string {
+  const labels: Record<string, string> = {
+    before: '操作前',
+    moving: '执行中',
+    after: '完成后',
+    visit: '访问',
+    trace: '追踪',
+    done: '完成',
+  }
+  return labels[name] || name
+}
+
+function animationSignature(value: TeachingStructureAnimation, actionId: string): string {
+  return `${actionId}:${JSON.stringify(value)}`
+}
 
 function buildTreeGraph(nodes: unknown[], edges: unknown[], items: unknown[]): TreeGraph {
   if (nodes.length) return buildNodeGraph(nodes, edges)
@@ -441,7 +539,8 @@ function readPayloadArray(key: string): unknown[] | null {
 }
 
 .structure-label,
-.legend-item {
+.legend-item,
+.phase-dot {
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -476,10 +575,13 @@ function readPayloadArray(key: string): unknown[] | null {
 .tree-edge {
   stroke: #cbd5e1;
   stroke-width: 2;
+  stroke-dasharray: 320;
+  stroke-dashoffset: 0;
 
   &.active {
     stroke: #0f766e;
     stroke-width: 3;
+    animation: treeEdgeTrace 0.72s ease-out;
   }
 }
 
@@ -501,11 +603,13 @@ function readPayloadArray(key: string): unknown[] | null {
   &.visited {
     background: #f8fafc;
     color: #64748b;
+    animation: treeVisitSettle 0.48s ease-out;
   }
 
   &.path {
     border-color: #2563eb;
     background: #eff6ff;
+    animation: treePathPulse 0.72s ease-out;
   }
 
   &.active {
@@ -514,7 +618,16 @@ function readPayloadArray(key: string): unknown[] | null {
     border-color: #0f766e;
     background: #ecfdf5;
     box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.14), 0 10px 18px rgba(15, 118, 110, 0.12);
+    animation: treeActivePop 0.62s ease-out;
   }
+}
+
+.tree-action_insert .tree-node.active {
+  animation: treeInsertDrop 0.7s ease-out;
+}
+
+.tree-action_delete .tree-node.active {
+  animation: treeDeleteLift 0.7s ease-out;
 }
 
 .node-value {
@@ -534,6 +647,23 @@ function readPayloadArray(key: string): unknown[] | null {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.tree-phase-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.phase-dot {
+  padding: 3px 8px;
+  background: #f1f5f9;
+  color: #64748b;
+
+  &.active {
+    background: #ecfdf5;
+    color: #0f766e;
+  }
 }
 
 .legend-item {
@@ -566,10 +696,51 @@ function readPayloadArray(key: string): unknown[] | null {
   font-size: 13px;
 }
 
+.tree-narration,
 .lesson-block-caption {
   margin: 0;
   color: #64748b;
   font-size: 12px;
   line-height: 1.65;
+}
+
+.tree-narration {
+  padding: 8px 10px;
+  border-left: 3px solid #0f766e;
+  border-radius: 0 8px 8px 0;
+  background: rgba(20, 184, 166, 0.08);
+  color: #475569;
+}
+
+@keyframes treeActivePop {
+  0% { transform: scale(0.92); }
+  55% { transform: scale(1.13); }
+  100% { transform: scale(1.08); }
+}
+
+@keyframes treeVisitSettle {
+  from { opacity: 0.62; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes treePathPulse {
+  0%, 100% { box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08); }
+  50% { box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.13), 0 10px 18px rgba(37, 99, 235, 0.12); }
+}
+
+@keyframes treeEdgeTrace {
+  from { stroke-dashoffset: 320; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes treeInsertDrop {
+  from { opacity: 0; transform: translateY(-18px) scale(0.9); }
+  to { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes treeDeleteLift {
+  0% { opacity: 1; transform: scale(1.08); }
+  70% { opacity: 0.35; transform: translateY(-14px) scale(0.94); }
+  100% { opacity: 1; transform: scale(1.08); }
 }
 </style>
