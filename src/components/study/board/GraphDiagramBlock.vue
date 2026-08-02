@@ -1,5 +1,5 @@
 <template>
-  <section class="graph-block">
+  <section class="graph-block" :class="`graph-action-${operationAction}`">
     <div class="lesson-block-header" v-if="block.title">
       <div class="lesson-block-title">{{ block.title }}</div>
       <span class="structure-label">{{ directed ? '有向图' : '图' }}</span>
@@ -23,7 +23,7 @@
               :x2="edge.toX"
               :y2="edge.toY"
               class="graph-edge"
-              :class="{ path: edge.path }"
+              :class="{ path: edge.path, active: isActiveEdge(edge.from, edge.to) }"
               :marker-end="directed ? `url(#${edge.path ? 'graph-arrow-active' : 'graph-arrow'})` : undefined"
             />
             <text
@@ -56,21 +56,38 @@
 
     <div v-else class="empty-structure">暂无图节点</div>
 
+    <div v-if="phaseDots.length" class="graph-phase-strip">
+      <span
+        v-for="phase in phaseDots"
+        :key="phase.name"
+        class="phase-dot"
+        :class="{ active: phase.name === currentPhase.name }"
+      >
+        {{ phase.label }}
+      </span>
+    </div>
+
     <div v-if="legendItems.length" class="graph-legend">
       <span v-for="item in legendItems" :key="item.key" class="legend-item" :class="item.key">
         {{ item.label }}
       </span>
     </div>
 
-    <p v-if="block.caption || block.content" class="lesson-block-caption">
+    <p v-if="phaseNarration" class="graph-narration">{{ phaseNarration }}</p>
+    <p v-else-if="block.caption || block.content" class="lesson-block-caption">
       {{ block.caption || block.content }}
     </p>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { LessonSceneAction, TeachingStructureBoardBlock } from '@/types/study'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import type {
+  LessonSceneAction,
+  TeachingStructureAnimation,
+  TeachingStructureAnimationPhase,
+  TeachingStructureBoardBlock,
+} from '@/types/study'
 
 const props = defineProps<{
   block: TeachingStructureBoardBlock
@@ -96,12 +113,38 @@ interface GraphEdge {
 }
 
 const stageSize = { width: 620, height: 320 }
-const rawNodes = computed(() => readPayloadArray('nodes') || props.block.nodes || props.block.items || [])
-const rawEdges = computed(() => readPayloadArray('edges') || props.block.edges || [])
-const activeIds = computed(() => normalizeStringArray(readPayloadArray('activeIds') || props.block.activeIds || []))
-const visitedIds = computed(() => normalizeStringArray(readPayloadArray('visitedIds') || props.block.visitedIds || []))
-const frontierIds = computed(() => normalizeStringArray(readPayloadArray('frontierIds') || props.block.frontierIds || []))
-const pathIds = computed(() => normalizeStringArray(readPayloadArray('pathIds') || props.block.pathIds || []))
+const currentPhaseName = ref('after')
+let timers: Array<ReturnType<typeof setTimeout>> = []
+
+const animation = computed<TeachingStructureAnimation>(() => {
+  const payloadAnimation = readPayloadValue('animation')
+  return (payloadAnimation && typeof payloadAnimation === 'object' && !Array.isArray(payloadAnimation)
+    ? payloadAnimation as TeachingStructureAnimation
+    : props.block.animation) || {}
+})
+const durationMs = computed(() => Math.max(Number(animation.value.durationMs || props.sceneAction?.durationMs) || 1800, 720))
+const phaseDefinitions = computed<TeachingStructureAnimationPhase[]>(() => {
+  if (animation.value.phases?.length) return normalizePhases(animation.value.phases)
+  return [{ name: 'after', startRatio: 0 }]
+})
+const currentPhase = computed<TeachingStructureAnimationPhase>(() => (
+  phaseDefinitions.value.find((phase) => phase.name === currentPhaseName.value)
+  || phaseDefinitions.value[0]
+  || { name: 'after', startRatio: 0 }
+))
+const rawNodes = computed(() => currentPhase.value.nodes || readPayloadArray('nodes') || props.block.nodes || props.block.items || [])
+const rawEdges = computed(() => currentPhase.value.edges || readPayloadArray('edges') || props.block.edges || [])
+const activeIds = computed(() => normalizeStringArray(currentPhase.value.activeIds || readPayloadArray('activeIds') || props.block.activeIds || []))
+const visitedIds = computed(() => normalizeStringArray(currentPhase.value.visitedIds || readPayloadArray('visitedIds') || props.block.visitedIds || []))
+const frontierIds = computed(() => normalizeStringArray(currentPhase.value.frontierIds || readPayloadArray('frontierIds') || props.block.frontierIds || []))
+const pathIds = computed(() => normalizeStringArray(currentPhase.value.pathIds || readPayloadArray('pathIds') || props.block.pathIds || []))
+const operationAction = computed(() => {
+  const animation = readPayloadValue('animation')
+  const record = animation && typeof animation === 'object' && !Array.isArray(animation)
+    ? animation as Record<string, unknown>
+    : {}
+  return stringValue(record.action ?? readPayloadValue('action') ?? '').toLowerCase().replace(/[-\s]/g, '_') || 'state'
+})
 const directed = computed(() => {
   const payload = props.sceneAction?.payload?.directed
   return typeof payload === 'boolean' ? payload : props.block.directed === true
@@ -143,6 +186,62 @@ const legendItems = computed(() => [
   ...(visitedIds.value.length ? [{ key: 'visited', label: '已访问' }] : []),
   ...(pathIds.value.length ? [{ key: 'path', label: '路径' }] : []),
 ])
+const phaseDots = computed(() => phaseDefinitions.value.length > 1
+  ? phaseDefinitions.value.map((phase) => ({ name: phase.name, label: phaseLabel(phase.name) }))
+  : [])
+const phaseNarration = computed(() => currentPhase.value.narrationHint || '')
+
+watch(
+  () => animationSignature(animation.value, props.sceneAction?.actionId || ''),
+  () => restartAnimation(),
+)
+
+onMounted(restartAnimation)
+onUnmounted(clearTimers)
+
+function restartAnimation() {
+  clearTimers()
+  const phases = phaseDefinitions.value
+  currentPhaseName.value = phases[0]?.name || 'after'
+  phases.slice(1).forEach((phase) => {
+    const delay = Math.max(0, Math.round((phase.startRatio ?? 0) * durationMs.value))
+    timers.push(setTimeout(() => {
+      currentPhaseName.value = phase.name
+    }, delay))
+  })
+}
+
+function clearTimers() {
+  timers.forEach((timer) => clearTimeout(timer))
+  timers = []
+}
+
+function normalizePhases(phases: TeachingStructureAnimationPhase[]): TeachingStructureAnimationPhase[] {
+  return phases
+    .filter((phase) => !!phase?.name)
+    .map((phase, index) => ({
+      ...phase,
+      startRatio: phase.startRatio ?? (index === 0 ? 0 : index / phases.length),
+    }))
+    .sort((a, b) => (a.startRatio ?? 0) - (b.startRatio ?? 0))
+}
+
+function phaseLabel(name: string): string {
+  const labels: Record<string, string> = {
+    before: '操作前',
+    moving: '执行中',
+    after: '完成后',
+    visit: '访问',
+    expand: '扩展邻居',
+    trace: '追踪路径',
+    done: '完成',
+  }
+  return labels[name] || name
+}
+
+function animationSignature(value: TeachingStructureAnimation, actionId: string): string {
+  return `${actionId}:${JSON.stringify(value)}`
+}
 
 function normalizeNodes(values: unknown[]): GraphNode[] {
   return values.map((value, index) => {
@@ -192,6 +291,10 @@ function isPathEdge(from: string, to: string): boolean {
   return fromIndex >= 0 && toIndex === fromIndex + 1
 }
 
+function isActiveEdge(from: string, to: string): boolean {
+  return activeIds.value.includes(from) || activeIds.value.includes(to) || isPathEdge(from, to)
+}
+
 function toRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : { value }
 }
@@ -210,8 +313,12 @@ function normalizeStringArray(values: unknown[]): string[] {
 }
 
 function readPayloadArray(key: string): unknown[] | null {
-  const value = props.sceneAction?.payload?.[key]
+  const value = readPayloadValue(key)
   return Array.isArray(value) ? value : null
+}
+
+function readPayloadValue(key: string): unknown {
+  return props.sceneAction?.payload?.[key]
 }
 </script>
 
@@ -237,7 +344,8 @@ function readPayloadArray(key: string): unknown[] | null {
 }
 
 .structure-label,
-.legend-item {
+.legend-item,
+.phase-dot {
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -279,10 +387,18 @@ function readPayloadArray(key: string): unknown[] | null {
 .graph-edge {
   stroke: #94a3b8;
   stroke-width: 2;
+  stroke-dasharray: 360;
+  stroke-dashoffset: 0;
 
-  &.path {
+  &.path,
+  &.active {
     stroke: #0f766e;
     stroke-width: 3;
+    animation: graphEdgeTrace 0.78s ease-out;
+  }
+
+  &.path {
+    stroke: #2563eb;
   }
 }
 
@@ -316,16 +432,19 @@ function readPayloadArray(key: string): unknown[] | null {
   &.visited {
     background: #f8fafc;
     color: #64748b;
+    animation: graphVisitSettle 0.48s ease-out;
   }
 
   &.frontier {
     border-color: #d97706;
     background: #fffbeb;
+    animation: graphFrontierPulse 0.86s ease-out;
   }
 
   &.path {
     border-color: #2563eb;
     background: #eff6ff;
+    animation: graphPathPulse 0.74s ease-out;
   }
 
   &.active {
@@ -334,13 +453,33 @@ function readPayloadArray(key: string): unknown[] | null {
     border-color: #0f766e;
     background: #ecfdf5;
     box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.14), 0 10px 18px rgba(15, 118, 110, 0.12);
+    animation: graphActivePop 0.62s ease-out;
   }
 }
 
+.graph-action_probe .graph-node.frontier,
+.graph-action_search .graph-node.frontier,
+.graph-action_bfs .graph-node.frontier,
+.graph-action_dfs .graph-node.frontier {
+  animation: graphFrontierPulse 1s ease-out;
+}
+
+.graph-phase-strip,
 .graph-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.phase-dot {
+  padding: 3px 8px;
+  background: #f1f5f9;
+  color: #64748b;
+
+  &.active {
+    background: #ecfdf5;
+    color: #0f766e;
+  }
 }
 
 .legend-item {
@@ -378,10 +517,45 @@ function readPayloadArray(key: string): unknown[] | null {
   font-size: 13px;
 }
 
+.graph-narration,
 .lesson-block-caption {
   margin: 0;
   color: #64748b;
   font-size: 12px;
   line-height: 1.65;
+}
+
+.graph-narration {
+  padding: 8px 10px;
+  border-left: 3px solid #0f766e;
+  border-radius: 0 8px 8px 0;
+  background: rgba(20, 184, 166, 0.08);
+  color: #475569;
+}
+
+@keyframes graphActivePop {
+  0% { transform: scale(0.92); }
+  55% { transform: scale(1.13); }
+  100% { transform: scale(1.08); }
+}
+
+@keyframes graphVisitSettle {
+  from { opacity: 0.56; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes graphFrontierPulse {
+  0%, 100% { box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08); }
+  50% { box-shadow: 0 0 0 5px rgba(217, 119, 6, 0.14), 0 10px 18px rgba(217, 119, 6, 0.12); }
+}
+
+@keyframes graphPathPulse {
+  0%, 100% { box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08); }
+  50% { box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.13), 0 10px 18px rgba(37, 99, 235, 0.12); }
+}
+
+@keyframes graphEdgeTrace {
+  from { stroke-dashoffset: 360; }
+  to { stroke-dashoffset: 0; }
 }
 </style>

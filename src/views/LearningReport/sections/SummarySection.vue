@@ -21,7 +21,7 @@
         </div>
 
         <div class="summary-actions">
-          <button class="primary-action" @click="$emit('action', 'tasks')">
+          <button class="primary-action" @click="goToNextWeekPlan">
             <component :is="TargetIconComp" :size="16" />
             <span>查看下周计划</span>
           </button>
@@ -38,6 +38,7 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { getIcon } from '@/assets/icons/create'
 import summaryImg from '@/assets/illustrations/summary-companion-wave.png'
 import WatercolorOrb from '../components/WatercolorOrb.vue'
@@ -52,6 +53,12 @@ defineProps<{
 defineEmits<{
   action: [type: 'tasks' | 'study' | 'profile']
 }>()
+
+const router = useRouter()
+
+function goToNextWeekPlan() {
+  router.push('/next-week-plan')
+}
 
 const TargetIconComp = getIcon('TargetIcon')
 </script>

@@ -1,5 +1,5 @@
 <template>
-  <section class="heap-block" :class="`heap-kind-${heapKind}`">
+  <section class="heap-block" :class="[`heap-kind-${heapKind}`, `heap-action-${operationAction}`]">
     <div class="lesson-block-header" v-if="block.title">
       <div class="lesson-block-title">{{ block.title }}</div>
       <div class="heap-badges">
@@ -86,15 +86,32 @@
 
     <div v-else class="empty-structure">暂无堆元素</div>
 
-    <p v-if="block.caption || block.content" class="lesson-block-caption">
+    <div v-if="phaseDots.length" class="heap-phase-strip">
+      <span
+        v-for="phase in phaseDots"
+        :key="phase.name"
+        class="phase-dot"
+        :class="{ active: phase.name === currentPhase.name }"
+      >
+        {{ phase.label }}
+      </span>
+    </div>
+
+    <p v-if="phaseNarration" class="heap-narration">{{ phaseNarration }}</p>
+    <p v-else-if="block.caption || block.content" class="lesson-block-caption">
       {{ block.caption || block.content }}
     </p>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { LessonSceneAction, TeachingStructureAnimation, TeachingStructureBoardBlock } from '@/types/study'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import type {
+  LessonSceneAction,
+  TeachingStructureAnimation,
+  TeachingStructureAnimationPhase,
+  TeachingStructureBoardBlock,
+} from '@/types/study'
 
 const props = defineProps<{
   block: TeachingStructureBoardBlock
@@ -147,6 +164,9 @@ const MIN_STAGE_WIDTH = 520
 const STAGE_PADDING_X = 34
 const STAGE_PADDING_Y = 24
 
+const currentPhaseName = ref('after')
+let timers: Array<ReturnType<typeof setTimeout>> = []
+
 const blockRecord = computed<Record<string, unknown>>(() => props.block as unknown as Record<string, unknown>)
 const animation = computed<TeachingStructureAnimation>(() => {
   const payloadAnimation = readPayloadValue('animation')
@@ -154,7 +174,17 @@ const animation = computed<TeachingStructureAnimation>(() => {
     ? payloadAnimation as TeachingStructureAnimation
     : props.block.animation) || {}
 })
-const rawItems = computed(() => readPayloadArray('items') || props.block.items || props.block.nodes || [])
+const durationMs = computed(() => Math.max(Number(animation.value.durationMs || props.sceneAction?.durationMs) || 1800, 720))
+const phaseDefinitions = computed<TeachingStructureAnimationPhase[]>(() => {
+  if (animation.value.phases?.length) return normalizePhases(animation.value.phases)
+  return [{ name: 'after', startRatio: 0 }]
+})
+const currentPhase = computed<TeachingStructureAnimationPhase>(() => (
+  phaseDefinitions.value.find((phase) => phase.name === currentPhaseName.value)
+  || phaseDefinitions.value[0]
+  || { name: 'after', startRatio: 0 }
+))
+const rawItems = computed(() => currentPhase.value.items || readPayloadArray('items') || props.block.items || props.block.nodes || [])
 const indexBase = computed<0 | 1>(() => resolveIndexBase(rawItems.value))
 const items = computed<HeapItem[]>(() => normalizeHeapItems(rawItems.value, indexBase.value))
 const heapKind = computed(() => {
@@ -172,39 +202,39 @@ const heapFormulaRows = computed(() => indexBase.value === 1
   ? ['parent(i) = floor(i / 2)', 'left(i) = 2i', 'right(i) = 2i + 1']
   : ['parent(i) = floor((i - 1) / 2)', 'left(i) = 2i + 1', 'right(i) = 2i + 2'])
 const effectiveHeapSize = computed(() => {
-  const rawValue = readPayloadValue('heapSize') ?? blockRecord.value.heapSize
+  const rawValue = currentPhase.value.heapSize ?? readPayloadValue('heapSize') ?? blockRecord.value.heapSize
   const raw = numberValue(rawValue, items.value.length)
   const normalized = indexBase.value === 1 && raw > items.value.length ? raw - 1 : raw
   return Math.max(0, Math.min(items.value.length, normalized))
 })
-const activeIndices = computed(() => normalizeHeapIndexArray(readPayloadArray('activeIndices') || props.block.activeIndices || []))
-const compareIds = computed(() => normalizeStringArray(readPayloadArray('compareIds') || props.block.compareIds || []))
+const activeIndices = computed(() => normalizeHeapIndexArray(currentPhase.value.activeIndices || readPayloadArray('activeIndices') || props.block.activeIndices || []))
+const compareIds = computed(() => normalizeStringArray(currentPhase.value.compareIds || readPayloadArray('compareIds') || props.block.compareIds || []))
 const compareIndices = computed(() => normalizeHeapIndexArray(compareIds.value))
-const pathIds = computed(() => normalizeStringArray(readPayloadArray('pathIds') || props.block.pathIds || []))
+const pathIds = computed(() => normalizeStringArray(currentPhase.value.pathIds || readPayloadArray('pathIds') || props.block.pathIds || []))
 const pathIndices = computed(() => normalizeHeapIndexArray(pathIds.value))
 const parentIndex = computed(() => {
-  const raw = normalizeHeapIndex(readPayloadValue('parentIndex') ?? blockRecord.value.parentIndex)
+  const raw = normalizeHeapIndex(currentPhase.value.parentIndex ?? readPayloadValue('parentIndex') ?? blockRecord.value.parentIndex)
   if (Number.isFinite(raw)) return raw
   if (compareIndices.value.length >= 2) return Math.min(...compareIndices.value)
   return Number.NaN
 })
 const childIndices = computed(() => {
-  const explicit = normalizeHeapIndexArray(readPayloadArray('childIndices') || blockRecord.value.childIndices || [])
+  const explicit = normalizeHeapIndexArray(currentPhase.value.childIndices || readPayloadArray('childIndices') || blockRecord.value.childIndices || [])
   if (explicit.length) return explicit
   if (!Number.isFinite(parentIndex.value)) return []
   return [parentIndex.value * 2 + 1, parentIndex.value * 2 + 2].filter((index) => index < items.value.length)
 })
 const swapIndices = computed(() => {
-  const explicit = normalizeHeapIndexArray(readPayloadArray('swapIndices') || blockRecord.value.swapIndices || [])
+  const explicit = normalizeHeapIndexArray(currentPhase.value.swapIndices || readPayloadArray('swapIndices') || blockRecord.value.swapIndices || [])
   if (explicit.length) return explicit
   if (String(animation.value.action || '').toLowerCase() !== 'swap') return []
   return normalizeHeapIndexArray([animation.value.from, animation.value.to])
 })
 const violationIndices = computed(() => normalizeHeapIndexArray(
-  readPayloadArray('violationIndices') || blockRecord.value.violationIndices || [],
+  currentPhase.value.violationIndices || readPayloadArray('violationIndices') || blockRecord.value.violationIndices || [],
 ))
 const sortedRange = computed(() => {
-  const explicit = normalizeRange(readPayloadArray('sortedRange') || blockRecord.value.sortedRange)
+  const explicit = normalizeRange(currentPhase.value.sortedRange || readPayloadArray('sortedRange') || blockRecord.value.sortedRange)
   if (explicit) return explicit
   if (effectiveHeapSize.value < items.value.length) {
     return [effectiveHeapSize.value, items.value.length - 1] as [number, number]
@@ -212,7 +242,7 @@ const sortedRange = computed(() => {
   return null
 })
 const operationLabel = computed(() => {
-  const action = String(animation.value.action || readPayloadValue('action') || '').toLowerCase()
+  const action = operationAction.value
   const labels: Record<string, string> = {
     compare: '比较父子节点',
     swap: '交换节点',
@@ -227,6 +257,7 @@ const operationLabel = computed(() => {
   }
   return labels[action] || ''
 })
+const operationAction = computed(() => String(animation.value.action || readPayloadValue('action') || '').toLowerCase().replace(/[-\s]/g, '_') || 'state')
 const treeLayout = computed<HeapTreeLayout>(() => buildHeapTreeLayout(items.value))
 const stageSize = computed(() => treeLayout.value.stageSize)
 const heapNodes = computed<HeapNode[]>(() => treeLayout.value.nodes)
@@ -262,6 +293,62 @@ const focusRows = computed<FocusRow[]>(() => {
   if (effectiveHeapSize.value < items.value.length) rows.push({ key: 'heap-size', label: '有效堆区', value: `[0, ${Math.max(effectiveHeapSize.value - 1, 0)}]` })
   return rows
 })
+const phaseDots = computed(() => phaseDefinitions.value.length > 1
+  ? phaseDefinitions.value.map((phase) => ({ name: phase.name, label: phaseLabel(phase.name) }))
+  : [])
+const phaseNarration = computed(() => currentPhase.value.narrationHint || '')
+
+watch(
+  () => animationSignature(animation.value, props.sceneAction?.actionId || ''),
+  () => restartAnimation(),
+)
+
+onMounted(restartAnimation)
+onUnmounted(clearTimers)
+
+function restartAnimation() {
+  clearTimers()
+  const phases = phaseDefinitions.value
+  currentPhaseName.value = phases[0]?.name || 'after'
+  phases.slice(1).forEach((phase) => {
+    const delay = Math.max(0, Math.round((phase.startRatio ?? 0) * durationMs.value))
+    timers.push(setTimeout(() => {
+      currentPhaseName.value = phase.name
+    }, delay))
+  })
+}
+
+function clearTimers() {
+  timers.forEach((timer) => clearTimeout(timer))
+  timers = []
+}
+
+function normalizePhases(phases: TeachingStructureAnimationPhase[]): TeachingStructureAnimationPhase[] {
+  return phases
+    .filter((phase) => !!phase?.name)
+    .map((phase, index) => ({
+      ...phase,
+      startRatio: phase.startRatio ?? (index === 0 ? 0 : index / phases.length),
+    }))
+    .sort((a, b) => (a.startRatio ?? 0) - (b.startRatio ?? 0))
+}
+
+function phaseLabel(name: string): string {
+  const labels: Record<string, string> = {
+    before: '操作前',
+    moving: '执行中',
+    compare: '比较',
+    swap: '交换',
+    sift: '调整',
+    after: '完成后',
+    done: '完成',
+  }
+  return labels[name] || name
+}
+
+function animationSignature(value: TeachingStructureAnimation, actionId: string): string {
+  return `${actionId}:${JSON.stringify(value)}`
+}
 
 function nodeClass(node: HeapNode): Record<string, boolean> {
   return {
@@ -509,7 +596,8 @@ function readPayloadArray(key: string): unknown[] | null {
 }
 
 .structure-label,
-.heap-kind-label {
+.heap-kind-label,
+.phase-dot {
   border-radius: 999px;
   font-size: 11px;
   font-weight: 760;
@@ -576,6 +664,7 @@ function readPayloadArray(key: string): unknown[] | null {
   &.compare {
     stroke: #d97706;
     stroke-width: 3;
+    animation: heapEdgePulse 0.74s ease-out;
   }
 
   &.path {
@@ -586,11 +675,13 @@ function readPayloadArray(key: string): unknown[] | null {
   &.swap {
     stroke: #7c3aed;
     stroke-width: 3;
+    animation: heapEdgeTrace 0.78s ease-out;
   }
 
   &.violation {
     stroke: #dc2626;
     stroke-width: 3;
+    animation: heapViolationPulse 0.84s ease-out;
   }
 
   &.muted {
@@ -617,11 +708,13 @@ function readPayloadArray(key: string): unknown[] | null {
   &.parent {
     border-color: #0f766e;
     background: #f0fdfa;
+    animation: heapFocusPop 0.62s ease-out;
   }
 
   &.child {
     border-color: #0284c7;
     background: #f0f9ff;
+    animation: heapFocusPop 0.62s ease-out;
   }
 
   &.path {
@@ -632,16 +725,19 @@ function readPayloadArray(key: string): unknown[] | null {
   &.compare {
     border-color: #d97706;
     background: #fffbeb;
+    animation: heapComparePulse 0.72s ease-out;
   }
 
   &.swap {
     border-color: #7c3aed;
     background: #f5f3ff;
+    animation: heapSwapHop 0.76s ease-out;
   }
 
   &.violation {
     border-color: #dc2626;
     background: #fef2f2;
+    animation: heapViolationPulse 0.84s ease-out;
   }
 
   &.sorted,
@@ -656,6 +752,7 @@ function readPayloadArray(key: string): unknown[] | null {
     border-color: #0f766e;
     background: #ecfdf5;
     box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.14), 0 10px 18px rgba(15, 118, 110, 0.12);
+    animation: heapFocusPop 0.62s ease-out;
   }
 }
 
@@ -713,26 +810,31 @@ function readPayloadArray(key: string): unknown[] | null {
   &.parent {
     background: #f0fdfa;
     border-color: #0f766e;
+    animation: heapComparePulse 0.72s ease-out;
   }
 
   &.child {
     background: #f0f9ff;
     border-color: #0284c7;
+    animation: heapComparePulse 0.72s ease-out;
   }
 
   &.compare {
     background: #fffbeb;
     border-color: #d97706;
+    animation: heapComparePulse 0.72s ease-out;
   }
 
   &.swap {
     background: #f5f3ff;
     border-color: #7c3aed;
+    animation: heapArraySwap 0.76s ease-out;
   }
 
   &.violation {
     background: #fef2f2;
     border-color: #dc2626;
+    animation: heapViolationPulse 0.84s ease-out;
   }
 
   &.sorted,
@@ -747,7 +849,24 @@ function readPayloadArray(key: string): unknown[] | null {
     background: #ecfdf5;
     border-color: #0f766e;
     box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
+    animation: heapComparePulse 0.72s ease-out;
   }
+}
+
+.heap-action-sift_up .heap-node.swap,
+.heap-action-siftup .heap-node.swap {
+  animation: heapSiftUp 0.82s ease-out;
+}
+
+.heap-action-sift_down .heap-node.swap,
+.heap-action-siftdown .heap-node.swap,
+.heap-action-heapify .heap-node.swap {
+  animation: heapSiftDown 0.82s ease-out;
+}
+
+.heap-action-extract .heap-node.active,
+.heap-action-delete .heap-node.active {
+  animation: heapExtractLift 0.84s ease-out;
 }
 
 .array-value {
@@ -805,6 +924,23 @@ function readPayloadArray(key: string): unknown[] | null {
   gap: 6px;
 }
 
+.heap-phase-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.phase-dot {
+  padding: 3px 8px;
+  background: #f1f5f9;
+  color: #64748b;
+
+  &.active {
+    background: #ecfdf5;
+    color: #0f766e;
+  }
+}
+
 .focus-row {
   display: grid;
   grid-template-columns: 68px minmax(0, 1fr);
@@ -854,10 +990,75 @@ function readPayloadArray(key: string): unknown[] | null {
   font-size: 13px;
 }
 
+.heap-narration,
 .lesson-block-caption {
   margin: 0;
   color: #64748b;
   font-size: 12px;
   line-height: 1.65;
+}
+
+.heap-narration {
+  padding: 8px 10px;
+  border-left: 3px solid #0f766e;
+  border-radius: 0 8px 8px 0;
+  background: rgba(20, 184, 166, 0.08);
+  color: #475569;
+}
+
+@keyframes heapFocusPop {
+  0% { transform: scale(0.94); }
+  54% { transform: scale(1.12); }
+  100% { transform: scale(1.08); }
+}
+
+@keyframes heapComparePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.15); }
+}
+
+@keyframes heapSwapHop {
+  0%, 100% { transform: translate(0, 0); }
+  38% { transform: translateY(-12px) scale(1.05); }
+  72% { transform: translateY(3px) scale(1.02); }
+}
+
+@keyframes heapArraySwap {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(-8px); }
+  70% { transform: translateX(8px); }
+}
+
+@keyframes heapSiftUp {
+  0% { transform: translateY(8px) scale(1); }
+  55% { transform: translateY(-16px) scale(1.07); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes heapSiftDown {
+  0% { transform: translateY(-8px) scale(1); }
+  55% { transform: translateY(16px) scale(1.07); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes heapExtractLift {
+  0% { opacity: 1; transform: scale(1.08); }
+  68% { opacity: 0.32; transform: translateY(-18px) scale(0.94); }
+  100% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes heapEdgePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes heapEdgeTrace {
+  from { stroke-dasharray: 220; stroke-dashoffset: 220; }
+  to { stroke-dasharray: 220; stroke-dashoffset: 0; }
+}
+
+@keyframes heapViolationPulse {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.22)); }
 }
 </style>
