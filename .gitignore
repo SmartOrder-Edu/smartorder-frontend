@@ -44,6 +44,15 @@ coverage/
 *.temp
 .cache/
 
+# 临时脚本与产物
+scratch_*
+*_diff.txt
+build_output.txt
+screenshot.png
+temp.scss
+recovered_*.vue
+found_*.vue
+
 # AI 编码工具本地配置
 .opencode/
 docs/superpowers/
