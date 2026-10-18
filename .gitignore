@@ -13,6 +13,7 @@ dist-ssr/
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+.history/
 .idea/
 *.suo
 *.ntvs*
@@ -42,3 +43,6 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# AI 编码工具本地配置
+.opencode/
