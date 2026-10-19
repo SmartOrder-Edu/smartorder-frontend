@@ -374,12 +374,110 @@
                   multiple
                   @change="handleFileSelected"
                 />
-                <button class="toolbar-btn" @click="handleContextClick" title="设置上下文（即将上线）">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                  </svg>
-                  <span>选择学习空间</span>
-                </button>
+                <el-popover
+                  v-model:visible="spaceSelectorVisible"
+                  placement="top-start"
+                  trigger="click"
+                  popper-class="space-context-popover"
+                  :width="340"
+                  @show="ensureLearningSpacesLoaded"
+                >
+                  <template #reference>
+                    <button
+                      class="toolbar-btn context-toolbar-btn"
+                      :class="{ active: hasFocusedContext }"
+                      @click="handleContextClick"
+                      :title="contextButtonTitle"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                      </svg>
+                      <span>{{ contextButtonLabel }}</span>
+                    </button>
+                  </template>
+
+                  <div class="space-context-panel">
+                    <div class="space-context-header">
+                      <span class="space-context-title">选择学习空间</span>
+                      <button class="space-context-refresh" @click="refreshLearningSpaces" title="刷新学习空间">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="23 4 23 10 17 10"/>
+                          <polyline points="1 20 1 14 7 14"/>
+                          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
+                          <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/>
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div class="space-context-options">
+                      <button
+                        class="space-context-option"
+                        :class="{ active: activeContext === 'global' }"
+                        @click="selectGlobalContext"
+                      >
+                        <span class="space-option-icon global">全</span>
+                        <span class="space-option-main">
+                          <span class="space-option-name">全局学习</span>
+                          <span class="space-option-meta">统筹所有学习空间</span>
+                        </span>
+                        <span v-if="activeContext === 'global'" class="space-option-check">✓</span>
+                      </button>
+
+                      <button
+                        class="space-context-option"
+                        :class="{ active: activeContext === 'evaluation' }"
+                        @click="selectEvaluationContext"
+                      >
+                        <span class="space-option-icon evaluation">测</span>
+                        <span class="space-option-main">
+                          <span class="space-option-name">练习评测</span>
+                          <span class="space-option-meta">错题、测评和薄弱点诊断</span>
+                        </span>
+                        <span v-if="activeContext === 'evaluation'" class="space-option-check">✓</span>
+                      </button>
+
+                      <div class="space-context-divider"></div>
+
+                      <div v-if="learningSpaceStore.loading" class="space-context-loading">正在加载学习空间...</div>
+                      <div v-else-if="availableLearningSpaces.length === 0" class="space-context-empty">
+                        暂无可选择的学习空间
+                      </div>
+                      <template v-else>
+                        <button
+                          v-for="space in availableLearningSpaces"
+                          :key="space.id"
+                          class="space-context-option"
+                          :class="{ active: selectedSpaceId === String(space.id) }"
+                          @click="selectLearningSpace(String(space.id))"
+                        >
+                          <span
+                            class="space-option-icon"
+                            :style="{ background: space.bgColor, color: space.color }"
+                          >
+                            {{ space.icon }}
+                          </span>
+                          <span class="space-option-main">
+                            <span class="space-option-name">{{ space.name }}</span>
+                            <span class="space-option-meta">{{ formatSpaceType(space.type) }} · 进度 {{ space.progress }}%</span>
+                          </span>
+                          <span v-if="selectedSpaceId === String(space.id)" class="space-option-check">✓</span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </el-popover>
+              </div>
+              <div class="selected-space-strip" v-if="hasFocusedContext">
+                <div class="selected-space-chip">
+                  <span class="selected-space-dot" :style="selectedContextStyle"></span>
+                  <span class="selected-space-label">{{ selectedContextChipText }}</span>
+                  <button class="selected-space-clear" @click="selectGlobalContext" title="切回全局学习">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div class="attachment-strip" v-if="attachments.length || uploadProgress.status !== 'idle'">
                 <div class="attachment-chip uploading" v-if="uploadProgress.status !== 'idle' && uploadProgress.status !== 'success'">
@@ -445,7 +543,8 @@
               <div class="composer-body">
                 <textarea
                   v-model="inputMessage"
-                  :placeholder="inputPlaceholder"
+                  :placeholder="isListening ? '正在聆听…' : inputPlaceholder"
+                  :disabled="isListening"
                   rows="1"
                   @keydown.enter.exact.prevent="sendMessage"
                   @keydown.enter.shift.exact.stop
@@ -453,6 +552,25 @@
                   ref="inputRef"
                 ></textarea>
                 <div class="composer-actions">
+                  <button
+                    v-if="!voiceUnsupported"
+                    class="action-btn mic-action"
+                    :class="{ listening: isListening }"
+                    :title="isListening ? '停止录音' : '语音输入'"
+                    :aria-label="isListening ? '停止录音' : '语音输入'"
+                    :disabled="agentStore.loading"
+                    @click="toggleVoice"
+                  >
+                    <svg v-if="!isListening" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                      <line x1="12" y1="19" x2="12" y2="23"/>
+                      <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="6" y="6" width="12" height="12" rx="2"/>
+                    </svg>
+                  </button>
                   <button
                     v-if="agentStore.loading"
                     class="action-btn stop-action"
@@ -611,6 +729,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { useLearningSpaceStore } from '@/stores/learningSpace'
 import {
   extractLearningSpaceCardsFromToolCalls,
   useAgentChat,
@@ -637,14 +756,17 @@ import MindMapCard from '@/components/agent/MindMapCard.vue'
 import LearningSpaceCards from '@/components/agent/LearningSpaceCards.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
+import { useVoiceInput } from '@/composables/useVoiceInput'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
 import type { RagReference } from '@/composables/useAgentChat'
 import AssistantPanel from '@/components/AssistantPanel.vue'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { getAvatarAuthInfo, type AvatarAuthInfo } from '@/api/avatar'
+import type { LearningSpaceType } from '@/api/learningSpace'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
+const learningSpaceStore = useLearningSpaceStore()
 const liveLearningSpaceCards = computed(() => extractLearningSpaceCardsFromToolCalls(agentStore.toolCalls))
 const route = useRoute()
 
@@ -659,6 +781,8 @@ const attachments = ref<AttachmentStatus[]>([])
 const pollingTimers = new Map<number, number>()
 const { upload: uploadAttachment, uploadProgress, resetProgress } = useAgentAttachmentUpload()
 const selectedReferences = ref<RagReference[]>([])
+const spaceSelectorVisible = ref(false)
+const selectedSpaceId = ref<string | null>(null)
 
 // 数字人面板状态
 const isAssistantCollapsed = ref(false)
@@ -743,27 +867,114 @@ const preloadAvatarAuthInfo = async () => {
   }
 }
 
-const activeContext = ref('global')
+type TutorContext = 'global' | 'evaluation' | 'space'
 
-const contextOptions = ref([
-  { id: 'global', label: '全局学习', color: '#6b7280' },
-  { id: 'evaluation', label: '练习评测', color: '#ec4899' },
-  { id: 'math', label: '高等数学', color: '#3b82f6' },
-  { id: 'english', label: '英语四级', color: '#10b981' },
-  { id: 'se', label: '软件工程', color: '#f59e0b' },
-  { id: 'os', label: '操作系统', color: '#8b5cf6' }
-])
+const activeContext = ref<TutorContext>('global')
+
+const availableLearningSpaces = computed(() => {
+  const activeSpaces = learningSpaceStore.activeSpaces
+  return activeSpaces.length > 0 ? activeSpaces : learningSpaceStore.spaces
+})
+
+const selectedLearningSpace = computed(() => {
+  if (!selectedSpaceId.value) return null
+  return learningSpaceStore.spaces.find(space => String(space.id) === selectedSpaceId.value) || null
+})
+
+const hasFocusedContext = computed(() => activeContext.value !== 'global')
+
+const contextButtonLabel = computed(() => {
+  if (selectedLearningSpace.value) return selectedLearningSpace.value.name
+  if (activeContext.value === 'space') return '已选择学习空间'
+  if (activeContext.value === 'evaluation') return '练习评测'
+  return '选择学习空间'
+})
+
+const contextButtonTitle = computed(() => {
+  if (selectedLearningSpace.value) return `当前学习空间：${selectedLearningSpace.value.name}`
+  if (activeContext.value === 'evaluation') return '当前上下文：练习评测'
+  return '选择学习空间上下文'
+})
+
+const selectedContextChipText = computed(() => {
+  if (selectedLearningSpace.value) return `当前学习空间：${selectedLearningSpace.value.name}`
+  if (activeContext.value === 'evaluation') return '当前上下文：练习评测'
+  return ''
+})
+
+const selectedContextStyle = computed(() => {
+  if (selectedLearningSpace.value) {
+    return { background: selectedLearningSpace.value.color }
+  }
+  if (activeContext.value === 'evaluation') {
+    return { background: '#ec4899' }
+  }
+  return { background: '#6b7280' }
+})
+
+const formatSpaceType = (type: LearningSpaceType) => {
+  const labelMap: Record<LearningSpaceType, string> = {
+    course: '课程',
+    exam: '考试',
+    project: '项目',
+    career: '职业',
+    competition: '竞赛',
+  }
+  return labelMap[type] || '学习'
+}
+
+const ensureLearningSpacesLoaded = async () => {
+  if (learningSpaceStore.loading || learningSpaceStore.spaces.length > 0) return
+  await learningSpaceStore.fetchSpaces()
+}
+
+const refreshLearningSpaces = async () => {
+  await learningSpaceStore.fetchSpaces()
+  if (learningSpaceStore.error) {
+    ElMessage.error(learningSpaceStore.error)
+    return
+  }
+  ElMessage.success('学习空间列表已刷新')
+}
+
+const selectGlobalContext = () => {
+  activeContext.value = 'global'
+  selectedSpaceId.value = null
+  spaceSelectorVisible.value = false
+  ElMessage.success('已切换到全局学习上下文。总 Agent 将为你统筹所有学习空间。')
+}
+
+const selectEvaluationContext = () => {
+  activeContext.value = 'evaluation'
+  selectedSpaceId.value = null
+  spaceSelectorVisible.value = false
+  ElMessage.success('已切换到"练习评测"模式。测评 Agent 将协助你进行针对性小练与错题攻坚。')
+}
+
+const selectLearningSpace = (spaceId: string, notify = true) => {
+  selectedSpaceId.value = spaceId
+  activeContext.value = 'space'
+  spaceSelectorVisible.value = false
+  if (!notify) return
+
+  const space = learningSpaceStore.spaces.find(item => String(item.id) === spaceId)
+  ElMessage.success(
+    space
+      ? `已切换到"${space.name}"学习空间。空间 Agent 将专注于该领域的解答。`
+      : '已切换到指定学习空间。'
+  )
+}
 
 const switchContext = (ctxId: string) => {
-  activeContext.value = ctxId
-  const ctx = contextOptions.value.find(c => c.id === ctxId)
   if (ctxId === 'global') {
-    ElMessage.success('已切换到全局学习上下文。总 Agent 将为你统筹所有学习空间。')
-  } else if (ctxId === 'evaluation') {
-    ElMessage.success('已切换到"练习评测"模式。测评 Agent 将协助你进行针对性小练与错题攻坚。')
-  } else if (ctx) {
-    ElMessage.success(`已切换到"${ctx.label}"学习空间。空间 Agent 将专注于该领域的解答。`)
+    selectGlobalContext()
+    return
   }
+  if (ctxId === 'evaluation') {
+    selectEvaluationContext()
+    return
+  }
+  selectLearningSpace(ctxId)
 }
 const greetingText = computed(() => {
   const hour = new Date().getHours()
@@ -779,16 +990,21 @@ const greetingText = computed(() => {
 
 // 动态欢迎数据（后续接入 API 后可实时更新）
 const learningSpaceCount = computed(() => {
-  // TODO: 从 learningSpace store 获取真实数量
-  return 4
+  return learningSpaceStore.activeSpaces.length || learningSpaceStore.spaces.length
 })
 const todayAvailableHours = computed(() => {
   // TODO: 从每日计划 API 获取真实数据
   return '2小时30分钟'
 })
 const todayFocusText = computed(() => {
-  // TODO: 从学习计划 API 获取真实重点
-  return '高等数学和软件工程今天是重点，操作系统昨天已完成复习可以暂缓。'
+  if (selectedLearningSpace.value) {
+    return `当前聚焦「${selectedLearningSpace.value.name}」，我会优先围绕这个学习空间回答。`
+  }
+  const focusNames = learningSpaceStore.activeSpaces.slice(0, 2).map(space => space.name)
+  if (focusNames.length > 0) {
+    return `${focusNames.join('和')}今天是重点，你也可以切换到某个学习空间继续深入。`
+  }
+  return '选择一个学习空间后，我会优先围绕该空间回答。'
 })
 
 const welcomeSummary = computed(() => {
@@ -938,8 +1154,14 @@ const autoResize = () => {
   }
 }
 
+const { isListening, voiceUnsupported, toggleVoice, stopVoice } = useVoiceInput(inputMessage, {
+  onUpdate: autoResize,
+  onEnd: () => nextTick(() => inputRef.value?.focus()),
+})
+
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || agentStore.loading) return
+  if (isListening.value) stopVoice()
   if (attachments.value.some(a => a.status === 'processing' || a.status === 'uploading')) {
     ElMessage.warning('附件仍在解析中，请稍后再提问')
     return
@@ -1140,7 +1362,7 @@ const clearAttachmentState = () => {
 }
 
 const handleContextClick = () => {
-  ElMessage.info('上下文设置功能即将上线，敬请期待')
+  void ensureLearningSpacesLoaded()
 }
 
 const removeReference = (ref: RagReference) => {
@@ -1526,6 +1748,12 @@ onMounted(() => {
   isAssistantCollapsed.value = window.innerWidth < 1280
   preloadAvatarAuthInfo()
   agentStore.fetchConversations()
+  ensureLearningSpacesLoaded().then(() => {
+    const routeSpaceId = route.query.spaceId
+    if (typeof routeSpaceId === 'string' && routeSpaceId) {
+      selectLearningSpace(routeSpaceId, false)
+    }
+  })
   if (window.innerWidth < 768) {
     historySidebarOpen.value = false
   }
@@ -2253,6 +2481,225 @@ watch(windowWidth, (newWidth, oldWidth) => {
   color: var(--primary-color);
 }
 
+.context-toolbar-btn {
+  max-width: 180px;
+}
+
+.context-toolbar-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-toolbar-btn.active {
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--primary-color);
+}
+
+:deep(.space-context-popover) {
+  padding: 0;
+  border-radius: 8px;
+}
+
+.space-context-panel {
+  padding: 10px;
+}
+
+.space-context-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 8px;
+}
+
+.space-context-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.space-context-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.space-context-refresh svg {
+  width: 14px;
+  height: 14px;
+}
+
+.space-context-refresh:hover {
+  background: #f1f5f9;
+  color: var(--primary-color);
+}
+
+.space-context-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.space-context-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.space-context-option:hover {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.space-context-option.active {
+  background: rgba(11, 183, 170, 0.08);
+  border-color: rgba(11, 183, 170, 0.25);
+}
+
+.space-option-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.space-option-icon.global {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.space-option-icon.evaluation {
+  background: #fce7f3;
+  color: #db2777;
+}
+
+.space-option-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.space-option-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.space-option-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.space-option-check {
+  flex: 0 0 auto;
+  color: var(--primary-color);
+  font-weight: 800;
+}
+
+.space-context-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: #eef2f7;
+}
+
+.space-context-loading,
+.space-context-empty {
+  padding: 16px 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.selected-space-strip {
+  display: flex;
+  padding: 6px 10px 0;
+}
+
+.selected-space-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid rgba(11, 183, 170, 0.2);
+  border-radius: 8px;
+  background: rgba(11, 183, 170, 0.08);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.selected-space-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.selected-space-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-space-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.selected-space-clear svg {
+  width: 12px;
+  height: 12px;
+}
+
+.selected-space-clear:hover {
+  background: rgba(11, 183, 170, 0.12);
+  color: var(--primary-color);
+}
+
 .attachment-strip {
   display: flex;
   flex-wrap: wrap;
@@ -2402,6 +2849,33 @@ watch(windowWidth, (newWidth, oldWidth) => {
 .stop-action:hover {
   background: #dc2626;
   transform: scale(1.05);
+}
+
+.mic-action {
+  background: transparent;
+  color: #64748b;
+  margin-right: 6px;
+}
+
+.mic-action:hover:not(:disabled) {
+  color: var(--primary-color);
+  background: rgba(11, 183, 170, 0.1);
+}
+
+.mic-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mic-action.listening {
+  color: white;
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  animation: micPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
 }
 
 .composer-footer {

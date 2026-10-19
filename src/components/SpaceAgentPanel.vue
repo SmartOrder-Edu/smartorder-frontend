@@ -1,292 +1,448 @@
 <template>
-  <div class="space-agent-panel">
-    <!-- Toggle button (mobile) -->
-    <button class="agent-toggle-fab" @click="open = !open" v-if="!open">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
-        <circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-        <line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>
-      </svg>
-    </button>
+  <aside class="agent-sidebar" ref="panelRef" :class="{ highlighted: isHighlighted }">
+    <!-- Header -->
+    <div class="as-header">
+      <div class="as-avatar">
+        <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+          <path d="M483.002182 188.043636h51.2v114.036364H483.002182z" fill="#40e3c2"/>
+          <path d="M510.929455 143.825455m-128 0a128 128 0 1 0 256 0 128 128 0 1 0-256 0Z" fill="#40e3c2"/>
+          <path d="M679.098182 301.963636c139.636364 13.963636 223.418182 79.127273 253.672727 197.818182 46.545455 179.2 34.909091 267.636364 32.581818 283.927273-2.327273 18.618182-30.254545 123.345455-160.581818 174.545454-83.781818 32.581818-172.218182 55.854545-293.236364 53.527273v-535.272727 535.272727c-116.363636 2.327273-204.8-18.618182-286.254545-48.872727l-9.309091-4.654546c-130.327273-53.527273-158.254545-158.254545-160.581818-174.545454-4.654545-16.290909-13.963636-104.727273 30.254545-283.927273 30.254545-118.690909 114.036364-186.181818 251.345455-200.145454 37.236364-2.327273 93.090909-6.981818 172.218182-6.981819h9.309091c74.472727 0 128 4.654545 160.581818 9.309091z" fill="#C5C5C5"/>
+          <path d="M139.170909 723.2c0 2.327273 0 2.327273 0 0 0 4.654545 2.327273 6.981818 2.327273 9.309091 4.654545 9.309091 9.309091 16.290909 16.290909 25.6 18.618182 23.272727 46.545455 44.218182 83.781818 58.181818l4.654546 2.327273 4.654545 2.327273c53.527273 18.618182 107.054545 30.254545 165.236364 37.236363 58.181818 4.654545 123.345455 4.654545 183.854545 0 58.181818-4.654545 111.709091-18.618182 165.236364-37.236363l4.654545-2.327273c41.890909-13.963636 69.818182-34.909091 88.436364-60.509091 6.981818-9.309091 11.636364-18.618182 16.290909-25.6 0-2.327273 2.327273-4.654545 2.327273-6.981818v-2.327273c0-2.327273 0-6.981818 2.327272-11.636364v-2.327272-39.563637c-2.327273-44.218182-13.963636-97.745455-32.581818-162.909091-18.618182-74.472727-72.145455-111.709091-174.545454-121.018121-53.527273-4.654545-93.090909-6.981818-148.945455-6.981819H502.225455c-58.181818 0-97.745455 2.327273-155.927273 6.981819-102.4 9.309091-153.6 46.545455-174.545455 118.690909-18.618182 65.163636-27.927273 118.690909-32.581818 162.909091 0 16.290909-2.327273 30.254545 0 39.563636v16.290909z" fill="#14254E"/>
+          <path d="M509.207273 695.272727c-27.927273 0-55.854545 11.636364-55.854546 20.945455s11.636364 39.563636 55.854546 39.563636c41.890909 0 51.2-23.272727 55.854545-39.563636 0-13.963636-27.927273-20.945455-55.854545-20.945455z" fill="#40E3C2"/>
+          <path d="M295.936 578.373818a72.145455 53.527273 90 1 0 107.054545 0 72.145455 53.527273 90 1 0-107.054545 0Z" fill="#40E3C2"/>
+          <path d="M617.099636 578.373818a72.145455 53.527273 90 1 0 107.054546 0 72.145455 53.527273 90 1 0-107.054546 0Z" fill="#40E3C2"/>
+        </svg>
+        <span class="as-status-dot"></span>
+      </div>
+      <div class="as-header-info">
+        <span class="as-agent-name">Space Agent</span>
+        <span class="as-agent-status">{{ agentStatusLabel }}</span>
+      </div>
+    </div>
 
-    <!-- Panel overlay (mobile) -->
-    <div class="agent-overlay" v-if="open && isMobile" @click="open = false"></div>
+    <!-- Context-aware guidance -->
+    <div class="as-context">
+      <p class="as-context-text">{{ contextMessage }}</p>
+    </div>
 
-    <!-- Panel content -->
-    <aside class="agent-panel" :class="{ open, mobile: isMobile, 'log-expanded': logExpanded }">
-      <div class="panel-header">
-        <div class="panel-header-left">
-          <div class="agent-avatar">
-            <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
-              <path d="M483.002182 188.043636h51.2v114.036364H483.002182z" fill="#40e3c2"/>
-              <path d="M510.929455 143.825455m-128 0a128 128 0 1 0 256 0 128 128 0 1 0-256 0Z" fill="#40e3c2"/>
-              <path d="M475.83125977 148.45865723v5.05620769h37.07885744v11.79781821h-16.8540259v23.59563642h16.8540259v11.79781817h-16.8540259V207.44774823l8.42701331 28.65184483h8.42701259v10.1124154h-15.16862307l-5.05620773-20.22483152L485.94367591 246.21200846H469.08964929v-11.7978182h11.79781818L485.94367591 207.44774823v-8.42701259H469.08964929v-11.79781893h18.5394287V163.62728031h-15.1686231L465.71884437 156.88566981v-8.42701258h10.1124154z m82.58472817 3.37080486v82.58472817l-10.1124154 11.79781822H519.65172773V151.82946209h38.76426021z m-11.79781819 11.79781822h-16.85402591v70.78690995h16.85402591V163.62728031z" fill="#40e3c2"/>
-              <path d="M679.098182 301.963636c139.636364 13.963636 223.418182 79.127273 253.672727 197.818182 46.545455 179.2 34.909091 267.636364 32.581818 283.927273-2.327273 18.618182-30.254545 123.345455-160.581818 174.545454-83.781818 32.581818-172.218182 55.854545-293.236364 53.527273v-535.272727 535.272727c-116.363636 2.327273-204.8-18.618182-286.254545-48.872727l-9.309091-4.654546c-130.327273-53.527273-158.254545-158.254545-160.581818-174.545454-4.654545-16.290909-13.963636-104.727273 30.254545-283.927273 30.254545-118.690909 114.036364-186.181818 251.345455-200.145454 37.236364-2.327273 93.090909-6.981818 172.218182-6.981819h9.309091c74.472727 0 128 4.654545 160.581818 9.309091z" fill="#C5C5C5"/>
-              <path d="M139.170909 723.2c0 2.327273 0 2.327273 0 0 0 4.654545 2.327273 6.981818 2.327273 9.309091 4.654545 9.309091 9.309091 16.290909 16.290909 25.6 18.618182 23.272727 46.545455 44.218182 83.781818 58.181818l4.654546 2.327273 4.654545 2.327273c53.527273 18.618182 107.054545 30.254545 165.236364 37.236363 58.181818 4.654545 123.345455 4.654545 183.854545 0 58.181818-4.654545 111.709091-18.618182 165.236364-37.236363l4.654545-2.327273c41.890909-13.963636 69.818182-34.909091 88.436364-60.509091 6.981818-9.309091 11.636364-18.618182 16.290909-25.6 0-2.327273 2.327273-4.654545 2.327273-6.981818v-2.327273c0-2.327273 0-6.981818 2.327272-11.636364v-2.327272-39.563637c-2.327273-44.218182-13.963636-97.745455-32.581818-162.909091-18.618182-74.472727-72.145455-111.709091-174.545454-121.018181-53.527273-4.654545-93.090909-6.981818-148.945455-6.981819H502.225455c-58.181818 0-97.745455 2.327273-155.927273 6.981819-102.4 9.309091-153.6 46.545455-174.545455 118.690909-18.618182 65.163636-27.927273 118.690909-32.581818 162.909091 0 16.290909-2.327273 30.254545 0 39.563636v16.290909z" fill="#14254E"/>
-              <path d="M509.207273 695.272727c-27.927273 0-55.854545 11.636364-55.854546 20.945455s11.636364 39.563636 55.854546 39.563636c41.890909 0 51.2-23.272727 55.854545-39.563636 0-13.963636-27.927273-20.945455-55.854545-20.945455z" fill="#40E3C2"/>
-              <path d="M295.936 578.373818a72.145455 53.527273 90 1 0 107.054545 0 72.145455 53.527273 90 1 0-107.054545 0Z" fill="#40E3C2"/>
-              <path d="M617.099636 578.373818a72.145455 53.527273 90 1 0 107.054546 0 72.145455 53.527273 90 1 0-107.054546 0Z" fill="#40E3C2"/>
-            </svg>
-          </div>
+    <!-- Thinking flow -->
+    <div class="as-section" v-if="decisionSteps && decisionSteps.length">
+      <span class="as-section-label">Agent 思考</span>
+      <div class="as-thinking-flow">
+        <div
+          v-for="(step, index) in decisionSteps"
+          :key="step.label"
+          class="as-thinking-step"
+          :class="step.status"
+          :style="{ '--thinking-delay': `${index * 95}ms` }"
+        >
+          <span class="as-thinking-dot"></span>
           <div>
-            <span class="panel-title">Space Agent</span>
-            <span class="panel-subtitle">在线 · {{ spaceName }}</span>
+            <strong>{{ step.label }}</strong>
+            <em>{{ step.detail }}</em>
           </div>
         </div>
-        <button class="panel-close" v-if="isMobile" @click="open = false">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="as-section">
+      <span class="as-section-label">快捷操作</span>
+      <div class="as-quick-actions">
+        <button
+          v-for="q in currentQuickActions"
+          :key="q.label"
+          class="as-quick-btn"
+          @click="$emit('quickAction', q.label)"
+        >
+          <span class="as-quick-icon" v-html="q.icon"></span>
+          <span class="as-quick-label">{{ q.label }}</span>
         </button>
       </div>
+    </div>
 
-      <!-- Agent insight -->
-      <div class="panel-insight" v-if="insight">
-        <p>{{ insight }}</p>
-      </div>
-
-      <!-- Quick actions -->
-      <div class="panel-quick-actions">
-        <button class="quick-action-btn" v-for="q in quickActions" :key="q.label" @click="$emit('quickAction', q.label)">
-          <span v-html="q.icon"></span>
-          {{ q.label }}
-        </button>
-      </div>
-
-      <!-- Chat messages -->
-      <div class="panel-chat" ref="chatContainer">
-        <div class="chat-messages" v-if="messages.length">
-          <div v-for="(msg, i) in messages" :key="i" class="chat-msg" :class="msg.role">
-            <div class="msg-content">
-              <p>{{ msg.text }}</p>
-              <!-- Action buttons from agent -->
-              <div class="msg-actions" v-if="msg.actions && msg.actions.length">
-                <button
-                  v-for="act in msg.actions"
-                  :key="act.label"
-                  class="msg-action-btn"
-                  :class="act.variant || 'default'"
-                  @click="$emit('agentAction', act)"
-                >
-                  {{ act.label }}
-                </button>
-              </div>
+    <!-- Chat messages -->
+    <div class="as-chat" ref="chatContainer">
+      <span class="as-section-label">对话</span>
+      <div class="as-chat-messages" v-if="messages.length">
+        <div v-for="(msg, i) in messages" :key="i" class="as-chat-msg" :class="msg.role">
+          <div class="as-msg-content">
+            <MarkdownRenderer v-if="msg.role === 'agent'" class="as-msg-markdown" :content="msg.text" />
+            <p v-else>{{ msg.text }}</p>
+            <div class="as-msg-actions" v-if="msg.actions && msg.actions.length">
+              <button
+                v-for="act in msg.actions"
+                :key="act.label"
+                class="as-msg-action-btn"
+                :class="act.variant || 'default'"
+                @click="$emit('agentAction', act)"
+              >
+                {{ act.label }}
+              </button>
             </div>
           </div>
         </div>
-        <div class="chat-empty" v-else>
-          <p>向 Agent 提问或点击快捷按钮</p>
-        </div>
       </div>
+      <div class="as-chat-empty" v-else>
+        <p>按 <kbd>Ctrl K</kbd> 或在底部命令栏向 Agent 提问</p>
+      </div>
+    </div>
 
-      <!-- Chat input -->
-      <div class="panel-input">
-        <input
-          v-model="input"
-          class="chat-input"
-          placeholder="输入问题..."
-          @keyup.enter="sendMessage"
-        />
-        <button class="chat-send" @click="sendMessage" :disabled="!input.trim()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/>
-          </svg>
-        </button>
+    <!-- Agent action log (collapsible) -->
+    <div class="as-log" :class="{ expanded: logExpanded }" v-if="agentActions && agentActions.length">
+      <button class="as-log-toggle" @click="logExpanded = !logExpanded">
+        <svg class="as-log-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12">
+          <polyline points="9 6 15 12 9 18"/>
+        </svg>
+        <span>Agent 操作日志</span>
+        <span class="as-log-count">{{ agentActions.length }}</span>
+      </button>
+      <div class="as-log-body" v-show="logExpanded">
+        <AgentActionLog :actions="agentActions" />
       </div>
-
-      <!-- Agent action log -->
-      <div class="panel-log" :class="{ expanded: logExpanded }" v-if="agentActions && agentActions.length">
-        <button class="log-header-btn" @click="logExpanded = !logExpanded">
-          <svg class="log-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="9 6 15 12 9 18"/></svg>
-          <span class="log-header-title">Agent 操作日志</span>
-          <span class="log-count-badge">{{ agentActions.length }}</span>
-        </button>
-        <div class="log-expanded-body" v-show="logExpanded">
-          <AgentActionLog :actions="agentActions" />
-        </div>
-      </div>
-    </aside>
-  </div>
+    </div>
+  </aside>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { agentApi } from '@/api/agent'
+import { refreshAccessToken } from '@/api/request'
 import type { AgentActionVO } from '@/types/learningSpace'
+import MarkdownRenderer from './MarkdownRenderer.vue'
 import AgentActionLog from './AgentActionLog.vue'
 
 interface ChatMessage {
   role: 'user' | 'agent'
   text: string
   actions?: { label: string; variant?: string }[]
+  replyId?: string
+  streaming?: boolean
+}
+
+interface DecisionStep {
+  label: string
+  detail: string
+  status: string
 }
 
 const props = defineProps<{
+  spaceId?: string
   spaceName?: string
   insight?: string
   agentActions?: AgentActionVO[]
+  decisionSteps?: DecisionStep[]
+  activeTab?: string
 }>()
 
 const emit = defineEmits<{
   quickAction: [label: string]
   agentAction: [action: { label: string; variant?: string }]
   sendMessage: [text: string]
+  agentReply: [message: ChatMessage]
 }>()
 
-const open = ref(false)
-const isMobile = ref(window.innerWidth <= 1024)
-const input = ref('')
 const messages = ref<ChatMessage[]>([])
+const panelRef = ref<HTMLElement>()
 const chatContainer = ref<HTMLElement>()
 const logExpanded = ref(false)
+const isHighlighted = ref(false)
+const isStreaming = ref(false)
+const conversationId = ref('')
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+let abortController: AbortController | null = null
 
-const quickActions = [
-  { label: '我在哪里薄弱？', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' },
-  { label: '调整我的计划', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>' },
-  { label: '生成测试题', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' },
-  { label: '推荐学习资源', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
+// Context-aware content
+const contextLabel = computed(() => {
+  const labels: Record<string, string> = {
+    today: '正在分析今日任务',
+    plan: '正在审视学习计划',
+    path: '正在跟踪学习路径',
+    resources: '正在匹配学习资源',
+    records: '正在回顾学习记录',
+    insight: '正在洞察学习数据',
+  }
+  return labels[props.activeTab || ''] || '在线 · 守护学习中'
+})
+
+const agentStatusLabel = computed(() => {
+  return isStreaming.value ? '正在生成回答...' : contextLabel.value
+})
+
+const contextMessage = computed(() => {
+  const messages: Record<string, string> = {
+    today: '当前是今日任务视图。我根据你的薄弱点和进度安排了这些任务，优先处理标记为"高优"的项。',
+    plan: '这是你的个性化学习计划。我会根据你的掌握度动态调整每个阶段的节奏。',
+    path: '这是你的知识学习路径。绿色节点已掌握，带⚠标记的节点需要重点关注。',
+    resources: '我根据你的学习进度推荐这些资源。点击"生成资源包"可让 Agent 为你定制学习材料。',
+    records: '这是你的学习记录。连续学习是提升效果的关键，保持当前节奏。',
+    insight: '这是你的学情洞察报告。我通过分析你的学习行为、测评结果和专注度变化来生成这些建议。',
+  }
+  return messages[props.activeTab || ''] || messages.today
+})
+
+const baseQuickActions = [
+  { label: '薄弱分析', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' },
+  { label: '调整计划', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>' },
+  { label: '生成测试', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' },
+  { label: '推荐资源', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
 ]
 
-function sendMessage() {
-  const text = input.value.trim()
-  if (!text) return
-  messages.value.push({ role: 'user', text })
-  input.value = ''
-  emit('sendMessage', text)
+const tabQuickActions: Record<string, typeof baseQuickActions> = {
+  today: [
+    { label: '调整今日安排', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>' },
+    { label: '薄弱分析', icon: baseQuickActions[0].icon },
+    { label: '生成测试', icon: baseQuickActions[2].icon },
+    { label: '调整计划', icon: baseQuickActions[1].icon },
+  ],
+  plan: [
+    { label: '调整计划', icon: baseQuickActions[1].icon },
+    { label: '查看路径', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' },
+    { label: '薄弱分析', icon: baseQuickActions[0].icon },
+    { label: '推荐资源', icon: baseQuickActions[3].icon },
+  ],
+  path: [
+    { label: '节点详情', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' },
+    { label: '生成脚本', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>' },
+    { label: '薄弱分析', icon: baseQuickActions[0].icon },
+    { label: '推荐资源', icon: baseQuickActions[3].icon },
+  ],
+  resources: [
+    { label: '生成资源包', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' },
+    { label: '推荐资源', icon: baseQuickActions[3].icon },
+    { label: '生成测试', icon: baseQuickActions[2].icon },
+    { label: '薄弱分析', icon: baseQuickActions[0].icon },
+  ],
+  records: [
+    { label: '薄弱分析', icon: baseQuickActions[0].icon },
+    { label: '调整计划', icon: baseQuickActions[1].icon },
+    { label: '生成测试', icon: baseQuickActions[2].icon },
+    { label: '推荐资源', icon: baseQuickActions[3].icon },
+  ],
+  insight: [
+    { label: '调整计划', icon: baseQuickActions[1].icon },
+    { label: '薄弱分析', icon: baseQuickActions[0].icon },
+    { label: '生成测试', icon: baseQuickActions[2].icon },
+    { label: '推荐资源', icon: baseQuickActions[3].icon },
+  ],
+}
 
-  // Simulate Agent response (replace with SSE streaming)
-  setTimeout(() => {
-    messages.value.push({
-      role: 'agent',
-      text: mockAgentResponse(text),
-      actions: text.includes('薄弱') || text.includes('错题')
-        ? [{ label: '开始练习', variant: 'primary' }, { label: '查看报告', variant: 'default' }]
-        : text.includes('测试')
-          ? [{ label: '开始测试', variant: 'primary' }]
-          : undefined,
-    })
-    nextTick(() => {
-      if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-    })
-  }, 600)
+const currentQuickActions = computed(() => {
+  return tabQuickActions[props.activeTab || ''] || tabQuickActions.today
+})
 
+function buildStudyContext(userMessage: string): Record<string, unknown> {
+  return {
+    source: 'learning_space_sidebar',
+    spaceId: props.spaceId,
+    spaceName: props.spaceName,
+    activeTab: props.activeTab,
+    activeTabLabel: contextLabel.value,
+    agentInsight: props.insight,
+    pageHint: contextMessage.value,
+    userMessage,
+  }
+}
+
+function buildAgentActions(question: string): ChatMessage['actions'] {
+  if (question.includes('薄弱') || question.includes('错题')) {
+    return [{ label: '开始练习', variant: 'primary' }, { label: '查看报告', variant: 'default' }]
+  }
+  if (question.includes('测试') || question.includes('题')) {
+    return [{ label: '开始测试', variant: 'primary' }]
+  }
+  if (question.includes('计划') || question.includes('安排')) {
+    return [{ label: '查看计划', variant: 'primary' }, { label: '调整任务', variant: 'default' }]
+  }
+  if (question.includes('资源') || question.includes('资料') || question.includes('导图')) {
+    return [{ label: '生成资源', variant: 'primary' }]
+  }
+  return undefined
+}
+
+function scrollChatToBottom() {
   nextTick(() => {
     if (chatContainer.value) chatContainer.value.scrollTop = chatContainer.value.scrollHeight
   })
 }
 
-function openPanel() {
-  open.value = true
-}
+async function receiveMessage(text: string) {
+  const trimmed = text.trim()
+  if (!trimmed || isStreaming.value) return
 
-function mockAgentResponse(question: string): string {
-  if (question.includes('薄弱')) return '根据最近的学习记录，你在**洛必达法则适用条件**上错误率较高（正确率42%），其次是**无穷小阶数比较**。建议优先完成洛必达法则专项练习。'
-  if (question.includes('测试')) return '已为你生成10道极限与连续的综合测试题，涵盖洛必达法则、极限运算、连续性判定。'
-  if (question.includes('计划')) return '建议将今天的任务调整为：1.洛必达法则专项练习（25分钟）2.连续与间断预习（20分钟）。高数空间当前进度正常，无需调整整体计划。'
-  return '收到你的问题。我会结合学习数据和你的个人画像给出针对性建议。'
-}
+  focusPanel()
+  messages.value.push({ role: 'user', text: trimmed })
+  const replyId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const agentMessage: ChatMessage = { role: 'agent', text: '正在思考...', replyId, streaming: true }
+  messages.value.push(agentMessage)
+  emit('sendMessage', trimmed)
+  emit('agentReply', { ...agentMessage })
+  scrollChatToBottom()
 
-function onResize() {
-  isMobile.value = window.innerWidth <= 1024
-}
+  let token: string
+  try {
+    token = await refreshAccessToken()
+  } catch {
+    agentMessage.text = '登录状态已失效，请重新登录后再试。'
+    agentMessage.streaming = false
+    emit('agentReply', { ...agentMessage })
+    scrollChatToBottom()
+    return
+  }
 
-onMounted(() => {
-  window.addEventListener('resize', onResize)
-  open.value = !isMobile.value
-})
+  isStreaming.value = true
+  abortController = new AbortController()
+  let answerText = ''
 
-onUnmounted(() => {
-  window.removeEventListener('resize', onResize)
-})
+  try {
+    await fetchEventSource(agentApi.chatStreamUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        message: trimmed,
+        conversationId: conversationId.value || undefined,
+        studyContext: buildStudyContext(trimmed),
+      }),
+      openWhenHidden: true,
+      signal: abortController.signal,
 
-defineExpose({
-  open: openPanel,
-})
-</script>
+      onmessage(event) {
+        if (!event.data) return
 
-<script lang="ts">
-export default { name: 'SpaceAgentPanel' }
-</script>
+        if (event.event === 'done') {
+          let donePayload: any = null
+          try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
+          if (donePayload?.conversationId) {
+            conversationId.value = donePayload.conversationId
+          }
+          const finalText = answerText.trim() || donePayload?.clarificationPayload?.question || '已处理完成。'
+          agentMessage.text = finalText
+          agentMessage.actions = buildAgentActions(trimmed)
+          agentMessage.streaming = false
+          isStreaming.value = false
+          abortController = null
+          emit('agentReply', { ...agentMessage })
+          scrollChatToBottom()
+          return
+        }
 
-<style scoped lang="scss">
-.space-agent-panel {
-  // Container for positioning
-}
+        try {
+          const data = JSON.parse(event.data)
+          if (data?.conversationId) {
+            conversationId.value = data.conversationId
+          }
+          if (data?.payload?.text) {
+            answerText += data.payload.text
+            agentMessage.text = answerText
+            emit('agentReply', { ...agentMessage })
+            scrollChatToBottom()
+          }
+        } catch {
+          // ignore non-JSON SSE payloads
+        }
+      },
 
-.agent-toggle-fab {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #0bb7aa, #0284c7);
-  border: none;
-  color: white;
-  cursor: pointer;
-  box-shadow: 0 14px 28px rgba(11, 183, 170, 0.28);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 90;
-  transition: transform 0.2s;
-
-  &:hover { transform: scale(1.05); }
-}
-
-.agent-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  z-index: 95;
-}
-
-.agent-panel {
-  width: 340px;
-  background: var(--color-card-bg);
-  backdrop-filter: blur(16px);
-  border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: calc(100vh - 120px);
-  position: sticky;
-  top: 100px;
-  overflow: hidden;
-  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.08);
-
-  &.mobile {
-    position: fixed;
-    top: auto;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    max-height: 80vh;
-    border-radius: 20px 20px 0 0;
-    z-index: 96;
-    transform: translateY(100%);
-    transition: transform 0.3s ease;
-
-    &.open { transform: translateY(0); }
+      onerror(err) {
+        console.error('[SpaceAgentPanel] SSE error:', err)
+        agentMessage.text = answerText
+          ? `${answerText}\n\n*[连接中断]*`
+          : '*[连接中断，请重试]*'
+        agentMessage.streaming = false
+        isStreaming.value = false
+        abortController = null
+        emit('agentReply', { ...agentMessage })
+        scrollChatToBottom()
+        throw err
+      },
+    })
+  } catch (err: any) {
+    if (err?.name !== 'AbortError') {
+      console.error('[SpaceAgentPanel] fetch error:', err)
+      if (!answerText) {
+        agentMessage.text = '*[连接失败，请稍后重试]*'
+      }
+      agentMessage.streaming = false
+      emit('agentReply', { ...agentMessage })
+      scrollChatToBottom()
+    }
+    isStreaming.value = false
+    abortController = null
   }
 }
 
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 16px 2px;
+function focusPanel() {
+  panelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  isHighlighted.value = true
+  if (highlightTimer) {
+    clearTimeout(highlightTimer)
+  }
+  highlightTimer = setTimeout(() => {
+    isHighlighted.value = false
+    highlightTimer = null
+  }, 1200)
 }
 
-.panel-header-left {
+// Watch activeTab to reset context message display
+watch(() => props.activeTab, () => {
+  // messages stay - they're the conversation history
+})
+
+onUnmounted(() => {
+  if (highlightTimer) {
+    clearTimeout(highlightTimer)
+  }
+  if (abortController) {
+    abortController.abort()
+    abortController = null
+  }
+})
+
+defineExpose({
+  receiveMessage,
+  focusPanel,
+})
+</script>
+
+<style scoped lang="scss">
+.agent-sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(100vh - 120px);
+  position: sticky;
+  top: 100px;
+  padding: 16px;
+  background: var(--color-card-bg);
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.agent-sidebar.highlighted {
+  border-color: rgba(11, 183, 170, 0.48);
+  box-shadow:
+    0 0 0 4px rgba(11, 183, 170, 0.1),
+    0 18px 46px rgba(11, 183, 170, 0.14);
+}
+
+/* ===== Header ===== */
+.as-header {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.agent-avatar {
-  width: 38px;
-  height: 38px;
+.as-avatar {
+  position: relative;
+  width: 40px;
+  height: 40px;
   border-radius: 13px;
   background: linear-gradient(135deg, #0bb7aa, #0284c7);
   display: flex;
@@ -294,267 +450,367 @@ export default { name: 'SpaceAgentPanel' }
   justify-content: center;
   color: white;
   box-shadow: 0 10px 20px rgba(11, 183, 170, 0.22);
+  flex-shrink: 0;
 }
 
-.panel-title {
+.as-status-dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid white;
+}
+
+.as-header-info {
+  min-width: 0;
+}
+
+.as-agent-name {
   display: block;
-  font-size: 0.875rem;
+  font-size: 0.9rem;
   font-weight: 800;
   color: #0f172a;
+  line-height: 1.3;
 }
 
-.panel-subtitle {
-  font-size: 0.6875rem;
+.as-agent-status {
+  font-size: 0.7rem;
   color: #64748b;
 }
 
-.panel-close {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: none;
-  background: #f3f4f6;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280;
+/* ===== Context Message ===== */
+.as-context {
+  padding: 12px 13px;
+  background: linear-gradient(135deg, #ecfdfb, #f0f9ff);
+  border-radius: 13px;
+  border: 1px solid rgba(11, 183, 170, 0.16);
+  border-left: 3px solid #0bb7aa;
 }
 
-.panel-insight {
-  padding: 0 16px;
-
-  p {
-    font-size: 0.8125rem;
-    color: #334155;
-    line-height: 1.6;
-    margin: 0;
-    padding: 12px 13px;
-    background: linear-gradient(135deg, #ecfdfb, #f8fafc);
-    border-radius: 13px;
-    border: 1px solid rgba(11, 183, 170, 0.16);
-    border-left: 3px solid #0bb7aa;
-  }
-}
-
-.panel-quick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 16px;
-}
-
-.quick-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: var(--color-card-bg-secondary);
-  font-size: 0.75rem;
+.as-context-text {
+  margin: 0;
+  font-size: 0.78rem;
   color: #334155;
-  cursor: pointer;
-  transition: all 0.15s;
-
-  &:hover {
-    border-color: rgba(11, 183, 170, 0.32);
-    color: #0a9e94;
-    background: #ecfdfb;
-  }
+  line-height: 1.6;
 }
 
-.panel-chat {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 16px;
-  min-height: 130px;
-  max-height: 240px;
-}
-
-.chat-messages {
+/* ===== Section Label ===== */
+.as-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
-.chat-msg {
-  &.user .msg-content {
+.as-section-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ===== Thinking Flow ===== */
+.as-thinking-flow {
+  display: grid;
+  gap: 6px;
+}
+
+.as-thinking-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  align-items: flex-start;
+  padding: 7px 10px;
+  border-radius: 11px;
+  background: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  animation: thinkingStepIn 0.38s ease both;
+  animation-delay: var(--thinking-delay);
+
+  strong {
+    display: block;
+    color: #0f172a;
+    font-size: 0.72rem;
+    line-height: 1.3;
+  }
+
+  em {
+    display: -webkit-box;
+    margin-top: 2px;
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.64rem;
+    font-style: normal;
+    line-height: 1.3;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  &.active {
+    background: linear-gradient(135deg, #ecfdfb, #f0f9ff);
+    border-color: rgba(11, 183, 170, 0.22);
+  }
+
+  &.warn .as-thinking-dot {
+    background: #f59e0b;
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+  }
+
+  &.pending {
+    opacity: 0.65;
+  }
+}
+
+.as-thinking-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: #0bb7aa;
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.12);
+  flex-shrink: 0;
+}
+
+@keyframes thinkingStepIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ===== Quick Actions ===== */
+.as-quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.as-quick-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: var(--color-card-bg-secondary);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+
+  &:hover {
+    border-color: rgba(11, 183, 170, 0.3);
+    background: #ecfdfb;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(11, 183, 170, 0.08);
+  }
+}
+
+.as-quick-icon {
+  display: flex;
+  align-items: center;
+  color: #0a9e94;
+  flex-shrink: 0;
+}
+
+.as-quick-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== Chat ===== */
+.as-chat {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 100px;
+  max-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.as-chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.as-chat-msg {
+  &.user .as-msg-content {
     background: linear-gradient(135deg, #ecfdfb, #e0f2fe);
     border-radius: 12px 12px 4px 12px;
     color: #075985;
-    margin-left: 24px;
+    margin-left: 20px;
   }
 
-  &.agent .msg-content {
+  &.agent .as-msg-content {
     background: #f8fafc;
     border-radius: 12px 12px 12px 4px;
-    margin-right: 24px;
-    border: 1px solid rgba(148, 163, 184, 0.14);
+    margin-right: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.12);
   }
 }
 
-.msg-content {
-  padding: 8px 12px;
-  font-size: 0.8125rem;
+.as-msg-content {
+  padding: 7px 11px;
+  font-size: 0.78rem;
   line-height: 1.5;
 
   p { margin: 0; }
 }
 
-.msg-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px;
+.as-msg-markdown {
+  color: inherit;
+  font-size: 0.78rem;
+  line-height: 1.55;
 }
 
-.msg-action-btn {
-  padding: 4px 12px;
+.as-msg-markdown :deep(p) {
+  margin: 0 0 0.55em;
+}
+
+.as-msg-markdown :deep(p:last-child),
+.as-msg-markdown :deep(ul:last-child),
+.as-msg-markdown :deep(ol:last-child),
+.as-msg-markdown :deep(pre:last-child) {
+  margin-bottom: 0;
+}
+
+.as-msg-markdown :deep(ul),
+.as-msg-markdown :deep(ol) {
+  margin: 0.3em 0 0.65em;
+  padding-left: 1.15em;
+}
+
+.as-msg-markdown :deep(li) {
+  margin: 0.16em 0;
+}
+
+.as-msg-markdown :deep(code:not(pre code)) {
+  padding: 0.1em 0.32em;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f766e;
+  font-size: 0.84em;
+}
+
+.as-msg-markdown :deep(pre),
+.as-msg-markdown :deep(.code-block-wrapper) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.as-msg-actions {
+  display: flex;
+  gap: 5px;
+  margin-top: 7px;
+  flex-wrap: wrap;
+}
+
+.as-msg-action-btn {
+  padding: 3px 10px;
   border-radius: 99px;
   border: 1px solid #e5e7eb;
   background: white;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
 
-  &.primary { background: #0bb7aa; border-color: transparent; color: white; }
-  &.default:hover { border-color: #0bb7aa; color: #0a9e94; }
+  &.primary {
+    background: #0bb7aa;
+    border-color: transparent;
+    color: white;
+    &:hover { opacity: 0.9; }
+  }
+
+  &.default:hover {
+    border-color: #0bb7aa;
+    color: #0a9e94;
+  }
 }
 
-.chat-empty {
-  padding: 20px 0;
+.as-chat-empty {
+  padding: 12px 0;
   text-align: center;
 
-  p { font-size: 0.8125rem; color: #9ca3af; margin: 0; }
-}
-
-.panel-input {
-  display: flex;
-  gap: 6px;
-  padding: 2px 16px 16px;
-}
-
-.chat-input {
-  flex: 1;
-  padding: 8px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  font-size: 0.8125rem;
-  color: #334155;
-  background: #f8fafc;
-  outline: none;
-  transition: border-color 0.15s;
-
-  &:focus {
-    border-color: #0bb7aa;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.1);
+  p {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin: 0;
   }
 }
 
-.chat-send {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  border: none;
-  background: linear-gradient(135deg, #0bb7aa, #0284c7);
-  color: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: opacity 0.15s;
-
-  &:disabled { opacity: 0.4; cursor: default; }
-  &:not(:disabled):hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 18px rgba(11, 183, 170, 0.2);
-  }
-}
-
-.panel-log {
-  padding: 10px 16px 16px;
-  border-top: 1px solid rgba(148, 163, 184, 0.14);
+/* ===== Action Log ===== */
+.as-log {
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+  padding-top: 8px;
 
   &.expanded {
-    flex: 1 1 240px;
-    min-height: 240px;
+    flex: 1 1 200px;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 }
 
-.log-header-btn {
+.as-log-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   width: 100%;
-  padding: 4px 2px;
+  padding: 3px 0;
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
   color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 
+  span { flex: 1; text-align: left; }
+
   &:hover { color: #0a9e94; }
 }
 
-.log-caret {
+.as-log-caret {
   flex-shrink: 0;
   transition: transform 0.2s;
 }
 
-.panel-log.expanded .log-caret { transform: rotate(90deg); }
+.as-log.expanded .as-log-caret { transform: rotate(90deg); }
 
-.log-header-title {
-  flex: 1;
-  text-align: left;
-}
-
-.log-count-badge {
-  font-size: 0.6875rem;
+.as-log-count {
+  font-size: 0.65rem;
   font-weight: 700;
   color: #0bb7aa;
   background: #ecfdfb;
-  padding: 1px 8px;
+  padding: 1px 7px;
   border-radius: 99px;
-  min-width: 20px;
-  text-align: center;
   text-transform: none;
   letter-spacing: 0;
 }
 
-.log-expanded-body {
+.as-log-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
-// hide AgentActionLog's own title to avoid duplication with the toggle bar
-.panel-log.expanded :deep(.log-title) { display: none; }
+.as-log.expanded :deep(.log-title) { display: none; }
 
-// shrink chat when the log is expanded so the log gets the bulk of the space
-.agent-panel.log-expanded .panel-chat {
-  flex: 0 1 110px;
-  min-height: 80px;
-  max-height: 150px;
-}
-
-@media (max-width: 1200px) {
-  .space-agent-panel {
-    width: 100%;
-  }
-
-  .agent-panel:not(.mobile) {
-    width: 100%;
-    position: static;
-    max-height: none;
-  }
+// Shrink chat when log expanded
+.agent-sidebar:has(.as-log.expanded) .as-chat {
+  flex: 0 1 90px;
+  min-height: 70px;
+  max-height: 120px;
 }
 </style>

@@ -456,7 +456,17 @@
         </div>
       </div>
 
-      <!-- ==================== 9. 代码/纯文本预览 (搜索高亮、自动折行、浅色/深色高亮) ==================== -->
+      <!-- ==================== 9. HTML 预览 (独立 iframe，可执行交互动画) ==================== -->
+      <div v-else-if="isPreviewableHtml(fileExt)" class="standalone-viewport-html">
+        <iframe
+          class="preview-html-iframe"
+          title="HTML 文件预览"
+          :srcdoc="previewTextContent"
+          sandbox="allow-scripts allow-forms allow-modals allow-popups"
+        ></iframe>
+      </div>
+
+      <!-- ==================== 10. 代码/纯文本预览 (搜索高亮、自动折行、浅色/深色高亮) ==================== -->
       <div v-else-if="isPreviewableText(fileExt)" class="standalone-viewport-text">
         <div class="preview-text-header">
           <div class="header-left">
@@ -499,7 +509,7 @@
         </div>
       </div>
 
-      <!-- ==================== 10. 不支持的格式 (星环全息卡片) ==================== -->
+      <!-- ==================== 11. 不支持的格式 (星环全息卡片) ==================== -->
       <div v-else class="preview-unsupported">
         <div class="glass-container aurora-glowing-card">
           <div class="unsupported-space-orbit">
@@ -1146,7 +1156,8 @@ onBeforeUnmount(() => {
 })
 
 const isPreviewableImage = (ext: string) => ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)
-const isPreviewableText = (ext: string) => ['txt', 'json', 'xml', 'yaml', 'yml', 'js', 'ts', 'py', 'java', 'sql', 'css', 'html'].includes(ext)
+const isPreviewableHtml = (ext: string) => ext === 'html' || ext === 'htm'
+const isPreviewableText = (ext: string) => ['txt', 'json', 'xml', 'yaml', 'yml', 'js', 'ts', 'py', 'java', 'sql', 'css'].includes(ext)
 const isPreviewableVideo = (ext: string) => ['mp4', 'webm', 'ogv'].includes(ext)
 const isPreviewableAudio = (ext: string) => ['mp3', 'wav', 'ogg'].includes(ext)
 const isPreviewablePdf = (ext: string) => ext === 'pdf'
@@ -3164,7 +3175,26 @@ const handleCopyText = async () => {
 @keyframes audPulse { 0%, 100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* ==================== 9. 代码编辑器优化 ==================== */
+/* ==================== 9. HTML 独立预览 ==================== */
+.standalone-viewport-html {
+  width: min(1180px, calc(100% - 48px));
+  height: calc(100vh - 128px);
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 15px 40px var(--shadow-color);
+}
+
+.preview-html-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #ffffff;
+}
+
+/* ==================== 10. 代码编辑器优化 ==================== */
 .standalone-viewport-text {
   width: 90%;
   max-width: 1080px;

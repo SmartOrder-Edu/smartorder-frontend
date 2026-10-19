@@ -37,6 +37,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '学习画像引导 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/space-launch',
+    name: 'SpaceLaunch',
+    component: () => import('@/views/SpaceLaunch/index.vue'),
+    meta: { title: '学习空间生成中 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard/index.vue'),
@@ -51,6 +57,24 @@ const routes: Array<RouteRecordRaw> = [
     name: 'LearningSpace',
     component: () => import('@/views/LearningSpace/index.vue'),
     meta: { title: '学习空间 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/space/:spaceId/knowledge/:nodeId',
+    name: 'LearningSpaceKnowledgeDetail',
+    component: () => import('@/views/LearningSpace/KnowledgeDetail.vue'),
+    meta: { title: '知识点详情 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/space/:spaceId/plan-adjustment',
+    name: 'LearningSpacePlanAdjustment',
+    component: () => import('@/views/LearningSpace/PlanAdjustment.vue'),
+    meta: { title: 'Agent 调整计划 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/space/:spaceId/insight-report',
+    name: 'LearningSpaceInsightReport',
+    component: () => import('@/views/LearningSpace/InsightReport.vue'),
+    meta: { title: '学情报告详情 - 知序智学', requiresAuth: true }
   },
   {
     path: '/ai-tutor',
@@ -69,6 +93,12 @@ const routes: Array<RouteRecordRaw> = [
     name: 'Tasks',
     component: () => import('@/views/Tasks/index.vue'),
     meta: { title: '任务日程 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/next-week-plan',
+    name: 'NextWeekPlan',
+    component: () => import('@/views/NextWeekPlan/index.vue'),
+    meta: { title: '下周学习计划 - 知序智学', requiresAuth: true }
   },
   {
     path: '/learning-report/weekly',

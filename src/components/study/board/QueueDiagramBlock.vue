@@ -107,7 +107,7 @@ const displayBlockPointers = computed(() => ({
 }))
 const displayItems = computed(() => currentPhase.value.items || displayBlockItems.value)
 const displayPointers = computed(() => currentPhase.value.pointers || displayBlockPointers.value)
-const activeIndices = computed(() => normalizeNumberArray(readPayloadArray('activeIndices') || props.block.activeIndices || []))
+const activeIndices = computed(() => normalizeNumberArray(currentPhase.value.activeIndices || readPayloadArray('activeIndices') || props.block.activeIndices || []))
 const isMovingPhase = computed(() => currentPhase.value.name === 'moving')
 const movingItem = computed(() => currentPhase.value.movingItem ?? animation.value.movingItem)
 const movingItemLabel = computed(() => itemLabel(movingItem.value))

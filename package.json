@@ -63,9 +63,6 @@
     "vue-tsc": "^3.3.7"
   },
   "main": ".eslintrc.js",
-  "directories": {
-    "test": "tests"
-  },
   "keywords": [],
   "author": "",
   "license": "ISC"

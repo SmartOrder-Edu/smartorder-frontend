@@ -1,9 +1,18 @@
 <template>
-  <div ref="rootRef" class="markdown-renderer" v-html="renderedHtml"></div>
+  <iframe
+    v-if="isHtmlPreview"
+    ref="htmlFrameRef"
+    class="html-preview-frame"
+    title="HTML 预览"
+    :srcdoc="htmlPreviewSrcdoc"
+    :style="{ height: `${htmlPreviewHeight}px` }"
+    sandbox="allow-scripts allow-forms allow-modals allow-popups"
+  ></iframe>
+  <div v-else ref="rootRef" class="markdown-renderer" v-html="renderedHtml"></div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, onUpdated, ref } from 'vue'
+import { computed, onMounted, onUnmounted, onUpdated, ref, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
@@ -178,14 +187,121 @@ const props = defineProps<{
   content: string
 }>()
 
+const htmlFrameRef = ref<HTMLIFrameElement>()
+const htmlPreviewHeight = ref(720)
+
+const renderableHtmlDocument = computed(() => extractRenderableHtmlDocument(props.content))
+
+const isHtmlPreview = computed(() => !!renderableHtmlDocument.value)
+
+const htmlPreviewSrcdoc = computed(() => {
+  if (!renderableHtmlDocument.value) return ''
+  return injectHtmlPreviewBridge(renderableHtmlDocument.value)
+})
+
 const renderedHtml = computed(() => {
   if (!props.content) return ''
+  if (isHtmlPreview.value) return ''
   try {
     return marked.parse(props.content) as string
   } catch {
     return props.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   }
 })
+
+function extractRenderableHtmlDocument(content: string): string {
+  const normalized = content.trim()
+  if (!normalized) return ''
+
+  if (isRunnableHtmlContent(normalized)) {
+    return normalizeHtmlDocument(normalized)
+  }
+
+  const fenced = normalized.match(/^```\s*(?:html)?[^\n]*\n([\s\S]*?)\n```\s*$/i)
+    || normalized.match(/```\s*html[^\n]*\n([\s\S]*?)\n```/i)
+  const fencedContent = fenced?.[1]?.trim() || ''
+  if (fencedContent && isRunnableHtmlContent(fencedContent)) {
+    return normalizeHtmlDocument(fencedContent)
+  }
+
+  return ''
+}
+
+function isRunnableHtmlContent(content: string): boolean {
+  const normalized = content.trim()
+
+  if (/^<!doctype\s+html[\s>]/i.test(normalized)
+    || /^<html[\s>]/i.test(normalized)
+    || (/<head[\s>]/i.test(normalized) && /<body[\s>]/i.test(normalized))) {
+    return true
+  }
+
+  return /<(script|style|canvas|svg)\b/i.test(normalized)
+    && /<\/?[a-z][\s\S]*>/i.test(normalized)
+}
+
+function normalizeHtmlDocument(html: string): string {
+  const normalized = html.trim()
+  if (/^<!doctype\s+html[\s>]/i.test(normalized) || /^<html[\s>]/i.test(normalized)) {
+    return normalized
+  }
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+  </style>
+</head>
+<body>
+${normalized}
+</body>
+</html>`
+}
+
+function injectHtmlPreviewBridge(html: string): string {
+  const bridge = `<script>
+;(() => {
+  const sendHeight = () => {
+    const doc = document.documentElement
+    const body = document.body
+    const height = Math.max(
+      doc ? doc.scrollHeight : 0,
+      doc ? doc.offsetHeight : 0,
+      body ? body.scrollHeight : 0,
+      body ? body.offsetHeight : 0,
+      320
+    )
+    window.parent.postMessage({ type: 'smartorder-html-preview-height', height }, '*')
+  }
+
+  window.addEventListener('load', sendHeight)
+  window.addEventListener('resize', sendHeight)
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(sendHeight).observe(document.documentElement)
+    if (document.body) new ResizeObserver(sendHeight).observe(document.body)
+  }
+  setTimeout(sendHeight, 0)
+  setTimeout(sendHeight, 300)
+})()
+</scr` + `ipt>`
+
+  if (/<\/body\s*>/i.test(html)) {
+    return html.replace(/<\/body\s*>/i, `${bridge}</body>`)
+  }
+
+  if (/<\/html\s*>/i.test(html)) {
+    return html.replace(/<\/html\s*>/i, `${bridge}</html>`)
+  }
+
+  return `${html}${bridge}`
+}
 
 // ─── Mermaid 渲染 ───────────────────────────────────────────
 const blobUrls: string[] = []
@@ -691,7 +807,30 @@ function bindCopyButtons(el: HTMLElement) {
   })
 }
 
+function handleHtmlPreviewMessage(event: MessageEvent) {
+  if (event.source !== htmlFrameRef.value?.contentWindow) return
+
+  const data = event.data
+  if (!data || data.type !== 'smartorder-html-preview-height') return
+
+  const height = Number(data.height)
+  if (!Number.isFinite(height)) return
+
+  htmlPreviewHeight.value = Math.min(Math.max(Math.ceil(height), 320), 2400)
+}
+
+watch(
+  () => props.content,
+  () => {
+    if (isHtmlPreview.value) {
+      htmlPreviewHeight.value = 720
+    }
+  },
+)
+
 onMounted(() => {
+  window.addEventListener('message', handleHtmlPreviewMessage)
+
   if (rootRef.value) {
     bindCopyButtons(rootRef.value)
     renderMermaidBlocks(rootRef.value)
@@ -706,12 +845,23 @@ onUpdated(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('message', handleHtmlPreviewMessage)
+
   blobUrls.forEach((url) => URL.revokeObjectURL(url))
   blobUrls.length = 0
 })
 </script>
 
 <style scoped>
+.html-preview-frame {
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+}
+
 .markdown-renderer {
   line-height: 1.7;
   word-break: break-word;

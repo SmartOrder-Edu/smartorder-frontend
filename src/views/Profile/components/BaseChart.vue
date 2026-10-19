@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { WarningFilled } from '@element-plus/icons-vue'
 import { useECharts } from '@/composables/useECharts'
 import type { EChartsOption } from 'echarts'
@@ -49,15 +49,18 @@ defineEmits<{
 }>()
 
 const chartDomRef = ref<HTMLElement | null>(null)
-const { init, setOption, instance } = useECharts(chartDomRef, {
+const { init, setOption, resize, instance } = useECharts(chartDomRef, {
   autoResize: true,
 })
 
 const isEmpty = ref(false)
+let resizeObserver: ResizeObserver | null = null
+let resizeFrame = 0
 
 function renderChart() {
   if (props.loading) return
   if (!chartDomRef.value) return
+  if (chartDomRef.value.clientWidth === 0 || chartDomRef.value.clientHeight === 0) return
 
   if (props.empty || !props.options) {
     isEmpty.value = true
@@ -81,8 +84,28 @@ function renderChart() {
   }
 }
 
+function scheduleRenderOrResize() {
+  if (typeof window === 'undefined') return
+  window.cancelAnimationFrame(resizeFrame)
+  resizeFrame = window.requestAnimationFrame(() => {
+    const dom = chartDomRef.value
+    if (!dom || dom.clientWidth === 0 || dom.clientHeight === 0) return
+
+    if (!instance.value || instance.value.isDisposed()) {
+      renderChart()
+      return
+    }
+
+    resize()
+  })
+}
+
 onMounted(async () => {
   await nextTick()
+  if (chartDomRef.value && typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(scheduleRenderOrResize)
+    resizeObserver.observe(chartDomRef.value)
+  }
   renderChart()
 })
 
@@ -93,6 +116,13 @@ watch(
   },
   { deep: true }
 )
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  if (typeof window !== 'undefined') {
+    window.cancelAnimationFrame(resizeFrame)
+  }
+})
 
 // 组件卸载时 useECharts 的 onBeforeUnmount 会自动 dispose
 </script>

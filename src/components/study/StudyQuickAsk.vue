@@ -15,7 +15,12 @@
       </svg>
     </button>
 
-    <form v-else class="quick-agent-form" @submit.prevent="sendMessage">
+    <form
+      v-else
+      class="quick-agent-form"
+      :class="{ 'voice-supported': !voiceUnsupported }"
+      @submit.prevent="sendMessage"
+    >
       <div class="quick-agent-orb">
         <img :src="teacherAvatar" alt="" />
       </div>
@@ -23,10 +28,30 @@
         ref="inputRef"
         v-model="input"
         class="quick-agent-input"
-        placeholder="哪里没懂？直接问 Agent..."
-        :disabled="stepStore.sendingFeedback"
+        :placeholder="isListening ? '正在聆听…' : '哪里没懂？直接问 Agent...'"
+        :disabled="stepStore.sendingFeedback || isListening"
         @keyup.esc="collapseInput"
       />
+      <button
+        v-if="!voiceUnsupported"
+        class="quick-agent-mic"
+        type="button"
+        :class="{ listening: isListening }"
+        :title="isListening ? '停止录音' : '语音输入'"
+        :aria-label="isListening ? '停止录音' : '语音输入'"
+        :disabled="stepStore.sendingFeedback"
+        @click="toggleVoice"
+      >
+        <svg v-if="!isListening" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+        <svg v-else viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+          <rect x="6" y="6" width="12" height="12" rx="2"/>
+        </svg>
+      </button>
       <button
         class="quick-agent-send"
         type="submit"
@@ -60,6 +85,7 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
 import { useTaskStepStore } from '@/stores/taskStep'
+import { useVoiceInput } from '@/composables/useVoiceInput'
 import teacherAvatar from '@/assets/teacher.png'
 
 defineProps<{ agentCollapsed: boolean }>()
@@ -70,6 +96,10 @@ const expanded = ref(false)
 const input = ref('')
 const inputRef = ref<HTMLInputElement | null>(null)
 
+const { isListening, voiceUnsupported, toggleVoice, stopVoice } = useVoiceInput(input, {
+  onEnd: () => nextTick(() => inputRef.value?.focus()),
+})
+
 function expandInput() {
   expanded.value = true
   emit('openAgentPanel')
@@ -78,6 +108,7 @@ function expandInput() {
 
 function collapseInput() {
   if (stepStore.sendingFeedback) return
+  if (isListening.value) stopVoice()
   expanded.value = false
   input.value = ''
 }
@@ -85,6 +116,7 @@ function collapseInput() {
 async function sendMessage() {
   const text = input.value.trim()
   if (!text || stepStore.sendingFeedback) return
+  if (isListening.value) stopVoice()
   input.value = ''
   emit('openAgentPanel')
   await stepStore.sendCustomMessage(text)
@@ -161,6 +193,10 @@ async function sendMessage() {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(16px);
   animation: quickAgentExpand 0.34s cubic-bezier(0.22, 1, 0.36, 1), quickAgentBreath 3.4s ease-in-out infinite;
+
+  &.voice-supported {
+    grid-template-columns: 36px minmax(0, 1fr) 34px 34px 28px;
+  }
 }
 
 .quick-agent-orb {
@@ -194,7 +230,8 @@ async function sendMessage() {
 }
 
 .quick-agent-send,
-.quick-agent-close {
+.quick-agent-close,
+.quick-agent-mic {
   width: 30px;
   height: 30px;
   border: none;
@@ -216,6 +253,36 @@ async function sendMessage() {
   &:disabled {
     opacity: 0.45;
     cursor: default;
+  }
+}
+
+.quick-agent-mic {
+  color: #64748b;
+  background: transparent;
+
+  &:hover:not(:disabled) {
+    color: #0bb7aa;
+    background: rgba(11, 183, 170, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  &.listening {
+    color: #fff;
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+    animation: micPulse 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes micPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
   }
 }
 

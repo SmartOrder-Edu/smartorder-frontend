@@ -99,7 +99,7 @@ export interface PathEdgeVO {
 
 export type ResourceType =
   | 'ppt' | 'doc' | 'html' | 'video' | 'mind_map' | 'quiz'
-  | 'case_study' | 'flashcard_set' | 'image' | 'audio' | 'link'
+  | 'animation_video' | 'case_study' | 'flashcard_set' | 'image' | 'audio' | 'link'
 export type ResourceSource = 'ai' | 'user' | 'curated'
 export type ResourceStatus = 'planned' | 'generating' | 'generated' | 'failed'
 export type ResourceGenerationJobStatus = 'pending' | 'generating' | 'generated' | 'failed'

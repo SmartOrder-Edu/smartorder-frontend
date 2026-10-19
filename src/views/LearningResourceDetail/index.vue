@@ -97,11 +97,11 @@
               />
 
               <!-- HTML -->
-              <div
+              <MarkdownRenderer
                 v-else-if="renderMode === 'html'"
                 class="html-content"
-                v-html="detail.content?.content || ''"
-              ></div>
+                :content="htmlContent"
+              />
 
               <!-- PPT -->
               <DocmeePptViewer
@@ -110,6 +110,28 @@
                 :ppt-id="pptData?.pptId"
                 :file-url="pptData?.fileUrl || detail.resource.url"
               />
+
+              <!-- Animation Video -->
+              <div v-else-if="renderMode === 'animationVideo'" class="animation-video-content">
+                <div class="animation-video-player-shell">
+                  <video
+                    class="animation-video-player"
+                    :src="animationVideoUrl"
+                    controls
+                    playsinline
+                    preload="metadata"
+                  >
+                    当前浏览器不支持视频播放。
+                  </video>
+                </div>
+                <div class="animation-video-info">
+                  <span class="animation-video-label">动画视频</span>
+                  <h2>{{ animationVideoData?.title || detail.resource.title }}</h2>
+                  <p v-if="animationVideoData?.reason || detail.resource.agentReason">
+                    {{ animationVideoData?.reason || detail.resource.agentReason }}
+                  </p>
+                </div>
+              </div>
 
               <!-- Quiz -->
               <div v-else-if="renderMode === 'quiz'" class="quiz-content">
@@ -251,11 +273,13 @@ const error = ref('')
 const retrying = ref(false)
 const generatingPpt = ref(false)
 const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const GENERATED_ANIMATION_VIDEO_URL = 'https://qihui-duomo.oss-cn-beijing.aliyuncs.com/videos/GeneratedVideoScene_with_audio.mp4'
 
 const resourceId = computed(() => String(route.params.resourceId || ''))
 
 const renderMode = computed(() => {
   const contentType = detail.value?.content?.contentType
+  if (detail.value?.resource.resourceType === 'animation_video') return 'animationVideo'
   if (contentType === 'html') return 'html'
   if (contentType === 'json' && detail.value?.resource.resourceType === 'quiz') return 'quiz'
   if (contentType === 'ppt_embed') return 'ppt'
@@ -265,6 +289,7 @@ const renderMode = computed(() => {
 })
 
 const markdownContent = computed(() => detail.value?.content?.content || '')
+const htmlContent = computed(() => detail.value?.content?.content || '')
 const resourceStatus = computed(() => {
   const jobStatus = generationJob.value?.status
   if (jobStatus === 'pending' || jobStatus === 'generating') return 'generating'
@@ -276,7 +301,9 @@ const generationError = computed(() => generationJob.value?.errorMessage || '')
 const quizData = computed<any | null>(() => parseJson(detail.value?.content?.content))
 const externalData = computed<any | null>(() => parseJson(detail.value?.content?.content))
 const pptData = computed<any | null>(() => parseJson(detail.value?.content?.content))
+const animationVideoData = computed<any | null>(() => parseJson(detail.value?.content?.content))
 const externalUrl = computed(() => externalData.value?.url || detail.value?.resource.url || '')
+const animationVideoUrl = computed(() => animationVideoData.value?.url || detail.value?.resource.url || GENERATED_ANIMATION_VIDEO_URL)
 const isBilibiliRecommendation = computed(() => externalData.value?.type === 'bilibili_recommendation')
 const bilibiliVideos = computed<any[]>(() => {
   const videos = externalData.value?.videos
@@ -308,6 +335,7 @@ function resourceTypeLabel(type: string) {
     quiz: '练习题',
     image: '图解',
     video: '视频脚本',
+    animation_video: '动画视频',
     link: 'B站推荐',
     ppt: 'PPT',
   }
@@ -1041,6 +1069,53 @@ watch(resourceId, () => {
   border-radius: 16px;
   background: #f1f5f9;
   font-size: 26px;
+}
+
+/* ========== Animation Video ========== */
+.animation-video-content {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.animation-video-player-shell {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #020617;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+}
+
+.animation-video-player {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #020617;
+}
+
+.animation-video-info {
+  margin-top: 18px;
+  text-align: left;
+
+  h2 {
+    margin: 6px 0 8px;
+    color: #0f172a;
+    font-size: 1.18rem;
+    line-height: 1.4;
+  }
+
+  p {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.9rem;
+    line-height: 1.65;
+  }
+}
+
+.animation-video-label {
+  color: #dc2626;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 /* ========== Responsive ========== */
