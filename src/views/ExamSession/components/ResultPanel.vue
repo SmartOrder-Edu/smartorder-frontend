@@ -13,6 +13,30 @@
       :correctAnswer="correctAnswerText"
     />
 
+    <!-- Judge0/沙箱判题结果：只展示后端裁剪后的安全信息 -->
+    <div class="judge-result-panel" v-if="judgeResult">
+      <div class="judge-result-header">
+        <span class="judge-status-badge" :class="judgeStatusClass">{{ judgeStatusText }}</span>
+        <span class="judge-summary-text">
+          通过 {{ judgeSummary.passed }}/{{ judgeSummary.total }} 个用例
+        </span>
+      </div>
+      <div class="judge-message" v-if="judgeMessage">
+        <pre>{{ judgeMessage }}</pre>
+      </div>
+      <div class="judge-cases" v-if="judgeCases.length">
+        <div v-for="item in judgeCases" :key="String(item.caseId)" class="judge-case-row">
+          <div class="case-meta">
+            <span class="case-status" :class="`case-${String(item.status || '').toLowerCase()}`">{{ item.status }}</span>
+            <span>{{ item.sample ? '样例用例' : '隐藏用例' }}</span>
+            <span>{{ item.timeMs || 0 }}ms</span>
+            <span>{{ item.memoryKb || 0 }}KB</span>
+          </div>
+          <pre v-if="item.sample && item.actualOutput" class="case-output">{{ item.actualOutput }}</pre>
+        </div>
+      </div>
+    </div>
+
     <!-- AI 展开解析触发条 -->
     <AIAnalysisTrigger 
       v-if="hasAnalysis" 
@@ -256,6 +280,45 @@ const toggleExpand = () => {
 }
 
 // 判定作答状态
+interface JudgeCaseView {
+  caseId?: string | number
+  sample?: boolean
+  status?: string
+  timeMs?: number
+  memoryKb?: number
+  actualOutput?: string
+}
+
+const judgeResult = computed(() => {
+  const value = props.grading?.judgeResult
+  return value && typeof value === 'object' ? value as Record<string, any> : null
+})
+
+const judgeSummary = computed(() => {
+  const summary = judgeResult.value?.summary || {}
+  return {
+    total: Number(summary.total || 0),
+    passed: Number(summary.passed || 0)
+  }
+})
+
+const judgeCases = computed<JudgeCaseView[]>(() => {
+  const cases = judgeResult.value?.cases
+  return Array.isArray(cases) ? cases : []
+})
+
+const judgeStatusText = computed(() => {
+  return String(judgeResult.value?.status || 'PENDING')
+})
+
+const judgeStatusClass = computed(() => {
+  return `judge-${judgeStatusText.value.toLowerCase()}`
+})
+
+const judgeMessage = computed(() => {
+  return String(judgeResult.value?.compileMessage || judgeResult.value?.runtimeMessage || '').trim()
+})
+
 const status = computed(() => {
   const g = props.grading
   if (g && g.status === 'graded') {
@@ -370,6 +433,97 @@ const misconceptions = computed(() => {
 }
 
 /* 智能深度解析面板 */
+.judge-result-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+.judge-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.judge-status-badge,
+.case-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.judge-ac,
+.case-ac {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.judge-wa,
+.judge-ce,
+.judge-re,
+.judge-tle,
+.judge-mle,
+.case-wa,
+.case-ce,
+.case-re,
+.case-tle,
+.case-mle {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.judge-summary-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.judge-message pre,
+.case-output {
+  margin: 10px 0 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.judge-cases {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.judge-case-row {
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.case-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .ai-analysis-panel {
   margin-top: 20px;
   border-radius: 18px;

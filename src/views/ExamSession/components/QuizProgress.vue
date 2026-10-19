@@ -38,8 +38,9 @@ const percentage = computed(() => {
 
 .circle-chart {
   position: relative;
-  width: 104px;
-  height: 104px;
+  /* 概况卡内圆环缩小一档，避免头部进度区压高页面。 */
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
   /* 环形进度颜色使用更自然的青绿色渐变与柔和截断 */
   background: conic-gradient(#14b8a6, #2dd4bf var(--percent, 0%), #e8edf4 var(--percent, 0%));
@@ -53,8 +54,8 @@ const percentage = computed(() => {
 .circle-chart::after {
   content: '';
   position: absolute;
-  width: 86px;
-  height: 86px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   background: #ffffff;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
@@ -71,7 +72,7 @@ const percentage = computed(() => {
 }
 
 .count-text {
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 800;
   color: #182230;
   line-height: 1.1;
@@ -79,14 +80,14 @@ const percentage = computed(() => {
 }
 
 .total-slash {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #98a2b3;
   margin: 0 1px;
 }
 
 .label-text {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   color: #667085;
   margin-top: 2px;

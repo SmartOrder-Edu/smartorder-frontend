@@ -478,19 +478,44 @@
       </el-dialog>
 
       <!-- 移动到对话框 -->
-      <el-dialog v-model="showMoveDialog" title="选择目标文件夹" width="520px" top="20vh" @opened="onMoveDialogOpened">
+      <el-dialog v-model="showMoveDialog" title="选择目标文件夹" width="520px" top="14vh"
+        class="move-folder-dialog" @opened="onMoveDialogOpened">
+        <template #header>
+          <div class="move-dialog-header">
+            <div class="move-dialog-header-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="20" height="20">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <div class="move-dialog-header-text">
+              <span class="move-dialog-title">选择目标文件夹</span>
+              <span class="move-dialog-subtitle">点选一个文件夹，所选内容将移动到该位置</span>
+            </div>
+          </div>
+        </template>
         <div class="move-tree-wrapper">
-          <div v-if="moveFullTree.length === 0" class="move-empty">没有可移动到的文件夹</div>
+          <div v-if="moveFullTree.length === 0" class="move-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" width="40" height="40">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              <path d="M9 13h6" stroke-linecap="round" />
+            </svg>
+            <span>没有可移动到的文件夹</span>
+          </div>
           <el-tree v-else :data="moveFullTree" :props="{ label: 'folderName', children: 'children' }"
             node-key="folderId" default-expand-all highlight-current @node-click="handleTreeNodeClick"
             class="move-tree">
             <template #default="{ data }">
               <div class="move-tree-node" :class="{ selected: moveTargetFolderId === String(data.folderId) }">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"
-                  style="color: #f59e0b; flex-shrink: 0;">
+                <svg class="move-tree-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  stroke-width="1.5" width="18" height="18">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
                 <span class="move-tree-label">{{ data.folderName }}</span>
+                <svg v-if="moveTargetFolderId === String(data.folderId)" class="move-tree-check"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
               </div>
             </template>
           </el-tree>
@@ -554,7 +579,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import SparkMD5 from 'spark-md5'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { getFolderContent, getFolderTree, createFolder as apiCreateFolder, updateFolder as apiUpdateFolder, deleteFolder as apiDeleteFolder, deleteFile as apiDeleteFile, moveFile as apiMoveFile, moveFolder as apiMoveFolder, batchMoveToFolder, apiInitUpload, apiGetSignUrl, apiUploadChunkToOSS, apiChunkDone, apiMergeChunks, apiCancelUpload, downloadFile } from '@/api/resource'
-import { getQuota } from '@/api/quota'
 import { useExportTask } from '@/composables/useExportTask'
 import PublishToSquareDialog from './components/PublishToSquareDialog.vue'
 import ExportProgressDialog from './components/ExportProgressDialog.vue'
@@ -594,6 +618,8 @@ interface DriveItem {
   size: number
   createdAt: string
   updatedAt: string
+  /** OSS 公共读直链：下载/预览直接用它，不再回后端换链 */
+  fileUrl?: string
   thumbnail?: string
   fileCount?: number
   aiStatus?: 'pending' | 'processing' | 'completed' | 'failed'
@@ -678,7 +704,6 @@ const handleBatchDelete = async () => {
     ElMessage.success('删除成功')
     const parentRealId = currentFolderId.value ? (folderIdMap.get(currentFolderId.value) ?? '0') : '0'
     await loadFolderFromApi(parentRealId)
-    refreshQuota()
   } catch { /* cancel */ }
 }
 
@@ -770,17 +795,8 @@ const displayItems = computed(() => {
   })
 })
 
-// 已用空间：以后端 /quota 接口返回的预聚合值为准（避免懒加载子目录导致漏算）
+// 已用空间：随 /yun-resource/folders/{id} 一起返回（后端配额表预聚合值），不再单独请求 /quota
 const usedStorage = ref(0)
-
-const refreshQuota = async () => {
-  try {
-    const data = await getQuota()
-    usedStorage.value = data ? Number(data.userSpace) || 0 : 0
-  } catch (err) {
-    console.error('refreshQuota failed:', err)
-  }
-}
 
 const storagePercent = computed(() => {
   return Math.round((usedStorage.value / totalStorage) * 100)
@@ -818,12 +834,18 @@ const loadFolderFromApi = async (parentId: string) => {
       extension: f.fileType || f.fileName.split('.').pop()?.toLowerCase() || '',
       size: f.fileSize,
       createdAt: f.updateTime,
-      updatedAt: f.updateTime
+      updatedAt: f.updateTime,
+      // 后端已把 objectKey 拼成 OSS 公共读直链，前端直接复用（预览/下载都不再走 /download 接口）
+      fileUrl: (f as any).fileUrl
     }))
     if (parentId === '0') {
       rootFiles.value = [...folders, ...files]
     } else {
       folderContents.value[data.folderId] = [...folders, ...files]
+    }
+    // 已用空间随文件夹详情一并返回（配额表预聚合），省掉一次 /quota 请求
+    if (data.userSpace !== undefined && data.userSpace !== null) {
+      usedStorage.value = Number(data.userSpace) || 0
     }
   } catch (err) {
     console.error('loadFolderFromApi failed:', err)
@@ -986,7 +1008,6 @@ const handleDelete = (item: DriveItem | null) => {
         : '0'
       await loadFolderFromApi(parentRealId)
       ElMessage.success('已删除')
-      refreshQuota()
     } catch {
       ElMessage.error('删除失败')
     }
@@ -1083,9 +1104,9 @@ const confirmMove = async () => {
 
 const handleDownload = (item: DriveItem | null) => {
   if (!item || item.type !== 'file') return
-  console.log('handleDownload item:', item)
   ElMessage.success(`正在下载: ${item.name}`)
-  downloadFile(item.id, item.name)
+  // 有 OSS 公共读直链就直接下；刚秒传入库等还没有直链的场景，内部回退到后端换链
+  downloadFile(item.id, item.name, item.fileUrl)
 }
 
 const handlePreview = (item: DriveItem | null) => {
@@ -1096,7 +1117,9 @@ const handlePreview = (item: DriveItem | null) => {
     query: {
       id: item.id,
       name: item.name,
-      size: item.size
+      size: item.size,
+      // 带上 OSS 公共读直链，预览页直接渲染，不再请求 /yun-resource/preview/{id}
+      url: item.fileUrl
     }
   })
   previewIframeUrl.value = routeData.href
@@ -1111,7 +1134,8 @@ const handleOpenInNewWindow = () => {
     query: {
       id: file.id,
       name: file.name,
-      size: file.size
+      size: file.size,
+      url: file.fileUrl
     }
   })
   window.open(routeData.href, '_blank')
@@ -1124,7 +1148,8 @@ const handleOpenInNewWindowDirect = (item: DriveItem | null) => {
     query: {
       id: item.id,
       name: item.name,
-      size: item.size
+      size: item.size,
+      url: item.fileUrl
     }
   })
   window.open(routeData.href, '_blank')
@@ -1260,7 +1285,7 @@ const handleHttpRequest = async (options: any) => {
       onSuccess()
       successCount++
       ElMessage.success(`文件 ${file.name} 秒传成功`)
-      refreshQuota()
+      usedStorage.value += item.size
       checkUploadFinish()
       return
     }
@@ -1317,8 +1342,8 @@ const handleHttpRequest = async (options: any) => {
       item.progress = Math.min(100, Math.round((uploadedSize / file.size) * 100))
     }
 
-    // 3. 合并请求
-    await apiMergeChunks({
+    // 3. 合并请求（返回该文件的 OSS 公共读直链，直接挂到列表项，预览/下载都无需再换链）
+    const mergeRes: any = await apiMergeChunks({
       fileHash,
       fileId
     })
@@ -1336,6 +1361,7 @@ const handleHttpRequest = async (options: any) => {
       size: item.size,
       createdAt: new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
+      fileUrl: mergeRes?.url,
       aiStatus: 'pending'
     }
 
@@ -1351,7 +1377,7 @@ const handleHttpRequest = async (options: any) => {
     onSuccess()
     successCount++
     ElMessage.success(`文件 ${file.name} 上传成功`)
-    refreshQuota()
+    usedStorage.value += item.size
   } catch (e: any) {
     if (e.message === 'Canceled') {
       item.status = 'canceled'
@@ -1451,8 +1477,8 @@ const handlePreviewMessage = (e: MessageEvent) => {
 onMounted(() => {
   document.addEventListener('click', onGlobalClick)
   window.addEventListener('message', handlePreviewMessage)
+  // 已用空间由 folders 接口一并返回，不再单独请求 /quota
   loadFolderFromApi('0')
-  refreshQuota()
 })
 
 onBeforeUnmount(() => {
@@ -2414,49 +2440,204 @@ onBeforeUnmount(() => {
 }
 
 /* 移动对话框 - 树形选择 */
+/* 对话框壳体 */
+:deep(.move-folder-dialog) {
+  border-radius: 16px;
+  box-shadow:
+    0 24px 64px -16px rgba(15, 23, 42, 0.22),
+    0 4px 16px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+:deep(.move-folder-dialog .el-dialog__header) {
+  padding: 20px 24px 14px;
+  margin-right: 0;
+}
+
+:deep(.move-folder-dialog .el-dialog__headerbtn) {
+  top: 20px;
+  right: 20px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+:deep(.move-folder-dialog .el-dialog__headerbtn:hover) {
+  background-color: #f1f5f9;
+}
+
+:deep(.move-folder-dialog .el-dialog__body) {
+  padding: 2px 24px 4px;
+}
+
+:deep(.move-folder-dialog .el-dialog__footer) {
+  padding: 14px 24px 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+:deep(.move-folder-dialog .el-dialog__footer .el-button) {
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-weight: 500;
+}
+
+/* 自定义标题区：图标 + 主标题 + 副标题 */
+.move-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 36px; /* 给右上角关闭按钮留位 */
+}
+
+.move-dialog-header-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #eff6ff, #e0f2fe);
+  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.move-dialog-title {
+  display: block;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.4;
+}
+
+.move-dialog-subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+/* 树容器：带边框圆角的浅底面板 + 细滚动条 */
 .move-tree-wrapper {
-  max-height: 360px;
+  max-height: 380px;
   overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.move-tree-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.move-tree-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.move-tree-wrapper::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .move-tree {
-  --el-tree-node-hover-bg-color: #f1f5f9;
+  --el-tree-node-hover-bg-color: transparent;
+  background: transparent;
 }
 
 :deep(.move-tree .el-tree-node__content) {
-  height: 38px;
-  border-radius: 6px;
-  padding: 0 4px;
+  height: 40px;
+  border-radius: 8px;
+  padding: 0 6px;
+  transition: background-color 0.15s ease;
 }
 
 :deep(.move-tree .el-tree-node__content:hover) {
-  background-color: #f1f5f9;
+  background-color: #eef2f7;
+}
+
+:deep(.move-tree .el-tree-node__expand-icon) {
+  color: #94a3b8;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+:deep(.move-tree .el-tree-node__expand-icon:hover) {
+  color: #3b82f6;
+}
+
+:deep(.move-tree .el-tree-node.is-current > .el-tree-node__content) {
+  background-color: transparent;
 }
 
 .move-tree-node {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.15s;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border-radius: 8px;
 }
 
+.move-tree-folder-icon {
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+
+.move-tree-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s ease;
+}
+
+/* 选中态：浅蓝底 + 蓝色文字 + 右侧对勾 */
 .move-tree-node.selected {
   background: #eff6ff;
 }
 
-.move-tree-label {
-  font-size: 0.8125rem;
-  color: #1e293b;
+.move-tree-node.selected .move-tree-label {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.move-tree-check {
+  color: #3b82f6;
+  flex-shrink: 0;
+  animation: move-check-in 0.18s ease;
+}
+
+@keyframes move-check-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .move-empty {
-  text-align: center;
-  padding: 40px 0;
-  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 0;
+  color: #94a3b8;
   font-size: 0.8125rem;
+}
+
+.move-empty svg {
+  opacity: 0.55;
 }
 
 /* 高保真全屏 iframe 预览 Dialog 样式 */
@@ -2837,16 +3018,69 @@ html[data-theme='dark'] {
     color: var(--text-secondary);
   }
 
+  :deep(.move-folder-dialog) {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 24px 64px -16px rgba(0, 0, 0, 0.5);
+  }
+
+  :deep(.move-folder-dialog .el-dialog__headerbtn:hover) {
+    background-color: var(--item-hover-bg);
+  }
+
+  :deep(.move-folder-dialog .el-dialog__footer) {
+    border-top-color: var(--border-color);
+  }
+
+  .move-dialog-header-icon {
+    background: var(--panel-bg-secondary);
+    color: #60a5fa;
+  }
+
+  .move-dialog-title {
+    color: var(--text-primary);
+  }
+
+  .move-dialog-subtitle {
+    color: var(--text-secondary);
+  }
+
+  .move-tree-wrapper {
+    border-color: var(--border-color);
+    background: var(--panel-bg-secondary);
+    scrollbar-color: var(--border-color) transparent;
+  }
+
+  .move-tree-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+  }
+
   :deep(.move-tree .el-tree-node__content:hover) {
     background-color: var(--item-hover-bg);
+  }
+
+  :deep(.move-tree .el-tree-node__expand-icon) {
+    color: var(--text-secondary);
+  }
+
+  .move-tree-label {
+    color: var(--text-primary);
   }
 
   .move-tree-node.selected {
     background: var(--button-hover-bg);
   }
 
-  .move-tree-label {
-    color: var(--text-primary);
+  .move-tree-node.selected .move-tree-label {
+    color: #60a5fa;
+  }
+
+  .move-tree-check {
+    color: #60a5fa;
+  }
+
+  .move-empty {
+    color: var(--text-secondary);
   }
 
   :deep(.el-tree) {

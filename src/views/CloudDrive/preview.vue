@@ -577,24 +577,67 @@ const fileSize = ref(Number(route.query.size || 0))
 const fileType = String(route.query.type || '').trim().replace(/^\./, '').toLowerCase()
 const fileExt = ref(fileType || fileName.value.split('.').pop()?.toLowerCase() || '')
 const isSquarePreview = ref(!!squareId.value)
+/** 网盘列表透传过来的 OSS 公共读直链：有它就直接渲染，不再回后端换链 */
+const directUrl = ref(String(route.query.url || ''))
 
-/** 获取文件内容的 API 路径：广场资源走 /resource-square/{id}/preview，云盘文件走 /yun-resource/preview/{id} */
-const getFetchUrl = () => {
+/** 获取文件内容的 API 路径：广场资源走 /resource-square/{id}/preview，云盘文件优先用 OSS 公共读直链 */
+const getFetchUrl = async (): Promise<string> => {
   if (squareId.value) {
     return `/resource-square/${squareId.value}/preview`
   }
-  const token = localStorage.getItem('token')
-  return `/yun-resource/preview/${fileId.value}?token=${token}`
+  if (directUrl.value) {
+    return directUrl.value
+  }
+  return await getPreviewUrl(fileId.value)
 }
 
 /** 获取在线预览直链 URL（用于 iframe/office viewer 等场景） */
-const getSquarePreviewUrl = () => {
+const getSquarePreviewUrl = async (): Promise<string> => {
   if (squareId.value) {
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
     const token = localStorage.getItem('token')
     return `${base}/resource-square/${squareId.value}/preview?token=${token}`
   }
-  return getPreviewUrl(fileId.value)
+  if (directUrl.value) {
+    return directUrl.value
+  }
+  return await getPreviewUrl(fileId.value)
+}
+
+/**
+ * 读取文件字节/文本：
+ * 直链场景必须用原生 fetch —— axios 实例会带上 Authorization 头，OSS 会拿它当签名校验而报错
+ */
+const fetchArrayBuffer = async (): Promise<ArrayBuffer> => {
+  const url = await getFetchUrl()
+  if (directUrl.value) {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return await res.arrayBuffer()
+    } catch (e) {
+      console.warn('OSS 直链读取失败，回退后端换链:', e)
+      const fallback = await getPreviewUrl(fileId.value)
+      return request.get<ArrayBuffer>(fallback, { responseType: 'arraybuffer' })
+    }
+  }
+  return request.get<ArrayBuffer>(url, { responseType: 'arraybuffer' })
+}
+
+const fetchText = async (): Promise<string> => {
+  const url = await getFetchUrl()
+  if (directUrl.value) {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return await res.text()
+    } catch (e) {
+      console.warn('OSS 直链读取失败，回退后端换链:', e)
+      const fallback = await getPreviewUrl(fileId.value)
+      return request.get<string>(fallback, { responseType: 'text' })
+    }
+  }
+  return request.get<string>(url, { responseType: 'text' })
 }
 
 // 状态声明
@@ -1150,7 +1193,7 @@ onMounted(async () => {
     return
   }
 
-  if (!fileId.value && !squareId.value) {
+  if (!fileId.value && !squareId.value && !directUrl.value) {
     ElMessage.error('无效的文件预览参数')
     loading.value = false
     return
@@ -1158,16 +1201,19 @@ onMounted(async () => {
 
   const ext = fileExt.value
   if (!isPreviewablePdf(ext)) {
-    previewUrl.value = getSquarePreviewUrl() + `&t=${Date.now()}`
+    try {
+      const base = await getSquarePreviewUrl()
+      previewUrl.value = base + (base.includes('?') ? '&' : '?') + `t=${Date.now()}`
+    } catch {
+      // 直链获取失败：拦截器已提示，走下方统一兜底
+    }
   } else {
     previewUrl.value = ''
   }
 
   try {
     if (isPreviewableWord(ext)) {
-      const arrayBuffer = await request.get<ArrayBuffer>(getFetchUrl(), {
-        responseType: 'arraybuffer'
-      })
+      const arrayBuffer = await fetchArrayBuffer()
       const docx = await import('docx-preview')
       initialized.value = true
       setTimeout(async () => {
@@ -1180,16 +1226,12 @@ onMounted(async () => {
         }
       }, 100)
     } else if (isPreviewableMarkdown(ext)) {
-      const text = await request.get<string>(getFetchUrl(), {
-        responseType: 'text'
-      })
+      const text = await fetchText()
       previewMarkdownSource.value = text
       generateMarkdownToc()
       initialized.value = true
     } else if (isPreviewableText(ext)) {
-      let text = await request.get<string>(getFetchUrl(), {
-        responseType: 'text'
-      })
+      let text = await fetchText()
       const MAX_PREVIEW_SIZE = 2 * 1024 * 1024
       if (text.length > MAX_PREVIEW_SIZE) {
         text = text.substring(0, MAX_PREVIEW_SIZE) + '\n\n...[内容过长已被部分截取展示]...'
@@ -1203,10 +1245,8 @@ onMounted(async () => {
         throw new Error('表格文件过大')
       }
 
-      const arrayBuffer = await request.get<ArrayBuffer>(getFetchUrl(), {
-        responseType: 'arraybuffer'
-      })
-      
+      const arrayBuffer = await fetchArrayBuffer()
+
       const XLSX = await import('xlsx')
       const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true })
       
@@ -1249,18 +1289,15 @@ onMounted(async () => {
       initialized.value = true
     } else if (isPreviewablePpt(ext)) {
       if (!isLocalhostEnv.value) {
-        const absoluteUrl = window.location.origin + getSquarePreviewUrl()
+        const target = await getSquarePreviewUrl()
+        // 云盘文件直链本身就是绝对地址；广场代理是相对路径，需补 origin
+        const absoluteUrl = target.startsWith('http') ? target : window.location.origin + target
         previewUrl.value = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(absoluteUrl)}`
       }
       initialized.value = true
     } else if (isPreviewablePdf(ext)) {
-      const blob = await request.get<Blob>(getFetchUrl(), {
-        responseType: 'blob'
-      })
-      if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl.value)
-      }
-      previewUrl.value = URL.createObjectURL(new Blob([blob as any], { type: 'application/pdf' }))
+      // OSS 公共读直链：iframe 直接加载浏览器内置 PDF 查看器，无需再经后端转 blob
+      previewUrl.value = await getSquarePreviewUrl()
       initialized.value = true
     } else {
       initialized.value = true
@@ -1277,9 +1314,10 @@ onMounted(async () => {
 
 const handleDownload = () => {
   if (isSquarePreview.value) return
-  if (!fileId.value) return
+  if (!directUrl.value && !fileId.value) return
   ElMessage.success(`开始下载: ${fileName.value}`)
-  downloadFile(fileId.value, fileName.value)
+  // 有 OSS 公共读直链就直接下载，缺失时才回后端换链
+  downloadFile(fileId.value, fileName.value, directUrl.value)
 }
 
 const handleClose = () => {

@@ -570,6 +570,11 @@
                         <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
                         <path d="M8 12l3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                       </svg>
+                      <svg v-else-if="row.questionType === 'code'" viewBox="0 0 24 24" class="type-svg-icon">
+                        <polyline points="16 18 22 12 16 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <polyline points="8 6 2 12 8 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <line x1="14" y1="4" x2="10" y2="20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
                       <svg v-else viewBox="0 0 24 24" class="type-svg-icon">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="2"/>
                         <line x1="8" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -817,6 +822,14 @@ const questionTypeRows = ref<QuestionTypeRow[]>([
     label: '简答题',
     description: '适合解释原理和过程',
     count: 2,
+    enabled: false
+  },
+  {
+    // 算法题沿用后端 code 题型，便于复用 Judge0 判题和测试用例链路
+    questionType: 'code',
+    label: '编程/算法题',
+    description: '适合练习算法实现和代码调试',
+    count: 1,
     enabled: false
   }
 ])

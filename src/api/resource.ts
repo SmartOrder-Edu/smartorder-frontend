@@ -134,33 +134,48 @@ export const apiCancelUpload = (params: { fileHash: string }) => {
   return request.post('/yun-resource/file/cancel', null, { params })
 }
 
-/** 下载文件 — 用 <a> 标签让浏览器原生下载，避免大文件撑爆前端内存 */
-export function downloadFile(id: string | undefined, fileName: string) {
+/** 获取文件 OSS 公共读直链（后端仅做归属校验并返回直链，不再代理文件流） */
+export async function getFileAccessUrl(id: string | undefined): Promise<string> {
   if (!id) {
-    console.error('downloadFile: id is undefined, 请检查文件数据是否有 id 字段')
-    return
+    console.error('getFileAccessUrl: id is undefined, 请检查文件数据是否有 id 字段')
+    return ''
   }
-  const base = import.meta.env.VITE_API_BASE_URL || '/api'
-  const token = localStorage.getItem('token')
-  const url = `${base}/yun-resource/download/${id}?token=${token}`
+  // request 响应拦截器已解包 Result.data，这里拿到的就是 URL 字符串
+  const url = await request.get<string>(`/yun-resource/download/${id}`)
+  return url || ''
+}
+
+/** 用 <a> 标签直接下载 OSS 公共读直链（与知识库文件下载同一套写法，无需再经后端） */
+export function downloadByPublicUrl(url: string | undefined | null, fileName: string): boolean {
+  if (!url) return false
   const a = document.createElement('a')
   a.href = url
   a.download = fileName
+  a.target = '_blank'
+  a.rel = 'noopener'
   a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
+  return true
 }
 
-/** 获取文件预览的直链 URL */
-export function getPreviewUrl(id: string | undefined): string {
-  if (!id) {
-    console.error('getPreviewUrl: id is undefined')
-    return ''
+/** 下载文件 — 优先用列表里已有的 OSS 公共读直链；没有直链时才回退到后端换链 */
+export async function downloadFile(id: string | undefined, fileName: string, fileUrl?: string) {
+  if (downloadByPublicUrl(fileUrl, fileName)) return
+  let url = ''
+  try {
+    url = await getFileAccessUrl(id)
+  } catch {
+    return // 失败时响应拦截器已弹出错误提示
   }
-  const base = import.meta.env.VITE_API_BASE_URL || '/api'
-  const token = localStorage.getItem('token')
-  return `${base}/yun-resource/preview/${id}?token=${token}`
+  if (!url) return
+  downloadByPublicUrl(url, fileName)
+}
+
+/** 获取文件预览的 OSS 公共读直链（用于 iframe/img/office viewer 等场景） */
+export async function getPreviewUrl(id: string | undefined): Promise<string> {
+  return getFileAccessUrl(id)
 }
 
 // ======================= 文件夹导出 =======================

@@ -36,14 +36,15 @@ defineProps<{
 .stat-box {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  /* 顶部概况项使用更紧凑的信息间距，匹配答题页工作台密度。 */
+  gap: 6px;
 }
 
 .stat-label {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
   color: #667085;
   transition: color 0.3s ease;
@@ -61,7 +62,7 @@ defineProps<{
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 800;
   color: #182230;
   display: flex;
@@ -79,7 +80,7 @@ defineProps<{
 }
 
 :deep(.text-desc) {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 750;
   color: #344054;
   transition: color 0.3s ease;

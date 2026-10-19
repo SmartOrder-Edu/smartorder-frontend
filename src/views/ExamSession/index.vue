@@ -13,9 +13,9 @@
       <div v-if="loading" class="loading-box">正在加载题目...</div>
       <div v-else-if="!questions.length" class="empty-box">暂无题目数据</div>
 
-      <div v-else class="exam-session-layout">
+      <div v-else class="exam-session-layout" :class="{ 'coding-mode': hasCodingQuestions }">
         <!-- 左侧栏：进度卡片 + 题目卡片列表 -->
-        <div class="exam-main-content">
+        <div v-if="!hasCodingQuestions" class="exam-main-content">
           <!-- 测评进度卡片 -->
           <QuizSummaryCard
             :answeredCount="answeredCount"
@@ -35,6 +35,7 @@
               :typeName="group.typeName"
               :active="q.globalIndex === currentActiveIndex"
               :answers="answers"
+              :codeLanguages="codeLanguages"
               :showAnswer="showAnswer"
               :isSubmitting="isSubmitting"
               :flagged="flaggedQuestions.has(q.globalIndex)"
@@ -47,12 +48,59 @@
               @select-judge="toggleJudge"
               @update-fill-blank="updateFillBlankValueIndexed"
               @update-essay="updateEssayValue"
+              @update-code="updateCodeValue"
+              @update-code-language="updateCodeLanguage"
               @toggle-flag="toggleFlag"
               @toggle-favorite="toggleFavorite"
               @show-kp="showKpExplanation"
               @prev="goPrevQuestion"
               @next="goNextQuestion"
               @toggle-analysis="toggleAnalysisExpand"
+            />
+          </div>
+        </div>
+
+        <!-- 编程测评模式：代码题升级为左题面 + 中编辑器 + 右辅助栏的在线 OJ 工作台 -->
+        <div v-else class="coding-main-content">
+          <QuizSummaryCard
+            :answeredCount="answeredCount"
+            :totalCount="questions.length"
+            :estimatedAccuracy="estimatedAccuracy"
+            :difficultyText="difficultyDistributionText"
+            :coverageTags="knowledgeCoverageTags"
+          />
+
+          <div v-for="group in groupedQuestions" :key="group.type" class="question-group coding-question-group">
+            <component
+              v-for="q in group.questions"
+              :key="q.id"
+              :is="isCodingQuestion(q) ? CodeQuestionWorkspace : QuestionCard"
+              :q="q"
+              :typeName="group.typeName"
+              :active="q.globalIndex === currentActiveIndex"
+              :answers="answers"
+              :codeLanguages="codeLanguages"
+              :showAnswer="showAnswer"
+              :isSubmitting="isSubmitting"
+              :flagged="flaggedQuestions.has(q.globalIndex)"
+              :favorited="favoritedQuestions.has(q.globalIndex)"
+              :sessionId="sessionId"
+              :grading="getQuestionGrading(q)"
+              :totalCount="questions.length"
+              :isAnalysisExpanded="isAnalysisExpanded(q.id)"
+              @select-option="toggleOption"
+              @select-judge="toggleJudge"
+              @update-fill-blank="updateFillBlankValueIndexed"
+              @update-essay="updateEssayValue"
+              @update-code="updateCodeValue"
+              @update-code-language="updateCodeLanguage"
+              @toggle-flag="toggleFlag"
+              @toggle-favorite="toggleFavorite"
+              @show-kp="showKpExplanation"
+              @prev="goPrevQuestion"
+              @next="goNextQuestion"
+              @toggle-analysis="toggleAnalysisExpand"
+              @submit="submitExam"
             />
           </div>
         </div>
@@ -349,6 +397,31 @@
           </div>
         </div>
       </div>
+
+      <!-- 算法题本地测试弹窗：用于录屏阶段模拟真实判题等待与成功反馈。 -->
+      <div class="modal-overlay algorithm-submit-overlay" v-if="showAlgorithmMockSubmitDialog">
+        <div class="modal-card algorithm-submit-card">
+          <div class="algorithm-submit-status">
+            <span
+              v-if="algorithmMockSubmitStatus === 'testing'"
+              class="algorithm-submit-spinner"
+              aria-hidden="true"
+            ></span>
+            <span v-else class="algorithm-submit-success" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.8">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </span>
+          </div>
+          <div class="algorithm-submit-title">{{ algorithmMockSubmitText }}</div>
+          <div class="algorithm-submit-subtitle">
+            {{ algorithmMockSubmitStatus === 'testing' ? '正在校验样例输出' : '所有测试样例均已通过' }}
+          </div>
+          <div class="modal-footer algorithm-submit-footer" v-if="algorithmMockSubmitStatus === 'success'">
+            <button type="button" class="btn-modal confirm" @click="closeAlgorithmMockSubmitDialog">知道了</button>
+          </div>
+        </div>
+      </div>
     </div>
   </AppLayout>
 </template>
@@ -363,6 +436,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 // 导入重构的拆分子组件
 import QuizSummaryCard from './components/QuizSummaryCard.vue'
 import QuestionCard from './components/QuestionCard.vue'
+import CodeQuestionWorkspace from './components/CodeQuestionWorkspace.vue'
 
 import { fetchEvaluationQuestions, type EvaluationQuestion } from '@/api/evaluationQuestion'
 import {
@@ -382,6 +456,7 @@ import {
   getQuestionTypeName,
   normalizeQuestionOptions
 } from '@/utils/examQuestionMapper'
+import { getMockAlgorithmQuestions } from '@/mocks/algorithmQuestionMock'
 
 const route = useRoute()
 const router = useRouter()
@@ -397,6 +472,7 @@ const goBack = () => {
 const loading = ref(false)
 const questions = ref<EvaluationQuestion[]>([])
 const answers = ref<Record<string | number, string>>({})
+const codeLanguages = ref<Record<string | number, string>>({})
 const showAnswer = ref(false)
 
 // 后端判分结果
@@ -406,12 +482,28 @@ const reportLoading = ref(false)
 const reportDialogVisible = ref(false)
 const selectedReport = ref<SessionReportVO | null>(null)
 
+const ALGORITHM_MOCK_SUBMIT_DELAY_MS = 2000
+const showAlgorithmMockSubmitDialog = ref(false)
+const algorithmMockSubmitStatus = ref<'testing' | 'success'>('testing')
+const algorithmMockSubmitText = ref('正在测试中')
+let algorithmMockSubmitTimer: number | null = null
+
 const examTitle = computed(() => String(route.query.title || '章节测验'))
 const spaceId = computed(() => route.query.spaceId ? String(route.query.spaceId) : undefined)
 const taskId = computed(() => route.query.taskId ? String(route.query.taskId) : undefined)
 const sessionId = computed(() => route.query.sessionId ? String(route.query.sessionId) : undefined)
 const rawStatus = computed(() => route.query.rawStatus ? String(route.query.rawStatus) : undefined)
-const reportSessionId = computed(() => sessionId.value || taskId.value)
+// 算法题后端判题链路未接入前，命中代码/算法类入口时使用前端本地 mock。
+const isAlgorithmMockSession = computed(() => {
+  const explicitMock = String(route.query.mockAlgorithm || route.query.algorithmMock || route.query.localMock || '').toLowerCase()
+  const questionType = String(route.query.questionType || route.query.type || '').toLowerCase()
+  const title = examTitle.value
+
+  return ['1', 'true', 'algorithm', 'code'].includes(explicitMock)
+    || ['algorithm', 'code', 'sql'].includes(questionType)
+    || /算法|编程|代码|链表|排序/.test(title)
+})
+const reportSessionId = computed(() => isAlgorithmMockSession.value ? undefined : (sessionId.value || taskId.value))
 const isFinishedSession = computed(() => {
   const status = String(rawStatus.value || '').toLowerCase()
   return ['finished', 'completed', 'complete', 'done', 'graded'].includes(status)
@@ -592,7 +684,7 @@ const groupedQuestions = computed(() => {
 
   // 全局序号：按固定题型顺序依次编号
   let globalIndex = 1
-  const order = ['single_choice', 'multiple_choice', 'fill_blank', 'judge', 'short_answer', 'essay']
+  const order = ['single_choice', 'multiple_choice', 'fill_blank', 'judge', 'code', 'sql', 'short_answer', 'essay']
   const result: any[] = []
   
   order.forEach(type => {
@@ -618,6 +710,16 @@ const groupedQuestions = computed(() => {
   })
   
   return result
+})
+
+// 编程类题目使用专属在线 OJ 工作台布局，避免被普通试卷题卡压缩。
+const isCodingQuestion = (q: EvaluationQuestion | any) => {
+  return q?.questionType === 'code' || q?.questionType === 'sql'
+}
+
+// 只要当前测评包含代码题，就启用三栏编程测评模式。
+const hasCodingQuestions = computed(() => {
+  return questions.value.some(q => isCodingQuestion(q))
 })
 
 // 扁平化的全局题目列表（带 globalIndex）
@@ -725,7 +827,16 @@ const knowledgeCoverageTags = computed(() => {
 const fetchQuestions = async () => {
   loading.value = true
   try {
-    if (sessionId.value) {
+    if (isAlgorithmMockSession.value) {
+      // 算法题第一阶段不请求后端，直接使用单链表插入排序模板 mock 数据。
+      questions.value = getMockAlgorithmQuestions()
+      gradingResult.value = null
+      showAnswer.value = false
+      answers.value = {}
+      codeLanguages.value = Object.fromEntries(
+        questions.value.map(q => [q.id, defaultCodeLanguage(q)])
+      )
+    } else if (sessionId.value) {
       // 有 sessionId → 从 session API 加载题目
       questions.value = await fetchSessionQuestions(sessionId.value as any)
       
@@ -836,6 +947,27 @@ const updateEssayValue = (q: EvaluationQuestion, val: string) => {
   answers.value[q.id as any] = val
 }
 
+const updateCodeValue = (q: EvaluationQuestion, val: string) => {
+  if (showAnswer.value) return
+  answers.value[q.id as any] = val
+  if (!codeLanguages.value[q.id as any]) {
+    codeLanguages.value[q.id as any] = defaultCodeLanguage(q)
+  }
+}
+
+const updateCodeLanguage = (q: EvaluationQuestion, language: string) => {
+  if (showAnswer.value) return
+  codeLanguages.value[q.id as any] = language
+}
+
+const defaultCodeLanguage = (q: EvaluationQuestion) => {
+  const raw = q.correctAnswer?.allowedLanguages
+  if (Array.isArray(raw) && raw.length > 0) {
+    return String(raw[0])
+  }
+  return q.questionType === 'sql' ? 'sql' : 'python'
+}
+
 const isQuestionAnswered = (q: EvaluationQuestion) => {
   const ans = answers.value[q.id as any]
   if (!ans) return false
@@ -861,6 +993,37 @@ const isQuestionAnswered = (q: EvaluationQuestion) => {
 
 const showUnfinishedModal = ref(false)
 const unfinishedTypesText = ref('')
+
+// 清理算法题本地测试弹窗的延迟计时器，避免切页或重复提交后旧状态覆盖当前界面。
+const clearAlgorithmMockSubmitTimer = () => {
+  if (algorithmMockSubmitTimer !== null) {
+    window.clearTimeout(algorithmMockSubmitTimer)
+    algorithmMockSubmitTimer = null
+  }
+}
+
+const closeAlgorithmMockSubmitDialog = () => {
+  if (algorithmMockSubmitStatus.value === 'success') {
+    showAlgorithmMockSubmitDialog.value = false
+  }
+}
+
+// 算法题暂不接后端判题，提交时只模拟真实测试等待，并在同一个弹窗内切换成功结果。
+const handleAlgorithmMockSubmit = () => new Promise<void>((resolve) => {
+  clearAlgorithmMockSubmitTimer()
+  algorithmMockSubmitStatus.value = 'testing'
+  algorithmMockSubmitText.value = '正在测试中'
+  showAlgorithmMockSubmitDialog.value = true
+
+  algorithmMockSubmitTimer = window.setTimeout(() => {
+    algorithmMockSubmitStatus.value = 'success'
+    algorithmMockSubmitText.value = '算法题测试成功，答案正确'
+    showAnswer.value = true
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    algorithmMockSubmitTimer = null
+    resolve()
+  }, ALGORITHM_MOCK_SUBMIT_DELAY_MS)
+})
 
 const submitExam = () => {
   const unfinishedTypes: string[] = []
@@ -897,6 +1060,12 @@ const buildUserAnswer = (q: EvaluationQuestion): Record<string, unknown> => {
     }
     case 'fill_blank':
       return { blanks: userAns ? userAns.split(';;') : [] }
+    case 'code':
+    case 'sql':
+      return {
+        language: codeLanguages.value[q.id as any] || defaultCodeLanguage(q),
+        code: userAns
+      }
     default:
       return { text: userAns }
   }
@@ -983,12 +1152,21 @@ const isResultDetailAnswered = (q: EvaluationQuestion, detail: AnswerDetailVO) =
   return hasMeaningfulAnswerValue(detail.userAnswer)
 }
 
+const resultUserAnswerToCodeLanguage = (q: EvaluationQuestion, rawUserAnswer?: unknown): string => {
+  const userAnswer = isPlainObject(rawUserAnswer) ? rawUserAnswer : undefined
+  const language = userAnswer ? firstAnswerField(userAnswer, ['language', 'lang', 'runtime']) : undefined
+  return language == null || String(language).trim() === '' ? defaultCodeLanguage(q) : String(language)
+}
+
 const applyResultUserAnswers = (result: SessionResultVO | null | undefined) => {
   if (!result?.detail?.length) return
   const questionMap = new Map(questions.value.map(q => [String(q.id), q]))
   result.detail.forEach(detail => {
     const q = questionMap.get(String(detail.questionId))
     if (!q) return
+    if (q.questionType === 'code' || q.questionType === 'sql') {
+      codeLanguages.value[q.id as any] = resultUserAnswerToCodeLanguage(q, detail.userAnswer)
+    }
     const value = resultUserAnswerToInputValue(q, detail.userAnswer)
     if (value) {
       answers.value[q.id as any] = value
@@ -1066,7 +1244,10 @@ const doSubmitExam = async () => {
       usedHint: 0
     }))
 
-    if (sessionId.value) {
+    if (isAlgorithmMockSession.value) {
+      await handleAlgorithmMockSubmit()
+      return
+    } else if (sessionId.value) {
       // 后端 session 模式：调用 submit API
       const result = await submitAnswers(sessionId.value as any, { answers: answerItems })
       gradingResult.value = result
@@ -1138,6 +1319,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('scroll', onWindowScroll)
+  clearAlgorithmMockSubmitTimer()
   if (pollingTimer) {
     clearInterval(pollingTimer)
     pollingTimer = null
@@ -1163,7 +1345,8 @@ const isAnalysisExpanded = (questionId: string | number) => {
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 24px clamp(24px, 2.2vw, 40px) 40px;
+  /* 顶部答题区采用紧凑留白，减少进入题目区域前的垂直占用。 */
+  padding: 8px clamp(24px, 2.2vw, 40px) 32px;
   background: #f6f8fb;
   min-height: 100vh;
   transition: background 0.3s ease;
@@ -1173,13 +1356,13 @@ const isAnalysisExpanded = (questionId: string | number) => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #475569;
   cursor: pointer;
-  margin-bottom: 24px;
-  padding: 8px 16px;
-  border-radius: 12px;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  border-radius: 10px;
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
   transition: all 0.2s ease;
@@ -1225,10 +1408,21 @@ const isAnalysisExpanded = (questionId: string | number) => {
   align-items: start;
 }
 
+.exam-session-layout.coding-mode {
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 18vw, 320px);
+}
+
 .exam-main-content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+  min-width: 0;
+}
+
+.coding-main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -1236,6 +1430,10 @@ const isAnalysisExpanded = (questionId: string | number) => {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.coding-question-group {
+  gap: 18px;
 }
 
 @media (min-width: 1025px) {
@@ -1254,6 +1452,11 @@ const isAnalysisExpanded = (questionId: string | number) => {
   max-height: 100vh;
   overflow-y: auto;
   padding-right: 2px;
+}
+
+.coding-mode .exam-sidebar {
+  top: 12px;
+  max-height: calc(100vh - 24px);
 }
 
 .sidebar-sticky-wrapper {
@@ -2019,6 +2222,73 @@ const isAnalysisExpanded = (questionId: string | number) => {
   box-shadow: 0 6px 16px rgba(20, 184, 166, 0.25);
 }
 
+.algorithm-submit-overlay {
+  z-index: 2100;
+}
+
+.algorithm-submit-card {
+  width: 360px;
+  padding: 30px 28px 0;
+  text-align: center;
+}
+
+.algorithm-submit-status {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 16px;
+  border-radius: 18px;
+  background: #f0fdfa;
+  color: #14b8a6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.algorithm-submit-spinner {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid rgba(20, 184, 166, 0.2);
+  border-top-color: #14b8a6;
+  animation: algorithm-submit-spin 0.82s linear infinite;
+}
+
+.algorithm-submit-success {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #14b8a6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.algorithm-submit-title {
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.algorithm-submit-subtitle {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.algorithm-submit-footer {
+  justify-content: center;
+  margin: 26px -28px 0;
+}
+
+@keyframes algorithm-submit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -2038,6 +2308,7 @@ const isAnalysisExpanded = (questionId: string | number) => {
   
   .exam-sidebar {
     position: static;
+    max-height: none;
   }
   
   .sidebar-sticky-wrapper {
@@ -2331,5 +2602,23 @@ html[data-theme='dark'] .btn-modal.cancel {
 html[data-theme='dark'] .btn-modal.cancel:hover {
   background: #243049;
   color: #f4f7fb;
+}
+
+html[data-theme='dark'] .algorithm-submit-status {
+  background: rgba(20, 184, 166, 0.14);
+}
+
+html[data-theme='dark'] .algorithm-submit-title {
+  color: #f8fafc;
+}
+
+html[data-theme='dark'] .algorithm-submit-subtitle {
+  color: #94a3b8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .algorithm-submit-spinner {
+    animation: none;
+  }
 }
 </style>

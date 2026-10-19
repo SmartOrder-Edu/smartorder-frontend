@@ -46,6 +46,35 @@
         </div>
       </div>
 
+      <!-- 代码题作答区域：复用现有编辑器能力，仅增强题卡内的编程题视觉层级 -->
+      <div class="q-code" v-else-if="q.questionType === 'code' || q.questionType === 'sql'">
+        <div class="code-toolbar">
+          <div class="code-runtime">
+            <span class="runtime-dot"></span>
+            <span>{{ codeLanguageLabel }}</span>
+          </div>
+          <select
+            :value="selectedCodeLanguage"
+            :disabled="showAnswer || isSubmitting"
+            class="code-language-select"
+            @change="e => handleCodeLanguageChange((e.target as HTMLSelectElement).value)"
+          >
+            <option v-for="lang in availableCodeLanguages" :key="lang.value" :value="lang.value">
+              {{ lang.label }}
+            </option>
+          </select>
+        </div>
+        <CodeEditor
+          :model-value="answers[q.id as any] || ''"
+          :readonly="showAnswer"
+          :language="selectedCodeLanguage"
+          :placeholder="codePlaceholder"
+          :show-footer="true"
+          :min-lines="14"
+          @update:model-value="handleCodeInput"
+        />
+      </div>
+
       <!-- 主观/问答题作答区域 -->
       <div class="q-essay" v-else>
         <textarea 
@@ -100,6 +129,7 @@ import OptionList from './OptionList.vue'
 import ResultPanel from './ResultPanel.vue'
 import QuestionFooter from './QuestionFooter.vue'
 import PageNavigation from './PageNavigation.vue'
+import CodeEditor from '@/components/exam/CodeEditor.vue'
 import { getQuestionAnswerText, normalizeQuestionOptions } from '@/utils/examQuestionMapper'
 import type { EvaluationQuestion } from '@/api/evaluationQuestion'
 import type { AnswerDetailVO } from '@/api/evaluationSession'
@@ -109,6 +139,7 @@ const props = defineProps<{
   typeName: string
   active: boolean
   answers: Record<string | number, string>
+  codeLanguages: Record<string | number, string>
   showAnswer: boolean
   isSubmitting: boolean
   flagged: boolean
@@ -124,6 +155,8 @@ const emit = defineEmits<{
   (e: 'select-judge', q: any, val: string): void
   (e: 'update-fill-blank', q: any, index: number, val: string): void
   (e: 'update-essay', q: any, val: string): void
+  (e: 'update-code', q: any, val: string): void
+  (e: 'update-code-language', q: any, language: string): void
   (e: 'toggle-flag', index: number): void
   (e: 'toggle-favorite', index: number): void
   (e: 'show-kp', q: any): void
@@ -219,6 +252,57 @@ const fillBlankValues = computed(() => {
   return result
 })
 
+const codeLanguageMap: Record<string, string> = {
+  python: 'Python',
+  java: 'Java',
+  cpp17: 'C++17',
+  cpp: 'C++',
+  c11: 'C11',
+  c: 'C',
+  sql: 'SQL'
+}
+
+const defaultCodeLanguage = computed(() => {
+  const raw = props.q.correctAnswer?.allowedLanguages
+  if (Array.isArray(raw) && raw.length > 0) {
+    return String(raw[0])
+  }
+  return props.q.questionType === 'sql' ? 'sql' : 'python'
+})
+
+const selectedCodeLanguage = computed(() => {
+  return props.codeLanguages[props.q.id as any] || defaultCodeLanguage.value
+})
+
+const availableCodeLanguages = computed(() => {
+  const raw = props.q.correctAnswer?.allowedLanguages
+  const values = Array.isArray(raw) && raw.length > 0
+    ? raw.map(item => String(item))
+    : ['python', 'java', 'cpp17', 'c11']
+
+  return values.map(value => ({
+    value,
+    label: codeLanguageMap[value] || value.toUpperCase()
+  }))
+})
+
+const codeLanguageLabel = computed(() => {
+  return codeLanguageMap[selectedCodeLanguage.value] || selectedCodeLanguage.value.toUpperCase()
+})
+
+const codePlaceholder = computed(() => {
+  if (selectedCodeLanguage.value === 'java') {
+    return 'class Solution {\n    public int[] solution(int[] nums) {\n        // 在这里编写你的代码\n        return new int[]{};\n    }\n}'
+  }
+  if (selectedCodeLanguage.value === 'cpp17' || selectedCodeLanguage.value === 'cpp') {
+    return '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    // 在这里编写你的代码\n    return 0;\n}'
+  }
+  if (selectedCodeLanguage.value === 'sql') {
+    return '-- 在这里编写 SQL\nSELECT * FROM table_name;'
+  }
+  return 'def solution():\n    # 在这里编写你的代码\n    pass'
+})
+
 // 交互转发
 const handleOptionSelect = (label: string) => {
   emit('select-option', props.q, label)
@@ -234,6 +318,14 @@ const handleFillBlankInput = (index: number, val: string) => {
 
 const handleEssayInput = (val: string) => {
   emit('update-essay', props.q, val)
+}
+
+const handleCodeInput = (val: string) => {
+  emit('update-code', props.q, val)
+}
+
+const handleCodeLanguageChange = (language: string) => {
+  emit('update-code-language', props.q, language)
 }
 
 const toggleAnalysis = () => {
@@ -324,6 +416,58 @@ const toggleAnalysis = () => {
   cursor: default;
 }
 
+/* 代码题样式：让普通题卡中的代码作答也具备在线 OJ 编辑质感 */
+.q-code {
+  padding: 12px 28px 24px;
+}
+
+.code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.code-runtime {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.runtime-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #14b8a6;
+  box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.12);
+}
+
+.code-language-select {
+  min-width: 132px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 1.5px solid #dbe3ec;
+  background: #ffffff;
+  color: #182230;
+  font-weight: 800;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.code-language-select:focus {
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
+}
+
 /* 简答/主观题样式 */
 .q-essay {
   padding: 12px 28px 24px;
@@ -399,14 +543,16 @@ html[data-theme='dark'] .fill-label {
 }
 
 html[data-theme='dark'] .custom-input,
-html[data-theme='dark'] .custom-textarea {
+html[data-theme='dark'] .custom-textarea,
+html[data-theme='dark'] .code-language-select {
   background: #151e2e;
   border-color: #334155;
   color: #cbd5e1;
 }
 
 html[data-theme='dark'] .custom-input:focus,
-html[data-theme='dark'] .custom-textarea:focus {
+html[data-theme='dark'] .custom-textarea:focus,
+html[data-theme='dark'] .code-language-select:focus {
   border-color: #14b8a6;
   background: #1e293b;
   box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.2);
@@ -422,5 +568,14 @@ html[data-theme='dark'] .custom-textarea[readonly] {
 html[data-theme='dark'] .question-footer {
   border-top-color: #334155;
   background: #182235;
+}
+
+html[data-theme='dark'] .code-toolbar {
+  background: #151e2e;
+  border-color: #334155;
+}
+
+html[data-theme='dark'] .code-runtime {
+  color: #cbd5e1;
 }
 </style>

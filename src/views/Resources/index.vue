@@ -43,9 +43,14 @@
       </div>
 
       <!-- Agent 精选横幅：loading / 数据就绪 / 空 -->
-      <section v-if="featuredLoading" class="featured-banner featured-skeleton">
-        <div class="featured-orb featured-orb--teal"></div>
-        <div class="featured-orb featured-orb--cyan"></div>
+      <section
+        v-if="featuredLoading"
+        class="featured-banner featured-skeleton"
+        aria-busy="true"
+        aria-label="正在加载精选资源"
+      >
+        <div class="featured-orb featured-orb--teal" aria-hidden="true"></div>
+        <div class="featured-orb featured-orb--cyan" aria-hidden="true"></div>
         <div class="featured-content">
           <div class="skel-badge-line"></div>
           <div class="skel-title-line"></div>
@@ -59,49 +64,61 @@
           </div>
           <div class="skel-cta-line"></div>
         </div>
-        <div class="featured-visual">
+        <div class="featured-visual" aria-hidden="true">
           <div class="visual-card"></div>
         </div>
       </section>
 
-      <section v-else-if="featuredResource" class="featured-banner">
-        <div class="featured-orb featured-orb--teal"></div>
-        <div class="featured-orb featured-orb--cyan"></div>
+      <section
+        v-else-if="featuredResource"
+        class="featured-banner"
+        aria-labelledby="featured-title"
+      >
+        <div class="featured-orb featured-orb--teal" aria-hidden="true"></div>
+        <div class="featured-orb featured-orb--cyan" aria-hidden="true"></div>
 
         <div class="featured-content">
-          <div class="featured-badge" :class="featuredReason">
-            <span class="badge-dot"></span>
-            <svg v-if="featuredReason === 'agent'" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.9L19.5 9.5 13.6 11.1 12 17l-1.6-5.9L4.5 9.5 10.4 7.9z"/></svg>
-            <svg v-else viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3.2 4 4.5 4 8.5a4 4 0 0 1-8 0c0-2 1-3 1-3-2.2 1.2-3 3-3 5a6 6 0 0 0 12 0c0-5.2-4-7.5-6-10.5z"/></svg>
-            {{ featuredReason === 'agent' ? 'Agent 精选' : '热门精选' }}
+          <div class="featured-eyebrow">
+            <span class="featured-badge" :class="featuredReason">
+              <span class="badge-dot" aria-hidden="true"></span>
+              <svg v-if="featuredReason === 'agent'" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2l1.6 5.9L19.5 9.5 13.6 11.1 12 17l-1.6-5.9L4.5 9.5 10.4 7.9z"/></svg>
+              <svg v-else viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2c1 3.2 4 4.5 4 8.5a4 4 0 0 1-8 0c0-2 1-3 1-3-2.2 1.2-3 3-3 5a6 6 0 0 0 12 0c0-5.2-4-7.5-6-10.5z"/></svg>
+              {{ featuredReason === 'agent' ? 'Agent 精选' : '热门精选' }}
+            </span>
+            <span class="type-chip">
+              <span class="sr-only">资源类型：</span>{{ getCategoryName(featuredResource.category) }}
+            </span>
           </div>
-          <h2 class="featured-title">{{ featuredResource.title }}</h2>
-          <p class="featured-desc">{{ featuredResource.description || '暂无描述' }}</p>
+
+          <h2 id="featured-title" class="featured-title">{{ featuredResource.title }}</h2>
+          <p class="featured-desc">
+            {{ featuredResource.description || '暂无详细描述，点击「查看详情」了解资源内容。' }}
+          </p>
 
           <div class="featured-stats">
             <div class="stat-chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
               <div class="stat-chip-body">
                 <span class="stat-value">{{ formatFileSize(featuredResource.fileSize) }}</span>
                 <span class="stat-label">大小</span>
               </div>
             </div>
             <div class="stat-chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
               <div class="stat-chip-body">
                 <span class="stat-value">{{ featuredResource.ratingAvg }}</span>
                 <span class="stat-label">推荐指数</span>
               </div>
             </div>
             <div class="stat-chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               <div class="stat-chip-body">
                 <span class="stat-value">{{ featuredResource.viewCount ?? 0 }}</span>
                 <span class="stat-label">浏览</span>
               </div>
             </div>
             <div class="stat-chip">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               <div class="stat-chip-body">
                 <span class="stat-value">{{ featuredResource.downloadCount }}</span>
                 <span class="stat-label">人转存</span>
@@ -110,22 +127,24 @@
           </div>
 
           <div class="featured-actions">
-            <button class="featured-cta" @click="openResource(featuredResource)">
+            <button type="button" class="featured-cta" @click="openResource(featuredResource)">
               查看详情
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
             </button>
             <button
+              type="button"
               class="featured-ghost"
               :disabled="featuredResource.hasDownloaded"
+              :title="featuredResource.hasDownloaded ? '该资源已在你的云盘中' : '转存到云盘'"
               @click="collectResource(featuredResource)"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
               {{ featuredResource.hasDownloaded ? '已转存' : '转存到云盘' }}
             </button>
           </div>
         </div>
 
-        <div class="featured-visual">
+        <div class="featured-visual" aria-hidden="true">
           <div class="visual-ring"></div>
           <div class="visual-card">
             <div class="card-glow"></div>
@@ -282,7 +301,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import CloudFilePickerDialog, { type PickedFile } from './components/CloudFilePickerDialog.vue'
 import PublishToSquareDialog from '@/views/CloudDrive/components/PublishToSquareDialog.vue'
 import { getSquareList, downloadFromSquare, getFeatured } from '@/api/resource-square'
-import type { ResourceSquareVO, FeaturedResourceVO, SquareSortBy } from '@/types/resource-square'
+import type { ResourceSquareVO, SquareSortBy } from '@/types/resource-square'
 import { resourceTypes, getCategoryName, getResourceIcon, formatFileSize } from './constants'
 
 const router = useRouter()
@@ -440,6 +459,19 @@ const onPublishSuccess = () => {
   gap: var(--spacing-xs);
 }
 
+/* 页头窄屏：按钮换行下沉，避免与描述文字叠压 */
+@media (max-width: 640px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+  .header-right .el-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* 筛选栏 */
 .filter-bar {
   display: flex;
@@ -495,56 +527,74 @@ const onPublishSuccess = () => {
 .type-icon { font-size: 0.875rem; }
 
 /* ==================== Agent 精选横幅 ==================== */
+/**
+ * 设计规范（对齐页面「治愈薄荷」浅色主题）
+ * 1. 表面：白 → 薄荷浅底渐变，取代原深色 #0b1424；层级由阴影与边框表达，不再用暗底反白。
+ * 2. 品牌：--fp-brand #0a7470 用于小字号文字（徽标底色上 ≥5.0:1）；#0d7d76→#0f766e 用于主按钮实底（白字 ≥4.9:1）。
+ * 3. 文字：标题 #0f172a / 正文 #475569 / 辅助 #64748b（在 #ffffff 与 #ecfdfb 上均 ≥4.5:1）。
+ * 4. 权重：标题 700 > 实心主按钮 > 数据 chips > 描边次按钮 > 装饰光斑，避免多点抢焦。
+ * 5. 尺寸：断点 1100 / 900 / 600 / 420，网格列随宽度收缩，≤900 隐藏纯装饰视觉卡（类型信息已前置为 chip）。
+ */
 .featured-banner {
+  /* 局部令牌：本板块唯一配色入口 */
+  --fp-ink: #0f172a;
+  --fp-ink-body: #475569;
+  --fp-ink-muted: #64748b;
+  --fp-brand: #0a7470;
+  --fp-brand-deep: #0f766e;
+  --fp-border: rgba(11, 183, 170, 0.18);
+  --fp-border-soft: rgba(148, 163, 184, 0.22);
+  --fp-chip-bg: rgba(255, 255, 255, 0.92);
+  --fp-shadow: 0 18px 40px -26px rgba(15, 23, 42, 0.3), 0 2px 6px rgba(15, 23, 42, 0.04);
+
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 196px;
   align-items: center;
-  gap: var(--spacing-2xl);
-  padding: var(--spacing-2xl);
-  background: linear-gradient(135deg, #0b1424 0%, #122244 45%, #0b3a3a 100%);
+  gap: clamp(16px, 2.2vw, 32px);
+  padding: clamp(20px, 2.6vw, 32px);
+  background:
+    radial-gradient(120% 150% at 100% 0%, rgba(11, 183, 170, 0.12) 0%, rgba(11, 183, 170, 0) 62%),
+    linear-gradient(135deg, #ffffff 0%, #f8fefd 52%, #ecfdfb 100%);
+  border: 1px solid var(--fp-border);
   border-radius: var(--radius-2xl);
   margin-bottom: var(--spacing-xl);
   overflow: hidden;
-  border: 1px solid rgba(11, 183, 170, 0.22);
-  box-shadow:
-    0 24px 50px -20px rgba(8, 20, 40, 0.55),
-    inset 0 0 0 1px rgba(11, 183, 170, 0.06);
+  box-shadow: var(--fp-shadow);
   isolation: isolate;
 }
 
-/* 氛围光斑 */
+/* 氛围光斑：低饱和薄荷/青色，仅作背景肌理 */
 .featured-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(60px);
+  filter: blur(64px);
   pointer-events: none;
   z-index: 0;
 }
 .featured-orb--teal {
-  width: 340px;
-  height: 340px;
-  background: radial-gradient(circle, #0bb7aa 0%, transparent 70%);
-  top: -130px;
-  right: -70px;
-  opacity: 0.55;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(11, 183, 170, 0.3) 0%, rgba(11, 183, 170, 0) 70%);
+  top: -140px;
+  right: -60px;
 }
 .featured-orb--cyan {
-  width: 280px;
-  height: 280px;
-  background: radial-gradient(circle, #06b6d4 0%, transparent 70%);
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.22) 0%, rgba(6, 182, 212, 0) 70%);
   bottom: -150px;
-  left: 8%;
-  opacity: 0.4;
+  left: 4%;
 }
 
-/* 细密网格底纹 */
+/* 细密网格底纹：极低对比，提供质感而不干扰文字 */
 .featured-banner::before {
   content: '';
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(11, 183, 170, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(11, 183, 170, 0.055) 1px, transparent 1px);
   background-size: 32px 32px;
   -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
   mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
@@ -552,62 +602,94 @@ const onPublishSuccess = () => {
   pointer-events: none;
 }
 
+/* 屏幕阅读器专用文本 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .featured-content {
   position: relative;
   z-index: 2;
-  flex: 1;
   min-width: 0;
-  color: #fff;
+  color: var(--fp-ink);
 }
 
-/* 精选徽标 */
+/* 徽标行：主标签（Agent/热门）+ 资源类型，信息前置，移动端不依赖右侧装饰卡 */
+.featured-eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .featured-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px 5px 10px;
+  padding: 4px 11px 4px 9px;
   border-radius: var(--radius-full);
   font-size: 0.75rem;
   font-weight: 600;
+  line-height: 1.5;
   letter-spacing: 0.02em;
-  margin-bottom: var(--spacing-md);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 .featured-badge .badge-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: currentColor;
-  animation: featuredDotPulse 2s ease-in-out infinite;
+  animation: featuredDotPulse 2.4s ease-in-out infinite;
 }
 .featured-badge svg {
   width: 13px;
   height: 13px;
+  flex-shrink: 0;
 }
 .featured-badge.agent {
-  background: rgba(11, 183, 170, 0.16);
-  color: #5eead4;
-  border: 1px solid rgba(94, 234, 212, 0.35);
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--fp-brand);
+  border: 1px solid rgba(11, 183, 170, 0.24);
 }
 .featured-badge.hot {
-  background: rgba(245, 158, 11, 0.16);
-  color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: #fff7ed;
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.28);
 }
 @keyframes featuredDotPulse {
-  0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-  70% { box-shadow: 0 0 0 6px transparent; opacity: 0.55; }
-  100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--fp-ink-muted);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--fp-border-soft);
 }
 
 .featured-title {
-  font-size: 1.625rem;
+  font-size: clamp(1.25rem, 1.02rem + 0.95vw, 1.75rem);
   font-weight: 700;
-  line-height: 1.3;
-  margin: 0 0 var(--spacing-sm);
-  color: #fff;
+  line-height: 1.32;
+  margin: 0 0 10px;
+  color: var(--fp-ink);
   letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -615,88 +697,102 @@ const onPublishSuccess = () => {
 }
 
 .featured-desc {
+  max-width: 62ch;
   font-size: 0.9375rem;
-  color: rgba(255, 255, 255, 0.68);
-  margin: 0 0 var(--spacing-lg);
-  line-height: 1.65;
+  color: var(--fp-ink-body);
+  margin: 0 0 20px;
+  line-height: 1.7;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* 数据指标 chips */
+/* 数据指标 chips：白底 + 细边框，弱于标题与主按钮 */
 .featured-stats {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-lg);
+  gap: 8px;
+  margin-bottom: 20px;
 }
 .stat-chip {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--fp-chip-bg);
+  border: 1px solid var(--fp-border-soft);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 .stat-chip:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(11, 183, 170, 0.4);
+  background: #ffffff;
+  border-color: rgba(11, 183, 170, 0.38);
+  box-shadow: 0 6px 16px -12px rgba(15, 118, 110, 0.6);
 }
 .stat-chip svg {
   width: 15px;
   height: 15px;
-  color: #5eead4;
+  color: var(--fp-brand);
   flex-shrink: 0;
 }
 .stat-chip-body {
   display: flex;
   flex-direction: column;
-  line-height: 1.2;
+  min-width: 0;
+  line-height: 1.25;
 }
 .stat-value {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--fp-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .stat-label {
   font-size: 0.6875rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--fp-ink-muted);
+  white-space: nowrap;
 }
 
-/* 操作按钮 */
+/* 操作按钮：主按钮实心深青（白字 ≥4.9:1），次按钮白底描边 */
 .featured-actions {
   display: flex;
-  gap: var(--spacing-sm);
   flex-wrap: wrap;
+  gap: 10px;
 }
 .featured-cta {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-height: 40px;
   padding: 10px 20px;
   border-radius: var(--radius-full);
   font-size: 0.875rem;
   font-weight: 600;
-  color: #0b1424;
-  background: linear-gradient(135deg, #5eead4 0%, #22d3ee 100%);
-  border: none;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0d7d76 0%, #0f766e 100%);
+  border: 1px solid transparent;
   cursor: pointer;
-  box-shadow: 0 8px 20px -6px rgba(34, 211, 238, 0.5);
+  box-shadow: 0 10px 24px -14px rgba(15, 118, 110, 0.9);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
 }
 .featured-cta:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 26px -6px rgba(34, 211, 238, 0.65);
-  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px -14px rgba(15, 118, 110, 1);
+  filter: brightness(0.96);
 }
 .featured-cta:active {
   transform: translateY(0);
+  filter: brightness(0.92);
+}
+.featured-cta:focus-visible,
+.featured-ghost:focus-visible {
+  outline: 2px solid var(--fp-brand-deep);
+  outline-offset: 3px;
 }
 .featured-cta svg {
   width: 16px;
@@ -705,24 +801,28 @@ const onPublishSuccess = () => {
 .featured-ghost {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-height: 40px;
   padding: 10px 16px;
   border-radius: var(--radius-full);
   font-size: 0.875rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.32);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 .featured-ghost:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.35);
-  color: #fff;
+  background: #f0fdfa;
+  border-color: rgba(11, 183, 170, 0.45);
+  color: var(--fp-brand);
 }
 .featured-ghost:disabled {
-  opacity: 0.5;
+  color: #68748a;
+  background: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.24);
   cursor: not-allowed;
 }
 .featured-ghost svg {
@@ -730,72 +830,74 @@ const onPublishSuccess = () => {
   height: 15px;
 }
 
-/* 右侧视觉区 */
+/* 右侧视觉区：浅色“资源卡”剪影，纯装饰 */
 .featured-visual {
   position: relative;
   z-index: 2;
-  flex-shrink: 0;
-  width: 180px;
-  height: 180px;
+  justify-self: end;
+  width: 196px;
+  height: 196px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .visual-ring {
   position: absolute;
-  inset: -10px;
+  inset: 4px;
   border-radius: 50%;
-  border: 1px dashed rgba(94, 234, 212, 0.3);
-  animation: featuredSpin 18s linear infinite;
+  border: 1px dashed rgba(11, 183, 170, 0.28);
+  animation: featuredSpin 24s linear infinite;
 }
 .visual-ring::after {
   content: '';
   position: absolute;
-  top: -4px;
+  top: -3px;
   left: 50%;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #5eead4;
+  background: var(--primary-color);
   transform: translateX(-50%);
-  box-shadow: 0 0 12px #5eead4;
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.14);
 }
 @keyframes featuredSpin {
   to { transform: rotate(360deg); }
 }
 .visual-card {
-  width: 148px;
-  height: 148px;
-  background: linear-gradient(145deg, rgba(11, 183, 170, 0.18), rgba(6, 182, 212, 0.1));
+  width: 150px;
+  height: 150px;
+  background: linear-gradient(150deg, #ffffff 0%, #f0fdfa 58%, #ccfbf1 100%);
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(94, 234, 212, 0.28);
+  border: 1px solid rgba(11, 183, 170, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  animation: featuredFloat 4s ease-in-out infinite;
+  box-shadow:
+    0 18px 34px -22px rgba(15, 118, 110, 0.55),
+    inset 0 1px 0 #ffffff;
+  animation: featuredFloat 6s ease-in-out infinite;
 }
 @keyframes featuredFloat {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  50% { transform: translateY(-5px); }
 }
 .card-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 45%, rgba(94, 234, 212, 0.35), transparent 70%);
-  animation: glowPulse 3s ease-in-out infinite;
+  background: radial-gradient(circle at 50% 45%, rgba(11, 183, 170, 0.16), transparent 70%);
+  animation: glowPulse 4s ease-in-out infinite;
 }
 .card-content {
   position: relative;
   text-align: center;
 }
 .card-icon-large {
-  width: 56px;
-  height: 56px;
+  width: 54px;
+  height: 54px;
   margin: 0 auto var(--spacing-xs);
-  color: rgba(255, 255, 255, 0.92);
-  filter: drop-shadow(0 0 10px rgba(94, 234, 212, 0.5));
+  color: var(--fp-brand);
 }
 .card-icon-large svg {
   width: 100%;
@@ -804,7 +906,7 @@ const onPublishSuccess = () => {
 .card-type {
   font-size: 0.75rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--fp-ink-muted);
   letter-spacing: 0.02em;
 }
 .card-spark {
@@ -812,8 +914,8 @@ const onPublishSuccess = () => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #5eead4;
-  box-shadow: 0 0 8px #5eead4;
+  background: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.14);
   opacity: 0;
   animation: featuredSpark 3.5s ease-in-out infinite;
 }
@@ -856,16 +958,17 @@ const onPublishSuccess = () => {
 }
 .featured-skeleton .visual-card {
   animation: none;
-  background: linear-gradient(110deg, rgba(255, 255, 255, 0.06) 30%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.06) 70%);
+  background: linear-gradient(110deg, #eef7f6 30%, #f8fefd 50%, #eef7f6 70%);
   background-size: 200% 100%;
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(11, 183, 170, 0.12);
+  box-shadow: none;
 }
 .featured-skeleton .skel-badge-line,
 .featured-skeleton .skel-title-line,
 .featured-skeleton .skel-desc-line,
 .featured-skeleton .skel-cta-line,
 .featured-skeleton .skel-stat {
-  background: linear-gradient(110deg, rgba(255, 255, 255, 0.08) 30%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0.08) 70%);
+  background: linear-gradient(110deg, var(--skeleton-bg-start) 30%, var(--skeleton-bg-middle) 50%, var(--skeleton-bg-end) 70%);
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
   border-radius: 6px;
@@ -892,13 +995,13 @@ const onPublishSuccess = () => {
 }
 .featured-skeleton .skel-stats-row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 22px;
   flex-wrap: wrap;
 }
 .featured-skeleton .skel-stat {
   width: 96px;
-  height: 40px;
+  height: 44px;
   border-radius: 10px;
 }
 .featured-skeleton .skel-cta-line {
@@ -908,33 +1011,87 @@ const onPublishSuccess = () => {
 }
 
 /* 精选横幅响应式 */
-@media (max-width: 960px) {
+@media (max-width: 1100px) {
   .featured-banner {
-    flex-direction: column-reverse;
-    align-items: flex-start;
-    gap: var(--spacing-lg);
+    grid-template-columns: minmax(0, 1fr) 168px;
   }
   .featured-visual {
-    width: auto;
-    height: auto;
+    width: 168px;
+    height: 168px;
   }
   .visual-card {
-    width: 120px;
-    height: 120px;
+    width: 132px;
+    height: 132px;
   }
-  .visual-ring {
-    inset: -6px;
+  .card-icon-large {
+    width: 46px;
+    height: 46px;
   }
 }
-@media (max-width: 560px) {
+
+/* ≤900：类型信息已由 .type-chip 承载，隐藏纯装饰视觉卡，单列排版 */
+@media (max-width: 900px) {
   .featured-banner {
-    padding: var(--spacing-xl);
+    grid-template-columns: minmax(0, 1fr);
   }
-  .featured-title {
-    font-size: 1.375rem;
+  .featured-visual {
+    display: none;
+  }
+  .featured-desc {
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .featured-banner {
+    padding: 18px;
+    border-radius: var(--radius-xl);
+  }
+  .featured-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .stat-chip {
-    flex: 1 1 calc(50% - 4px);
+    padding: 8px 10px;
+  }
+  .featured-actions {
+    gap: 8px;
+  }
+  .featured-cta,
+  .featured-ghost {
+    flex: 1 1 132px;
+  }
+}
+
+@media (max-width: 420px) {
+  .featured-title {
+    font-size: 1.1875rem;
+  }
+  .featured-actions {
+    flex-direction: column;
+  }
+  .featured-cta,
+  .featured-ghost {
+    /* 纵向排列时清掉横向的 flex-basis，避免被当作高度拉伸 */
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
+
+/* 尊重系统“减少动态效果”偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .visual-ring,
+  .visual-card,
+  .card-glow,
+  .card-spark,
+  .featured-badge .badge-dot,
+  .featured-banner::before {
+    animation: none !important;
+  }
+  .featured-cta,
+  .featured-ghost,
+  .stat-chip {
+    transition: none;
   }
 }
 

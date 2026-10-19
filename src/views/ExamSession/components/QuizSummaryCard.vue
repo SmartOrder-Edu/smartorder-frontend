@@ -108,14 +108,15 @@ const difficultyDistribution = computed(() => {
 <style scoped>
 .quiz-summary-card {
   display: grid;
-  grid-template-columns: 170px 1fr 1fr 1.25fr 1.25fr;
-  gap: 28px;
+  grid-template-columns: 132px 1fr 1fr 1.2fr 1.25fr;
+  gap: 22px;
   align-items: center;
-  padding: 28px 32px;
+  /* 概况卡压缩为答题工作台密度，保留关键统计但降低头部高度。 */
+  padding: 18px 24px;
   background: #ffffff;
   border: 1px solid #e8edf4;
-  border-radius: 26px;
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.05);
+  border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -138,7 +139,7 @@ const difficultyDistribution = computed(() => {
   display: flex;
   justify-content: flex-start;
   border-right: 1.5px solid #edf2f7;
-  padding-right: 28px;
+  padding-right: 22px;
   z-index: 1;
 }
 
@@ -146,14 +147,14 @@ const difficultyDistribution = computed(() => {
 .difficulty-wrapper {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .mini-bar-chart {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  height: 48px;
+  gap: 7px;
+  height: 40px;
 }
 
 .bar-item {
@@ -164,8 +165,8 @@ const difficultyDistribution = computed(() => {
 }
 
 .bar-track {
-  width: 10px;
-  height: 32px;
+  width: 8px;
+  height: 28px;
   background: #f1f5f9;
   border-radius: 999px;
   position: relative;
@@ -207,10 +208,10 @@ const difficultyDistribution = computed(() => {
 }
 
 .coverage-tag {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
-  height: 28px;
-  padding: 0 10px;
+  height: 26px;
+  padding: 0 9px;
   border-radius: 8px;
   background: #f0f4f9;
   color: #475569;
@@ -220,9 +221,9 @@ const difficultyDistribution = computed(() => {
 /* 响应式调整 */
 @media (max-width: 1200px) {
   .quiz-summary-card {
-    grid-template-columns: 140px 1fr 1fr 1.1fr;
-    gap: 20px;
-    padding: 24px 28px;
+    grid-template-columns: 120px 1fr 1fr 1.1fr;
+    gap: 18px;
+    padding: 18px 22px;
   }
   
   .quiz-summary-card > :last-child {
@@ -233,15 +234,15 @@ const difficultyDistribution = computed(() => {
   }
   
   .progress-section {
-    padding-right: 20px;
+    padding-right: 18px;
   }
 }
 
 @media (max-width: 868px) {
   .quiz-summary-card {
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    padding: 24px;
+    gap: 20px;
+    padding: 20px;
   }
   
   .progress-section {
@@ -250,7 +251,7 @@ const difficultyDistribution = computed(() => {
     border-right: none;
     border-bottom: 1.5px solid #edf2f7;
     padding-right: 0;
-    padding-bottom: 20px;
+    padding-bottom: 16px;
     margin-bottom: 4px;
   }
   
