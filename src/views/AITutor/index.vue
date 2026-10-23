@@ -130,9 +130,9 @@
             <!-- 消息列表 -->
             <div
               v-for="(msg, index) in messages"
-              :key="index"
+              :key="msg.id"
               class="message-wrapper"
-              :class="msg.role"
+              :class="[msg.role, msg.status === 'streaming' ? 'is-streaming' : '']"
             >
               <div class="message-avatar">
                 <svg v-if="msg.role === 'ai'" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
@@ -151,14 +151,28 @@
                 </svg>
               </div>
               <div class="message-content">
-                <div class="message-bubble" :class="{ 'user-bubble': msg.role === 'user' }">
-                  <!-- 思考与工具调用过程（默认折叠） -->
+                <div
+                  class="message-bubble"
+                  :class="{
+                    'user-bubble': msg.role === 'user',
+                    'message-bubble-error': msg.status === 'error',
+                  }"
+                >
+                  <!-- 阶段指示器（规划中） -->
+                  <div
+                    v-if="msg.status === 'streaming' && agentStore.currentPhase === 'PLANNING' && !agentStore.currentTaskList"
+                    class="phase-indicator"
+                  >
+                    <span class="phase-spinner"></span>
+                    <span class="phase-label">正在分析目标并生成任务计划...</span>
+                  </div>
+                  <!-- 思考与工具调用过程（流式中自动展开，定稿后折叠） -->
                   <ReasoningProcess
                     v-if="msg.role === 'ai' && hasReasoningContent(msg)"
                     :segments="msg.reasoningSegments || []"
                     :thinking-text="msg.thinkingText || ''"
                     :tool-calls="msg.toolCalls || []"
-                    :streaming="false"
+                    :streaming="msg.status === 'streaming'"
                     :duration-ms="msg.thinkingDurationMs || null"
                   />
                   <!-- 网络搜索来源卡片 -->
@@ -171,14 +185,14 @@
                     v-if="msg.role === 'ai' && msg.ragSources?.chunks?.length"
                     :sources="msg.ragSources"
                   />
-                  <!-- AI 消息使用 Markdown 渲染 -->
-                  <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
+                  <!-- AI 消息使用 Markdown 渲染（流式时内容逐字追加到同一条消息） -->
+                  <MarkdownRenderer v-if="msg.role === 'ai' && msg.content" :content="msg.content" />
                   <!-- 学习空间卡片（业务结果展示） -->
                   <LearningSpaceCards
                     v-if="msg.role === 'ai' && msg.learningSpaceCards?.length"
                     :cards="msg.learningSpaceCards"
                   />
-                  <!-- 思维导图卡片（历史消息） -->
+                  <!-- 思维导图卡片 -->
                   <template v-if="msg.role === 'ai' && msg.mindMaps?.length">
                     <MindMapCard
                       v-for="(mm, idx) in msg.mindMaps"
@@ -195,6 +209,12 @@
                       <span>{{ msg.attachmentFileIds.length }}个附件</span>
                     </div>
                   </template>
+
+                  <!-- 正在思考…（占位气泡，还没有任何可见内容时） -->
+                  <div v-if="isThinkingPlaceholder(msg)" class="thinking-placeholder">
+                    <span class="thinking-label">正在思考</span>
+                    <span class="loading-dots"><span></span><span></span><span></span></span>
+                  </div>
 
                   <!-- 资源卡片 -->
                   <div v-if="msg.resources" class="message-resources">
@@ -216,8 +236,8 @@
                   <pre v-if="msg.code" class="message-code"><code>{{ msg.code }}</code></pre>
                 </div>
 
-                <!-- 操作按钮 -->
-                <div class="message-actions" v-if="msg.role === 'ai'">
+                <!-- 操作按钮（生成中不显示） -->
+                <div class="message-actions" v-if="msg.role === 'ai' && msg.status !== 'streaming'">
                   <button class="msg-action-btn" @click="copyMessage(msg.content)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
@@ -244,85 +264,10 @@
               </div>
             </div>
 
-            <!-- 流式加载指示器 -->
-            <div class="message-wrapper ai loading-wrapper" v-if="agentStore.loading">
-              <div class="message-avatar">
-                <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
-                  <path d="M483.002182 188.043636h51.2v114.036364H483.002182z" fill="#40e3c2"/>
-                  <path d="M510.929455 143.825455m-128 0a128 128 0 1 0 256 0 128 128 0 1 0-256 0Z" fill="#40e3c2"/>
-                  <path d="M475.83125977 148.45865723v5.05620769h37.07885744v11.79781821h-16.8540259v23.59563642h16.8540259v11.79781817h-16.8540259V207.44774823l8.42701331 28.65184483h8.42701259v10.1124154h-15.16862307l-5.05620773-20.22483152L485.94367591 246.21200846H469.08964929v-11.7978182h11.79781818L485.94367591 207.44774823v-8.42701259H469.08964929v-11.79781893h18.5394287V163.62728031h-15.1686231L465.71884437 156.88566981v-8.42701258h10.1124154z m82.58472817 3.37080486v82.58472817l-10.1124154 11.79781822H519.65172773V151.82946209h38.76426021z m-11.79781819 11.79781822h-16.85402591v70.78690995h16.85402591V163.62728031z" fill="#40e3c2"/>
-                  <path d="M679.098182 301.963636c139.636364 13.963636 223.418182 79.127273 253.672727 197.818182 46.545455 179.2 34.909091 267.636364 32.581818 283.927273-2.327273 18.618182-30.254545 123.345455-160.581818 174.545454-83.781818 32.581818-172.218182 55.854545-293.236364 53.527273v-535.272727 535.272727c-116.363636 2.327273-204.8-18.618182-286.254545-48.872727l-9.309091-4.654546c-130.327273-53.527273-158.254545-158.254545-160.581818-174.545454-4.654545-16.290909-13.963636-104.727273 30.254545-283.927273 30.254545-118.690909 114.036364-186.181818 251.345455-200.145454 37.236364-2.327273 93.090909-6.981818 172.218182-6.981819h9.309091c74.472727 0 128 4.654545 160.581818 9.309091z" fill="#C5C5C5"/>
-                  <path d="M139.170909 723.2c0 2.327273 0 2.327273 0 0 0 4.654545 2.327273 6.981818 2.327273 9.309091 4.654545 9.309091 9.309091 16.290909 16.290909 25.6 18.618182 23.272727 46.545455 44.218182 83.781818 58.181818l4.654546 2.327273 4.654545 2.327273c53.527273 18.618182 107.054545 30.254545 165.236364 37.236363 58.181818 4.654545 123.345455 4.654545 183.854545 0 58.181818-4.654545 111.709091-18.618182 165.236364-37.236363l4.654545-2.327273c41.890909-13.963636 69.818182-34.909091 88.436364-60.509091 6.981818-9.309091 11.636364-18.618182 16.290909-25.6 0-2.327273 2.327273-4.654545 2.327273-6.981818v-2.327273c0-2.327273 0-6.981818 2.327272-11.636364v-2.327272-39.563637c-2.327273-44.218182-13.963636-97.745455-32.581818-162.909091-18.618182-74.472727-72.145455-111.709091-174.545454-121.018181-53.527273-4.654545-93.090909-6.981818-148.945455-6.981819H502.225455c-58.181818 0-97.745455 2.327273-155.927273 6.981819-102.4 9.309091-153.6 46.545455-174.545455 118.690909-18.618182 65.163636-27.927273 118.690909-32.581818 162.909091 0 16.290909-2.327273 30.254545 0 39.563636v16.290909z" fill="#14254E"/>
-                  <path d="M509.207273 695.272727c-27.927273 0-55.854545 11.636364-55.854546 20.945455s11.636364 39.563636 55.854546 39.563636c41.890909 0 51.2-23.272727 55.854545-39.563636 0-13.963636-27.927273-20.945455-55.854545-20.945455z" fill="#40E3C2"/>
-                  <path d="M295.936 578.373818a72.145455 53.527273 90 1 0 107.054545 0 72.145455 53.527273 90 1 0-107.054545 0Z" fill="#40E3C2"/>
-                  <path d="M617.099636 578.373818a72.145455 53.527273 90 1 0 107.054546 0 72.145455 53.527273 90 1 0-107.054546 0Z" fill="#40E3C2"/>
-                </svg>
-              </div>
-              <div class="message-content">
-                <div class="message-bubble">
-                  <!-- 阶段指示器 -->
-                  <div v-if="agentStore.currentPhase === 'PLANNING' && !agentStore.currentTaskList" class="phase-indicator">
-                    <span class="phase-spinner"></span>
-                    <span class="phase-label">正在分析目标并生成任务计划...</span>
-                  </div>
-                  <!-- 思考与工具调用过程（流式，自动展开） -->
-                  <ReasoningProcess
-                    v-if="hasLiveReasoningContent()"
-                    :segments="agentStore.reasoningSegments"
-                    :thinking-text="agentStore.thinkingText"
-                    :tool-calls="agentStore.toolCalls"
-                    :streaming="true"
-                  />
-                  <!-- 网络搜索来源卡片（流式实时展示） -->
-                  <WebSearchSources
-                    v-if="agentStore.currentWebSearchReferences?.length"
-                    :references="agentStore.currentWebSearchReferences"
-                  />
-                  <!-- RAG 检索来源卡片（流式实时展示） -->
-                  <RagSources
-                    v-if="agentStore.currentRagSources?.chunks?.length"
-                    :sources="agentStore.currentRagSources"
-                  />
-                  <!-- 回答内容（流式） -->
-                  <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
-                  <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
-                  <!-- 学习空间卡片（流式实时展示） -->
-                  <LearningSpaceCards
-                    v-if="liveLearningSpaceCards.length"
-                    :cards="liveLearningSpaceCards"
-                  />
-                  <!-- 思维导图卡片（流式实时展示） -->
-                  <template v-if="agentStore.currentMindMaps?.length">
-                    <MindMapCard
-                      v-for="(mm, idx) in agentStore.currentMindMaps"
-                      :key="'mm-live-' + idx"
-                      :data="mm"
-                    />
-                  </template>
-
-                  <!-- 学习计划预览（LEARNING_PLAN 草稿审阅） -->
-                  <LearningPlanPreview
-                    v-if="agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
-                    :learning-plan="agentStore.learningPlanDraft"
-                    :confirming="agentStore.planConfirmLoading"
-                    :readonly="agentStore.learningPlanPreviewReadonly"
-                    :space-created="agentStore.learningPlanSpaceCreated"
-                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
-                    @cancel="handleLearningPlanCancel"
-                  />
-
-                  <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
-                  <div v-if="!agentStore.reasoningSegments.length && !agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText && !agentStore.currentTaskList" class="loading-dots">
-                    <span></span><span></span><span></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 学习计划预览需要在 SSE 结束后继续保留，直到用户确认创建学习空间 -->
+            <!-- 学习计划预览：流式期间与结束后都保留，直到用户确认创建学习空间 -->
             <div
               class="message-wrapper ai learning-plan-review-wrapper"
-              v-if="!agentStore.loading && agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
+              v-if="agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
             >
               <div class="message-avatar"></div>
               <div class="message-content">
@@ -731,7 +676,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
 import {
-  extractLearningSpaceCardsFromToolCalls,
   useAgentChat,
   type ChatMessage,
 } from '@/composables/useAgentChat'
@@ -767,7 +711,6 @@ import type { LearningSpaceType } from '@/api/learningSpace'
 const userStore = useUserStore()
 const agentStore = useAgentStore()
 const learningSpaceStore = useLearningSpaceStore()
-const liveLearningSpaceCards = computed(() => extractLearningSpaceCardsFromToolCalls(agentStore.toolCalls))
 const route = useRoute()
 
 const inputMessage = ref('')
@@ -834,13 +777,17 @@ const switchMode = (mode: ChatMode) => {
   currentForceMode.value = mode === 'AUTO' ? null : mode
 }
 
-// 监听 AI 消息变化，将最新消息传递给数字人
-watch(() => messages.value, (newMessages) => {
-  const lastAiMessage = [...newMessages].reverse().find(m => m.role === 'ai')
-  if (lastAiMessage) {
-    latestAiMessageForAvatar.value = lastAiMessage.content
-  }
-}, { deep: true })
+// 监听最后一条 AI 消息的内容变化（流式时逐字更新），同步给数字人。
+// 不做 deep watch：现在流式文本直接写进消息对象，deep 会在每个 token 上遍历整个列表。
+watch(
+  () => {
+    const last = messages.value[messages.value.length - 1]
+    return last && last.role === 'ai' ? last.content : ''
+  },
+  (content) => {
+    if (content) latestAiMessageForAvatar.value = content
+  },
+)
 
 const preloadAvatarAuthInfo = async () => {
   avatarAuthLoading.value = true
@@ -1439,13 +1386,20 @@ function hasReasoningContent(msg: ChatMessage): boolean {
   )
 }
 
-/** 判断当前流式状态是否有推理内容 */
-function hasLiveReasoningContent(): boolean {
-  return !!(
-    agentStore.reasoningSegments.length ||
-    agentStore.thinkingText ||
-    agentStore.toolCalls.length
-  )
+/**
+ * 是否是"空的占位气泡"：正在生成，但还没有任何可见内容。
+ * 此时显示「正在思考…」，避免出现一个空白的 AI 气泡。
+ */
+function isThinkingPlaceholder(msg: ChatMessage): boolean {
+  if (msg.status !== 'streaming') return false
+  // 学习计划草稿有自己的展示卡片，此时不需要"正在思考"
+  if (agentStore.learningPlanDraft && agentStore.showLearningPlanPreview) return false
+  return !msg.content
+    && !hasReasoningContent(msg)
+    && !msg.webSearchReferences?.length
+    && !msg.ragSources?.chunks?.length
+    && !msg.learningSpaceCards?.length
+    && !msg.mindMaps?.length
 }
 
 /** 取消自动执行倒计时 */
@@ -2227,15 +2181,49 @@ watch(windowWidth, (newWidth, oldWidth) => {
   width: fit-content;
 }
 
-/* 流式光标 */
-.streaming-cursor {
+/* 流式光标：跟在最后一段文字尾部（而不是单独占一行） */
+.message-wrapper.is-streaming :deep(.markdown-renderer) > *:last-child::after {
+  content: '';
   display: inline-block;
-  width: 8px;
-  height: 16px;
-  background: var(--primary-color);
+  width: 7px;
+  height: 15px;
   margin-left: 2px;
+  background: var(--primary-color);
   vertical-align: text-bottom;
   animation: blink 0.8s step-end infinite;
+}
+
+/* 正在思考… 占位气泡 */
+.thinking-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 2px 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.thinking-label {
+  letter-spacing: 0.02em;
+}
+
+.thinking-placeholder .loading-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* 生成失败/中断：气泡给一点轻微提示色 */
+.message-bubble-error {
+  background: rgba(239, 68, 68, 0.04);
+  border-radius: var(--radius-lg);
+  padding: 4px 8px;
+}
+
+/* 流式中的消息不再有淡入动画，避免每个 delta 都闪一下 */
+.message-wrapper.is-streaming {
+  animation: none;
 }
 
 @keyframes blink {

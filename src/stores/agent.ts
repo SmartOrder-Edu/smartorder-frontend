@@ -59,6 +59,12 @@ export const useAgentStore = defineStore('agent', () => {
   // 当前追踪 ID
   const currentTraceId = ref<string>('')
 
+  // 当前轮的助手占位消息 ID（后端 agent.message.created 下发，done 时用于定稿）
+  const currentAssistantMessageId = ref<string>('')
+
+  // 本轮是否新建了会话（agent.conversation.created 置 true，用于避免消息数重复累加）
+  const conversationCreatedThisTurn = ref(false)
+
   // 当前运行模式
   const currentMode = ref<string>('')
 
@@ -144,6 +150,8 @@ export const useAgentStore = defineStore('agent', () => {
     reasoningSegments.value = []
     routeResult.value = null
     traceEvents.value = []
+    currentAssistantMessageId.value = ''
+    conversationCreatedThisTurn.value = false
     loading.value = true
     planDialogVisible.value = false
     tracePanelVisible.value = false
@@ -209,6 +217,27 @@ export const useAgentStore = defineStore('agent', () => {
     }
 
     switch (eventName) {
+      /**
+       * 首条消息：后端已建好会话并下发兜底标题。
+       * 前端据此把会话 upsert 到侧边栏头部，避免"发完第一条消息左侧没有这条会话"。
+       */
+      case 'agent.conversation.created': {
+        const cid = data.payload?.conversationId || data.conversationId
+        if (cid) {
+          currentConversationId.value = cid
+          conversationCreatedThisTurn.value = true
+        }
+        break
+      }
+
+      /** 助手占位消息已创建（status=RUNNING），记住 messageId 用于 done 定稿 */
+      case 'agent.message.created': {
+        if (data.payload?.messageId != null) {
+          currentAssistantMessageId.value = String(data.payload.messageId)
+        }
+        break
+      }
+
       case 'agent.text.delta':
         if (data.payload?.text) {
           answerText.value += data.payload.text
@@ -660,6 +689,18 @@ export const useAgentStore = defineStore('agent', () => {
     }
   }
 
+  /** 更新当前会话的最后活跃时间与消息数（一轮对话结束后调用） */
+  function touchConversation(messageCountDelta = 0) {
+    const cid = currentConversationId.value
+    if (!cid) return
+    const conv = conversations.value.find(c => c.conversationId === cid)
+    if (!conv) return
+    conv.lastActiveTime = new Date().toISOString()
+    if (messageCountDelta) {
+      conv.messageCount = (conv.messageCount || 0) + messageCountDelta
+    }
+  }
+
   function addExecutionStep(step: ExecutionStep) {
     const existing = executionSteps.value.find(s => s.stepName === step.stepName)
     if (existing) {
@@ -717,6 +758,7 @@ export const useAgentStore = defineStore('agent', () => {
     return traceEvents.value.filter(e => e.traceId === currentTraceId.value)
   }
 
+
   /**
    * 获取对话列表
    */
@@ -731,6 +773,7 @@ export const useAgentStore = defineStore('agent', () => {
       conversationsLoading.value = false
     }
   }
+
 
   /**
    * 删除指定对话
@@ -764,6 +807,8 @@ export const useAgentStore = defineStore('agent', () => {
   function reset() {
     currentConversationId.value = ''
     currentTraceId.value = ''
+    currentAssistantMessageId.value = ''
+    conversationCreatedThisTurn.value = false
     currentMode.value = ''
     answerText.value = ''
     thinkingText.value = ''
@@ -800,6 +845,8 @@ export const useAgentStore = defineStore('agent', () => {
   return {
     currentConversationId,
     currentTraceId,
+    currentAssistantMessageId,
+    conversationCreatedThisTurn,
     currentMode,
     answerText,
     thinkingText,
@@ -847,6 +894,7 @@ export const useAgentStore = defineStore('agent', () => {
     getCurrentMessageTraceEvents,
     fetchConversations,
     deleteConversation,
+    touchConversation,
     reset,
   }
 })
