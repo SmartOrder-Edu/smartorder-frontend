@@ -226,6 +226,17 @@ export const useAgentStore = defineStore('agent', () => {
         if (cid) {
           currentConversationId.value = cid
           conversationCreatedThisTurn.value = true
+          upsertConversation(cid, data.payload?.title || '')
+        }
+        break
+      }
+
+      /** 模型压缩标题异步生成完成：更新侧边栏与顶栏标题 */
+      case 'agent.conversation.title': {
+        const cid = data.payload?.conversationId || data.conversationId
+        const title = data.payload?.title
+        if (cid && title) {
+          upsertConversation(cid, title)
         }
         break
       }
@@ -689,6 +700,30 @@ export const useAgentStore = defineStore('agent', () => {
     }
   }
 
+  /**
+   * 把会话 upsert 到列表（首条消息时后端下发 conversation.created）。
+   * 新建的会话排到最前；已有会话只更新标题/活跃时间，不改变顺序。
+   */
+  function upsertConversation(conversationId: string, title?: string) {
+    const list = conversations.value
+    const idx = list.findIndex(c => c.conversationId === conversationId)
+    if (idx >= 0) {
+      const conv = list[idx]
+      if (title) conv.title = title
+      conv.lastActiveTime = new Date().toISOString()
+      return conv
+    }
+    const created: ConversationVO = {
+      conversationId,
+      title: title || '',
+      lastMessage: '',
+      messageCount: 2,
+      lastActiveTime: new Date().toISOString(),
+    }
+    list.unshift(created)
+    return list[0]
+  }
+
   /** 更新当前会话的最后活跃时间与消息数（一轮对话结束后调用） */
   function touchConversation(messageCountDelta = 0) {
     const cid = currentConversationId.value
@@ -758,9 +793,12 @@ export const useAgentStore = defineStore('agent', () => {
     return traceEvents.value.filter(e => e.traceId === currentTraceId.value)
   }
 
-
   /**
-   * 获取对话列表
+   * 获取对话列表（整表刷新）
+   *
+   * 会置 `conversationsLoading`，侧边栏会显示"加载中..."。
+   * 只在首次进入页面等"必须整表重建"的场景使用；
+   * 日常操作（新建对话、删除对话）请用 `syncConversations()`。
    */
   async function fetchConversations() {
     conversationsLoading.value = true
@@ -774,6 +812,81 @@ export const useAgentStore = defineStore('agent', () => {
     }
   }
 
+  /** 静默同步是否进行中（防重入，不影响任何 loading UI） */
+  const conversationsSyncing = ref(false)
+  /** 上次静默同步的时间戳（用于节流，避免频繁拉列表） */
+  let lastConversationsSyncAt = 0
+
+  /**
+   * 静默增量同步对话列表
+   *
+   * 与 `fetchConversations` 的区别（这正是点"新建对话"时不该整表刷新的原因）：
+   * 1. 不置 `conversationsLoading` —— 侧边栏不会闪一下"加载中..."；
+   * 2. 不替换整个数组 —— 逐条比对，只把**新增的**插进去、只更新**变了的**字段，
+   *    已有列表项的引用保持不变，v-for 复用 DOM，没有任何重建/闪烁；
+   * 3. 远端没有但本地有的会话（刚创建、列表接口还没读到）保留下来，不会被"刷没"。
+   *
+   * 这是**兜底**通道：主路径是 SSE 的 `agent.conversation.created` / `.title` 事件，
+   * 只有事件丢了（断线、别的标签页新建）才需要它来对齐。
+   *
+   * @param options.minIntervalMs 节流窗口，窗口内重复调用直接跳过（默认不节流）
+   */
+  async function syncConversations(options?: { minIntervalMs?: number }) {
+    const minInterval = options?.minIntervalMs ?? 0
+    if (minInterval > 0 && Date.now() - lastConversationsSyncAt < minInterval) return
+    if (conversationsSyncing.value) return
+    conversationsSyncing.value = true
+    lastConversationsSyncAt = Date.now()
+    try {
+      const latest = (await agentApi.getConversations()) || []
+      mergeConversations(latest)
+    } catch (e) {
+      // 静默失败：保持现有列表不动，不打扰用户
+      console.error('[AgentStore] 同步对话列表失败:', e)
+    } finally {
+      conversationsSyncing.value = false
+    }
+  }
+
+  /** 把远端列表合并进本地（新增插入 / 变更原地更新 / 无变化则完全不动） */
+  function mergeConversations(latest: ConversationVO[]) {
+    const localMap = new Map(conversations.value.map(c => [c.conversationId, c]))
+    const remoteIds = new Set(latest.map(c => c.conversationId))
+    let changed = false
+
+    const merged: ConversationVO[] = latest.map(remote => {
+      const local = localMap.get(remote.conversationId)
+      if (!local) {
+        changed = true
+        return remote
+      }
+      // 原地改字段，不换对象引用 → 对应列表项不会重新渲染
+      if (remote.title && remote.title !== local.title) {
+        local.title = remote.title
+        changed = true
+      }
+      if (remote.lastMessage !== local.lastMessage) {
+        local.lastMessage = remote.lastMessage
+        changed = true
+      }
+      if (typeof remote.messageCount === 'number' && remote.messageCount !== local.messageCount) {
+        local.messageCount = remote.messageCount
+        changed = true
+      }
+      if (remote.lastActiveTime && remote.lastActiveTime !== local.lastActiveTime) {
+        local.lastActiveTime = remote.lastActiveTime
+        changed = true
+      }
+      return local
+    })
+
+    // 本地有、远端没有的（通常是刚创建还没进列表接口的会话）放到最前面
+    const localOnly = conversations.value.filter(c => !remoteIds.has(c.conversationId))
+    if (localOnly.length > 0) changed = true
+
+    if (!changed) return
+    conversations.value = [...localOnly, ...merged]
+  }
 
   /**
    * 删除指定对话
@@ -893,7 +1006,9 @@ export const useAgentStore = defineStore('agent', () => {
     closeTracePanel,
     getCurrentMessageTraceEvents,
     fetchConversations,
+    syncConversations,
     deleteConversation,
+    upsertConversation,
     touchConversation,
     reset,
   }

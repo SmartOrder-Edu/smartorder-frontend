@@ -14,8 +14,16 @@
             </button>
           </div>
           <div class="history-sidebar-list">
-            <div class="history-loading" v-if="agentStore.conversationsLoading">加载中...</div>
-            <div class="history-empty" v-else-if="agentStore.conversations.length === 0">
+            <!-- 只有在"还没有任何内容"时才显示加载态。
+                 已有列表时，任何后台刷新都不应该有任何视觉提示（否则就是"点一下闪一下加载中"） -->
+            <div
+              class="history-loading"
+              v-if="agentStore.conversationsLoading && agentStore.conversations.length === 0"
+            >加载中...</div>
+            <div
+              class="history-empty"
+              v-else-if="!agentStore.conversationsLoading && agentStore.conversations.length === 0"
+            >
               <p class="empty-text">暂无对话记录</p>
               <p class="empty-hint">发送一条消息开始对话</p>
             </div>
@@ -1152,10 +1160,13 @@ const sendQuickMessage = (msg: string) => {
   sendMessage()
 }
 
-const handleNewChat = async () => {
+const handleNewChat = () => {
+  // 只做本地重置：清空当前会话与附件，立刻给出新对话界面
   startNewConversation()
   clearAttachmentState()
-  await agentStore.fetchConversations()
+  // 后台静默增量同步：有新会话才插进来，没变化就完全不动，
+  // 不置 loading，侧边栏不会闪"加载中..."（旧实现是整表刷新）
+  agentStore.syncConversations()
 }
 
 const handleStopGeneration = () => {
@@ -1180,7 +1191,8 @@ const handleDeleteConversation = async (conv: ConversationVO) => {
   try {
     await deleteConversation(conv.conversationId)
     ElMessage.success('对话已删除')
-    await agentStore.fetchConversations()
+    // 本地已移除该项，这里只做静默增量同步兜底，不整表刷新
+    agentStore.syncConversations()
   } catch {
     ElMessage.error('删除失败，请重试')
   }
@@ -1702,6 +1714,7 @@ onMounted(() => {
   isAssistantCollapsed.value = window.innerWidth < 1280
   preloadAvatarAuthInfo()
   agentStore.fetchConversations()
+  document.addEventListener('visibilitychange', handleVisibilitySync)
   ensureLearningSpacesLoaded().then(() => {
     const routeSpaceId = route.query.spaceId
     if (typeof routeSpaceId === 'string' && routeSpaceId) {
@@ -1731,11 +1744,22 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearAttachmentState()
+  document.removeEventListener('visibilitychange', handleVisibilitySync)
   if (autoConfirmTimer) {
     clearInterval(autoConfirmTimer)
     autoConfirmTimer = null
   }
 })
+
+/**
+ * 兜底对齐：窗口重新可见时静默同步一次会话列表。
+ * 覆盖"事件驱动拿不到"的场景（SSE 断线、在别的标签页/设备新建了会话）。
+ * 60s 节流，切换标签页不会每次都打接口。
+ */
+function handleVisibilitySync() {
+  if (document.visibilityState !== 'visible') return
+  agentStore.syncConversations({ minIntervalMs: 60_000 })
+}
 
 watch(windowWidth, (newWidth, oldWidth) => {
   if (newWidth < 1280 && oldWidth >= 1280) {
