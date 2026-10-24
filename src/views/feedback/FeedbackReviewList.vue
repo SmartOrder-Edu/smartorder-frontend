@@ -622,7 +622,8 @@ const handleCurrentChange = (val: number) => {
 
 // 提交人工审核与答复
 const submitReview = async (status: number) => {
-  if (!selectedRow.value) return
+  // 审核请求进行中禁止重复提交同一条反馈。
+  if (submittingReview.value || !selectedRow.value) return
 
   if (status === 4 && !reviewForm.reviewRemark.trim()) {
     ElMessage.warning('驳回时必须填写内部复核备注作为驳回原因')

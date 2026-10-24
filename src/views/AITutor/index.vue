@@ -565,8 +565,9 @@
         </main>
 
         <!-- 数字人面板：聊天区右侧的辅助陪伴面板 -->
+        <!-- 收起时卸载数字人连接，停止后台重连与重复鉴权。 -->
         <AssistantPanel
-          v-show="!isAssistantCollapsed"
+          v-if="!isAssistantCollapsed"
           class="assistant-panel-slot"
           :latestAiMessage="latestAiMessageForAvatar"
           :initial-auth-info="avatarAuthInfo"
@@ -1474,6 +1475,8 @@ const openMsgTrace = async (msg: any) => {
 // === Plan-and-Execute Gate 事件处理 ===
 
 const handleGateAnswer = async (clarificationId: string, answer: string) => {
+  // 卡片和聊天输入可能同时触发同一澄清请求，使用同一个同步锁。
+  if (gateSubmitting.value) return
   const draftId = agentStore.currentDraftId
   if (clarificationId && draftId) {
     gateSubmitting.value = true
@@ -1725,7 +1728,9 @@ watch(
 
 onMounted(() => {
   isAssistantCollapsed.value = window.innerWidth < 1280
-  preloadAvatarAuthInfo()
+  // 默认收起时不预取数字人鉴权，展开后再建立连接。
+  if (isAssistantCollapsed.value) avatarAuthLoading.value = false
+  else void preloadAvatarAuthInfo()
   agentStore.fetchConversations()
   const conversationId = route.query.conversationId
   if (typeof conversationId === 'string' && conversationId) void loadConversation(conversationId)
@@ -1754,6 +1759,12 @@ onMounted(() => {
         sendQuickMessage(`分析我的测评错题，试卷ID为 ${jobId}`)
       }, 500)
     })
+  }
+})
+
+watch(isAssistantCollapsed, collapsed => {
+  if (!collapsed && !avatarAuthInfo.value && !avatarAuthLoading.value) {
+    void preloadAvatarAuthInfo()
   }
 })
 

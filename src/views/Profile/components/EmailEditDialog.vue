@@ -169,6 +169,8 @@ const startCountdown = () => {
 }
 
 const sendCode = async () => {
+  // 发送中或倒计时内忽略重复请求。
+  if (sending.value || countdown.value > 0) return
   const email = form.newEmail.trim()
   if (!email) {
     errors.newEmail = '请输入新邮箱'

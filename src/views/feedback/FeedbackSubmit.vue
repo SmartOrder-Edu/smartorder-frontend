@@ -439,34 +439,33 @@ const handleResetForm = () => {
 
 // 提交反馈与保存修改
 const handleSubmit = async () => {
-  if (!formRef.value) return
-  
-  await formRef.value.validate(async (valid) => {
+  // 从表单校验开始锁定，防止连续点击并发提交同一反馈。
+  if (submitting.value || !formRef.value) return
+  submitting.value = true
+  try {
+    const valid = await formRef.value.validate().catch(() => false)
     if (valid) {
-      submitting.value = true
-      try {
-        if (isEditing.value && editingId.value) {
-          // 修改反馈
-          await request.put(`/feedback/${editingId.value}`, formData)
-          ElMessage.success('修改成功，已为您重新触发AI审核')
-          successVisible.value = true
-          cancelEdit()
-          fetchMyHistory()
-        } else {
-          // 提交新反馈
-          await request.post('/feedback/submit', formData)
-          ElMessage.success('提交成功')
-          successVisible.value = true
-          handleResetForm()
-          fetchMyHistory()
-        }
-      } catch (error) {
-        console.error(error)
-      } finally {
-        submitting.value = false
+      if (isEditing.value && editingId.value) {
+        // 修改反馈
+        await request.put(`/feedback/${editingId.value}`, formData)
+        ElMessage.success('修改成功，已为您重新触发AI审核')
+        successVisible.value = true
+        cancelEdit()
+        fetchMyHistory()
+      } else {
+        // 提交新反馈
+        await request.post('/feedback/submit', formData)
+        ElMessage.success('提交成功')
+        successVisible.value = true
+        handleResetForm()
+        fetchMyHistory()
       }
     }
-  })
+  } catch (error) {
+    console.error(error)
+  } finally {
+    submitting.value = false
+  }
 }
 
 // 进入编辑模式

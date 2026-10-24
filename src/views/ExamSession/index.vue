@@ -1026,6 +1026,8 @@ const handleAlgorithmMockSubmit = () => new Promise<void>((resolve) => {
 })
 
 const submitExam = () => {
+  // 提交期间屏蔽答题卡和侧栏的重复触发。
+  if (isSubmitting.value || showAnswer.value) return
   const unfinishedTypes: string[] = []
   groupedQuestions.value.forEach(group => {
     const hasUnanswered = group.questions.some(q => !isQuestionAnswered(q))
@@ -1043,6 +1045,7 @@ const submitExam = () => {
 }
 
 const confirmSubmit = () => {
+  if (isSubmitting.value || showAnswer.value) return
   showUnfinishedModal.value = false
   doSubmitExam()
 }
@@ -1234,6 +1237,8 @@ const formatDateTime = (value?: string | null) => {
 }
 
 const doSubmitExam = async () => {
+  // 同步加锁，避免两处提交按钮在一次渲染前同时发起判分请求。
+  if (isSubmitting.value || showAnswer.value) return
   isSubmitting.value = true
   try {
     // 构建提交 payload

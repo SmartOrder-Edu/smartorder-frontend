@@ -192,7 +192,8 @@ const onOpen = () => {
 }
 
 const handleSubmit = async () => {
-  if (!canSubmit.value || !props.file) return
+  // 发布请求在途时忽略重复点击。
+  if (submitting.value || !canSubmit.value || !props.file) return
 
   submitting.value = true
   try {

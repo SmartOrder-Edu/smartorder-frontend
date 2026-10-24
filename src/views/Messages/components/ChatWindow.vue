@@ -214,7 +214,7 @@
               type="primary"
               @click="handleSend"
               :loading="sending"
-              :disabled="!messageText.trim()"
+              :disabled="sending || !messageText.trim()"
             >
               <el-icon><Promotion /></el-icon>
             </el-button>
@@ -352,7 +352,8 @@ function handleScroll() {
 }
 
 async function handleSend() {
-  if (!messageText.value.trim() || !props.friend) return
+  // 在请求开始时拦截重复点击和连续回车，避免同一条私信被发送多次。
+  if (sending.value || !messageText.value.trim() || !props.friend) return
 
   sending.value = true
   try {

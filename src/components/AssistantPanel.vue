@@ -92,6 +92,7 @@ const emit = defineEmits(['collapse']);
 const AVATAR_HEARTBEAT_INTERVAL = 25000;
 const AVATAR_RECONNECT_BASE_DELAY = 3000;
 const AVATAR_RECONNECT_MAX_DELAY = 30000;
+const AVATAR_RECONNECT_MAX_ATTEMPTS = 3;
 const AVATAR_DEBUG_PREFIX = '[AvatarDebug]';
 
 const redactAvatarUrl = (url: string) => {
@@ -219,8 +220,14 @@ const resetAvatarRuntime = () => {
 
 const scheduleAvatarReconnect = (reason = 'connection lost') => {
   if (isUnmounted || isInitializing || avatarReconnectTimer !== null) return;
-  clearAvatarReconnect();
   stopAvatarHeartbeat();
+  // 连续失败达到上限后停止自动鉴权和重连，用户可重新展开面板再试。
+  if (reconnectAttempts >= AVATAR_RECONNECT_MAX_ATTEMPTS) {
+    isLoading.value = false;
+    console.warn(`[Avatar] reconnect stopped after ${reconnectAttempts} attempts: ${reason}`);
+    return;
+  }
+  clearAvatarReconnect();
 
   const delay = Math.min(
     AVATAR_RECONNECT_BASE_DELAY * Math.max(1, reconnectAttempts + 1),
@@ -379,7 +386,6 @@ const connectXfWebSocket = () => {
   isManualSocketClose = false;
   avatarSocket.onopen = () => {
     logAvatarStep('socket:open', { requestId, readyState: getSocketStateName(avatarSocket?.readyState) });
-    reconnectAttempts = 0;
     startAvatarHeartbeat();
     const startCmd = {
       header: { app_id: avatarAuth.value.appId, request_id: requestId, ctrl: "start", scene_id: avatarAuth.value.sceneId },
@@ -437,6 +443,8 @@ const connectXfWebSocket = () => {
         hasStreamUrl: Boolean(payload.avatar.stream_url),
       });
       if (payload.avatar.event_type === 'stream_info') {
+        // 收到可播放的视频流后才清零失败次数，避免连接刚建立就断开时无限鉴权。
+        reconnectAttempts = 0;
         logAvatarStep('stream:info', {
           sid: res.header?.sid,
           streamUrl: payload.avatar.stream_url,

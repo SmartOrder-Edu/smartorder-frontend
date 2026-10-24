@@ -328,6 +328,8 @@ const rules: FormRules = {
 }
 
 const sendCode = async () => {
+  // 请求和倒计时共用发送限制，拦截连续点击。
+  if (codeLoading.value || countdown.value > 0) return
   if (!formData.email) {
     ElMessage.warning('请先输入邮箱')
     return

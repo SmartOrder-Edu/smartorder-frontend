@@ -296,6 +296,8 @@ async function receiveMessage(text: string) {
   const trimmed = text.trim()
   if (!trimmed || isStreaming.value) return
 
+  // 刷新令牌前同步锁定发送，防止连续操作并发创建多个 Agent 任务。
+  isStreaming.value = true
   focusPanel()
   messages.value.push({ role: 'user', text: trimmed })
   const replyId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -310,12 +312,12 @@ async function receiveMessage(text: string) {
   } catch {
     agentMessage.text = '登录状态已失效，请重新登录后再试。'
     agentMessage.streaming = false
+    isStreaming.value = false
     emit('agentReply', { ...agentMessage })
     scrollChatToBottom()
     return
   }
 
-  isStreaming.value = true
   abortController = new AbortController()
   let answerText = ''
 

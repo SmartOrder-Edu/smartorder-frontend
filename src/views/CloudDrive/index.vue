@@ -464,7 +464,7 @@
         <el-input v-model="newFolderName" placeholder="请输入文件夹名称" @keyup.enter="confirmNewFolder" />
         <template #footer>
           <el-button @click="showNewFolderDialog = false">取消</el-button>
-          <el-button type="primary" :disabled="!newFolderName.trim()" @click="confirmNewFolder">确定</el-button>
+          <el-button type="primary" :disabled="creatingFolder || !newFolderName.trim()" @click="confirmNewFolder">确定</el-button>
         </template>
       </el-dialog>
 
@@ -473,7 +473,7 @@
         <el-input v-model="renameValue" placeholder="请输入新名称" @keyup.enter="confirmRename" />
         <template #footer>
           <el-button @click="showRenameDialog = false">取消</el-button>
-          <el-button type="primary" :disabled="!renameValue.trim()" @click="confirmRename">确定</el-button>
+          <el-button type="primary" :disabled="renamingFolder || !renameValue.trim()" @click="confirmRename">确定</el-button>
         </template>
       </el-dialog>
 
@@ -635,6 +635,9 @@ const isDragging = ref(false)
 const showUploadDialog = ref(false)
 const showNewFolderDialog = ref(false)
 const showRenameDialog = ref(false)
+// 文件夹创建与重命名各自持有请求锁，防止回车和按钮并发提交。
+const creatingFolder = ref(false)
+const renamingFolder = ref(false)
 const showPreviewDialog = ref(false)
 const previewIframeUrl = ref('')
 const newFolderName = ref('')
@@ -937,7 +940,8 @@ const handleNewFolder = () => {
 
 const confirmNewFolder = async () => {
   const name = newFolderName.value.trim()
-  if (!name) return
+  if (!name || creatingFolder.value) return
+  creatingFolder.value = true
   const parentRealId = currentFolderId.value
     ? (folderIdMap.get(currentFolderId.value) ?? '0')
     : '0'
@@ -948,6 +952,8 @@ const confirmNewFolder = async () => {
     await loadFolderFromApi(parentRealId)
   } catch {
     // API 报错由 request 拦截器处理
+  } finally {
+    creatingFolder.value = false
   }
 }
 
@@ -959,7 +965,8 @@ const handleRename = (item: DriveItem | null) => {
 }
 
 const confirmRename = async () => {
-  if (!renameTarget.value || !renameValue.value.trim()) return
+  if (renamingFolder.value || !renameTarget.value || !renameValue.value.trim()) return
+  renamingFolder.value = true
   const item = renameTarget.value
   const newName = renameValue.value.trim()
   if (item.type === 'folder') {
@@ -975,6 +982,8 @@ const confirmRename = async () => {
         await loadFolderFromApi(parentRealId)
       } catch {
         // API 报错由 request 拦截器处理
+      } finally {
+        renamingFolder.value = false
       }
       return
     }
@@ -984,6 +993,7 @@ const confirmRename = async () => {
   item.updatedAt = new Date().toISOString().split('T')[0]
   showRenameDialog.value = false
   ElMessage.success('重命名成功')
+  renamingFolder.value = false
 }
 
 const handleDelete = (item: DriveItem | null) => {

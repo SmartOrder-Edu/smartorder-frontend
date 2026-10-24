@@ -185,7 +185,8 @@ function handleAddFriend(user: UserVO) {
 }
 
 async function confirmAddFriend() {
-  if (!selectedUser.value) return
+  // 请求未完成时忽略连续点击，避免重复发送好友申请。
+  if (sendingRequest.value || !selectedUser.value) return
 
   sendingRequest.value = true
   try {

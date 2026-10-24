@@ -498,10 +498,12 @@ async function handleCoverUpload(options: any) {
 }
 
 async function handleSubmit() {
-  const valid = await formRef.value?.validate().catch(() => false)
-  if (!valid) return
+  // 表单校验也是异步的，须先锁定提交入口。
+  if (submitting.value) return
   submitting.value = true
   try {
+    const valid = await formRef.value?.validate().catch(() => false)
+    if (!valid) return
     if (editingId.value) {
       await spaceStore.updateSpace(editingId.value, { ...form.value })
       ElMessage.success('空间已更新')

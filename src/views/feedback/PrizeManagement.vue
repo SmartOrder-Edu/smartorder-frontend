@@ -578,9 +578,11 @@ const openCreateDialog = () => {
 
 // 确认批量录入卡密
 const handleSubmit = async () => {
-  if (!formRef.value) return
-  
-  await formRef.value.validate(async (valid) => {
+  // 校验开始前锁定批量录入，避免生成重复卡密。
+  if (submitting.value || !formRef.value) return
+  submitting.value = true
+  try {
+    const valid = await formRef.value.validate().catch(() => false)
     if (valid) {
       // 兼容英文逗号、分号及换行分割提取卡密
       const codes = form.rawCodes
@@ -594,23 +596,20 @@ const handleSubmit = async () => {
         return
       }
 
-      submitting.value = true
-      try {
-        await request.post('/admin/prize/create', {
-          name: form.name,
-          prizeCodes: codes
-        })
-        ElMessage.success(`成功批量录入 ${codes.length} 条可用卡密！`)
-        dialogVisible.value = false
-        fetchStats()
-        fetchList()
-      } catch (error) {
-        console.error(error)
-      } finally {
-        submitting.value = false
-      }
+      await request.post('/admin/prize/create', {
+        name: form.name,
+        prizeCodes: codes
+      })
+      ElMessage.success(`成功批量录入 ${codes.length} 条可用卡密！`)
+      dialogVisible.value = false
+      fetchStats()
+      fetchList()
     }
-  })
+  } catch (error) {
+    console.error(error)
+  } finally {
+    submitting.value = false
+  }
 }
 
 // 作废卡密

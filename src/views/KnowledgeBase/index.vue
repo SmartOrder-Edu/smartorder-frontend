@@ -335,42 +335,41 @@ const handleCoverUpload = async (options: any) => {
 }
 
 const submitForm = async () => {
-  if (!formRef.value) return
-  await formRef.value.validate(async (valid: boolean) => {
+  // 校验开始前锁定提交，避免连续点击同时通过异步表单校验。
+  if (saving.value || !formRef.value) return
+  saving.value = true
+  try {
+    const valid = await formRef.value.validate().catch(() => false)
     if (valid) {
-      saving.value = true
-      try {
-        if (kbForm.id === 0) {
-          // 调用后端创建接口
-          await createKnowledgeBase({
-            name: kbForm.name,
-            category: kbForm.category,
-            description: kbForm.description,
-            coverUrl: kbForm.coverUrl
-          })
-          ElMessage.success('知识库创建成功')
-          
-          fetchKbList() // 刷新列表
-        } else {
-          // 调用后端更新接口
-          await updateKnowledgeBase({
-            id: kbForm.id,
-            name: kbForm.name,
-            category: kbForm.category,
-            description: kbForm.description,
-            coverUrl: kbForm.coverUrl
-          })
-          ElMessage.success('知识库保存成功')
-          fetchKbList() // 刷新列表
-        }
-        dialogVisible.value = false
-      } catch (error: any) {
-        console.error(error)
-      } finally {
-        saving.value = false
+      if (kbForm.id === 0) {
+        // 调用后端创建接口
+        await createKnowledgeBase({
+          name: kbForm.name,
+          category: kbForm.category,
+          description: kbForm.description,
+          coverUrl: kbForm.coverUrl
+        })
+        ElMessage.success('知识库创建成功')
+        fetchKbList() // 刷新列表
+      } else {
+        // 调用后端更新接口
+        await updateKnowledgeBase({
+          id: kbForm.id,
+          name: kbForm.name,
+          category: kbForm.category,
+          description: kbForm.description,
+          coverUrl: kbForm.coverUrl
+        })
+        ElMessage.success('知识库保存成功')
+        fetchKbList() // 刷新列表
       }
+      dialogVisible.value = false
     }
-  })
+  } catch (error: any) {
+    console.error(error)
+  } finally {
+    saving.value = false
+  }
 }
 
 const goToDetail = (id: number) => {

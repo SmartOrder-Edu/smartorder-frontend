@@ -199,26 +199,27 @@ function toolLabel(toolId: string): string {
 }
 
 function submitAnswer() {
-  if (!userAnswer.value.trim()) return
+  if (props.submitting || !userAnswer.value.trim()) return
   const id = props.clarification?.clarificationId || ''
   emit('answer', id, userAnswer.value.trim())
   userAnswer.value = ''
 }
 
 function submitSelectAnswer() {
-  if (!selectedOption.value) return
+  if (props.submitting || !selectedOption.value) return
   emit('answer', props.clarification!.clarificationId, selectedOption.value)
   selectedOption.value = ''
 }
 
 function submitMultiSelectAnswer() {
-  if (selectedOptions.value.length === 0) return
+  if (props.submitting || selectedOptions.value.length === 0) return
   emit('answer', props.clarification!.clarificationId, JSON.stringify(selectedOptions.value))
   selectedOptions.value = []
 }
 
 function submitNumericAnswer() {
-  if (numericAnswer.value === '') return
+  // 父级提交状态是所有澄清输入共用的并发锁。
+  if (props.submitting || numericAnswer.value === '') return
   emit('answer', props.clarification!.clarificationId, numericAnswer.value)
   numericAnswer.value = ''
 }

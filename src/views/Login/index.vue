@@ -420,6 +420,8 @@ const getParticleStyle = (index: number) => {
 }
 
 const sendCode = async () => {
+  // 验证码请求进行中或倒计时未结束时，不再发送第二次。
+  if (codeLoading.value || countdown.value > 0) return
   if (!formData.account) {
     ElMessage.warning('请先输入邮箱')
     return
@@ -439,10 +441,11 @@ const sendCode = async () => {
 }
 
 const handleLogin = async () => {
-  if (!formRef.value) return
+  // 表单校验开始即锁定登录入口，避免连续提交并发登录。
+  if (loading.value || !formRef.value) return
+  loading.value = true
   try {
     await formRef.value.validate()
-    loading.value = true
 
     if (loginType.value === 'password') {
       await userStore.login(formData.account, formData.password)
