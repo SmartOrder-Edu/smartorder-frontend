@@ -580,6 +580,8 @@ export function useAgentChat(scrollCallback?: () => void) {
           forceMode: isClarificationReply ? undefined : (currentForceMode.value || undefined),
           clarificationAnswerJson,
         })
+      // 立即绑定服务端确认的消息 ID；后续快照和事件使用同一标识更新。
+      assistantMsg.messageId = task.messageId
       sessionStorage.removeItem(pendingKey)
       if (!userStore.userInfo) await userStore.fetchUserInfo().catch(() => undefined)
       const scopeKey = await resolveCacheScope(true)
@@ -1194,7 +1196,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           status: msg.status === 'RUNNING' ? 'streaming'
             : msg.status === 'FAILED' ? 'error'
             : msg.status === 'CANCELLED' ? 'stopped' : 'done',
-          messageId: msg.id != null ? String(msg.id) : undefined,
+          messageId: msg.publicId || (msg.id != null ? String(msg.id) : undefined),
           sequenceNo: msg.sequenceNo,
           traceId: msg.traceId || undefined,
           timestamp: new Date(msg.createTime).getTime(),

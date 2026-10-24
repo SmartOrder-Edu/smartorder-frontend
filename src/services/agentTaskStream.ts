@@ -87,7 +87,7 @@ export async function followAgentTask(options: TaskStreamOptions, persistent = t
     try {
       options.onState(failures ? 'RECONNECTING' : 'CONNECTING')
       const response = await fetch(agentApi.taskEventsUrl(snapshot.taskId, snapshot.snapshotEventId,
-        snapshot.streamVersion), { method: 'GET', signal: controller.signal,
+        snapshot.streamVersion, snapshot.messages[0]?.messageId), { method: 'GET', signal: controller.signal,
         headers: { Authorization: `Bearer ${token}`, 'Last-Event-ID': cursor,
           Accept: 'text/event-stream' }, cache: 'no-store' })
       if (response.status === 401) {

@@ -1,5 +1,5 @@
 import request from './request'
-import type { AgentTaskSnapshot } from '@/db/agentCacheRepository'
+import type { AgentTaskSnapshot, AgentTaskStatus } from '@/db/agentCacheRepository'
 import type { LearningPlanDraft, PlanPauseInfo, TaskList } from '@/types/planExecute'
 
 export interface AgentChatRequest {
@@ -52,6 +52,8 @@ export interface ConversationVO {
 
 export interface MessageVO {
   id: number
+  /** 新版助手消息的稳定对外 ID；兼容旧历史时回退到数值 ID。 */
+  publicId?: string
   /** 会话内顺序与后端消息状态。 */
   sequenceNo?: number
   status?: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
@@ -97,7 +99,7 @@ export const agentApi = {
   /** 仅首次发送调用；同一 requestId 重试时服务端返回原任务。 */
   createTask(body: AgentChatRequest & { requestId: string }) {
     return request.post<{ taskId: string; conversationId: string; messageId: string;
-      streamVersion: string; status: string }>('/agent/tasks', body)
+      streamVersion: string; status: AgentTaskStatus }>('/agent/tasks', body)
   },
 
   /** F5 和异常重同步均读取服务端权威快照。 */
@@ -117,10 +119,12 @@ export const agentApi = {
   },
 
   /** 仅生成 SSE 地址；Bearer 令牌由可恢复的 fetch 订阅请求头承载。 */
-  taskEventsUrl(taskId: string, after: string, streamVersion: string) {
+  taskEventsUrl(taskId: string, after: string, streamVersion: string, messageId?: string) {
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
-    return `${base}/agent/tasks/${encodeURIComponent(taskId)}/events?after=${encodeURIComponent(after)}&streamVersion=${encodeURIComponent(streamVersion)}`
+    const message = messageId ? `&messageId=${encodeURIComponent(messageId)}` : ''
+    return `${base}/agent/tasks/${encodeURIComponent(taskId)}/events?after=${encodeURIComponent(after)}&streamVersion=${encodeURIComponent(streamVersion)}${message}`
   },
+  /** @deprecated 主聊天已重构为 createTask + getTaskSnapshot + taskEventsUrl；旧页面兼容调用。 */
   chatStreamUrl(): string {
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
     return `${base}/agent/chat/stream`

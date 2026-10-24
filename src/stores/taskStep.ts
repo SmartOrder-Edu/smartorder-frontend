@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { taskStepApi } from '@/api/spaceDashboard'
 import { studySessionApi } from '@/api/studySession'
-import { agentApi, type AgentChatRequest } from '@/api/agent'
-import { refreshAccessToken } from '@/api/request'
+import type { AgentChatRequest } from '@/api/agent'
+import { sendAgentTaskMessage, resumeAgentTaskMessage } from '@/services/agentTaskMessage'
+import type { AgentTaskReceipt } from '@/services/agentTaskMessageFlow'
 import { ElMessage } from 'element-plus'
 import { useTimelinePlayer } from '@/composables/useTimelinePlayer'
 import type { TaskStepVO, StepStatus } from '@/types/learningSpace'
@@ -60,6 +60,17 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   const sessionId = ref<string>('')
   const lessonBundleId = ref<string>('')
   const studyConversationId = ref<string>('')
+  let studyAgentGeneration = 0
+  const studyAgentControllers = new Set<AbortController>()
+  /** 切换学习会话时中止旧订阅，旧回调不得再改写新会话。 */
+  function stopStudyAgentSubscriptions() {
+    studyAgentGeneration += 1
+    studyAgentControllers.forEach(controller => controller.abort())
+    studyAgentControllers.clear()
+  }
+
+  function studyTaskKey() { return `agent-study-task:${sessionId.value || taskId.value}` }
+  function studyConversationKey() { return `agent-study-conversation:${sessionId.value || taskId.value}` }
   const sessionScenes = ref<Record<string, StudySessionVO['currentScene']>>({})
   const sessionTimelines = ref<Record<string, LessonTimeline>>({})
   const mastery = ref<MasteryJudge | null>(null)
@@ -284,6 +295,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     id: string,
     options: { mode?: StudyMode; spaceId?: string; pathNodeId?: string; source?: string; stepId?: string } = {},
   ) {
+    stopStudyAgentSubscriptions()
     loading.value = true
     try {
       taskId.value = id
@@ -298,6 +310,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       const backendSession = await startBackendStudySession(id, options)
       applyBackendSession(backendSession, id)
       chatMessages.value = getInitialChatMessages()
+      studyConversationId.value = sessionStorage.getItem(studyConversationKey()) || ''
+      void restoreStudyAgentTask()
       void reportStudyEvent({
         eventType: 'session_started',
         targetType: 'task',
@@ -317,6 +331,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   }
 
   async function loadSession(id: string) {
+    stopStudyAgentSubscriptions()
     loading.value = true
     try {
       const backendSession = await studySessionApi.get(id)
@@ -327,6 +342,8 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       steps.value = await taskStepApi.getSteps(backendSession.taskId)
       applyBackendSession(backendSession, backendSession.taskId)
       chatMessages.value = getInitialChatMessages()
+      studyConversationId.value = sessionStorage.getItem(studyConversationKey()) || ''
+      void restoreStudyAgentTask()
       reportStepEntered(scriptSteps.value[currentStepIndex.value], 'session_restore')
     } finally {
       loading.value = false
@@ -423,7 +440,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
    * 教学内容型反馈由 study-scoped SSE 生成，控制型反馈继续交给后端教学动作处理。
    */
   async function sendFeedback(type: FeedbackType) {
-    if (sendingFeedback.value || diagramGenerating.value || contextualFeedbackGenerating.value) return
+    if (sendingFeedback.value || diagramGenerating.value || contextualFeedbackGenerating.value
+        || studyAgentControllers.size) return
+    if (sessionStorage.getItem(studyTaskKey())) { void restoreStudyAgentTask(); return }
     const labels: Record<FeedbackType, string> = {
       dont_understand: '我没看懂',
       slower: '讲慢一点',
@@ -493,7 +512,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   /** 用户在右侧自由输入消息 */
   async function sendCustomMessage(text: string) {
     const question = text.trim()
-    if (!question) return
+    // 同一学习会话等待当前任务终态后再提交，避免两个 Agent 回答交错。
+    if (!question || sendingFeedback.value || studyAgentControllers.size) return
+    if (sessionStorage.getItem(studyTaskKey())) { void restoreStudyAgentTask(); return }
     sendingFeedback.value = true
     const assistantMessage: StudyChatMessage = {
       id: `a-stream-${Date.now()}`,
@@ -522,7 +543,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       chatMessages.value.push(assistantMessage)
       const streamOk = await streamStudyAgentReply(question, assistantMessage)
       if (!streamOk || !assistantMessage.text.trim()) {
-        assistantMessage.text = 'Agent 对话暂时没有连上后端，请检查登录状态、后端服务和 `/agent/chat/stream` 接口。'
+        assistantMessage.text = assistantMessage.text.trim()
+          ? `${assistantMessage.text}\n\n*[Agent 执行或连接失败，请重试]*`
+          : 'Agent 对话未能完成，请检查网络或稍后重试。'
         ElMessage.error('Agent 对话接口未返回有效内容')
         return
       }
@@ -568,7 +591,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       const agentPrompt = buildContextualFeedbackPrompt(type, label)
       const streamOk = await streamStudyAgentReply(label, assistantMessage, agentPrompt)
       if (!streamOk || !assistantMessage.text.trim()) {
-        assistantMessage.text = buildContextualFeedbackFailureText(type)
+        assistantMessage.text = assistantMessage.text.trim()
+          ? `${assistantMessage.text}\n\n*[Agent 执行或连接失败，请重试]*`
+          : buildContextualFeedbackFailureText(type)
         ElMessage.error('Agent 反馈接口未返回有效内容')
         return
       }
@@ -616,7 +641,9 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       const agentPrompt = buildDiagramAgentPrompt(label)
       const streamOk = await streamStudyAgentReply(label, assistantMessage, agentPrompt)
       if (!streamOk || !assistantMessage.text.trim()) {
-        assistantMessage.text = 'Agent 图解暂时没有生成成功，请检查后端服务和 `/agent/chat/stream` 接口。'
+        assistantMessage.text = assistantMessage.text.trim()
+          ? `${assistantMessage.text}\n\n*[Agent 执行或连接失败，请重试]*`
+          : 'Agent 图解暂时没有生成成功，请检查网络或稍后重试。'
         ElMessage.error('Agent 图解接口未返回有效内容')
         return
       }
@@ -637,66 +664,92 @@ export const useTaskStepStore = defineStore('taskStep', () => {
     assistantMessage: StudyChatMessage,
     agentPrompt?: string,
   ): Promise<boolean> {
-    let token = ''
-    try {
-      token = await refreshAccessToken()
-    } catch {
-      return false
-    }
-
-    const body: AgentChatRequest = {
+    // 会话 ID 在 POST 前固定，确认响应丢失时可沿用同一 requestId 重试。
+    const conversationId = studyConversationId.value || crypto.randomUUID()
+    studyConversationId.value = conversationId
+    sessionStorage.setItem(studyConversationKey(), conversationId)
+    const generation = studyAgentGeneration
+    const taskKey = studyTaskKey()
+    const controller = new AbortController()
+    studyAgentControllers.add(controller)
+    const body: AgentChatRequest & { conversationId: string } = {
       message: agentPrompt || question,
-      conversationId: studyConversationId.value || undefined,
+      conversationId,
       forceMode: 'REACT',
       studyContext: buildStudyContext(question),
     }
+    // 确认尚未返回也保存原请求，F5 后用同一请求摘要和幂等键恢复。
+    sessionStorage.setItem(taskKey, JSON.stringify({ question, body, uiMessageId: assistantMessage.id }))
 
     try {
-      await fetchEventSource(agentApi.chatStreamUrl(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      let reconnectNoticeShown = false
+      const result = await sendAgentTaskMessage(body, {
+        signal: controller.signal,
+        onReceipt(receipt) {
+          sessionStorage.setItem(taskKey, JSON.stringify({ receipt, question, body, uiMessageId: receipt.messageId }))
+          if (generation !== studyAgentGeneration || controller.signal.aborted) return
+          studyConversationId.value = receipt.conversationId
+          assistantMessage.id = receipt.messageId
         },
-        body: JSON.stringify(body),
-        openWhenHidden: true,
-        onmessage(event) {
-          if (!event.data) return
-
-          if (event.event === 'done') {
-            try {
-              const donePayload = JSON.parse(event.data)
-              if (donePayload?.conversationId) {
-                studyConversationId.value = String(donePayload.conversationId)
-              }
-            } catch {
-              // ignore malformed done payload
-            }
-            return
-          }
-
-          try {
-            const data = JSON.parse(event.data)
-            if (data?.conversationId) {
-              studyConversationId.value = String(data.conversationId)
-            }
-            if (event.event === 'agent.text.delta' && data?.payload?.text) {
-              assistantMessage.text += String(data.payload.text)
-            }
-          } catch {
-            // ignore non-json SSE payloads
-          }
+        onText(content) {
+          if (generation === studyAgentGeneration && !controller.signal.aborted) assistantMessage.text = content
         },
-        onerror(error) {
-          console.error('[StudyAgent] SSE error:', error)
-          throw error
+        onState(state) {
+          if (generation !== studyAgentGeneration || controller.signal.aborted) return
+          if (state === 'OFFLINE' && !reconnectNoticeShown) {
+            reconnectNoticeShown = true
+            ElMessage.warning('网络中断，正在继续接收 Agent 回答')
+          }
         },
       })
-      return true
+      if (generation !== studyAgentGeneration) return false
+      sessionStorage.removeItem(taskKey)
+      return result.status === 'COMPLETED'
     } catch (error) {
-      console.warn('[StudyAgent] 流式对话失败。', error)
+      if (generation === studyAgentGeneration && !controller.signal.aborted) console.warn('[StudyAgent] 流式对话失败。', error)
       return false
+    } finally {
+      studyAgentControllers.delete(controller)
     }
+  }
+
+  /** F5 后按确认回执恢复原任务，仅 GET 快照和 SSE；终态移除待恢复记录。 */
+  async function restoreStudyAgentTask() {
+    const key = studyTaskKey()
+    let saved: { receipt?: AgentTaskReceipt; question: string; uiMessageId?: string;
+      body?: AgentChatRequest & { conversationId: string } } | null = null
+    try { saved = JSON.parse(sessionStorage.getItem(key) || 'null') } catch { sessionStorage.removeItem(key) }
+    if (!saved?.receipt?.taskId && !saved?.body) return
+    const generation = studyAgentGeneration
+    const controller = new AbortController()
+    studyAgentControllers.add(controller)
+    const answerId = saved.receipt?.messageId || saved.uiMessageId || `a-${Date.now()}`
+    let answer = chatMessages.value.find(message => message.id === answerId && message.role === 'agent')
+    if (!answer) {
+      answer = { id: answerId, role: 'agent', text: '', markdown: true, createTime: Date.now() }
+      chatMessages.value.push({ id: `u-${answerId}`, role: 'user', text: saved.question,
+        markdown: false, createTime: Date.now() }, answer)
+    }
+    try {
+      const options = { signal: controller.signal,
+        onReceipt(receipt: AgentTaskReceipt) {
+          sessionStorage.setItem(key, JSON.stringify({ ...saved, receipt }))
+          if (generation === studyAgentGeneration) answer.id = receipt.messageId
+        },
+        onText(content: string) { if (generation === studyAgentGeneration) answer.text = content },
+      }
+      const result = saved.receipt
+        ? await resumeAgentTaskMessage(saved.receipt, options)
+        : await sendAgentTaskMessage(saved.body!, options)
+      if (generation !== studyAgentGeneration) return
+      sessionStorage.removeItem(key)
+      if (result.status !== 'COMPLETED') answer.text = `${result.content}\n\n*[Agent 执行失败，请重试]*`.trim()
+    } catch (error) {
+      if (generation === studyAgentGeneration && !controller.signal.aborted) {
+        answer.text = `${answer.text}\n\n*[连接失败，可刷新页面继续恢复]*`.trim()
+        console.warn('[StudyAgent] 恢复失败。', error)
+      }
+    } finally { studyAgentControllers.delete(controller) }
   }
 
   function buildStudyContext(question: string): Record<string, unknown> {
@@ -869,7 +922,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
       : type === 'another_example'
         ? '生成新例子'
         : '生成类似题'
-    return `Agent 暂时没有完成${action}，请检查后端服务和 \`/agent/chat/stream\` 接口。`
+    return `Agent 暂时没有完成${action}，请检查网络或稍后重试。`
   }
 
   function buildDiagramNoteTitle(): string {
@@ -986,6 +1039,7 @@ export const useTaskStepStore = defineStore('taskStep', () => {
   }
 
   function reset() {
+    stopStudyAgentSubscriptions()
     clearSceneActions()
     endTeaching()
     steps.value = []

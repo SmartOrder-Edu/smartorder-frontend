@@ -98,6 +98,7 @@
         <div v-if="streaming" class="chat-msg ai streaming">
           <div class="msg-text markdown-text">
             <MarkdownRenderer :content="streamingText || '思考中...'" />
+            <div v-if="connectionHint" class="connection-hint">{{ connectionHint }}</div>
           </div>
         </div>
       </div>
@@ -109,32 +110,34 @@
           type="text"
           placeholder="对资源内容提问..."
           @keydown.enter="sendMessage(inputText)"
-          :disabled="streaming"
+          :disabled="streaming || !!pendingReceipt"
         />
         <button
           type="button"
           class="send-btn"
-          :disabled="!inputText.trim() || streaming"
+          :disabled="!inputText.trim() || streaming || !!pendingReceipt"
           @click="sendMessage(inputText)"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
             <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/>
           </svg>
         </button>
-        <button v-if="streaming" type="button" class="stop-btn" @click="stopStreaming">
+        <button v-if="streaming && pendingReceipt" type="button" class="stop-btn" title="停止接收，后台任务继续运行" @click="stopStreaming">
           <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12">
             <rect x="4" y="4" width="16" height="16" rx="2"/>
           </svg>
         </button>
+        <button v-else-if="pendingReceipt" type="button" class="stop-btn" @click="restoreResourceTask">继续接收</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
-import { fetchEventSource } from '@microsoft/fetch-event-source'
-import { refreshAccessToken } from '@/api/request'
+import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { sendAgentTaskMessage, resumeAgentTaskMessage } from '@/services/agentTaskMessage'
+import type { AgentTaskReceipt } from '@/services/agentTaskMessageFlow'
+import type { AgentChatRequest } from '@/api/agent'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 
 const props = defineProps<{
@@ -152,11 +155,39 @@ const emit = defineEmits<{
 const expanded = ref(false)
 const streaming = ref(false)
 const streamingText = ref('')
+const connectionHint = ref('')
 const inputText = ref('')
 const chatMessages = ref<{ role: 'user' | 'ai'; content: string }[]>([])
 const messagesEl = ref<HTMLElement | null>(null)
 const inputEl = ref<HTMLInputElement | null>(null)
 let abortController: AbortController | null = null
+let resourceConversationId = ''
+const pendingReceipt = ref<AgentTaskReceipt | null>(null)
+const resourceTaskKey = (id: string) => `agent-resource-task:${id}`
+const resourceConversationKey = (id: string) => `agent-resource-conversation:${id}`
+
+/** 资源切换或页面刷新后从同一资源的任务回执恢复。 */
+function loadResourceState() {
+  resourceConversationId = sessionStorage.getItem(resourceConversationKey(props.resourceId)) || ''
+  try { pendingReceipt.value = JSON.parse(sessionStorage.getItem(resourceTaskKey(props.resourceId)) || 'null')?.receipt || null }
+  catch { sessionStorage.removeItem(resourceTaskKey(props.resourceId)); pendingReceipt.value = null }
+  if (sessionStorage.getItem(resourceTaskKey(props.resourceId))) void restoreResourceTask()
+}
+onMounted(loadResourceState)
+onUnmounted(() => abortController?.abort())
+
+/** 切换资源时停止旧订阅并隔离会话，避免旧回答写到新资源面板。 */
+watch(() => props.resourceId, () => {
+  abortController?.abort()
+  abortController = null
+  resourceConversationId = ''
+  pendingReceipt.value = null
+  chatMessages.value = []
+  streamingText.value = ''
+  connectionHint.value = ''
+  streaming.value = false
+  loadResourceState()
+})
 
 const hints = [
   { label: '这篇文章的核心内容是什么？', prompt: '请基于当前资源内容，总结核心知识点和要点' },
@@ -214,99 +245,71 @@ function scrollMessagesToBottom() {
 
 async function sendMessage(text: string) {
   const trimmed = text.trim()
-  if (!trimmed || streaming.value) return
+  if (!trimmed || streaming.value || pendingReceipt.value) return
 
   chatMessages.value.push({ role: 'user', content: trimmed })
   inputText.value = ''
   streaming.value = true
   streamingText.value = ''
+  connectionHint.value = ''
 
   const message = buildContextMessage(trimmed)
 
-  let token: string
+  // 同一个资源面板复用会话；确认响应丢失时重试仍使用原会话和幂等键。
+  resourceConversationId ||= crypto.randomUUID()
+  const resourceId = props.resourceId
+  sessionStorage.setItem(resourceConversationKey(resourceId), resourceConversationId)
+  const body: AgentChatRequest & { conversationId: string } = { message,
+    conversationId: resourceConversationId, forceMode: 'REACT' }
+  // POST 回执未到时也保留原请求，刷新重试沿用服务端幂等键与请求摘要。
+  sessionStorage.setItem(resourceTaskKey(resourceId), JSON.stringify({ question: trimmed, body }))
+  const controller = new AbortController()
+  abortController = controller
+
   try {
-    token = await refreshAccessToken()
-  } catch {
-    streaming.value = false
-    return
-  }
-
-  const base = import.meta.env.VITE_API_BASE_URL || '/api'
-  abortController = new AbortController()
-
-  try {
-    await fetchEventSource(`${base}/agent/chat/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        message,
-        forceMode: 'REACT',
-      }),
-      openWhenHidden: true,
-      signal: abortController.signal,
-
-      onmessage(event) {
-        if (!event.data) return
-
-        if (event.event === 'done') {
-          if (streamingText.value) {
-            chatMessages.value.push({
-              role: 'ai',
-              content: streamingText.value,
-            })
-          } else if (!streamingText.value) {
-            chatMessages.value.push({
-              role: 'ai',
-              content: '已处理完成。',
-            })
-          }
-          streamingText.value = ''
-          streaming.value = false
-          abortController = null
-          scrollMessagesToBottom()
-          return
-        }
-
-        try {
-          const data = JSON.parse(event.data)
-          if (data?.payload?.text) {
-            streamingText.value += data.payload.text
-            scrollMessagesToBottom()
-          }
-        } catch {
-          // ignore non-JSON
+    const result = await sendAgentTaskMessage(body, {
+      signal: controller.signal,
+      onReceipt(receipt) {
+        // 即使页面已卸载，也保留回执供 F5 恢复；旧资源回调不改写当前面板。
+        sessionStorage.setItem(resourceTaskKey(resourceId), JSON.stringify({ receipt, question: trimmed, body }))
+        if (props.resourceId === resourceId) {
+          resourceConversationId = receipt.conversationId
+          sessionStorage.setItem(resourceConversationKey(resourceId), receipt.conversationId)
+          pendingReceipt.value = receipt
         }
       },
-
-      onerror(err) {
-        console.error('[ResourceAIPanel] SSE error:', err)
-        if (streamingText.value) {
-          chatMessages.value.push({
-            role: 'ai',
-            content: streamingText.value + '\n\n*[连接中断]*',
-          })
-        } else {
-          chatMessages.value.push({
-            role: 'ai',
-            content: '*[连接中断，请重试]*',
-          })
-        }
-        streamingText.value = ''
-        streaming.value = false
-        abortController = null
+      onText(content) {
+        if (controller.signal.aborted || props.resourceId !== resourceId) return
+        streamingText.value = content
         scrollMessagesToBottom()
-        throw err
+      },
+      onState(state) {
+        if (controller.signal.aborted || props.resourceId !== resourceId) return
+        connectionHint.value = state === 'OFFLINE' || state === 'RECONNECTING'
+          ? '连接中断，正在恢复…' : ''
       },
     })
-  } catch (err: any) {
-    if (err.name !== 'AbortError') {
-      console.error('[ResourceAIPanel] fetch error:', err)
+    // 终态以服务端快照为准，FAILED/CANCELLED 都明确告知用户。
+    const failed = result.status !== 'COMPLETED'
+    if (controller.signal.aborted || props.resourceId !== resourceId) return
+    sessionStorage.removeItem(resourceTaskKey(resourceId))
+    pendingReceipt.value = null
+    chatMessages.value.push({ role: 'ai', content: failed
+      ? `${result.content || ''}\n\n*[Agent 执行失败，请重试]*`.trim()
+      : result.content || '已处理完成。' })
+  } catch (error: any) {
+    if (error?.name !== 'AbortError' && props.resourceId === resourceId) {
+      console.error('[ResourceAIPanel] 任务对话失败:', error)
+      chatMessages.value.push({ role: 'ai', content: `${streamingText.value}\n\n*[请求或连接失败，请重试]*`.trim() })
+    }
+  } finally {
+    if (abortController === controller) {
+      abortController = null
+      streamingText.value = ''
+      connectionHint.value = ''
       streaming.value = false
     }
-    abortController = null
+    scrollMessagesToBottom()
   }
 }
 
@@ -318,15 +321,64 @@ function stopStreaming() {
   if (streamingText.value) {
     chatMessages.value.push({
       role: 'ai',
-      content: streamingText.value + '\n\n*[已停止]*',
+      content: streamingText.value + '\n\n*[已停止接收；后台任务仍在运行，可继续接收]*',
     })
   }
   streamingText.value = ''
+  connectionHint.value = ''
   streaming.value = false
+}
+
+/** 读取服务端快照后继续订阅已有任务，绝不重新提交用户问题。 */
+async function restoreResourceTask() {
+  const resourceId = props.resourceId
+  const key = resourceTaskKey(resourceId)
+  let saved: { receipt?: AgentTaskReceipt; question: string;
+    body?: AgentChatRequest & { conversationId: string } } | null = null
+  try { saved = JSON.parse(sessionStorage.getItem(key) || 'null') } catch { sessionStorage.removeItem(key) }
+  if ((!saved?.receipt?.taskId && !saved?.body) || streaming.value) return
+  pendingReceipt.value = saved.receipt || null
+  resourceConversationId = saved.receipt?.conversationId || saved.body!.conversationId
+  if (!chatMessages.value.length) chatMessages.value.push({ role: 'user', content: saved.question })
+  expanded.value = true
+  streaming.value = true
+  const controller = new AbortController()
+  abortController = controller
+  try {
+    const options = { signal: controller.signal,
+      onReceipt(receipt: AgentTaskReceipt) {
+        sessionStorage.setItem(key, JSON.stringify({ ...saved, receipt }))
+        if (props.resourceId === resourceId) pendingReceipt.value = receipt
+      },
+      onText(content: string) { if (!controller.signal.aborted && props.resourceId === resourceId) streamingText.value = content },
+      onState(state: string) { if (props.resourceId === resourceId) connectionHint.value = state === 'OFFLINE' ? '连接中断，正在恢复…' : '' },
+    }
+    const result = saved.receipt
+      ? await resumeAgentTaskMessage(saved.receipt, options)
+      : await sendAgentTaskMessage(saved.body!, options)
+    if (controller.signal.aborted || props.resourceId !== resourceId) return
+    sessionStorage.removeItem(key)
+    pendingReceipt.value = null
+    chatMessages.value.push({ role: 'ai', content: result.status === 'COMPLETED'
+      ? result.content || '已处理完成。' : `${result.content}\n\n*[Agent 执行失败，请重试]*`.trim() })
+  } catch (error) {
+    if (!controller.signal.aborted && props.resourceId === resourceId) {
+      connectionHint.value = '连接失败，可点击继续接收重试'
+      console.warn('[ResourceAIPanel] 恢复失败。', error)
+    }
+  } finally {
+    if (abortController === controller) { abortController = null; streaming.value = false; streamingText.value = '' }
+  }
 }
 </script>
 
 <style scoped lang="scss">
+.connection-hint {
+  margin-top: 6px;
+  color: #b45309;
+  font-size: 12px;
+}
+
 .resource-ai-panel {
   position: sticky;
   top: 24px;

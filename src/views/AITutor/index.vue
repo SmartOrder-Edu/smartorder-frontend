@@ -72,7 +72,7 @@
             </button>
             <span class="current-conv-title">{{ currentConvTitle }}</span>
             <button
-              v-if="isAssistantCollapsed"
+              v-if="avatarEnabled && isAssistantCollapsed"
               class="avatar-top-toggle"
               type="button"
               title="展开数字人"
@@ -567,7 +567,7 @@
         <!-- 数字人面板：聊天区右侧的辅助陪伴面板 -->
         <!-- 收起时卸载数字人连接，停止后台重连与重复鉴权。 -->
         <AssistantPanel
-          v-if="!isAssistantCollapsed"
+          v-if="avatarEnabled && !isAssistantCollapsed"
           class="assistant-panel-slot"
           :latestAiMessage="latestAiMessageForAvatar"
           :initial-auth-info="avatarAuthInfo"
@@ -683,7 +683,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
@@ -716,9 +716,10 @@ import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload
 import { useVoiceInput } from '@/composables/useVoiceInput'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
 import type { RagReference } from '@/composables/useAgentChat'
-import AssistantPanel from '@/components/AssistantPanel.vue'
+// 数字人组件按需加载，开关关闭时不加载播放器代码。
+const AssistantPanel = defineAsyncComponent(() => import('@/components/AssistantPanel.vue'))
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { getAvatarAuthInfo, type AvatarAuthInfo } from '@/api/avatar'
+import { getAvatarAuthInfo, getAvatarConfig, type AvatarAuthInfo } from '@/api/avatar'
 import type { LearningSpaceType } from '@/api/learningSpace'
 
 const userStore = useUserStore()
@@ -742,10 +743,12 @@ const spaceSelectorVisible = ref(false)
 const selectedSpaceId = ref<string | null>(null)
 
 // 数字人面板状态
-const isAssistantCollapsed = ref(false)
+// 系统配置返回 true 前，保持数字人收起，避免默认发起鉴权或连接。
+const avatarEnabled = ref(false)
+const isAssistantCollapsed = ref(true)
 const latestAiMessageForAvatar = ref('')
 const avatarAuthInfo = ref<AvatarAuthInfo | null>(null)
-const avatarAuthLoading = ref(true)
+const avatarAuthLoading = ref(false)
 
 const { width: windowWidth } = useWindowSize()
 const isMobile = computed(() => windowWidth.value < 768)
@@ -805,6 +808,7 @@ watch(
 )
 
 const preloadAvatarAuthInfo = async () => {
+  if (!avatarEnabled.value) return
   avatarAuthLoading.value = true
   try {
     const response: any = await getAvatarAuthInfo()
@@ -826,6 +830,20 @@ const preloadAvatarAuthInfo = async () => {
     console.warn('[AITutor] preload avatar auth info failed:', error)
   } finally {
     avatarAuthLoading.value = false
+  }
+}
+
+// 配置读取失败时维持默认关闭；仅显式开启才加载数字人。
+const loadAvatarConfig = async () => {
+  try {
+    const config = await getAvatarConfig()
+    avatarEnabled.value = config?.enabled === true
+    if (avatarEnabled.value) {
+      isAssistantCollapsed.value = window.innerWidth < 1280
+      if (!isAssistantCollapsed.value) void preloadAvatarAuthInfo()
+    }
+  } catch (error) {
+    console.warn('[AITutor] load avatar config failed:', error)
   }
 }
 
@@ -1727,10 +1745,8 @@ watch(
 )
 
 onMounted(() => {
-  isAssistantCollapsed.value = window.innerWidth < 1280
-  // 默认收起时不预取数字人鉴权，展开后再建立连接。
-  if (isAssistantCollapsed.value) avatarAuthLoading.value = false
-  else void preloadAvatarAuthInfo()
+  // 先读取系统开关，关闭时不渲染面板，也不请求数字人鉴权。
+  void loadAvatarConfig()
   agentStore.fetchConversations()
   const conversationId = route.query.conversationId
   if (typeof conversationId === 'string' && conversationId) void loadConversation(conversationId)
@@ -1763,7 +1779,7 @@ onMounted(() => {
 })
 
 watch(isAssistantCollapsed, collapsed => {
-  if (!collapsed && !avatarAuthInfo.value && !avatarAuthLoading.value) {
+  if (avatarEnabled.value && !collapsed && !avatarAuthInfo.value && !avatarAuthLoading.value) {
     void preloadAvatarAuthInfo()
   }
 })
