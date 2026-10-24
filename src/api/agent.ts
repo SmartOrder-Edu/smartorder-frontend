@@ -1,10 +1,13 @@
 import request from './request'
+import type { AgentTaskSnapshot } from '@/db/agentCacheRepository'
 import type { LearningPlanDraft, PlanPauseInfo, TaskList } from '@/types/planExecute'
 
 export interface AgentChatRequest {
   message: string
   conversationId?: string
   fileIds?: number[]
+  /** RAG 已选知识库，由现有 Agent 路由使用。 */
+  knowledgeBaseIds?: number[]
   /** 学习执行页上下文：当前脚本步骤、教学段、画布、时间轴位置等 */
   studyContext?: Record<string, unknown>
   /** 强制运行模式：'REACT' 快速回答 / 'PLAN_AND_EXECUTE' 目标规划，不传则走意图路由 */
@@ -49,6 +52,9 @@ export interface ConversationVO {
 
 export interface MessageVO {
   id: number
+  /** 会话内顺序与后端消息状态。 */
+  sequenceNo?: number
+  status?: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
   role: string
   content: string | null
   toolName: string | null
@@ -88,6 +94,33 @@ export interface PlanningSnapshot {
  * Agent 对话相关 API
  */
 export const agentApi = {
+  /** 仅首次发送调用；同一 requestId 重试时服务端返回原任务。 */
+  createTask(body: AgentChatRequest & { requestId: string }) {
+    return request.post<{ taskId: string; conversationId: string; messageId: string;
+      streamVersion: string; status: string }>('/agent/tasks', body)
+  },
+
+  /** F5 和异常重同步均读取服务端权威快照。 */
+  getTaskSnapshot(taskId: string) {
+    return request.get<AgentTaskSnapshot>(`/agent/tasks/${encodeURIComponent(taskId)}/snapshot`)
+  },
+
+  /** 按会话定位原任务；GET 不会创建新任务。 */
+  getActiveChatTask(conversationId: string) {
+    return request.get<{ taskId?: string; conversationId?: string; streamVersion?: string;
+      status?: string }>('/agent/tasks/active', { params: { conversationId } })
+  },
+
+  /** 当前 JWT 绑定的租户与用户缓存作用域。 */
+  getCacheScope() {
+    return request.get<{ scopeKey: string }>('/agent/tasks/cache-scope')
+  },
+
+  /** 仅生成 SSE 地址；Bearer 令牌由可恢复的 fetch 订阅请求头承载。 */
+  taskEventsUrl(taskId: string, after: string, streamVersion: string) {
+    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    return `${base}/agent/tasks/${encodeURIComponent(taskId)}/events?after=${encodeURIComponent(after)}&streamVersion=${encodeURIComponent(streamVersion)}`
+  },
   chatStreamUrl(): string {
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
     return `${base}/agent/chat/stream`

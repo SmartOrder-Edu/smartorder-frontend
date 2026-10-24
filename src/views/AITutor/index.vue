@@ -195,6 +195,10 @@
                   />
                   <!-- AI 消息使用 Markdown 渲染（流式时内容逐字追加到同一条消息） -->
                   <MarkdownRenderer v-if="msg.role === 'ai' && msg.content" :content="msg.content" />
+                  <!-- 恢复状态明确告知用户，离线缓存不能冒充服务器最终结果。 -->
+                  <p v-if="msg.role === 'ai' && msg.errorText" class="message-recovery-hint" role="status">
+                    {{ msg.errorText }}
+                  </p>
                   <!-- 学习空间卡片（业务结果展示） -->
                   <LearningSpaceCards
                     v-if="msg.role === 'ai' && msg.learningSpaceCards?.length"
@@ -679,7 +683,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
@@ -720,6 +724,7 @@ const userStore = useUserStore()
 const agentStore = useAgentStore()
 const learningSpaceStore = useLearningSpaceStore()
 const route = useRoute()
+const router = useRouter()
 
 const inputMessage = ref('')
 const chatContainer = ref<HTMLElement>()
@@ -771,6 +776,7 @@ const {
   loadConversation,
   startNewConversation,
   deleteConversation,
+  dispose,
   answerClarificationViaSSE,
   confirmGateViaSSE,
 } = useAgentChat(scrollToBottom)
@@ -1385,6 +1391,13 @@ const loadConversationFromSidebar = async (conv: ConversationVO) => {
   }
 }
 
+/** 把会话 ID 保存在路由，F5 后才能精确定位原任务。 */
+watch(() => agentStore.currentConversationId, conversationId => {
+  if (route.query.conversationId === conversationId) return
+  const query = { ...route.query, conversationId: conversationId || undefined }
+  void router.replace({ query })
+})
+
 const hasTraceEventsForMsg = (msg: any): boolean => {
   return !!(msg.traceEvents?.length) || !!msg.traceId
 }
@@ -1714,6 +1727,8 @@ onMounted(() => {
   isAssistantCollapsed.value = window.innerWidth < 1280
   preloadAvatarAuthInfo()
   agentStore.fetchConversations()
+  const conversationId = route.query.conversationId
+  if (typeof conversationId === 'string' && conversationId) void loadConversation(conversationId)
   document.addEventListener('visibilitychange', handleVisibilitySync)
   ensureLearningSpacesLoaded().then(() => {
     const routeSpaceId = route.query.spaceId
@@ -1743,6 +1758,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  dispose()
   clearAttachmentState()
   document.removeEventListener('visibilitychange', handleVisibilitySync)
   if (autoConfirmTimer) {
@@ -2243,6 +2259,14 @@ watch(windowWidth, (newWidth, oldWidth) => {
   background: rgba(239, 68, 68, 0.04);
   border-radius: var(--radius-lg);
   padding: 4px 8px;
+}
+
+/* 缓存预览、断网和降级提示与回答内容分开显示。 */
+.message-recovery-hint {
+  margin: 8px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 /* 流式中的消息不再有淡入动画，避免每个 delta 都闪一下 */

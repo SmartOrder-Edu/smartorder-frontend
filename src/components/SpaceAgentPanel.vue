@@ -69,6 +69,8 @@
           <div class="as-msg-content">
             <MarkdownRenderer v-if="msg.role === 'agent'" class="as-msg-markdown" :content="msg.text" />
             <p v-else>{{ msg.text }}</p>
+            <!-- 断线和离线预览状态独立展示，避免混入回答正文。 -->
+            <p v-if="msg.hint" class="as-msg-recovery" role="status">{{ msg.hint }}</p>
             <div class="as-msg-actions" v-if="msg.actions && msg.actions.length">
               <button
                 v-for="act in msg.actions"
@@ -105,10 +107,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
-import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { agentApi } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
+import { agentCache, type AgentTaskSnapshot } from '@/db/agentCacheRepository'
+import { coordinateAgentTask, type TaskStreamOptions } from '@/services/agentTaskStream'
 import type { AgentActionVO } from '@/types/learningSpace'
 import MarkdownRenderer from './MarkdownRenderer.vue'
 import AgentActionLog from './AgentActionLog.vue'
@@ -119,6 +122,7 @@ interface ChatMessage {
   actions?: { label: string; variant?: string }[]
   replyId?: string
   streaming?: boolean
+  hint?: string
 }
 
 interface DecisionStep {
@@ -267,6 +271,27 @@ function scrollChatToBottom() {
   })
 }
 
+/** 空间面板沿用聊天页身份作用域，登出时由用户 Store 清理同一份缓存。 */
+async function resolveSpaceCacheScope(): Promise<string> {
+  const token = localStorage.getItem('token') || ''
+  if (!token) return ''
+  let fingerprint = ''
+  if (token && crypto.subtle) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+    fingerprint = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+  }
+  try {
+    const scope = (await agentApi.getCacheScope()).scopeKey
+    localStorage.setItem('agent-cache-scope', scope)
+    localStorage.setItem('agent-cache-token-hash', fingerprint)
+    return scope
+  } catch {
+    // 仅当当前 token 摘要已验证时允许离线预览，防止切换账号后读到旧身份缓存。
+    return localStorage.getItem('agent-cache-token-hash') === fingerprint
+      ? localStorage.getItem('agent-cache-scope') || '' : ''
+  }
+}
+
 async function receiveMessage(text: string) {
   const trimmed = text.trim()
   if (!trimmed || isStreaming.value) return
@@ -280,9 +305,8 @@ async function receiveMessage(text: string) {
   emit('agentReply', { ...agentMessage })
   scrollChatToBottom()
 
-  let token: string
   try {
-    token = await refreshAccessToken()
+    await refreshAccessToken()
   } catch {
     agentMessage.text = '登录状态已失效，请重新登录后再试。'
     agentMessage.streaming = false
@@ -296,69 +320,62 @@ async function receiveMessage(text: string) {
   let answerText = ''
 
   try {
-    await fetchEventSource(agentApi.chatStreamUrl(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        message: trimmed,
-        conversationId: conversationId.value || undefined,
-        studyContext: buildStudyContext(trimmed),
-      }),
-      openWhenHidden: true,
-      signal: abortController.signal,
-
-      onmessage(event) {
-        if (!event.data) return
-
-        if (event.event === 'done') {
-          let donePayload: any = null
-          try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
-          if (donePayload?.conversationId) {
-            conversationId.value = donePayload.conversationId
-          }
-          const finalText = answerText.trim() || donePayload?.clarificationPayload?.question || '已处理完成。'
-          agentMessage.text = finalText
-          agentMessage.actions = buildAgentActions(trimmed)
+    // 同一空间保留会话 ID 与请求幂等键；续传只读原 taskId。
+    const id = conversationId.value || crypto.randomUUID()
+    conversationId.value = id
+    sessionStorage.setItem(`space-agent:${props.spaceId || 'default'}`, id)
+    const requestKey = `space-agent-request:${id}:${trimmed}`
+    const requestId = sessionStorage.getItem(requestKey) || crypto.randomUUID()
+    sessionStorage.setItem(requestKey, requestId)
+    const task = await agentApi.createTask({ requestId, message: trimmed,
+      conversationId: id, studyContext: buildStudyContext(trimmed) })
+    sessionStorage.removeItem(requestKey)
+    const scope = await resolveSpaceCacheScope()
+    const snapshot = await agentApi.getTaskSnapshot(task.taskId)
+    const options: TaskStreamOptions = {
+      scopeKey: scope, snapshot, signal: abortController.signal,
+      onSnapshot(authority: AgentTaskSnapshot) {
+        answerText = authority.messages.find(item => item.role === 'assistant')?.content || ''
+        agentMessage.text = answerText || '正在思考...'
+        agentMessage.hint = undefined
+        if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(authority.status)) {
           agentMessage.streaming = false
           isStreaming.value = false
-          abortController = null
-          emit('agentReply', { ...agentMessage })
-          scrollChatToBottom()
-          return
+          agentMessage.actions = buildAgentActions(trimmed)
         }
-
-        try {
-          const data = JSON.parse(event.data)
-          if (data?.conversationId) {
-            conversationId.value = data.conversationId
-          }
-          if (data?.payload?.text) {
-            answerText += data.payload.text
-            agentMessage.text = answerText
-            emit('agentReply', { ...agentMessage })
-            scrollChatToBottom()
-          }
-        } catch {
-          // ignore non-JSON SSE payloads
-        }
-      },
-
-      onerror(err) {
-        console.error('[SpaceAgentPanel] SSE error:', err)
-        agentMessage.text = answerText
-          ? `${answerText}\n\n*[连接中断]*`
-          : '*[连接中断，请重试]*'
-        agentMessage.streaming = false
-        isStreaming.value = false
-        abortController = null
         emit('agentReply', { ...agentMessage })
         scrollChatToBottom()
-        throw err
       },
-    })
+      onEvent(frame) {
+        if (frame.event === 'task_completed' || frame.event === 'task_failed'
+            || frame.event === 'task_cancelled') {
+          agentMessage.streaming = false
+          isStreaming.value = false
+          emit('agentReply', { ...agentMessage })
+          return
+        }
+        const data = JSON.parse(frame.data)
+        const delta = data.content || data.payload?.text
+        if (frame.event === 'agent.text.delta' && delta) {
+          answerText += delta
+          agentMessage.text = answerText
+          emit('agentReply', { ...agentMessage })
+          scrollChatToBottom()
+        }
+      },
+      onState(state) {
+        agentMessage.hint = state === 'OFFLINE' ? '离线预览，可能不是最新内容'
+          : state === 'RECONNECTING' ? '连接中断，正在恢复'
+          : state === 'DEGRADED' ? '本地缓存不可用，正在从服务器恢复'
+          : state === 'AUTH_EXPIRED' ? '登录状态已过期，请重新登录'
+          : state === 'FORBIDDEN' ? '会话不可访问' : undefined
+        if (state === 'AUTH_EXPIRED' || state === 'FORBIDDEN') {
+          agentMessage.streaming = false
+          isStreaming.value = false
+        }
+      },
+    }
+    await coordinateAgentTask(options)
   } catch (err: any) {
     if (err?.name !== 'AbortError') {
       console.error('[SpaceAgentPanel] fetch error:', err)
@@ -373,6 +390,85 @@ async function receiveMessage(text: string) {
     abortController = null
   }
 }
+
+/** 空间面板刷新后只查询原会话最近任务，终态直接采用快照，运行态续传原 taskId。 */
+async function restoreSpaceTask() {
+  const id = sessionStorage.getItem(`space-agent:${props.spaceId || 'default'}`)
+  if (!id || isStreaming.value) return
+  conversationId.value = id
+  try {
+    const scope = await resolveSpaceCacheScope()
+    if (!scope) return
+    const cached = await agentCache.preview(scope, id).catch(() => null)
+    const cachedTask = cached?.checkpoints.at(-1)
+    // 先绘制整个本地会话；随后服务端历史与任务快照覆盖可能过期的预览。
+    messages.value = cached?.messages.map(item => ({ role: item.role === 'assistant' ? 'agent' : 'user',
+      text: item.baseContent || '正在思考...', replyId: item.taskId,
+      streaming: item.taskId === cachedTask?.taskId
+        && (cachedTask?.status === 'RUNNING' || cachedTask?.status === 'QUEUED'),
+      hint: item.taskId === cachedTask?.taskId ? '离线预览，正在与服务端对齐' : undefined,
+    } as ChatMessage)) || []
+    const history = await agentApi.getConversationMessages(id)
+    messages.value = history.list.filter(item => item.role === 'user' || item.role === 'assistant')
+      .map(item => ({ role: item.role === 'assistant' ? 'agent' : 'user',
+        text: item.content || '', replyId: item.traceId,
+        streaming: item.status === 'RUNNING' } as ChatMessage))
+    const recent = await agentApi.getActiveChatTask(id)
+    if (!recent.taskId) return
+    const snapshot = await agentApi.getTaskSnapshot(recent.taskId)
+    const replyId = recent.taskId
+    let agentMessage = messages.value.find(item => item.role === 'agent' && item.replyId === replyId)
+    if (!agentMessage || agentMessage.replyId !== replyId) {
+      agentMessage = { role: 'agent', replyId, text: snapshot.messages[0]?.content || '正在思考...' }
+      messages.value.push(agentMessage)
+    }
+    agentMessage.text = snapshot.messages[0]?.content || agentMessage.text
+    agentMessage.hint = undefined
+    agentMessage.streaming = !['COMPLETED', 'FAILED', 'CANCELLED'].includes(snapshot.status)
+    if (!agentMessage.streaming) {
+      agentMessage.text = snapshot.messages[0]?.content || agentMessage.text
+      return
+    }
+    isStreaming.value = true
+    abortController = new AbortController()
+    let answerText = snapshot.messages[0]?.content || ''
+    const options: TaskStreamOptions = { scopeKey: scope, snapshot, signal: abortController.signal,
+      onSnapshot(authority) {
+        answerText = authority.messages[0]?.content || ''
+        agentMessage.text = answerText || '正在思考...'
+        agentMessage.hint = undefined
+        if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(authority.status)) {
+          agentMessage.streaming = false
+          isStreaming.value = false
+        }
+        emit('agentReply', { ...agentMessage })
+      },
+      onEvent(frame) {
+        if (frame.event === 'agent.text.delta') {
+          answerText += JSON.parse(frame.data).content || ''
+          agentMessage.text = answerText
+          emit('agentReply', { ...agentMessage })
+        }
+      },
+      onState(state) {
+        agentMessage.hint = state === 'OFFLINE' ? '离线预览，可能不是最新内容'
+          : state === 'RECONNECTING' ? '连接中断，正在恢复'
+          : state === 'DEGRADED' ? '本地缓存不可用，正在从服务器恢复' : undefined
+      },
+    }
+    await coordinateAgentTask(options)
+  } catch (error) {
+    console.warn('[SpaceAgentPanel] 恢复失败:', error)
+  } finally { isStreaming.value = false }
+}
+
+onMounted(() => { void restoreSpaceTask() })
+watch(() => props.spaceId, () => {
+  abortController?.abort()
+  messages.value = []
+  conversationId.value = ''
+  void restoreSpaceTask()
+})
 
 function focusPanel() {
   panelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
@@ -408,6 +504,12 @@ defineExpose({
 </script>
 
 <style scoped lang="scss">
+.as-msg-recovery {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 12px;
+}
+
 .agent-sidebar {
   width: 320px;
   flex-shrink: 0;

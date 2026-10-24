@@ -4,13 +4,18 @@ import { userApi } from '@/api/user'
 import type { UserInfoResponse, UpdateUserParams, AuthIdentity } from '@/api/user'
 import { studentProfileApi } from '@/api/studentProfile'
 import { chatWebSocket } from '@/utils/websocket'
+import { agentCache } from '@/db/agentCacheRepository'
 
 const TOKEN_KEY = 'token'
 const SHORT_TOKEN_KEY = 'shortToken'
 const ACCOUNT_KEY = 'remembered_account'
+const AGENT_SCOPE_KEY = 'agent-cache-scope'
+const AGENT_SCOPE_TOKEN_HASH = 'agent-cache-token-hash'
 
 export interface UserInfo {
   id: string
+  /** 若后端身份含租户，该字段参与本地缓存隔离。 */
+  tenantId?: string
   username: string
   email: string
   phone?: string
@@ -38,6 +43,14 @@ export const useUserStore = defineStore('user', () => {
   const profileInitialized = computed(() => userInfo.value?.profileInitialized ?? false)
 
   function setToken(newToken: string) {
+    // 切换身份时先清空上一身份的本地聊天缓存。
+    if (token.value && token.value !== newToken) {
+      const oldScope = localStorage.getItem(AGENT_SCOPE_KEY)
+      if (oldScope) void agentCache.clearScope(oldScope).catch(() => undefined)
+      localStorage.removeItem(AGENT_SCOPE_KEY)
+      localStorage.removeItem(AGENT_SCOPE_TOKEN_HASH)
+      userInfo.value = null
+    }
     token.value = newToken
     localStorage.setItem(TOKEN_KEY, newToken)
   }
@@ -97,6 +110,10 @@ export const useUserStore = defineStore('user', () => {
     try {
       await userApi.logout()
     } catch {}
+    const oldScope = localStorage.getItem(AGENT_SCOPE_KEY)
+    if (oldScope) await agentCache.clearScope(oldScope).catch(() => undefined)
+    localStorage.removeItem(AGENT_SCOPE_KEY)
+    localStorage.removeItem(AGENT_SCOPE_TOKEN_HASH)
     token.value = ''
     shortToken.value = ''
     userInfo.value = null

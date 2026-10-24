@@ -3,6 +3,9 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent, type ToolCallState, type ReasoningSegment } from '@/stores/agent'
 import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
+import { agentCache, type AgentTaskSnapshot } from '@/db/agentCacheRepository'
+import { coordinateAgentTask, followAgentTask, type TaskStreamOptions } from '@/services/agentTaskStream'
+import { useUserStore } from '@/stores/user'
 import type {
   TaskItem,
   TaskList,
@@ -297,9 +300,30 @@ function hydratePlanningSnapshot(agentStore: ReturnType<typeof useAgentStore>, s
 
 export function useAgentChat(scrollCallback?: () => void) {
   const agentStore = useAgentStore()
+  const userStore = useUserStore()
   const messages = ref<ChatMessage[]>([])
   const loadingHistory = ref(false)
   let abortController: AbortController | null = null
+  let offlineConversationId: string | null = null
+  let verifiedScope = ''
+  /** 本地作用域仅在当前 token 摘要匹配时用于离线预览；在线以服务端身份接口复核。 */
+  const resolveCacheScope = async (verifyServer = false): Promise<string> => {
+    const token = localStorage.getItem('token')
+    if (!token || !crypto.subtle) return ''
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
+    const fingerprint = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+    const cached = localStorage.getItem('agent-cache-token-hash') === fingerprint
+      ? localStorage.getItem('agent-cache-scope') || '' : ''
+    if (cached && !verifyServer) { verifiedScope = cached; return cached }
+    try {
+      const response = await agentApi.getCacheScope()
+      verifiedScope = response.scopeKey
+      localStorage.setItem('agent-cache-scope', response.scopeKey)
+      localStorage.setItem('agent-cache-token-hash', fingerprint)
+      return verifiedScope
+    } catch { verifiedScope = cached; return cached }
+  }
+  const cacheScope = () => verifiedScope
 
   const getCurrentMindMaps = (): MindMapData[] => agentStore.currentMindMaps || []
   const getCurrentLearningSpaceCards = (): LearningSpaceCardPayload[] =>
@@ -507,12 +531,9 @@ export function useAgentChat(scrollCallback?: () => void) {
     const assistantMsg = beginAssistantMessage()
     scrollCallback?.()
 
-    const base = import.meta.env.VITE_API_BASE_URL || '/api'
-
     // SSE 请求前主动刷新 accessToken，确保长连接期间 token 不会过期
-    let token: string
     try {
-      token = await refreshAccessToken()
+      await refreshAccessToken()
     } catch {
       // 不能直接 return —— 否则占位气泡会永远停在"正在思考…"
       finishAssistantMessage(assistantMsg, {
@@ -544,27 +565,62 @@ export function useAgentChat(scrollCallback?: () => void) {
         }
       }
 
-      await fetchEventSource(`${base}/agent/chat/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      // 请求 ID 在网络结果不明时留在 sessionStorage；再次提交复用同一键。
+      const conversationId = agentStore.currentConversationId || crypto.randomUUID()
+      agentStore.currentConversationId = conversationId
+      const pendingKey = `agent-request:${conversationId}:${message}`
+      const requestId = sessionStorage.getItem(pendingKey) || crypto.randomUUID()
+      sessionStorage.setItem(pendingKey, requestId)
+      const task = await agentApi.createTask({
+          requestId,
           message,
-          conversationId: agentStore.currentConversationId || undefined,
+          conversationId,
           fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
           knowledgeBaseIds: knowledgeBaseIds && knowledgeBaseIds.length > 0 ? knowledgeBaseIds : undefined,
           forceMode: isClarificationReply ? undefined : (currentForceMode.value || undefined),
           clarificationAnswerJson,
-        }),
-        openWhenHidden: true,
-        signal: abortController.signal,
+        })
+      sessionStorage.removeItem(pendingKey)
+      if (!userStore.userInfo) await userStore.fetchUserInfo().catch(() => undefined)
+      const scopeKey = await resolveCacheScope(true)
+      const snapshot = await agentApi.getTaskSnapshot(task.taskId)
+      const follow = scopeKey ? coordinateAgentTask
+        : (options: TaskStreamOptions) => followAgentTask(options, false)
+      await follow({
+        scopeKey, snapshot, signal: abortController.signal,
+        onSnapshot(authority: AgentTaskSnapshot) {
+          assistantMsg.errorText = undefined
+          const base = authority.messages.find(item => item.role === 'assistant')
+          if (base) {
+            assistantMsg.messageId = base.messageId
+            assistantMsg.content = base.content
+            agentStore.answerText = base.content
+          }
+          if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(authority.status)) {
+            agentStore.finishTurn()
+            finishAssistantMessage(assistantMsg, { status: authority.status === 'COMPLETED' ? 'done' : 'error',
+              content: base?.content || '' })
+          }
+          scrollCallback?.()
+        },
+        onState(state: string) {
+          if (state === 'OFFLINE' || state === 'RECONNECTING') assistantMsg.errorText = '连接中断，正在恢复'
+          if (state === 'DEGRADED') assistantMsg.errorText = '本地缓存不可用，正在从服务端恢复'
+          if (state === 'FORBIDDEN') assistantMsg.errorText = '会话不可访问，请重新登录'
+          if (state === 'AUTH_EXPIRED') assistantMsg.errorText = '登录状态已过期，请重新登录'
+          if (state === 'STREAMING') assistantMsg.errorText = undefined
+          if (state === 'FORBIDDEN' || state === 'AUTH_EXPIRED') {
+            const partial = agentStore.answerText
+            agentStore.finishTurn()
+            finishAssistantMessage(assistantMsg, { status: 'error', content: partial })
+          }
+        },
 
-        onmessage(event) {
+        onEvent(event) {
           if (!event.data) return
 
-          if (event.event === 'done') {
+          if (event.event === 'done' || event.event === 'task_completed'
+              || event.event === 'task_failed' || event.event === 'task_cancelled') {
             // 提前解析 done payload — 需要在定稿前获取 clarificationPayload / messageId
             let donePayload: any = null
             try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
@@ -584,7 +640,7 @@ export function useAgentChat(scrollCallback?: () => void) {
               assistantMsg.sequenceNo = donePayload.sequenceNo
             }
             finishAssistantMessage(assistantMsg, {
-              status: 'done',
+              status: event.event === 'task_failed' || event.event === 'task_cancelled' ? 'error' : 'done',
               content: finalContent,
             })
             if (isEmptyAssistantMessage(assistantMsg)) {
@@ -632,22 +688,6 @@ export function useAgentChat(scrollCallback?: () => void) {
           }
         },
 
-        onerror(err) {
-          console.error('[useAgentChat] SSE error:', err)
-          // 保留已累积内容，避免渲染突然消失；占位气泡就地标记为"连接中断"
-          const partial = agentStore.answerText
-          agentStore.finishTurn()
-          finishAssistantMessage(assistantMsg, {
-            status: 'error',
-            content: partial,
-            appendText: '\n\n*[连接中断]*',
-            errorText: '连接中断',
-          })
-          agentStore.planExecuting = false
-          abortController = null
-          scrollCallback?.()
-          throw err
-        },
       })
     } catch (err: any) {
       if (err.name !== 'AbortError') {
@@ -1110,7 +1150,27 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 加载指定对话的历史消息
    */
   const loadConversation = async (conversationId: string) => {
+    // 切换会话先关闭旧订阅；页面关闭不会取消后端 Agent。
+    abortController?.abort()
+    abortController = null
+    agentStore.currentConversationId = conversationId
     loadingHistory.value = true
+    const scopeKey = await resolveCacheScope()
+    if (scopeKey) {
+      try {
+        const cached = await agentCache.preview(scopeKey, conversationId)
+        if (cached.messages.length) {
+          messages.value = cached.messages.map(item => ({
+            id: `cached:${item.messageId}`, role: item.role === 'user' ? 'user' : 'ai',
+            content: item.baseContent, status: item.status === 'COMPLETED' ? 'done' : 'streaming',
+            messageId: item.messageId, traceId: item.taskId,
+            timestamp: item.updatedAt, errorText: '缓存预览，正在校验服务器状态',
+          }))
+          scrollCallback?.()
+        }
+      } catch (error) { console.warn('[useAgentChat] 本地缓存不可用:', error) }
+    }
+    if (!userStore.userInfo) void userStore.fetchUserInfo().catch(() => undefined)
     try {
       // 倒序分页：先查总数，再请求最后一页，确保最新消息一定加载
       const countResult = await agentApi.getConversationMessages(conversationId, 1, 1)
@@ -1131,8 +1191,11 @@ export function useAgentChat(scrollCallback?: () => void) {
           id: nextMessageId(msg.role === 'user' ? 'u' : 'a'),
           role: (msg.role === 'user' ? 'user' : 'ai') as 'user' | 'ai',
           content: msg.content || '',
-          status: 'done',
+          status: msg.status === 'RUNNING' ? 'streaming'
+            : msg.status === 'FAILED' ? 'error'
+            : msg.status === 'CANCELLED' ? 'stopped' : 'done',
           messageId: msg.id != null ? String(msg.id) : undefined,
+          sequenceNo: msg.sequenceNo,
           traceId: msg.traceId || undefined,
           timestamp: new Date(msg.createTime).getTime(),
         }
@@ -1333,8 +1396,83 @@ export function useAgentChat(scrollCallback?: () => void) {
       }
 
       messages.value = msgs
+      offlineConversationId = null
       agentStore.currentConversationId = conversationId
       resetPlanningStateForConversation(agentStore)
+
+      // 历史 API 始终覆盖缓存预览；活动任务另取一致快照再续传。
+      if (scopeKey) {
+        await agentCache.saveHistory(scopeKey, conversationId, msgs.filter(item => item.messageId).map(item => ({
+          id: item.messageId!, role: item.role === 'ai' ? 'assistant' : 'user',
+          content: item.content, status: item.status === 'done' ? 'COMPLETED' : 'RUNNING',
+          updatedAt: item.timestamp, sequenceNo: item.sequenceNo,
+        }))).catch(error =>
+          console.warn('[useAgentChat] 历史缓存写入失败:', error))
+      }
+      try {
+        const active = await agentApi.getActiveChatTask(conversationId)
+        if (active.taskId) {
+          const authority = await agentApi.getTaskSnapshot(active.taskId)
+          const assistant = authority.messages.find(item => item.role === 'assistant')
+          let target = messages.value.find(item => item.traceId === authority.taskId && item.role === 'ai')
+          if (!target) {
+            target = { id: `task:${authority.taskId}`, role: 'ai', content: '', status: 'streaming',
+              traceId: authority.taskId, timestamp: Date.now() }
+            messages.value.push(target)
+            target = messages.value[messages.value.length - 1]
+          }
+          target.messageId = assistant?.messageId
+          target.content = assistant?.content || ''
+          target.status = authority.status === 'COMPLETED' ? 'done'
+            : ['FAILED', 'CANCELLED'].includes(authority.status) ? 'error' : 'streaming'
+          streamingMessage = target
+          agentStore.startNewTurn()
+          agentStore.answerText = target.content
+          abortController = new AbortController()
+          const onSnapshot = (fresh: AgentTaskSnapshot) => {
+            target!.errorText = undefined
+            const message = fresh.messages.find(item => item.role === 'assistant')
+            target!.content = message?.content || ''
+            target!.messageId = message?.messageId
+            target!.status = fresh.status === 'COMPLETED' ? 'done' : 'streaming'
+            agentStore.answerText = target!.content
+            if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(fresh.status)) agentStore.finishTurn()
+            scrollCallback?.()
+          }
+          const options: TaskStreamOptions = {
+            scopeKey, snapshot: authority, signal: abortController.signal, onSnapshot,
+            onState(state) { target!.errorText = state === 'OFFLINE' ? '离线预览，可能不是最新内容'
+              : state === 'DEGRADED' ? '本地缓存不可用，正在恢复'
+              : state === 'AUTH_EXPIRED' ? '登录状态已过期，请重新登录'
+              : state === 'FORBIDDEN' ? '会话不可访问，请重新登录' : undefined
+              if (state === 'AUTH_EXPIRED' || state === 'FORBIDDEN') {
+                target!.status = 'error'
+                agentStore.finishTurn()
+              }
+            },
+            onEvent(frame) {
+              if (frame.event === 'task_completed' || frame.event === 'task_failed'
+                  || frame.event === 'task_cancelled') {
+                target!.status = frame.event === 'task_completed' ? 'done' : 'error'
+                agentStore.finishTurn()
+                return
+              }
+              try {
+                agentStore.handleEvent(frame.event, JSON.parse(frame.data) as AgentTraceEvent)
+                syncStreamingMessage()
+              } catch (error) { console.warn('[useAgentChat] 恢复事件无效:', error) }
+            },
+          }
+          if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(authority.status)) {
+            // 终态快照已覆盖历史竞态，无需打开 SSE 或再次启动任务。
+            onSnapshot(authority)
+          } else {
+            void (scopeKey ? coordinateAgentTask(options) : followAgentTask(options, false))
+              .catch(error => { target!.errorText = `恢复失败：${String(error)}` })
+          }
+        }
+      } catch (error) { console.warn('[useAgentChat] 活动任务恢复失败:', error) }
+      if (scopeKey) void agentCache.cleanup(scopeKey).catch(() => undefined)
 
       // === 水合会话级目标规划快照 ===
       // 执行面板是会话级状态，不属于某条消息；历史会话打开时只恢复一个快照。
@@ -1357,6 +1495,8 @@ export function useAgentChat(scrollCallback?: () => void) {
       scrollCallback?.()
     } catch (e) {
       console.error('[useAgentChat] 加载对话消息失败:', e)
+      offlineConversationId = conversationId
+      for (const item of messages.value) item.errorText = '离线预览，可能不是最新内容'
     } finally {
       loadingHistory.value = false
     }
@@ -1379,16 +1519,35 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 开始新一轮对话
    */
   const startNewConversation = () => {
+    abortController?.abort()
+    abortController = null
     messages.value = []
     streamingMessage = null
     agentStore.reset()
   }
 
   const clearMessages = () => {
+    abortController?.abort()
+    abortController = null
     messages.value = []
     streamingMessage = null
     agentStore.reset()
   }
+
+  /** 页面卸载只释放订阅和本地协调锁，不取消服务端任务。 */
+  const dispose = () => {
+    abortController?.abort()
+    abortController = null
+    window.removeEventListener('online', resumeOfflineConversation)
+  }
+
+  /** 服务器恢复可访问后重新用权威历史和快照校验离线预览。 */
+  const resumeOfflineConversation = () => {
+    if (offlineConversationId && agentStore.currentConversationId === offlineConversationId) {
+      void loadConversation(offlineConversationId)
+    }
+  }
+  window.addEventListener('online', resumeOfflineConversation)
 
   /**
    * 删除对话并清理本地状态
@@ -1396,6 +1555,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   const deleteConversation = async (conversationId: string) => {
     const wasActive = agentStore.currentConversationId === conversationId
     await agentStore.deleteConversation(conversationId)
+    if (cacheScope()) await agentCache.clearConversation(cacheScope(), conversationId)
     if (wasActive) {
       messages.value = []
     }
@@ -1413,6 +1573,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     startNewConversation,
     clearMessages,
     deleteConversation,
+    dispose,
     answerClarificationViaSSE,
     confirmGateViaSSE,
   }
