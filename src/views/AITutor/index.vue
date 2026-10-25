@@ -85,7 +85,17 @@
           </div>
             <div class="chat-flow" ref="chatFlowRef">
               <div class="chat-flow-inner">
-            <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
+            <div class="chat-messages" v-loading="loadingHistory">
+            <!-- 本地缓存提示：缓存先渲染，网络校验完成后消失 -->
+            <div v-if="historyFromCache && messages.length > 0" class="cache-hint">
+              已显示本地缓存
+            </div>
+            <!-- 更早历史：缓存优先，后端游标分页兜底 -->
+            <div v-if="hasMoreHistory && messages.length > 0" class="load-older-history">
+              <button class="load-older-button" :disabled="loadingOlder" @click="handleLoadOlder">
+                {{ loadingOlder ? '加载中…' : '加载更早的消息' }}
+              </button>
+            </div>
             <!-- 目标规划执行面板：会话级唯一状态区，不再作为普通聊天消息重复出现 -->
             <div
               class="planning-execution-shelf"
@@ -730,7 +740,6 @@ const learningSpaceStore = useLearningSpaceStore()
 const route = useRoute()
 
 const inputMessage = ref('')
-const chatContainer = ref<HTMLElement>()
 const chatFlowRef = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const fileInputRef = ref<HTMLInputElement>()
@@ -771,12 +780,17 @@ const scrollToBottom = () => {
 const {
   messages,
   loadingHistory,
+  historyFromCache,
+  hasMoreHistory,
+  loadingOlder,
+  loadOlderMessages,
   currentForceMode,
   sendMessage: agentSend,
   stopGeneration,
   confirmPlan,
   cancelPlan,
   loadConversation,
+  flushPendingOutbox,
   startNewConversation,
   deleteConversation,
   answerClarificationViaSSE,
@@ -1393,6 +1407,18 @@ const loadConversationFromSidebar = async (conv: ConversationVO) => {
   }
 }
 
+/** 加载更早消息并保持当前视口位置（否则顶部插入会让内容突然下跳） */
+const handleLoadOlder = async () => {
+  const el = chatFlowRef.value
+  const previousHeight = el?.scrollHeight || 0
+  const previousTop = el?.scrollTop || 0
+  await loadOlderMessages()
+  await nextTick()
+  if (el) {
+    el.scrollTop = el.scrollHeight - previousHeight + previousTop
+  }
+}
+
 const hasTraceEventsForMsg = (msg: any): boolean => {
   return !!(msg.traceEvents?.length) || !!msg.traceId
 }
@@ -1715,7 +1741,9 @@ watch(
 onMounted(() => {
   // 数字人面板默认收起（含宽屏），不再按窗口宽度自动展开
   preloadAvatarAuthInfo()
-  agentStore.fetchConversations()
+  // 先用 IndexedDB 缓存渲染侧边栏，再后台拉服务端列表（SWR）
+  void agentStore.hydrateCachedConversations()
+  void agentStore.fetchConversations()
   document.addEventListener('visibilitychange', handleVisibilitySync)
   ensureLearningSpacesLoaded().then(() => {
     const routeSpaceId = route.query.spaceId
@@ -1749,6 +1777,9 @@ onMounted(() => {
       loadConversation(lastConversationId)
         .then(() => loadConversationAttachments(lastConversationId))
         .catch(() => { /* 会话可能已被删除，loadConversation 内部已处理 */ })
+        .finally(() => { void flushPendingOutbox() })
+    } else {
+      void flushPendingOutbox()
     }
   }
 })
@@ -1770,6 +1801,7 @@ onUnmounted(() => {
 function handleVisibilitySync() {
   if (document.visibilityState !== 'visible') return
   agentStore.syncConversations({ minIntervalMs: 60_000 })
+  void flushPendingOutbox()
 }
 
 watch(windowWidth, (newWidth, oldWidth) => {
@@ -2041,6 +2073,41 @@ watch(windowWidth, (newWidth, oldWidth) => {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+}
+
+.cache-hint {
+  align-self: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-color-secondary, #64748b);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.load-older-history {
+  display: flex;
+  justify-content: center;
+}
+
+.load-older-button {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: transparent;
+  color: var(--text-color-secondary, #64748b);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.load-older-button:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--text-color, #0f172a);
+}
+
+.load-older-button:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .planning-execution-shelf {

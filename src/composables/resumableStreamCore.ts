@@ -124,3 +124,59 @@ export function parseEventSeq(id: string | null | undefined): number | null {
 export function shouldResumeGeneration(status: string | null | undefined): boolean {
   return status === 'CREATED' || status === 'RUNNING'
 }
+
+/**
+ * SSE 连接的时间参数。
+ *
+ * <p>服务端心跳是 15 秒一次；空闲超时取 3 倍心跳，既能发现半开连接，
+ * 又不会因为一次心跳丢失就误判断线。</p>
+ */
+export interface StreamTimingOptions {
+  /** 从发起到拿到响应头的上限 */
+  connectTimeoutMs: number
+  /** 多久没收到任何字节（含注释心跳）就认为连接已死 */
+  idleTimeoutMs: number
+  /** 连接稳定多久后重置退避窗口与 attempt */
+  stableResetMs: number
+  /** 快速重试窗口用尽后的慢探测间隔 */
+  slowProbeIntervalMs: number
+  /** 单次订阅的总时长上限（不含离线暂停） */
+  maxTotalMs: number
+}
+
+export const DEFAULT_STREAM_TIMING: StreamTimingOptions = {
+  connectTimeoutMs: 12_000,
+  idleTimeoutMs: 45_000,
+  stableResetMs: 10_000,
+  slowProbeIntervalMs: 45_000,
+  maxTotalMs: 30 * 60_000,
+}
+
+export type HttpRetryAction = 'retry' | 'refresh-token' | 'reconcile' | 'stop'
+
+/**
+ * HTTP 状态码的恢复语义。
+ *
+ * <p>与 {@link decideRetry} 的区别：400/404/410 不再一律 stop，
+ * 而是交给上层做终态对账（查生成状态 / 读历史消息），对账后可能直接完成。</p>
+ */
+export function classifyHttpStatus(status: number | null): HttpRetryAction {
+  if (status === null) return 'retry'
+  if (status === 401) return 'refresh-token'
+  if (status === 400 || status === 404 || status === 410) return 'reconcile'
+  if (status === 403) return 'stop'
+  if (status === 429) return 'retry'
+  if (status >= 500) return 'retry'
+  if (status >= 400) return 'stop'
+  return 'retry'
+}
+
+/**
+ * 连接稳定一段时间后，才允许重置重试窗口。
+ *
+ * <p>关键修复：旧实现从 run() 开始计时且成功后不重置，
+ * 生成超过两分钟后第一次断线会直接判定“重连超时”。</p>
+ */
+export function shouldResetRetryWindow(connectedForMs: number, stableResetMs: number): boolean {
+  return Number.isFinite(connectedForMs) && connectedForMs >= stableResetMs
+}

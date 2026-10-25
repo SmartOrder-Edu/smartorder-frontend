@@ -27,6 +27,9 @@ const {
   createSeqGate,
   parseEventSeq,
   shouldResumeGeneration,
+  classifyHttpStatus,
+  shouldResetRetryWindow,
+  DEFAULT_STREAM_TIMING,
 } = core
 
 const NO_JITTER = { baseDelayMs: 1000, maxDelayMs: 15000, jitterRatio: 0, windowMs: 120000 }
@@ -121,4 +124,26 @@ test('刷新后只对未完成生成接流', () => {
   assert.equal(shouldResumeGeneration('CANCELLED'), false)
   assert.equal(shouldResumeGeneration('INTERRUPTED'), false)
   assert.equal(shouldResumeGeneration(null), false)
+})
+
+test('400/404/410 交给终态对账，而不是直接判死', () => {
+  assert.equal(classifyHttpStatus(400), 'reconcile')
+  assert.equal(classifyHttpStatus(404), 'reconcile')
+  assert.equal(classifyHttpStatus(410), 'reconcile')
+  assert.equal(classifyHttpStatus(401), 'refresh-token')
+  assert.equal(classifyHttpStatus(403), 'stop')
+  assert.equal(classifyHttpStatus(429), 'retry')
+  assert.equal(classifyHttpStatus(503), 'retry')
+  assert.equal(classifyHttpStatus(null), 'retry')
+})
+
+test('连接稳定超过阈值才允许重置重试窗口', () => {
+  assert.equal(shouldResetRetryWindow(9_999, 10_000), false)
+  assert.equal(shouldResetRetryWindow(10_000, 10_000), true)
+  assert.equal(shouldResetRetryWindow(Number.NaN, 10_000), false)
+})
+
+test('默认空闲超时至少覆盖三次心跳', () => {
+  assert.ok(DEFAULT_STREAM_TIMING.idleTimeoutMs >= 3 * 15_000)
+  assert.ok(DEFAULT_STREAM_TIMING.maxTotalMs > DEFAULT_STREAM_TIMING.slowProbeIntervalMs)
 })

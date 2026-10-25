@@ -1,6 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { agentApi, type ConversationVO, type ExecutionStep, type PlanSummary } from '@/api/agent'
+import { useUserStore } from './user'
+import {
+  getCachedConversations,
+  saveCachedConversations,
+  upsertCachedConversation,
+  removeCachedConversation,
+} from '@/cache/conversationCache'
 import type {
   TaskList,
   TaskItem,
@@ -138,6 +145,16 @@ export const useAgentStore = defineStore('agent', () => {
   // === 对话历史列表 ===
   const conversations = ref<ConversationVO[]>([])
   const conversationsLoading = ref(false)
+
+  /** 当前用户 ID（缓存按用户分库）；未登录/加载中返回 null，自动降级为不缓存 */
+  function cacheUserId(): string | null {
+    try {
+      const id = useUserStore().userInfo?.id
+      return id ? String(id) : null
+    } catch {
+      return null
+    }
+  }
 
   /**
    * 开始新的对话轮次
@@ -580,7 +597,6 @@ export const useAgentStore = defineStore('agent', () => {
       }
 
       case 'agent.gate.answered': {
-        const status = data.payload?.status as string
         const answeredClarificationId = data.payload?.clarificationId as string
         if (answeredClarificationId) {
           clarificationAnsweredIds.value.add(answeredClarificationId)
@@ -716,6 +732,8 @@ export const useAgentStore = defineStore('agent', () => {
       const conv = list[idx]
       if (title) conv.title = title
       conv.lastActiveTime = new Date().toISOString()
+      const uid = cacheUserId()
+      if (uid) void upsertCachedConversation(uid, conv)
       return conv
     }
     const created: ConversationVO = {
@@ -726,6 +744,8 @@ export const useAgentStore = defineStore('agent', () => {
       lastActiveTime: new Date().toISOString(),
     }
     list.unshift(created)
+    const uid = cacheUserId()
+    if (uid) void upsertCachedConversation(uid, created)
     return list[0]
   }
 
@@ -739,6 +759,8 @@ export const useAgentStore = defineStore('agent', () => {
     if (messageCountDelta) {
       conv.messageCount = (conv.messageCount || 0) + messageCountDelta
     }
+    const uid = cacheUserId()
+    if (uid) void upsertCachedConversation(uid, conv)
   }
 
   function addExecutionStep(step: ExecutionStep) {
@@ -806,14 +828,38 @@ export const useAgentStore = defineStore('agent', () => {
    * 日常操作（新建对话、删除对话）请用 `syncConversations()`。
    */
   async function fetchConversations() {
-    conversationsLoading.value = true
+    // 缓存已经渲染出列表时不要整表 loading，避免侧边栏闪一下
+    conversationsLoading.value = conversations.value.length === 0
     try {
       const data = await agentApi.getConversations()
       conversations.value = data || []
+      const uid = cacheUserId()
+      if (uid && conversations.value.length > 0) {
+        void saveCachedConversations(uid, conversations.value)
+      }
     } catch (e) {
+      // 网络失败时保留缓存渲染结果，不清空侧边栏
       console.error('[AgentStore] 获取对话列表失败:', e)
     } finally {
       conversationsLoading.value = false
+    }
+  }
+
+  /**
+   * 启动时先用 IndexedDB 缓存渲染侧边栏，再后台拉服务端列表。
+   * 缓存为空/不可用时什么都不做，保持原有 loading 行为。
+   */
+  async function hydrateCachedConversations() {
+    if (conversations.value.length > 0) return
+    const uid = cacheUserId()
+    if (!uid) return
+    try {
+      const cached = await getCachedConversations(uid)
+      if (cached.length > 0 && conversations.value.length === 0) {
+        conversations.value = cached
+      }
+    } catch (err) {
+      console.warn('[AgentStore] 读取会话列表缓存失败:', err)
     }
   }
 
@@ -845,6 +891,10 @@ export const useAgentStore = defineStore('agent', () => {
     try {
       const latest = (await agentApi.getConversations()) || []
       mergeConversations(latest)
+      const uid = cacheUserId()
+      if (uid && conversations.value.length > 0) {
+        void saveCachedConversations(uid, conversations.value)
+      }
     } catch (e) {
       // 静默失败：保持现有列表不动，不打扰用户
       console.error('[AgentStore] 同步对话列表失败:', e)
@@ -899,6 +949,8 @@ export const useAgentStore = defineStore('agent', () => {
   async function deleteConversation(conversationId: string) {
     await agentApi.deleteConversation(conversationId)
     conversations.value = conversations.value.filter(c => c.conversationId !== conversationId)
+    const uid = cacheUserId()
+    if (uid) void removeCachedConversation(uid, conversationId)
     if (currentConversationId.value === conversationId) {
       currentConversationId.value = ''
     }
@@ -1020,6 +1072,7 @@ export const useAgentStore = defineStore('agent', () => {
     closeTracePanel,
     getCurrentMessageTraceEvents,
     fetchConversations,
+    hydrateCachedConversations,
     syncConversations,
     deleteConversation,
     upsertConversation,

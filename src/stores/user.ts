@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { userApi } from '@/api/user'
-import type { UserInfoResponse, UpdateUserParams, AuthIdentity } from '@/api/user'
+import type { UpdateUserParams, AuthIdentity } from '@/api/user'
 import { studentProfileApi } from '@/api/studentProfile'
 import { chatWebSocket } from '@/utils/websocket'
+import { deleteAgentCacheDb } from '@/cache/db'
 
 const TOKEN_KEY = 'token'
 const SHORT_TOKEN_KEY = 'shortToken'
@@ -94,6 +95,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function logout() {
+    const userId = userInfo.value?.id
     try {
       await userApi.logout()
     } catch {}
@@ -103,6 +105,8 @@ export const useUserStore = defineStore('user', () => {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(SHORT_TOKEN_KEY)
     chatWebSocket.disconnect()
+    // 清除本账号的会话缓存，避免下一位登录用户看到上一位的对话
+    if (userId) void deleteAgentCacheDb(String(userId))
   }
 
   function saveRememberedAccount(account: string) {

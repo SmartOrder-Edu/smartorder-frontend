@@ -8,6 +8,8 @@ export interface AgentChatRequest {
   message: string
   conversationId?: string
   fileIds?: number[]
+  /** 知识库 ID 列表（与 fileIds 分开传给后端） */
+  knowledgeBaseIds?: number[]
   /** 学习执行页上下文：当前脚本步骤、教学段、画布、时间轴位置等 */
   studyContext?: Record<string, unknown>
   /** 强制运行模式：'REACT' 快速回答 / 'PLAN_AND_EXECUTE' 目标规划，不传则走意图路由 */
@@ -89,6 +91,10 @@ export interface MessageVO {
   /** 本条消息关联的附件文件ID列表，JSON数组格式如[1,2,3] */
   attachmentFileIds?: string
   createTime: string
+  /** 会话内序号，用于缓存排序与 beforeSequence 游标 */
+  sequenceNo?: number
+  /** RUNNING / COMPLETED / FAILED / CANCELLED */
+  status?: string
 }
 
 export interface MessagePageResult {
@@ -96,6 +102,10 @@ export interface MessagePageResult {
   total: number
   page: number
   size: number
+  /** 是否还有更早的消息（beforeSequence 游标分页） */
+  hasMore?: boolean
+  /** 下一页更早消息的游标 */
+  nextBeforeSequence?: number | null
 }
 
 /** 批量 trace 接口的精简事件（后端已按当前用户过滤） */
@@ -149,13 +159,18 @@ export const agentApi = {
 
   /** 查询生成状态（断线兜底 / 刷新恢复） */
   getGeneration(generationId: string) {
-    return request.get<AgentGenerationVO>(`/agent/generations/${encodeURIComponent(generationId)}`)
+    return request.get<AgentGenerationVO>(
+      `/agent/generations/${encodeURIComponent(generationId)}`,
+      { showError: false },
+    )
   },
 
   /** 协作式取消：停止后仍可回放已产生的事件 */
   cancelGeneration(generationId: string) {
     return request.post<{ generationId: string; cancelAccepted: boolean }>(
       `/agent/generations/${encodeURIComponent(generationId)}/cancel`,
+      undefined,
+      { showError: false },
     )
   },
 
@@ -163,6 +178,7 @@ export const agentApi = {
   getActiveGeneration(conversationId: string) {
     return request.get<AgentGenerationVO | null>(
       `/agent/generations/conversations/${encodeURIComponent(conversationId)}/active`,
+      { showError: false },
     )
   },
 
@@ -213,11 +229,25 @@ export const agentApi = {
     return request.get<ConversationVO[]>('/agent/conversations')
   },
 
-  /** 获取指定对话的消息（分页） */
-  getConversationMessages(conversationId: string, page = 1, size = 100) {
+  /**
+   * 获取指定对话的消息。
+   *
+   * <p>传 beforeSequence 时走后端游标分页（取更早的一页）；
+   * 不传时兼容旧的 page/size OFFSET 分页。</p>
+   */
+  getConversationMessages(
+    conversationId: string,
+    page = 1,
+    size = 100,
+    options: { beforeSequence?: number; showError?: boolean } = {},
+  ) {
+    const params: Record<string, number> = { page, size }
+    if (typeof options.beforeSequence === 'number' && Number.isFinite(options.beforeSequence)) {
+      params.beforeSequence = options.beforeSequence
+    }
     return request.get<MessagePageResult>(
       `/agent/conversations/${conversationId}/messages`,
-      { params: { page, size } }
+      { params, showError: options.showError }
     )
   },
 
