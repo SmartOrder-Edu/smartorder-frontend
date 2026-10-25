@@ -153,6 +153,7 @@ interface TimelineNode {
 
 const agentStore = useAgentStore()
 
+// traceEvents 不含 token 级 delta（打开面板时由 AITutor 按 reasoningSegments 合成思考节点）
 const traceList = computed(() => {
   return agentStore.traceEvents.filter(
     (e) => e.traceId === agentStore.activeTraceId

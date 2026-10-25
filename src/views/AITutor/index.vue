@@ -224,6 +224,12 @@
                     <span class="loading-dots"><span></span><span></span><span></span></span>
                   </div>
 
+                  <!-- 断线重连提示：气泡与已生成内容保留，后台按 seq 游标补发遗漏事件 -->
+                  <div v-if="msg.reconnecting" class="reconnect-hint">
+                    <span class="reconnect-spinner"></span>
+                    <span>连接中断，正在重连…</span>
+                  </div>
+
                   <!-- 资源卡片 -->
                   <div v-if="msg.resources" class="message-resources">
                     <div
@@ -560,9 +566,9 @@
           </div>
         </main>
 
-        <!-- 数字人面板：聊天区右侧的辅助陪伴面板 -->
+        <!-- 数字人面板：聊天区右侧的辅助陪伴面板，默认收起（v-if 确保收起时不建立 RTC 连接） -->
         <AssistantPanel
-          v-show="!isAssistantCollapsed"
+          v-if="!isAssistantCollapsed"
           class="assistant-panel-slot"
           :latestAiMessage="latestAiMessageForAvatar"
           :initial-auth-info="avatarAuthInfo"
@@ -685,6 +691,7 @@ import { useUserStore } from '@/stores/user'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
 import {
   useAgentChat,
+  readLastConversationId,
   type ChatMessage,
 } from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
@@ -692,6 +699,7 @@ import type { ConversationVO } from '@/api/agent'
 import { agentApi } from '@/api/agent'
 import { agentAttachmentApi, type AttachmentStatus } from '@/api/agentAttachment'
 import type { AgentTraceEvent, ReasoningSegment } from '@/stores/agent'
+import { normalizeAgentTraceEvent } from '@/utils/agentTraceEvent'
 import type { TaskList } from '@/types/planExecute'
 import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import ReasoningProcess from '@/components/agent/ReasoningProcess.vue'
@@ -735,8 +743,8 @@ const selectedReferences = ref<RagReference[]>([])
 const spaceSelectorVisible = ref(false)
 const selectedSpaceId = ref<string | null>(null)
 
-// 数字人面板状态
-const isAssistantCollapsed = ref(false)
+// 数字人面板状态：默认收起，由用户主动点击右上角「数字人」按钮展开
+const isAssistantCollapsed = ref(true)
 const latestAiMessageForAvatar = ref('')
 const avatarAuthInfo = ref<AvatarAuthInfo | null>(null)
 const avatarAuthLoading = ref(true)
@@ -1429,24 +1437,9 @@ const openMsgTrace = async (msg: any) => {
     agentStore.traceEvents = injectThinkEventIfMissing(msg.traceEvents, msg.thinkingText, msg.reasoningSegments)
   } else if (msg.traceId) {
     try {
-      const rawEvents: any[] = await agentApi.getTraceEvents(msg.traceId)
-      // 标准化后端实体格式 → 前端 AgentTraceEvent 格式
-      const normalized = (rawEvents || []).map((raw: any) => {
-        let payload = raw.payload
-        if (typeof payload === 'string') {
-          try { payload = JSON.parse(payload) } catch { /* keep as string */ }
-        }
-        return {
-          traceId: raw.traceId || '',
-          conversationId: raw.conversationId || '',
-          userId: raw.userId || 0,
-          mode: raw.agentMode || raw.mode || '',
-          eventType: raw.eventType || '',
-          seq: raw.sequenceNum || raw.seq || 0,
-          timestamp: raw.createTime ? new Date(raw.createTime).getTime() : (raw.timestamp || Date.now()),
-          payload,
-        }
-      })
+      // 批量接口取单条 trace：与历史消息共用同一套用户过滤与精简 DTO
+      const traceMap = await agentApi.getTraceEventsBatch([msg.traceId])
+      const normalized = (traceMap[msg.traceId] || []).map(normalizeAgentTraceEvent)
       const enriched = injectThinkEventIfMissing(normalized, msg.thinkingText, msg.reasoningSegments)
       agentStore.traceEvents = enriched
       msg.traceEvents = enriched // 缓存（含合成 think 事件）
@@ -1512,7 +1505,7 @@ const handleLearningPlanCancel = () => {
 }
 
 /**
- * 历史 trace 中缺少 agent.think.delta（后端不持久化高频 delta 事件），
+ * 追踪时间线里没有 agent.think.delta（后端不持久化，前端也不再收集 token 级 delta），
  * 导致抽屉时间线缺少"思考"节点。
  *
  * - 如果有 reasoningSegments，按段精确合成多条 think.delta 与工具事件交错
@@ -1523,12 +1516,15 @@ function injectThinkEventIfMissing(
   thinkingText?: string,
   reasoningSegments?: ReasoningSegment[],
 ): AgentTraceEvent[] {
+  // 没有过程事件就没有时间线可挂（实时流里 delta 不落 traceEvents），直接交给空状态
+  if (events.length === 0) return events
+
   // 优先使用 reasoningSegments 精确重建思考与工具的交错顺序
   if (reasoningSegments?.length) {
     return interleaveThinkFromSegments(events, reasoningSegments)
   }
 
-  if (!thinkingText || events.length === 0) return events
+  if (!thinkingText) return events
   const hasThinkDelta = events.some(e => e.eventType === 'agent.think.delta')
   if (hasThinkDelta) return events
 
@@ -1549,13 +1545,14 @@ function injectThinkEventIfMissing(
 
 /**
  * 根据 reasoningSegments 在工具事件之间精确插入合成 think.delta 事件，
- * 使历史追踪面板与实时展示的思考→工具→思考交错结构完全一致。
+ * 使追踪面板的思考→工具→思考交错结构与消息里的推理过程一致。
  */
 function interleaveThinkFromSegments(
   events: AgentTraceEvent[],
   segments: ReasoningSegment[],
 ): AgentTraceEvent[] {
   const ref = events[0]
+  if (!ref) return events
   const result: AgentTraceEvent[] = []
   let seq = 0
 
@@ -1579,6 +1576,11 @@ function interleaveThinkFromSegments(
       case 'agent.phase.change':
       case 'agent.status':
         preEvents.push(e)
+        break
+      // 思考/正文由 reasoningSegments 重建；忽略数组里可能残留的 token 级 delta，
+      // 避免二次打开追踪面板时把已合成的事件再当成后置事件追加一遍。
+      case 'agent.think.delta':
+      case 'agent.text.delta':
         break
       default:
         postEvents.push(e)
@@ -1711,7 +1713,7 @@ watch(
 )
 
 onMounted(() => {
-  isAssistantCollapsed.value = window.innerWidth < 1280
+  // 数字人面板默认收起（含宽屏），不再按窗口宽度自动展开
   preloadAvatarAuthInfo()
   agentStore.fetchConversations()
   document.addEventListener('visibilitychange', handleVisibilitySync)
@@ -1739,6 +1741,15 @@ onMounted(() => {
         sendQuickMessage(`分析我的测评错题，试卷ID为 ${jobId}`)
       }, 500)
     })
+  } else {
+    // 刷新后恢复上次会话：否则页面停在欢迎页，看起来像“消息全没了”。
+    // loadConversation 内部会继续接回仍在执行的生成（从 Redis 事件日志回放）。
+    const lastConversationId = readLastConversationId()
+    if (lastConversationId) {
+      loadConversation(lastConversationId)
+        .then(() => loadConversationAttachments(lastConversationId))
+        .catch(() => { /* 会话可能已被删除，loadConversation 内部已处理 */ })
+    }
   }
 })
 
@@ -2236,6 +2247,31 @@ watch(windowWidth, (newWidth, oldWidth) => {
   display: flex;
   gap: 4px;
   align-items: center;
+}
+
+/* 断线重连提示：与“正在思考”同排，弱提示色，不打断阅读 */
+.reconnect-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin-top: 4px;
+  padding: 2px 0;
+  font-size: 0.8125rem;
+  color: #b26a00;
+}
+
+.reconnect-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(178, 106, 0, 0.25);
+  border-top-color: #b26a00;
+  border-radius: 50%;
+  animation: reconnect-spin 0.8s linear infinite;
+}
+
+@keyframes reconnect-spin {
+  to { transform: rotate(360deg); }
 }
 
 /* 生成失败/中断：气泡给一点轻微提示色 */

@@ -13,6 +13,7 @@ import type {
 } from '@/types/planExecute'
 import type { RagSourcePayload, WebSearchReference } from '@/composables/useAgentChat'
 import type { MindMapData } from '@/types/mindMap'
+import { appendTraceEvent } from '@/utils/agentTrace'
 
 export interface AgentTraceEvent<T = any> {
   traceId: string
@@ -202,9 +203,9 @@ export const useAgentStore = defineStore('agent', () => {
    * 处理 SSE 事件
    */
   function handleEvent(eventName: string, data: AgentTraceEvent) {
-    traceEvents.value.push(data)
-    // 按 seq 排序
-    traceEvents.value.sort((a, b) => a.seq - b.seq)
+    // token 级 delta（text/think）只驱动正文与思考渲染，不进入追踪时间线。
+    // 断线回放几千条事件时，逐条 push 进响应式数组是前端最大的一块无用功。
+    appendTraceEvent(traceEvents.value, eventName, data)
 
     if (data.traceId) {
       currentTraceId.value = data.traceId
@@ -469,7 +470,11 @@ export const useAgentStore = defineStore('agent', () => {
       case 'agent.mindmap.created': {
         const mm = data.payload as MindMapData
         if (mm && Array.isArray(mm.nodes) && mm.nodes.length > 0) {
-          currentMindMaps.value.push(mm)
+          // 快照恢复时历史 trace 已种入同一张导图，重放事件按内容去重
+          const key = mindMapKey(mm)
+          if (!currentMindMaps.value.some(existing => mindMapKey(existing) === key)) {
+            currentMindMaps.value.push(mm)
+          }
         }
         break
       }
@@ -896,6 +901,15 @@ export const useAgentStore = defineStore('agent', () => {
     conversations.value = conversations.value.filter(c => c.conversationId !== conversationId)
     if (currentConversationId.value === conversationId) {
       currentConversationId.value = ''
+    }
+  }
+
+  /** 思维导图内容指纹：同一张导图在快照 + 重放路径下只保留一份 */
+  function mindMapKey(mm: MindMapData): string {
+    try {
+      return JSON.stringify(mm)
+    } catch {
+      return `${mm?.topic || ''}|${mm?.nodes?.length || 0}`
     }
   }
 

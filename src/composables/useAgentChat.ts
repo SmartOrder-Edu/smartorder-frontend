@@ -1,8 +1,23 @@
 import { ref, watch } from 'vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent, type ToolCallState, type ReasoningSegment } from '@/stores/agent'
-import { agentApi, type ExecutionStep, type PlanSummary } from '@/api/agent'
+import { agentApi, type AgentGenerationVO, type AgentTraceEventBrief, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
+import {
+  createResumableStream,
+  type ResumableStream,
+  type StreamFailure,
+} from '@/composables/useResumableAgentStream'
+import { shouldResumeGeneration } from '@/composables/resumableStreamCore'
+import { mergeTraceEventsForMessage, traceEventsForMessage } from '@/utils/agentTrace'
+import { normalizeAgentTraceEvent } from '@/utils/agentTraceEvent'
+import {
+  buildAgentStreamSnapshot,
+  clearAgentStreamSnapshot,
+  loadAgentStreamSnapshot,
+  saveAgentStreamSnapshot,
+  type AgentStreamSnapshot,
+} from '@/utils/agentStreamSnapshot'
 import type {
   TaskItem,
   TaskList,
@@ -72,6 +87,10 @@ export interface ChatMessage {
   content: string
   /** 消息状态，见 ChatMessageStatus */
   status: ChatMessageStatus
+  /** 网络中断后是否正在自动重连（气泡保持“生成中”，不提前定稿） */
+  reconnecting?: boolean
+  /** 后端生成任务 ID（断线重连 / 刷新恢复用） */
+  generationId?: string
   /** 后端 conversation_message 主键（agent.message.created / done 下发） */
   messageId?: string
   /** 后端消息序号 */
@@ -121,6 +140,72 @@ let localMessageSeq = 0
 function nextMessageId(prefix: 'u' | 'a'): string {
   localMessageSeq += 1
   return `${prefix}_${Date.now().toString(36)}_${localMessageSeq}`
+}
+
+/**
+ * 生成幂等键：一次用户发送只生成一次。
+ * 重试创建、断线重连后重新创建都必须复用同一个 key，服务端据此拒绝重复执行模型调用。
+ */
+function createClientRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** 记住“最后打开的会话”，刷新页面后才能回到原来的对话，而不是停在欢迎页 */
+const LAST_CONVERSATION_KEY = 'smartorder:agent:lastConversationId'
+
+export function readLastConversationId(): string | null {
+  try {
+    return localStorage.getItem(LAST_CONVERSATION_KEY)
+  } catch {
+    return null
+  }
+}
+
+function rememberConversation(conversationId: string) {
+  try {
+    localStorage.setItem(LAST_CONVERSATION_KEY, conversationId)
+  } catch {
+    // 隐私模式/配额满：记不住就算了，不影响主流程
+  }
+}
+
+function forgetConversation() {
+  try {
+    localStorage.removeItem(LAST_CONVERSATION_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * 创建生成任务（带短重试）。
+ *
+ * 请求超时/网络抖动时服务端可能已经建好任务，复用 clientRequestId 重试会直接拿回原任务，
+ * 不会重复生成；403/404 这类明确的拒绝不重试。
+ */
+async function createGenerationWithRetry(
+  payload: Parameters<typeof agentApi.createGeneration>[0],
+  attempts = 3,
+): Promise<AgentGenerationVO> {
+  let lastError: any
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await agentApi.createGeneration(payload)
+    } catch (err: any) {
+      lastError = err
+      const status = err?.response?.status
+      if (status === 401 || status === 403 || status === 404) {
+        break
+      }
+      if (attempt < attempts) {
+        await new Promise(resolve => setTimeout(resolve, 400 * attempt))
+      }
+    }
+  }
+  throw lastError
 }
 
 function computeTotalWeeks(plan: any): number {
@@ -300,6 +385,10 @@ export function useAgentChat(scrollCallback?: () => void) {
   const messages = ref<ChatMessage[]>([])
   const loadingHistory = ref(false)
   let abortController: AbortController | null = null
+  /** 当前正在运行的“可恢复事件流”（断线自动重连） */
+  let activeStream: ResumableStream | null = null
+  /** 当前生成任务 ID：停止时用于通知服务端取消 */
+  let activeGenerationId: string | null = null
 
   const getCurrentMindMaps = (): MindMapData[] => agentStore.currentMindMaps || []
   const getCurrentLearningSpaceCards = (): LearningSpaceCardPayload[] =>
@@ -379,7 +468,8 @@ export function useAgentChat(scrollCallback?: () => void) {
     msg.errorText = options.errorText
     msg.messageId = msg.messageId || agentStore.currentAssistantMessageId || undefined
     msg.traceId = agentStore.currentTraceId || msg.traceId
-    msg.traceEvents = agentStore.traceEvents.length ? [...agentStore.traceEvents] : undefined
+    // 历史事件 + 快照之后补收到的事件合并；没有历史时直接共享已过滤的 store 数组
+    msg.traceEvents = mergeTraceEventsForMessage(msg.traceEvents, agentStore.traceEvents)
     msg.thinkingText = agentStore.thinkingText || undefined
     msg.thinkingDurationMs = agentStore.thinkingDurationMs
     msg.toolCalls = agentStore.toolCalls.length ? agentStore.toolCalls.map(t => ({ ...t })) : undefined
@@ -425,6 +515,126 @@ export function useAgentChat(scrollCallback?: () => void) {
     if (streamingMessage === msg) streamingMessage = null
   }
 
+  // ===== 刷新快照：lastSeq + 当前可见的流式状态 =====
+  // 只在事件应用并 commit 后记录游标；写入节流，pagehide 时同步 flush。
+  // 恢复时先水合快照，再只订阅 seq > lastSeq 的增量。
+  const SNAPSHOT_FLUSH_INTERVAL_MS = 500
+  let snapshotTracking = false
+  let snapshotGenerationId = ''
+  let snapshotConversationId = ''
+  let snapshotLastSeq = 0
+  let snapshotDirty = false
+  let snapshotTimer: ReturnType<typeof setTimeout> | null = null
+  let snapshotPageHideHandler: (() => void) | null = null
+
+  const writeStreamSnapshot = () => {
+    if (!snapshotTracking || !snapshotGenerationId) return
+    saveAgentStreamSnapshot(buildAgentStreamSnapshot({
+      generationId: snapshotGenerationId,
+      conversationId: snapshotConversationId,
+      lastSeq: snapshotLastSeq,
+      answerText: agentStore.answerText,
+      thinkingText: agentStore.thinkingText,
+      thinkingDurationMs: agentStore.thinkingDurationMs,
+      toolCalls: agentStore.toolCalls,
+      reasoningSegments: agentStore.reasoningSegments,
+    }))
+  }
+
+  const flushStreamSnapshot = () => {
+    if (snapshotTimer !== null) {
+      clearTimeout(snapshotTimer)
+      snapshotTimer = null
+    }
+    if (!snapshotTracking) return
+    snapshotDirty = false
+    writeStreamSnapshot()
+  }
+
+  const scheduleStreamSnapshot = () => {
+    if (!snapshotTracking) return
+    snapshotDirty = true
+    if (snapshotTimer !== null) return
+    snapshotTimer = setTimeout(() => {
+      snapshotTimer = null
+      if (!snapshotTracking || !snapshotDirty) return
+      snapshotDirty = false
+      writeStreamSnapshot()
+    }, SNAPSHOT_FLUSH_INTERVAL_MS)
+  }
+
+  const stopStreamSnapshot = (clearStorage: boolean) => {
+    if (snapshotTimer !== null) {
+      clearTimeout(snapshotTimer)
+      snapshotTimer = null
+    }
+    if (snapshotPageHideHandler && typeof window !== 'undefined') {
+      window.removeEventListener('pagehide', snapshotPageHideHandler)
+    }
+    snapshotPageHideHandler = null
+    snapshotTracking = false
+    snapshotDirty = false
+    snapshotGenerationId = ''
+    snapshotConversationId = ''
+    snapshotLastSeq = 0
+    if (clearStorage) {
+      clearAgentStreamSnapshot()
+    }
+  }
+
+  const clearStreamSnapshot = () => stopStreamSnapshot(true)
+
+  const beginStreamSnapshot = (generationId: string, conversationId: string, afterSeq: number) => {
+    stopStreamSnapshot(false)
+    snapshotTracking = true
+    snapshotGenerationId = generationId
+    snapshotConversationId = conversationId || ''
+    snapshotLastSeq = Math.max(0, Math.floor(Number(afterSeq) || 0))
+    snapshotDirty = false
+    if (typeof window !== 'undefined') {
+      snapshotPageHideHandler = () => flushStreamSnapshot()
+      window.addEventListener('pagehide', snapshotPageHideHandler)
+    }
+  }
+
+  /** 事件已应用并 commit：此时 store 与 lastSeq 处于同一时刻 */
+  const onStreamEventApplied = (seq: number) => {
+    if (!snapshotTracking || !Number.isFinite(seq) || seq <= 0) return
+    if (seq > snapshotLastSeq) {
+      snapshotLastSeq = seq
+    }
+    scheduleStreamSnapshot()
+  }
+
+  const hydrateStreamingStateFromSnapshot = (snapshot: AgentStreamSnapshot) => {
+    agentStore.answerText = snapshot.answerText
+    agentStore.thinkingText = snapshot.thinkingText
+    agentStore.thinkingDurationMs = snapshot.thinkingDurationMs
+    agentStore.toolCalls = (snapshot.toolCalls || []).map(tool => ({ ...tool }))
+    agentStore.reasoningSegments = (snapshot.reasoningSegments || []).map(segment => ({
+      ...segment,
+      toolCall: segment.toolCall ? { ...segment.toolCall } : undefined,
+    }))
+    // 快照只存 toolCalls / reasoningSegments；联网搜索引用可从工具结果恢复
+    const webSearchCall = [...agentStore.toolCalls].reverse().find(tool =>
+      tool.toolName === 'webSearch'
+      && tool.result
+      && typeof tool.result === 'object'
+      && Array.isArray((tool.result as any).webSearchReferences),
+    )
+    agentStore.currentWebSearchReferences = webSearchCall
+      ? [...((webSearchCall.result as any).webSearchReferences)]
+      : []
+  }
+
+  /** 只清理属于该会话的快照，避免误删另一个会话的恢复数据 */
+  const clearSnapshotForConversation = (conversationId: string) => {
+    const stored = loadAgentStreamSnapshot()
+    if (!stored || !stored.conversationId || stored.conversationId === conversationId) {
+      clearStreamSnapshot()
+    }
+  }
+
   /** 用户手动选择的运行模式，null 表示走意图路由 */
   const currentForceMode = ref<'REACT' | 'PLAN_AND_EXECUTE' | null>(null)
 
@@ -444,10 +654,27 @@ export function useAgentChat(scrollCallback?: () => void) {
   /**
    * 停止当前生成
    *
-   * 直接给正在流式的占位气泡"定稿"，不再另起一条消息——
-   * 旧实现会新 push 一条，导致界面上出现两条 AI 气泡（占位气泡消失 + 新气泡出现）。
+   * 与旧实现的区别：断线不再等于停止。这里必须显式通知服务端取消，
+   * 否则连接虽然断了，服务端仍会继续跑完整轮生成（浪费额度且可能落库一条“已完成”的回答）。
+   *
+   * 仍然把正在流式的占位气泡“原地定稿”，避免出现两条 AI 气泡。
    */
   const stopGeneration = () => {
+    // 用户主动停止：快照不再代表“可恢复的进行中生成”
+    clearStreamSnapshot()
+    // ① 先停本地订阅，保证停止后不会再有事件写进气泡
+    if (activeStream) {
+      activeStream.stop()
+      activeStream = null
+    }
+    // ② 协作式取消：服务端在循环边界退出，已提交的副作用不回滚
+    if (activeGenerationId) {
+      const generationId = activeGenerationId
+      activeGenerationId = null
+      agentApi.cancelGeneration(generationId).catch(err => {
+        console.warn('[useAgentChat] 取消生成失败:', generationId, err)
+      })
+    }
     if (abortController) {
       abortController.abort()
       abortController = null
@@ -457,6 +684,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     agentStore.finishTurn()
     agentStore.planExecuting = false
     if (target) {
+      target.reconnecting = false
       finishAssistantMessage(target, {
         status: 'stopped',
         content: partial,
@@ -467,10 +695,339 @@ export function useAgentChat(scrollCallback?: () => void) {
   }
 
   /**
-   * 发送消息给 Agent（使用 fetch-event-source POST SSE）
+   * 收到 done：把占位气泡原地补成完整回答（RUNNING → COMPLETED）。
+   * 这里刻意吞掉异常——终态已经到手，再抛错只会触发一次没有意义的重连。
+   */
+  const finalizeAssistantTurn = (
+    assistantMsg: ChatMessage,
+    donePayload: any,
+    countMessageOnDone = true,
+  ) => {
+    try {
+      // 提前解析 done payload — 需要在定稿前获取 clarificationPayload / messageId
+      const hasReActClarification = !!donePayload?.clarificationPayload
+        && !agentStore.currentTaskList
+      const finalContent = agentStore.answerText || (hasReActClarification
+        ? (donePayload.clarificationPayload.question || '请提供更多信息')
+        : '')
+      // finishTurn 会清空 answerText 并结算思考时长，所以先取内容再收尾
+      agentStore.finishTurn()
+      if (donePayload?.messageId != null) {
+        assistantMsg.messageId = String(donePayload.messageId)
+      }
+      if (donePayload?.sequenceNo != null) {
+        assistantMsg.sequenceNo = donePayload.sequenceNo
+      }
+      assistantMsg.reconnecting = false
+      // 终态失败/中断：气泡标成 error，避免刷新后看起来像“正常但空”的回答
+      const terminalError = donePayload?.status === 'FAILED'
+        || donePayload?.status === 'INTERRUPTED'
+        || !!donePayload?.error
+      finishAssistantMessage(assistantMsg, {
+        status: terminalError ? 'error' : 'done',
+        content: finalContent,
+        errorText: terminalError
+          ? (donePayload?.error || '生成失败')
+          : undefined,
+      })
+      if (isEmptyAssistantMessage(assistantMsg)) {
+        removeMessage(assistantMsg)
+      }
+      // 刷新恢复时这两条消息早已计入数据库，不能在本机重复累加
+      if (countMessageOnDone) {
+        agentStore.touchConversation(agentStore.conversationCreatedThisTurn ? 0 : 2)
+      }
+      // 优先以后端 done payload 的 runStatus 判断，其次从前端 taskList 推断
+      const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
+      const terminalStatuses = ['COMPLETED', 'FAILED', 'PARTIAL_COMPLETED']
+      const runStatus = donePayload?.runStatus
+      if (runStatus && pausedStatuses.includes(runStatus)) {
+        agentStore.planExecuting = true
+        if (agentStore.currentTaskList && agentStore.currentTaskList.status !== runStatus) {
+          agentStore.currentTaskList.status = runStatus
+        }
+      } else if (runStatus && terminalStatuses.includes(runStatus)) {
+        if (agentStore.currentTaskList) {
+          agentStore.currentTaskList.status = runStatus
+        }
+        agentStore.planExecuting = false
+      } else if (!agentStore.currentTaskList || !pausedStatuses.includes(agentStore.currentTaskList.status)) {
+        agentStore.planExecuting = false
+      }
+    } catch (err) {
+      console.error('[useAgentChat] done 事件处理失败:', err)
+    } finally {
+      // 终态已落库，刷新时走历史消息，不再需要流式快照
+      clearStreamSnapshot()
+      scrollCallback?.()
+    }
+  }
+
+  /**
+   * 清空“本轮”的流式状态。
+   *
+   * 刷新恢复时事件日志要从 seq=0 重放，如果不清空，回放出来的正文会叠加到上一次轮次上。
+   * 只清瞬态字段，不动规划快照（快照由 loadConversation 水合）。
+   */
+  const resetStreamingState = () => {
+    agentStore.answerText = ''
+    agentStore.thinkingText = ''
+    agentStore.thinkingStartTime = null
+    agentStore.thinkingDurationMs = null
+    agentStore.toolCalls = []
+    agentStore.reasoningSegments = []
+    agentStore.routeResult = null
+    agentStore.traceEvents = []
+    agentStore.currentWebSearchReferences = []
+    agentStore.currentRagSources = null
+    agentStore.currentMindMaps = []
+    agentStore.loading = true
+  }
+
+  /**
+   * 按帧合并“把 store 状态同步进气泡”的操作。
+   *
+   * 实时流下每秒几十条事件，逐条同步没问题；但断线恢复/刷新恢复要一次性回放几千条，
+   * 逐条复制数组并触发响应式更新会明显卡顿，合并到一帧一次即可（最终状态不变）。
+   */
+  let syncFrameHandle: number | null = null
+  const scheduleSyncStreamingMessage = () => {
+    if (syncFrameHandle !== null) return
+    const run = () => {
+      syncFrameHandle = null
+      syncStreamingMessage()
+    }
+    if (typeof requestAnimationFrame === 'function') {
+      syncFrameHandle = requestAnimationFrame(run)
+    } else {
+      syncFrameHandle = setTimeout(run, 16) as unknown as number
+    }
+  }
+
+  /**
+   * 运行一次可恢复事件流。
+   *
+   * 发送新消息与刷新后恢复共用这套逻辑：应用事件 → 按 seq 去重/重连 → done 定稿。
+   * 区别只在 initialAfterSeq：新消息从 0 开始；刷新恢复从快照的 lastSeq 开始，只补增量。
+   */
+  const runGenerationStream = async (
+    generationId: string,
+    assistantMsg: ChatMessage,
+    initialAfterSeq = 0,
+    countMessageOnDone = true,
+  ) => {
+    activeGenerationId = generationId
+    abortController = new AbortController()
+    const stream = createResumableStream()
+    activeStream = stream
+
+    try {
+      await stream.run({
+        generationId,
+        initialAfterSeq,
+        signal: abortController.signal,
+
+        onEvent(eventName, data) {
+          agentStore.handleEvent(eventName, data)
+
+          // plan.created 时根据 taskList.status 推导 planExecuting
+          // （后端 EXECUTING 状态时不应强制改为 false）
+          if (eventName === 'agent.plan.created') {
+            const tl = data?.payload?.taskList
+            if (tl) {
+              agentStore.planExecuting = tl.status === 'EXECUTING'
+            }
+          }
+          // 每个事件后把实时状态同步进占位气泡（思考/工具/正文/引用）
+          // 回放/恢复时事件成批到达，按帧合并，避免几千条事件把主线程卡住
+          scheduleSyncStreamingMessage()
+        },
+
+        // 关键顺序：先应用事件、再 commit 游标、最后才允许记录快照
+        onApplied: (seq) => onStreamEventApplied(seq),
+
+        onTerminal: (payload) => finalizeAssistantTurn(assistantMsg, payload, countMessageOnDone),
+
+        onStateChange(state) {
+          // 重连期间保留正文和气泡，只标记“正在重连”
+          assistantMsg.reconnecting = state === 'reconnecting'
+        },
+
+        onFailure(failure: StreamFailure) {
+          // 自动恢复彻底失败：保留已收到的内容并定稿为错误，等待用户手动重试
+          clearStreamSnapshot()
+          const partial = agentStore.answerText
+          agentStore.finishTurn()
+          assistantMsg.reconnecting = false
+          finishAssistantMessage(assistantMsg, {
+            status: 'error',
+            content: partial,
+            appendText: `\n\n*[${failure.message}]*`,
+            errorText: failure.message,
+          })
+          agentStore.planExecuting = false
+          scrollCallback?.()
+        },
+      })
+    } catch (err: any) {
+      // stop() 主动中断时是 AbortError，属于预期路径
+      if (err?.name !== 'AbortError') {
+        console.error('[useAgentChat] 流式对话异常:', err)
+      }
+    } finally {
+      if (activeStream === stream) {
+        activeStream = null
+      }
+      abortController = null
+      // 正常 done/失败/停止都会在各自路径清快照；这里只做停止跟踪的兜底
+      stopStreamSnapshot(false)
+    }
+  }
+
+  /**
+   * 刷新页面 / 重新进入会话时，把仍在执行的生成接回来。
+   *
+   * 生成中的正文只存在于服务端事件日志（Redis）和本标签页的 sessionStorage 快照里。
+   * 有匹配快照时先水合文本/思考/工具，再从 lastSeq 之后只补增量；
+   * 没有快照时退回从 0 回放，保证内容正确。
+   */
+  const resumeActiveGeneration = async (conversationId: string) => {
+    if (!conversationId || activeStream) return
+
+    let active: AgentGenerationVO | null = null
+    try {
+      active = await agentApi.getActiveGeneration(conversationId)
+    } catch (err) {
+      console.warn('[useAgentChat] 查询活跃生成失败（非关键）:', err)
+      return
+    }
+
+    // 快照只在本会话、本次 generation 上有效；不匹配时宁可从头回放，也不能拼错状态
+    const storedSnapshot = loadAgentStreamSnapshot()
+
+    if (!active?.generationId) {
+      if (storedSnapshot && storedSnapshot.conversationId === conversationId) {
+        clearStreamSnapshot()
+      }
+      return
+    }
+    // 查询期间用户已经切走：不要给旧会话接流，避免污染新会话
+    if (agentStore.currentConversationId !== conversationId) return
+
+    // 复用历史里的 assistant 占位气泡（同一 messageId），避免出现两个空气泡
+    let target: ChatMessage | undefined
+    if (active.assistantMessageId != null) {
+      target = messages.value.find(
+        m => m.role === 'ai' && m.messageId != null
+          && String(m.messageId) === String(active!.assistantMessageId),
+      )
+    }
+
+    // 进程已退出的生成：库里只是空的 RUNNING 占位行，明确标记中断，别留一个永久空泡
+    if (active.status === 'INTERRUPTED') {
+      clearSnapshotForConversation(conversationId)
+      const placeholder = target || (messages.value[messages.value.length - 1]?.role === 'ai'
+        ? messages.value[messages.value.length - 1]
+        : undefined)
+      if (placeholder) {
+        placeholder.status = 'error'
+        placeholder.content = placeholder.content || '生成已中断，请重新发送。'
+        placeholder.errorText = '生成已中断'
+      }
+      return
+    }
+    // 已终态：正文已经落库，历史消息里就是完整答案，不需要再接流
+    if (!shouldResumeGeneration(active.status)) {
+      clearSnapshotForConversation(conversationId)
+      return
+    }
+    if (!target) {
+      const last = messages.value[messages.value.length - 1]
+      if (last?.role === 'ai' && !last.content) {
+        target = last
+      }
+    }
+    if (!target) {
+      messages.value.push({
+        id: nextMessageId('a'),
+        role: 'ai',
+        content: '',
+        status: 'streaming',
+        timestamp: Date.now(),
+      })
+      target = messages.value[messages.value.length - 1]
+    }
+
+    const snapshotUsable = !!storedSnapshot
+      && storedSnapshot.generationId === active.generationId
+      && storedSnapshot.conversationId === conversationId
+      && Number.isInteger(storedSnapshot.lastSeq)
+      && storedSnapshot.lastSeq >= 0
+      // active.lastSeq 为 0 通常表示元数据还没更新；非 0 时才做上限校验
+      && (active.lastSeq <= 0 || storedSnapshot.lastSeq <= active.lastSeq)
+    if (storedSnapshot && !snapshotUsable) {
+      clearStreamSnapshot()
+    }
+
+    resetStreamingState()
+    streamingMessage = target
+    target.status = 'streaming'
+    target.content = ''
+    target.reconnecting = false
+    target.generationId = active.generationId
+    if (active.assistantMessageId != null) {
+      target.messageId = String(active.assistantMessageId)
+      agentStore.currentAssistantMessageId = String(active.assistantMessageId)
+    }
+    if (active.assistantSequenceNo != null) {
+      target.sequenceNo = active.assistantSequenceNo
+    }
+    agentStore.currentConversationId = conversationId
+    if (active.traceId) {
+      agentStore.currentTraceId = active.traceId
+    }
+
+    // 先画快照，再订阅 seq > lastSeq 的增量；首屏不再等整轮回放
+    const initialAfterSeq = snapshotUsable ? storedSnapshot!.lastSeq : 0
+    if (snapshotUsable) {
+      // 历史 trace 已经还原了路由/RAG/思维导图；先把它们放回 store，
+      // 避免快照水合后 syncStreamingMessage 用空值覆盖。
+      // 导图可能含快照之后的事件，重复由 store 的内容指纹去重。
+      if (target.routeResult) agentStore.routeResult = target.routeResult
+      if (target.ragSources) agentStore.currentRagSources = target.ragSources
+      if (target.mindMaps?.length) agentStore.currentMindMaps = [...target.mindMaps]
+      if (target.mindMaps?.length) agentStore.currentMindMaps = [...target.mindMaps]
+      // 只种入 lastSeq 之前的过程事件，之后的事件由流补发，避免重复
+      if (target.traceEvents?.length) {
+        const historicalEvents = target.traceEvents.filter(
+          event => event.seq > 0 && event.seq <= initialAfterSeq,
+        )
+        if (historicalEvents.length > 0) {
+          agentStore.traceEvents = [...historicalEvents]
+        }
+      }
+      hydrateStreamingStateFromSnapshot(storedSnapshot!)
+      syncStreamingMessage()
+    }
+    scrollCallback?.()
+
+    console.info('[useAgentChat] 恢复进行中的生成:', active.generationId,
+      snapshotUsable ? `after=${initialAfterSeq}` : 'after=0')
+    beginStreamSnapshot(active.generationId, conversationId, initialAfterSeq)
+    await runGenerationStream(active.generationId, target, initialAfterSeq, false)
+  }
+
+  /**
+   * 发送消息给 Agent。
+   *
+   * 流程：创建生成任务（幂等）→ 订阅可恢复事件流（GET SSE）→ 按 seq 增量应用。
+   * 网络中断时保留气泡并自动重连，重连只补发遗漏事件，不会重复追加正文。
    */
   const sendMessage = async (message: string, references?: RagReference[]) => {
     if (!message.trim() || agentStore.loading) return
+
+    // 新一轮开始：上一轮快照（即使异常残留）不再有效
+    clearStreamSnapshot()
 
     // 从 references 中提取 fileIds（用于向下兼容）
     const attachmentFileIds = references
@@ -491,7 +1048,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     }
 
     // ① 乐观更新：先把用户这句话显示成一个气泡
-    messages.value.push({
+    const userMsg: ChatMessage = {
       id: nextMessageId('u'),
       role: 'user',
       content: message,
@@ -499,7 +1056,8 @@ export function useAgentChat(scrollCallback?: () => void) {
       timestamp: Date.now(),
       attachmentFileIds: attachmentFileIds && attachmentFileIds.length > 0 ? attachmentFileIds : undefined,
       references: references && references.length > 0 ? [...references] : undefined,
-    })
+    }
+    messages.value.push(userMsg)
 
     agentStore.startNewTurn({ preservePlanState: isClarificationReply })
 
@@ -507,169 +1065,73 @@ export function useAgentChat(scrollCallback?: () => void) {
     const assistantMsg = beginAssistantMessage()
     scrollCallback?.()
 
-    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    // ③ 创建生成任务：执行与订阅解耦。
+    //    同一个 clientRequestId 重试只会命中同一任务，不会重复调用一次模型。
+    const clientRequestId = createClientRequestId()
 
-    // SSE 请求前主动刷新 accessToken，确保长连接期间 token 不会过期
-    let token: string
+    // 从 references 中提取 fileIds 和 knowledgeBaseIds
+    let fileIds: number[] | undefined
+    let knowledgeBaseIds: number[] | undefined
+    if (references && references.length > 0) {
+      const files = references.filter(r => r.type === 'file')
+      if (files.length > 0) {
+        fileIds = files.map(r => parseInt(r.id))
+      }
+      const kbs = references.filter(r => r.type === 'kb')
+      if (kbs.length > 0) {
+        knowledgeBaseIds = kbs.map(r => parseInt(r.id))
+      }
+    }
+
+    let generation: AgentGenerationVO
     try {
-      token = await refreshAccessToken()
-    } catch {
-      // 不能直接 return —— 否则占位气泡会永远停在"正在思考…"
+      generation = await createGenerationWithRetry({
+        message,
+        conversationId: agentStore.currentConversationId || undefined,
+        fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
+        knowledgeBaseIds: knowledgeBaseIds && knowledgeBaseIds.length > 0 ? knowledgeBaseIds : undefined,
+        forceMode: isClarificationReply ? undefined : (currentForceMode.value || undefined),
+        clarificationAnswerJson,
+        clientRequestId,
+      })
+    } catch (err: any) {
+      const reason = err?.message || '请求失败，请重试'
+      console.error('[useAgentChat] 创建生成任务失败:', err)
+      agentStore.finishTurn()
       finishAssistantMessage(assistantMsg, {
         status: 'error',
-        content: '登录状态已过期，请重新登录后再试',
-        errorText: '登录状态已过期',
+        content: '',
+        appendText: `*[${reason}]*`,
+        errorText: reason,
       })
-      agentStore.finishTurn()
       scrollCallback?.()
       return
     }
 
-    // 创建新的 AbortController
-    abortController = new AbortController()
-
-    try {
-      // 从 references 中提取 fileIds 和 knowledgeBaseIds
-      let fileIds: number[] | undefined
-      let knowledgeBaseIds: number[] | undefined
-
-      if (references && references.length > 0) {
-        const files = references.filter(r => r.type === 'file')
-        if (files.length > 0) {
-          fileIds = files.map(r => parseInt(r.id))
-        }
-        const kbs = references.filter(r => r.type === 'kb')
-        if (kbs.length > 0) {
-          knowledgeBaseIds = kbs.map(r => parseInt(r.id))
-        }
-      }
-
-      await fetchEventSource(`${base}/agent/chat/stream`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          message,
-          conversationId: agentStore.currentConversationId || undefined,
-          fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
-          knowledgeBaseIds: knowledgeBaseIds && knowledgeBaseIds.length > 0 ? knowledgeBaseIds : undefined,
-          forceMode: isClarificationReply ? undefined : (currentForceMode.value || undefined),
-          clarificationAnswerJson,
-        }),
-        openWhenHidden: true,
-        signal: abortController.signal,
-
-        onmessage(event) {
-          if (!event.data) return
-
-          if (event.event === 'done') {
-            // 提前解析 done payload — 需要在定稿前获取 clarificationPayload / messageId
-            let donePayload: any = null
-            try { donePayload = JSON.parse(event.data) } catch { /* ignore */ }
-
-            // ③ 定稿：把占位气泡原地补成完整回答（RUNNING → COMPLETED）
-            const hasReActClarification = !!donePayload?.clarificationPayload
-              && !agentStore.currentTaskList
-            const finalContent = agentStore.answerText || (hasReActClarification
-              ? (donePayload.clarificationPayload.question || '请提供更多信息')
-              : '')
-            // finishTurn 会清空 answerText 并结算思考时长，所以先取内容再收尾
-            agentStore.finishTurn()
-            if (donePayload?.messageId != null) {
-              assistantMsg.messageId = String(donePayload.messageId)
-            }
-            if (donePayload?.sequenceNo != null) {
-              assistantMsg.sequenceNo = donePayload.sequenceNo
-            }
-            finishAssistantMessage(assistantMsg, {
-              status: 'done',
-              content: finalContent,
-            })
-            if (isEmptyAssistantMessage(assistantMsg)) {
-              removeMessage(assistantMsg)
-            }
-            agentStore.touchConversation(agentStore.conversationCreatedThisTurn ? 0 : 2)
-            // 优先以后端 done payload 的 runStatus 判断，其次从前端 taskList 推断
-            const pausedStatuses = ['PAUSED_CLARIFICATION', 'PAUSED_CONFIRMATION']
-            const terminalStatuses = ['COMPLETED', 'FAILED', 'PARTIAL_COMPLETED']
-            const runStatus = donePayload?.runStatus
-            if (runStatus && pausedStatuses.includes(runStatus)) {
-              agentStore.planExecuting = true
-              if (agentStore.currentTaskList && agentStore.currentTaskList.status !== runStatus) {
-                agentStore.currentTaskList.status = runStatus
-              }
-            } else if (runStatus && terminalStatuses.includes(runStatus)) {
-              if (agentStore.currentTaskList) {
-                agentStore.currentTaskList.status = runStatus
-              }
-              agentStore.planExecuting = false
-            } else if (!agentStore.currentTaskList || !pausedStatuses.includes(agentStore.currentTaskList.status)) {
-              agentStore.planExecuting = false
-            }
-            abortController = null
-            scrollCallback?.()
-            return
-          }
-
-          try {
-            const data = JSON.parse(event.data) as AgentTraceEvent
-            agentStore.handleEvent(event.event, data)
-
-            // plan.created 时根据 taskList.status 推导 planExecuting
-            // （后端 EXECUTING 状态时不应强制改为 false）
-            if (event.event === 'agent.plan.created') {
-              const tl = data.payload?.taskList
-              if (tl) {
-                agentStore.planExecuting = tl.status === 'EXECUTING'
-              }
-            }
-            // 每个事件后把实时状态同步进占位气泡（思考/工具/正文/引用）
-            syncStreamingMessage()
-          } catch {
-            // 非 JSON 忽略
-          }
-        },
-
-        onerror(err) {
-          console.error('[useAgentChat] SSE error:', err)
-          // 保留已累积内容，避免渲染突然消失；占位气泡就地标记为"连接中断"
-          const partial = agentStore.answerText
-          agentStore.finishTurn()
-          finishAssistantMessage(assistantMsg, {
-            status: 'error',
-            content: partial,
-            appendText: '\n\n*[连接中断]*',
-            errorText: '连接中断',
-          })
-          agentStore.planExecuting = false
-          abortController = null
-          scrollCallback?.()
-          throw err
-        },
-      })
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        console.error('[useAgentChat] fetch error:', err)
-        // 请求没跑起来（网络/4xx/5xx）：占位气泡不能一直停在"正在思考…"
-        if (assistantMsg.status === 'streaming') {
-          const partial = agentStore.answerText
-          agentStore.finishTurn()
-          finishAssistantMessage(assistantMsg, {
-            status: 'error',
-            content: partial,
-            appendText: '\n\n*[请求失败，请重试]*',
-            errorText: '请求失败',
-          })
-        } else {
-          agentStore.finishTurn()
-        }
-        agentStore.planExecuting = false
-        scrollCallback?.()
-      }
-      abortController = null
+    // 发送接口已经同步落库：会话与占位消息 ID 立即可用，不必等第一个 SSE 事件。
+    // 即使随后 SSE 一次都没连上，页面也知道这段消息属于哪个会话、是哪一行。
+    if (generation.conversationId) {
+      agentStore.currentConversationId = generation.conversationId
+      agentStore.upsertConversation(generation.conversationId, generation.title || '')
+      rememberConversation(generation.conversationId)
     }
+    if (generation.userMessageId != null) {
+      userMsg.messageId = String(generation.userMessageId)
+    }
+    if (generation.assistantMessageId != null) {
+      assistantMsg.messageId = String(generation.assistantMessageId)
+      agentStore.currentAssistantMessageId = String(generation.assistantMessageId)
+    }
+    if (generation.assistantSequenceNo != null) {
+      assistantMsg.sequenceNo = generation.assistantSequenceNo
+    }
+
+    assistantMsg.generationId = generation.generationId
+    // 发送与刷新恢复共用同一套“应用事件 / 断线重连 / done 定稿”逻辑。
+    // 新生成从 0 开始记录快照；恢复路径会从快照的 lastSeq 开始。
+    beginStreamSnapshot(generation.generationId,
+      generation.conversationId || agentStore.currentConversationId, 0)
+    await runGenerationStream(generation.generationId, assistantMsg)
   }
 
   /**
@@ -677,6 +1139,7 @@ export function useAgentChat(scrollCallback?: () => void) {
    */
   const confirmPlan = async (draftId: string) => {
     if (!draftId || confirmPlanLocked.value) return
+    clearStreamSnapshot()
     confirmPlanLocked.value = true
     agentStore.planConfirmLoading = true
     agentStore.resetExecutionSteps()
@@ -835,6 +1298,7 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 通过专用 API 提交澄清回答（SSE）——不经过 /agent/chat/stream
    */
   const answerClarificationViaSSE = async (draftId: string, clarificationId: string, answer: string): Promise<boolean> => {
+    clearStreamSnapshot()
     agentStore.startNewTurn({ preservePlanState: true })
 
     // 乐观更新：立即追加用户回答气泡
@@ -989,6 +1453,7 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 通过专用 API 确认 CONFIRMATION 门（SSE）
    */
   const confirmGateViaSSE = async (draftId: string) => {
+    clearStreamSnapshot()
     agentStore.startNewTurn({ preservePlanState: true })
     // 乐观占位气泡
     const assistantMsg = beginAssistantMessage()
@@ -1110,6 +1575,23 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 加载指定对话的历史消息
    */
   const loadConversation = async (conversationId: string) => {
+    // 切换会话：旧会话的快照不再适用；同会话刷新则保留，交给 resumeActiveGeneration 使用
+    const previousConversationId = agentStore.currentConversationId
+    const storedSnapshot = loadAgentStreamSnapshot()
+    if ((previousConversationId && previousConversationId !== conversationId)
+      || (storedSnapshot?.conversationId && storedSnapshot.conversationId !== conversationId)) {
+      clearStreamSnapshot()
+    }
+    // 切换会话：先断开旧的流式连接，避免旧生成的事件继续写进新会话的气泡
+    if (activeStream) {
+      activeStream.stop()
+      activeStream = null
+    }
+    if (abortController) {
+      abortController.abort()
+      abortController = null
+    }
+    activeGenerationId = null
     loadingHistory.value = true
     try {
       // 倒序分页：先查总数，再请求最后一页，确保最新消息一定加载
@@ -1172,20 +1654,19 @@ export function useAgentChat(scrollCallback?: () => void) {
         msgs.push(chatMsg)
       }
 
-      // 第二遍：并行拉取所有 trace 事件
+      // 第二遍：一次批量拉取所有 trace，避免长会话 N 个请求线性变慢
       if (traceJobs.length > 0) {
-        const traceResults = await Promise.all(
-          traceJobs.map(j =>
-            agentApi.getTraceEvents(j.traceId).catch(e => {
-              console.warn('[useAgentChat] 获取 trace 事件失败:', j.traceId, e)
-              return null
-            }),
-          ),
-        )
+        const traceIds = [...new Set(traceJobs.map(j => j.traceId))]
+        let traceMap: Record<string, AgentTraceEventBrief[]> = {}
+        try {
+          traceMap = await agentApi.getTraceEventsBatch(traceIds)
+        } catch (e) {
+          console.warn('[useAgentChat] 批量获取 trace 事件失败:', e)
+        }
 
         for (let j = 0; j < traceJobs.length; j++) {
           const chatMsg = msgs[traceJobs[j].msgIndex]
-          const events = traceResults[j]
+          const events = traceMap[traceJobs[j].traceId]
           if (!events || !Array.isArray(events)) continue
 
           const toolCalls: ToolCallState[] = []
@@ -1194,21 +1675,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           const pendingTools: Map<number, { toolName: string; arguments?: any; startedAt: number }> = new Map()
 
           for (const raw of events) {
-            let payload = raw.payload
-            if (typeof payload === 'string') {
-              try { payload = JSON.parse(payload) } catch { /* keep as string */ }
-            }
-
-            const evt: AgentTraceEvent = {
-              traceId: raw.traceId || '',
-              conversationId: raw.conversationId || '',
-              userId: raw.userId || 0,
-              mode: raw.agentMode || raw.mode || '',
-              eventType: raw.eventType || '',
-              seq: raw.sequenceNum || raw.seq || 0,
-              timestamp: raw.createTime ? new Date(raw.createTime).getTime() : (raw.timestamp || Date.now()),
-              payload,
-            }
+            const evt = normalizeAgentTraceEvent(raw)
 
             traceEvents.push(evt)
 
@@ -1334,6 +1801,7 @@ export function useAgentChat(scrollCallback?: () => void) {
 
       messages.value = msgs
       agentStore.currentConversationId = conversationId
+      rememberConversation(conversationId)
       resetPlanningStateForConversation(agentStore)
 
       // === 水合会话级目标规划快照 ===
@@ -1355,8 +1823,18 @@ export function useAgentChat(scrollCallback?: () => void) {
       }
 
       scrollCallback?.()
+
+      // 刷新/重新进入会话时恢复进行中的生成：事件日志在 Redis，正文还没落 MySQL，
+      // 不接回来的话页面上只会看到一条空的 assistant 消息。
+      void resumeActiveGeneration(conversationId)
     } catch (e) {
       console.error('[useAgentChat] 加载对话消息失败:', e)
+      // 会话被删除/无权访问时清掉本地记忆，避免每次刷新都去加载一个不存在的会话
+      const message = String((e as any)?.message || '')
+      if (/不存在|无权|删除|归档/.test(message)) {
+        clearStreamSnapshot()
+        forgetConversation()
+      }
     } finally {
       loadingHistory.value = false
     }
@@ -1379,14 +1857,18 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 开始新一轮对话
    */
   const startNewConversation = () => {
+    clearStreamSnapshot()
     messages.value = []
     streamingMessage = null
+    forgetConversation()
     agentStore.reset()
   }
 
   const clearMessages = () => {
+    clearStreamSnapshot()
     messages.value = []
     streamingMessage = null
+    forgetConversation()
     agentStore.reset()
   }
 
@@ -1395,6 +1877,10 @@ export function useAgentChat(scrollCallback?: () => void) {
    */
   const deleteConversation = async (conversationId: string) => {
     const wasActive = agentStore.currentConversationId === conversationId
+    const stored = loadAgentStreamSnapshot()
+    if (wasActive || !stored || !stored.conversationId || stored.conversationId === conversationId) {
+      clearStreamSnapshot()
+    }
     await agentStore.deleteConversation(conversationId)
     if (wasActive) {
       messages.value = []
