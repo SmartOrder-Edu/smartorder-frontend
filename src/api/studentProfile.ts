@@ -299,9 +299,16 @@ export interface MetacognitiveProfile {
 
 export interface KnowledgePoint {
   knowledgePointId?: string
-  knowledgePointName?: string
-  masteryLevel?: number
+  knowledgePointNameCache?: string
+  chapterId?: string
+  knowledgeType?: string
+  importance?: string
+  prerequisiteKnowledgePointIds?: string[]
+  masteryScore?: number
+  masteryLevel?: string
   cognitiveMastery?: Record<string, any>
+  independenceLevel?: string
+  prerequisiteReadiness?: Record<string, any>
   assessmentStatistics?: Record<string, any>
   retention?: Record<string, any>
   misconceptions?: Record<string, any>
@@ -310,11 +317,23 @@ export interface KnowledgePoint {
 export interface ChapterSummary {
   chapterId?: string
   chapterName?: string
+  masteryScore?: number
+  masteryLevel?: string
+  completedKnowledgePointCount?: number
+  totalKnowledgePointCount?: number
+  weakKnowledgePointIds?: string[]
   overallMastery?: number
-  knowledgePoints?: Record<string, KnowledgePoint>
 }
 
 export interface KnowledgeMastery {
+  overallMasteryScore?: number
+  overallMasteryLevel?: string
+  coverageRate?: number
+  trend?: string
+  currentChapterId?: string
+  chapterSummaries?: Record<string, ChapterSummary>
+  knowledgePoints?: Record<string, KnowledgePoint>
+  // Legacy frontend/mock shape. The backend field is chapterSummaries.
   chapters?: Record<string, ChapterSummary>
   metadata?: DimensionMetadata
 }
@@ -328,6 +347,7 @@ export interface SubjectLearningPreferenceOverride {
 }
 
 export interface SubjectBehavior {
+  statisticsWindows?: Record<string, any>
   statisticsWindow?: Record<string, any>
   behaviorPatterns?: Record<string, any>
   resourceEffectiveness?: Record<string, any>
@@ -336,11 +356,18 @@ export interface SubjectBehavior {
 }
 
 export interface CurrentLearningState {
+  stateId?: string
+  learningStatus?: string
+  currentGoalId?: string
+  currentPlanNodeId?: string
+  currentChapterId?: string
+  currentKnowledgePointId?: string
   currentTask?: Record<string, any>
   blockingIssues?: Record<string, any>
   sessionSignals?: Record<string, any>
   recentPerformance?: Record<string, any>
   readiness?: Record<string, any>
+  nextActions?: Record<string, any>[]
   nextAction?: Record<string, any>
 }
 
@@ -365,6 +392,10 @@ export interface SubjectProfile {
   metadata?: SubjectMetadata
 }
 
+export interface SubjectProfiles {
+  profiles?: Record<string, SubjectProfile>
+}
+
 // ==================== 主接口 ====================
 
 /** 学生画像完整数据（与后端 StudentProfile 实体对齐） */
@@ -379,7 +410,7 @@ export interface StudentProfileData {
   commonMisconceptions?: CommonMisconceptions
   learningPreference?: LearningPreference
   metacognitiveProfile?: MetacognitiveProfile
-  subjectProfiles?: Record<string, SubjectProfile>
+  subjectProfiles?: SubjectProfiles
   // 维度元数据
   dimensionMetadata?: Record<string, DimensionMetadata>
   // 系统字段

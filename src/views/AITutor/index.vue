@@ -1,24 +1,7 @@
 <template>
   <AppLayout>
     <div class="ai-tutor-page">
-      <!-- 对话上下文选择器 -->
-      <div class="context-switcher">
-        <span class="context-label">当前对话范围：</span>
-        <div class="context-chips">
-          <button
-            v-for="ctx in contextOptions"
-            :key="ctx.id"
-            class="context-chip"
-            :class="{ active: activeContext === ctx.id }"
-            @click="switchContext(ctx.id)"
-          >
-            <span class="chip-dot" :style="{ background: ctx.color }"></span>
-            {{ ctx.label }}
-          </button>
-        </div>
-      </div>
-
-      <div class="tutor-container">
+      <div class="tutor-container" :class="{ 'assistant-collapsed': isAssistantCollapsed }">
         <!-- 左侧：历史会话侧边栏 -->
         <aside class="history-sidebar" :class="{ open: historySidebarOpen }">
           <div class="history-sidebar-header">
@@ -31,8 +14,16 @@
             </button>
           </div>
           <div class="history-sidebar-list">
-            <div class="history-loading" v-if="agentStore.conversationsLoading">加载中...</div>
-            <div class="history-empty" v-else-if="agentStore.conversations.length === 0">
+            <!-- 只有在"还没有任何内容"时才显示加载态。
+                 已有列表时，任何后台刷新都不应该有任何视觉提示（否则就是"点一下闪一下加载中"） -->
+            <div
+              class="history-loading"
+              v-if="agentStore.conversationsLoading && agentStore.conversations.length === 0"
+            >加载中...</div>
+            <div
+              class="history-empty"
+              v-else-if="!agentStore.conversationsLoading && agentStore.conversations.length === 0"
+            >
               <p class="empty-text">暂无对话记录</p>
               <p class="empty-hint">发送一条消息开始对话</p>
             </div>
@@ -70,7 +61,7 @@
         </aside>
 
         <!-- 聊天区域 -->
-        <main class="chat-area">
+        <main class="chat-area" :class="{ 'sidebar-open': historySidebarOpen }">
           <div class="chat-area-top-bar">
             <button class="history-toggle-btn" @click="historySidebarOpen = !historySidebarOpen" :title="historySidebarOpen ? '收起历史' : '展开历史'">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -79,27 +70,62 @@
                 <line x1="3" y1="18" x2="21" y2="18"/>
               </svg>
             </button>
-            <span class="current-conv-title" v-if="currentConvTitle">{{ currentConvTitle }}</span>
+            <span class="current-conv-title">{{ currentConvTitle }}</span>
+            <button
+              v-if="isAssistantCollapsed"
+              class="avatar-top-toggle"
+              type="button"
+              title="展开数字人"
+              @click.stop="isAssistantCollapsed = false"
+            >
+              <span class="avatar-top-toggle-status" :class="{ active: !!avatarAuthInfo?.wssUrl }"></span>
+              <el-icon><ArrowLeft /></el-icon>
+              <span>数字人</span>
+            </button>
           </div>
-          <div class="chat-flow">
-            <div class="chat-flow-inner">
+            <div class="chat-flow" ref="chatFlowRef">
+              <div class="chat-flow-inner">
             <div class="chat-messages" ref="chatContainer" v-loading="loadingHistory">
+            <!-- 目标规划执行面板：会话级唯一状态区，不再作为普通聊天消息重复出现 -->
+            <div
+              class="planning-execution-shelf"
+              v-if="agentStore.currentTaskList && !agentStore.showLearningPlanPreview"
+            >
+              <TaskExecutionPanel
+                :task-list="agentStore.currentTaskList"
+                :task-execution-map="agentStore.taskExecutionMap"
+                :pause-info="agentStore.planPauseInfo"
+                :confirming="agentStore.planConfirmLoading"
+                :live-reasoning-segments="agentStore.reasoningSegments"
+                :is-current-active="true"
+                :gate-submitting="gateSubmitting"
+                :show-gate-card="false"
+                collapsible
+                default-collapsed
+                @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
+                @gate-answer="handleGateAnswer"
+                @gate-confirm="handleGateConfirm"
+                @gate-cancel="handleGateCancel"
+              />
+            </div>
+
             <!-- 欢迎消息 -->
             <div class="welcome-message" v-if="messages.length === 0 && !agentStore.loading">
               <div class="welcome-avatar">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                  <line x1="9" y1="9" x2="9.01" y2="9"/>
-                  <line x1="15" y1="9" x2="15.01" y2="9"/>
+                <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="30" height="30">
+                  <path d="M483.002182 188.043636h51.2v114.036364H483.002182z" fill="#40e3c2"/>
+                  <path d="M510.929455 143.825455m-128 0a128 128 0 1 0 256 0 128 128 0 1 0-256 0Z" fill="#40e3c2"/>
+                  <path d="M475.83125977 148.45865723v5.05620769h37.07885744v11.79781821h-16.8540259v23.59563642h16.8540259v11.79781817h-16.8540259V207.44774823l8.42701331 28.65184483h8.42701259v10.1124154h-15.16862307l-5.05620773-20.22483152L485.94367591 246.21200846H469.08964929v-11.7978182h11.79781818L485.94367591 207.44774823v-8.42701259H469.08964929v-11.79781893h18.5394287V163.62728031h-15.1686231L465.71884437 156.88566981v-8.42701258h10.1124154z m82.58472817 3.37080486v82.58472817l-10.1124154 11.79781822H519.65172773V151.82946209h38.76426021z m-11.79781819 11.79781822h-16.85402591v70.78690995h16.85402591V163.62728031z" fill="#40e3c2"/>
+                  <path d="M679.098182 301.963636c139.636364 13.963636 223.418182 79.127273 253.672727 197.818182 46.545455 179.2 34.909091 267.636364 32.581818 283.927273-2.327273 18.618182-30.254545 123.345455-160.581818 174.545454-83.781818 32.581818-172.218182 55.854545-293.236364 53.527273v-535.272727 535.272727c-116.363636 2.327273-204.8-18.618182-286.254545-48.872727l-9.309091-4.654546c-130.327273-53.527273-158.254545-158.254545-160.581818-174.545454-4.654545-16.290909-13.963636-104.727273 30.254545-283.927273 30.254545-118.690909 114.036364-186.181818 251.345455-200.145454 37.236364-2.327273 93.090909-6.981818 172.218182-6.981819h9.309091c74.472727 0 128 4.654545 160.581818 9.309091z" fill="#C5C5C5"/>
+                  <path d="M139.170909 723.2c0 2.327273 0 2.327273 0 0 0 4.654545 2.327273 6.981818 2.327273 9.309091 4.654545 9.309091 9.309091 16.290909 16.290909 25.6 18.618182 23.272727 46.545455 44.218182 83.781818 58.181818l4.654546 2.327273 4.654545 2.327273c53.527273 18.618182 107.054545 30.254545 165.236364 37.236363 58.181818 4.654545 123.345455 4.654545 183.854545 0 58.181818-4.654545 111.709091-18.618182 165.236364-37.236363l4.654545-2.327273c41.890909-13.963636 69.818182-34.909091 88.436364-60.509091 6.981818-9.309091 11.636364-18.618182 16.290909-25.6 0-2.327273 2.327273-4.654545 2.327273-6.981818v-2.327273c0-2.327273 0-6.981818 2.327272-11.636364v-2.327272-39.563637c-2.327273-44.218182-13.963636-97.745455-32.581818-162.909091-18.618182-74.472727-72.145455-111.709091-174.545454-121.018181-53.527273-4.654545-93.090909-6.981818-148.945455-6.981819H502.225455c-58.181818 0-97.745455 2.327273-155.927273 6.981819-102.4 9.309091-153.6 46.545455-174.545455 118.690909-18.618182 65.163636-27.927273 118.690909-32.581818 162.909091 0 16.290909-2.327273 30.254545 0 39.563636v16.290909z" fill="#14254E"/>
+                  <path d="M509.207273 695.272727c-27.927273 0-55.854545 11.636364-55.854546 20.945455s11.636364 39.563636 55.854546 39.563636c41.890909 0 51.2-23.272727 55.854545-39.563636 0-13.963636-27.927273-20.945455-55.854545-20.945455z" fill="#40E3C2"/>
+                  <path d="M295.936 578.373818a72.145455 53.527273 90 1 0 107.054545 0 72.145455 53.527273 90 1 0-107.054545 0Z" fill="#40E3C2"/>
+                  <path d="M617.099636 578.373818a72.145455 53.527273 90 1 0 107.054546 0 72.145455 53.527273 90 1 0-107.054546 0Z" fill="#40E3C2"/>
                 </svg>
               </div>
               <div class="welcome-content">
                 <h3>{{ greetingText }}</h3>
-                <p class="welcome-summary">
-                  我正在管理你的 <strong>{{ learningSpaceCount }} 个学习空间</strong>。今天你预计可用 <strong>{{ todayAvailableHours }}</strong>。
-                  {{ todayFocusText }}
-                </p>
+                <p class="welcome-summary" v-html="welcomeSummary"></p>
                 <div class="welcome-features">
                   <div class="feature-item" v-for="f in welcomeFeatures" :key="f.label" @click="sendQuickMessage(f.label)">
                     <span class="feature-icon" v-html="f.icon"></span>
@@ -112,16 +138,20 @@
             <!-- 消息列表 -->
             <div
               v-for="(msg, index) in messages"
-              :key="index"
+              :key="msg.id"
               class="message-wrapper"
-              :class="msg.role"
+              :class="[msg.role, msg.status === 'streaming' ? 'is-streaming' : '']"
             >
               <div class="message-avatar">
-                <svg v-if="msg.role === 'ai'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                  <line x1="9" y1="9" x2="9.01" y2="9"/>
-                  <line x1="15" y1="9" x2="15.01" y2="9"/>
+                <svg v-if="msg.role === 'ai'" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
+                  <path d="M483.002182 188.043636h51.2v114.036364H483.002182z" fill="#40e3c2"/>
+                  <path d="M510.929455 143.825455m-128 0a128 128 0 1 0 256 0 128 128 0 1 0-256 0Z" fill="#40e3c2"/>
+                  <path d="M475.83125977 148.45865723v5.05620769h37.07885744v11.79781821h-16.8540259v23.59563642h16.8540259v11.79781817h-16.8540259V207.44774823l8.42701331 28.65184483h8.42701259v10.1124154h-15.16862307l-5.05620773-20.22483152L485.94367591 246.21200846H469.08964929v-11.7978182h11.79781818L485.94367591 207.44774823v-8.42701259H469.08964929v-11.79781893h18.5394287V163.62728031h-15.1686231L465.71884437 156.88566981v-8.42701258h10.1124154z m82.58472817 3.37080486v82.58472817l-10.1124154 11.79781822H519.65172773V151.82946209h38.76426021z m-11.79781819 11.79781822h-16.85402591v70.78690995h16.85402591V163.62728031z" fill="#40e3c2"/>
+                  <path d="M679.098182 301.963636c139.636364 13.963636 223.418182 79.127273 253.672727 197.818182 46.545455 179.2 34.909091 267.636364 32.581818 283.927273-2.327273 18.618182-30.254545 123.345455-160.581818 174.545454-83.781818 32.581818-172.218182 55.854545-293.236364 53.527273v-535.272727 535.272727c-116.363636 2.327273-204.8-18.618182-286.254545-48.872727l-9.309091-4.654546c-130.327273-53.527273-158.254545-158.254545-160.581818-174.545454-4.654545-16.290909-13.963636-104.727273 30.254545-283.927273 30.254545-118.690909 114.036364-186.181818 251.345455-200.145454 37.236364-2.327273 93.090909-6.981818 172.218182-6.981819h9.309091c74.472727 0 128 4.654545 160.581818 9.309091z" fill="#C5C5C5"/>
+                  <path d="M139.170909 723.2c0 2.327273 0 2.327273 0 0 0 4.654545 2.327273 6.981818 2.327273 9.309091 4.654545 9.309091 9.309091 16.290909 16.290909 25.6 18.618182 23.272727 46.545455 44.218182 83.781818 58.181818l4.654546 2.327273 4.654545 2.327273c53.527273 18.618182 107.054545 30.254545 165.236364 37.236363 58.181818 4.654545 123.345455 4.654545 183.854545 0 58.181818-4.654545 111.709091-18.618182 165.236364-37.236363l4.654545-2.327273c41.890909-13.963636 69.818182-34.909091 88.436364-60.509091 6.981818-9.309091 11.636364-18.618182 16.290909-25.6 0-2.327273 2.327273-4.654545 2.327273-6.981818v-2.327273c0-2.327273 0-6.981818 2.327272-11.636364v-2.327272-39.563637c-2.327273-44.218182-13.963636-97.745455-32.581818-162.909091-18.618182-74.472727-72.145455-111.709091-174.545454-121.018181-53.527273-4.654545-93.090909-6.981818-148.945455-6.981819H502.225455c-58.181818 0-97.745455 2.327273-155.927273 6.981819-102.4 9.309091-153.6 46.545455-174.545455 118.690909-18.618182 65.163636-27.927273 118.690909-32.581818 162.909091 0 16.290909-2.327273 30.254545 0 39.563636v16.290909z" fill="#14254E"/>
+                  <path d="M509.207273 695.272727c-27.927273 0-55.854545 11.636364-55.854546 20.945455s11.636364 39.563636 55.854546 39.563636c41.890909 0 51.2-23.272727 55.854545-39.563636 0-13.963636-27.927273-20.945455-55.854545-20.945455z" fill="#40E3C2"/>
+                  <path d="M295.936 578.373818a72.145455 53.527273 90 1 0 107.054545 0 72.145455 53.527273 90 1 0-107.054545 0Z" fill="#40E3C2"/>
+                  <path d="M617.099636 578.373818a72.145455 53.527273 90 1 0 107.054546 0 72.145455 53.527273 90 1 0-107.054546 0Z" fill="#40E3C2"/>
                 </svg>
                 <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -129,14 +159,28 @@
                 </svg>
               </div>
               <div class="message-content">
-                <div class="message-bubble" :class="{ 'user-bubble': msg.role === 'user' }">
-                  <!-- 思考与工具调用过程（默认折叠） -->
+                <div
+                  class="message-bubble"
+                  :class="{
+                    'user-bubble': msg.role === 'user',
+                    'message-bubble-error': msg.status === 'error',
+                  }"
+                >
+                  <!-- 阶段指示器（规划中） -->
+                  <div
+                    v-if="msg.status === 'streaming' && agentStore.currentPhase === 'PLANNING' && !agentStore.currentTaskList"
+                    class="phase-indicator"
+                  >
+                    <span class="phase-spinner"></span>
+                    <span class="phase-label">正在分析目标并生成任务计划...</span>
+                  </div>
+                  <!-- 思考与工具调用过程（流式中自动展开，定稿后折叠） -->
                   <ReasoningProcess
                     v-if="msg.role === 'ai' && hasReasoningContent(msg)"
                     :segments="msg.reasoningSegments || []"
                     :thinking-text="msg.thinkingText || ''"
                     :tool-calls="msg.toolCalls || []"
-                    :streaming="false"
+                    :streaming="msg.status === 'streaming'"
                     :duration-ms="msg.thinkingDurationMs || null"
                   />
                   <!-- 网络搜索来源卡片 -->
@@ -144,9 +188,27 @@
                     v-if="msg.role === 'ai' && msg.webSearchReferences?.length"
                     :references="msg.webSearchReferences"
                   />
-                  <!-- AI 消息使用 Markdown 渲染 -->
-                  <MarkdownRenderer v-if="msg.role === 'ai'" :content="msg.content" />
-                  <template v-else>
+                  <!-- RAG 检索来源卡片 -->
+                  <RagSources
+                    v-if="msg.role === 'ai' && msg.ragSources?.chunks?.length"
+                    :sources="msg.ragSources"
+                  />
+                  <!-- AI 消息使用 Markdown 渲染（流式时内容逐字追加到同一条消息） -->
+                  <MarkdownRenderer v-if="msg.role === 'ai' && msg.content" :content="msg.content" />
+                  <!-- 学习空间卡片（业务结果展示） -->
+                  <LearningSpaceCards
+                    v-if="msg.role === 'ai' && msg.learningSpaceCards?.length"
+                    :cards="msg.learningSpaceCards"
+                  />
+                  <!-- 思维导图卡片 -->
+                  <template v-if="msg.role === 'ai' && msg.mindMaps?.length">
+                    <MindMapCard
+                      v-for="(mm, idx) in msg.mindMaps"
+                      :key="'mm-' + idx"
+                      :data="mm"
+                    />
+                  </template>
+                  <template v-if="msg.role === 'user'">
                     <p class="message-text">{{ msg.content }}</p>
                     <div v-if="msg.attachmentFileIds?.length" class="message-attachment-hint">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
@@ -155,6 +217,12 @@
                       <span>{{ msg.attachmentFileIds.length }}个附件</span>
                     </div>
                   </template>
+
+                  <!-- 正在思考…（占位气泡，还没有任何可见内容时） -->
+                  <div v-if="isThinkingPlaceholder(msg)" class="thinking-placeholder">
+                    <span class="thinking-label">正在思考</span>
+                    <span class="loading-dots"><span></span><span></span><span></span></span>
+                  </div>
 
                   <!-- 资源卡片 -->
                   <div v-if="msg.resources" class="message-resources">
@@ -176,8 +244,8 @@
                   <pre v-if="msg.code" class="message-code"><code>{{ msg.code }}</code></pre>
                 </div>
 
-                <!-- 操作按钮 -->
-                <div class="message-actions" v-if="msg.role === 'ai'">
+                <!-- 操作按钮（生成中不显示） -->
+                <div class="message-actions" v-if="msg.role === 'ai' && msg.status !== 'streaming'">
                   <button class="msg-action-btn" @click="copyMessage(msg.content)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
@@ -198,100 +266,26 @@
                 </div>
 
                 <!-- 计划创建卡片（LEGACY 模式） -->
-                <PlanCreatedCard v-if="msg.planSummary && !msg.taskList" :plan="msg.planSummary" />
-
-                <!-- Plan-and-Execute: 规划审阅阶段（所有任务待执行） -->
-                <!-- 注意：不使用 msg.planExecuting 判断，因为自动确认竞态会导致该值不准确；
-                     改用 isPlanAwaitingConfirmation 根据 TaskList.status 精确判断 -->
-                <PlanChecklist
-                  v-if="msg.taskList && isPlanAwaitingConfirmation(msg.taskList) && !agentStore.showLearningPlanPreview"
-                  :task-list="msg.taskList"
-                  :confirming="agentStore.planConfirmLoading"
-                  @confirm="confirmPlan(msg.taskList.confirmationDraftId || agentStore.currentDraftId)"
-                />
-
-                <!-- Plan-and-Execute: 执行中/已完成的手风琴 -->
-                <PlanExecutionAccordion
-                  v-if="msg.taskList && !isPlanAwaitingConfirmation(msg.taskList)"
-                  :task-list="msg.taskList"
-                  :task-execution-map="msg.taskExecutionMap || new Map()"
-                  :pause-info="msg.pauseInfo || null"
-                  @gate-answer="handleGateAnswer"
-                  @gate-confirm="handleGateConfirm"
-                  @gate-cancel="handleGateCancel"
-                />
+                <PlanCreatedCard v-if="msg.planSummary" :plan="msg.planSummary" />
 
                 <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
               </div>
             </div>
 
-            <!-- 流式加载指示器 -->
-            <div class="message-wrapper ai loading-wrapper" v-if="agentStore.loading">
-              <div class="message-avatar">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                  <line x1="9" y1="9" x2="9.01" y2="9"/>
-                  <line x1="15" y1="9" x2="15.01" y2="9"/>
-                </svg>
-              </div>
-              <div class="message-content">
-                <div class="message-bubble">
-                  <!-- 阶段指示器 -->
-                  <div v-if="agentStore.currentPhase === 'PLANNING' && !agentStore.currentTaskList" class="phase-indicator">
-                    <span class="phase-spinner"></span>
-                    <span class="phase-label">正在分析目标并生成任务计划...</span>
-                  </div>
-                  <!-- 思考与工具调用过程（流式，自动展开） -->
-                  <ReasoningProcess
-                    v-if="hasLiveReasoningContent()"
-                    :segments="agentStore.reasoningSegments"
-                    :thinking-text="agentStore.thinkingText"
-                    :tool-calls="agentStore.toolCalls"
-                    :streaming="true"
-                  />
-                  <!-- 回答内容（流式） -->
-                  <MarkdownRenderer v-if="agentStore.answerText" :content="agentStore.answerText" />
-                  <span class="streaming-cursor" v-if="agentStore.answerText && agentStore.loading"></span>
-
-                  <!-- 学习计划预览（LEARNING_PLAN 草稿审阅） -->
-                  <LearningPlanPreview
-                    v-if="agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
-                    :learning-plan="agentStore.learningPlanDraft"
-                    :confirming="agentStore.planConfirmLoading"
-                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
-                  />
-
-                  <!-- Plan-and-Execute: 紧凑状态卡片（任务详情在右侧面板） -->
-                  <PlanStatusCard
-                    v-if="agentStore.currentTaskList && !agentStore.showLearningPlanPreview"
-                    :task-list="agentStore.currentTaskList"
-                    :confirming="agentStore.planConfirmLoading"
-                    :completed-count="planCompletedCount"
-                    :total-count="planTotalCount"
-                    :current-running-desc="planCurrentRunningDesc"
-                    @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
-                  />
-
-                  <!-- 仅有 loading dots 的情况（还没有任何思考/工具/回答） -->
-                  <div v-if="!agentStore.reasoningSegments.length && !agentStore.thinkingText && !agentStore.toolCalls.length && !agentStore.answerText && !agentStore.currentTaskList" class="loading-dots">
-                    <span></span><span></span><span></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 学习计划预览需要在 SSE 结束后继续保留，直到用户确认创建学习空间 -->
+            <!-- 学习计划预览：流式期间与结束后都保留，直到用户确认创建学习空间 -->
             <div
               class="message-wrapper ai learning-plan-review-wrapper"
-              v-if="!agentStore.loading && agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
+              v-if="agentStore.learningPlanDraft && agentStore.showLearningPlanPreview"
             >
               <div class="message-avatar"></div>
               <div class="message-content">
                 <LearningPlanPreview
                   :learning-plan="agentStore.learningPlanDraft"
                   :confirming="agentStore.planConfirmLoading"
+                  :readonly="agentStore.learningPlanPreviewReadonly"
+                  :space-created="agentStore.learningPlanSpaceCreated"
                   @confirm="cancelAutoConfirm(); confirmPlan(agentStore.learningPlanDraft?.draftId || '')"
+                  @cancel="handleLearningPlanCancel"
                 />
               </div>
             </div>
@@ -305,12 +299,14 @@
                 <GateCard
                   reason="CLARIFICATION"
                   :question="clarificationPauseInfo.question"
-                  @answer="answer => handleGateAnswer(clarificationPauseInfo!.taskId, answer)"
+                  :clarification="clarificationPauseInfo.clarification"
+                  :submitting="gateSubmitting"
+                  @answer="(clarificationId: string, answer: string) => handleGateAnswer(clarificationId, answer)"
                 />
               </div>
             </div>
           </div>
-            </div>
+              </div>
           </div>
 
           <!-- 底部输入 -->
@@ -331,12 +327,110 @@
                   multiple
                   @change="handleFileSelected"
                 />
-                <button class="toolbar-btn" @click="handleContextClick" title="设置上下文（即将上线）">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                  </svg>
-                  <span>上下文</span>
-                </button>
+                <el-popover
+                  v-model:visible="spaceSelectorVisible"
+                  placement="top-start"
+                  trigger="click"
+                  popper-class="space-context-popover"
+                  :width="340"
+                  @show="ensureLearningSpacesLoaded"
+                >
+                  <template #reference>
+                    <button
+                      class="toolbar-btn context-toolbar-btn"
+                      :class="{ active: hasFocusedContext }"
+                      @click="handleContextClick"
+                      :title="contextButtonTitle"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                      </svg>
+                      <span>{{ contextButtonLabel }}</span>
+                    </button>
+                  </template>
+
+                  <div class="space-context-panel">
+                    <div class="space-context-header">
+                      <span class="space-context-title">选择学习空间</span>
+                      <button class="space-context-refresh" @click="refreshLearningSpaces" title="刷新学习空间">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polyline points="23 4 23 10 17 10"/>
+                          <polyline points="1 20 1 14 7 14"/>
+                          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
+                          <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/>
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div class="space-context-options">
+                      <button
+                        class="space-context-option"
+                        :class="{ active: activeContext === 'global' }"
+                        @click="selectGlobalContext"
+                      >
+                        <span class="space-option-icon global">全</span>
+                        <span class="space-option-main">
+                          <span class="space-option-name">全局学习</span>
+                          <span class="space-option-meta">统筹所有学习空间</span>
+                        </span>
+                        <span v-if="activeContext === 'global'" class="space-option-check">✓</span>
+                      </button>
+
+                      <button
+                        class="space-context-option"
+                        :class="{ active: activeContext === 'evaluation' }"
+                        @click="selectEvaluationContext"
+                      >
+                        <span class="space-option-icon evaluation">测</span>
+                        <span class="space-option-main">
+                          <span class="space-option-name">练习评测</span>
+                          <span class="space-option-meta">错题、测评和薄弱点诊断</span>
+                        </span>
+                        <span v-if="activeContext === 'evaluation'" class="space-option-check">✓</span>
+                      </button>
+
+                      <div class="space-context-divider"></div>
+
+                      <div v-if="learningSpaceStore.loading" class="space-context-loading">正在加载学习空间...</div>
+                      <div v-else-if="availableLearningSpaces.length === 0" class="space-context-empty">
+                        暂无可选择的学习空间
+                      </div>
+                      <template v-else>
+                        <button
+                          v-for="space in availableLearningSpaces"
+                          :key="space.id"
+                          class="space-context-option"
+                          :class="{ active: selectedSpaceId === String(space.id) }"
+                          @click="selectLearningSpace(String(space.id))"
+                        >
+                          <span
+                            class="space-option-icon"
+                            :style="{ background: space.bgColor, color: space.color }"
+                          >
+                            {{ space.icon }}
+                          </span>
+                          <span class="space-option-main">
+                            <span class="space-option-name">{{ space.name }}</span>
+                            <span class="space-option-meta">{{ formatSpaceType(space.type) }} · 进度 {{ space.progress }}%</span>
+                          </span>
+                          <span v-if="selectedSpaceId === String(space.id)" class="space-option-check">✓</span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </el-popover>
+              </div>
+              <div class="selected-space-strip" v-if="hasFocusedContext">
+                <div class="selected-space-chip">
+                  <span class="selected-space-dot" :style="selectedContextStyle"></span>
+                  <span class="selected-space-label">{{ selectedContextChipText }}</span>
+                  <button class="selected-space-clear" @click="selectGlobalContext" title="切回全局学习">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
               <div class="attachment-strip" v-if="attachments.length || uploadProgress.status !== 'idle'">
                 <div class="attachment-chip uploading" v-if="uploadProgress.status !== 'idle' && uploadProgress.status !== 'success'">
@@ -362,6 +456,23 @@
               <div class="mode-selector">
                 <button
                   class="mode-btn"
+                  :class="{ active: currentMode === 'AUTO' }"
+                  @click="switchMode('AUTO')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <path d="M12 2v4"/>
+                    <path d="M12 18v4"/>
+                    <path d="M4.93 4.93l2.83 2.83"/>
+                    <path d="M16.24 16.24l2.83 2.83"/>
+                    <path d="M2 12h4"/>
+                    <path d="M18 12h4"/>
+                    <path d="M4.93 19.07l2.83-2.83"/>
+                    <path d="M16.24 7.76l2.83-2.83"/>
+                  </svg>
+                  <span>智能路由</span>
+                </button>
+                <button
+                  class="mode-btn"
                   :class="{ active: currentMode === 'REACT' }"
                   @click="switchMode('REACT')"
                 >
@@ -385,7 +496,8 @@
               <div class="composer-body">
                 <textarea
                   v-model="inputMessage"
-                  :placeholder="inputPlaceholder"
+                  :placeholder="isListening ? '正在聆听…' : inputPlaceholder"
+                  :disabled="isListening"
                   rows="1"
                   @keydown.enter.exact.prevent="sendMessage"
                   @keydown.enter.shift.exact.stop
@@ -393,6 +505,25 @@
                   ref="inputRef"
                 ></textarea>
                 <div class="composer-actions">
+                  <button
+                    v-if="!voiceUnsupported"
+                    class="action-btn mic-action"
+                    :class="{ listening: isListening }"
+                    :title="isListening ? '停止录音' : '语音输入'"
+                    :aria-label="isListening ? '停止录音' : '语音输入'"
+                    :disabled="agentStore.loading"
+                    @click="toggleVoice"
+                  >
+                    <svg v-if="!isListening" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                      <line x1="12" y1="19" x2="12" y2="23"/>
+                      <line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                    <svg v-else viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="6" y="6" width="12" height="12" rx="2"/>
+                    </svg>
+                  </button>
                   <button
                     v-if="agentStore.loading"
                     class="action-btn stop-action"
@@ -428,6 +559,16 @@
             </div>
           </div>
         </main>
+
+        <!-- 数字人面板：聊天区右侧的辅助陪伴面板 -->
+        <AssistantPanel
+          v-show="!isAssistantCollapsed"
+          class="assistant-panel-slot"
+          :latestAiMessage="latestAiMessageForAvatar"
+          :initial-auth-info="avatarAuthInfo"
+          :auth-info-loading="avatarAuthLoading"
+          @collapse="isAssistantCollapsed = true"
+        />
 
         <!-- 右侧：快捷工具 + 任务执行面板 -->
         <aside class="tutor-sidebar">
@@ -508,26 +649,13 @@
                 class="tool-card"
                 @click="sendQuickMessage(tool.prompt)"
               >
-                <span class="tool-icon" v-html="tool.icon"></span>
+                <span class="tool-icon" :class="{ 'tool-icon-lg': tool.id === 3 }" v-html="tool.icon"></span>
                 <span class="tool-label">{{ tool.label }}</span>
                 <span class="tool-desc">{{ tool.desc }}</span>
               </button>
             </div>
           </div>
 
-          <!-- 任务执行面板（Plan-and-Execute 模式下出现） -->
-          <TaskExecutionPanel
-            v-if="!agentStore.showLearningPlanPreview"
-            :task-list="agentStore.currentTaskList"
-            :task-execution-map="agentStore.taskExecutionMap"
-            :pause-info="agentStore.planPauseInfo"
-            :confirming="agentStore.planConfirmLoading"
-            :live-reasoning-segments="agentStore.reasoningSegments"
-            @confirm="cancelAutoConfirm(); confirmPlan(agentStore.currentDraftId)"
-            @gate-answer="handleGateAnswer"
-            @gate-confirm="handleGateConfirm"
-            @gate-cancel="handleGateCancel"
-          />
         </aside>
       </div>
       <!-- 移动端历史侧边栏遮罩 -->
@@ -551,9 +679,14 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { useAgentChat, type ChatMessage } from '@/composables/useAgentChat'
+import { useLearningSpaceStore } from '@/stores/learningSpace'
+import {
+  useAgentChat,
+  type ChatMessage,
+} from '@/composables/useAgentChat'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationVO } from '@/api/agent'
 import { agentApi } from '@/api/agent'
@@ -564,34 +697,49 @@ import PlanCreatedCard from '@/components/agent/PlanCreatedCard.vue'
 import ReasoningProcess from '@/components/agent/ReasoningProcess.vue'
 import AgentTracePanel from '@/components/AgentTracePanel.vue'
 import PlanRevealOverlay from '@/components/plan/PlanRevealOverlay.vue'
-import PlanChecklist from '@/components/plan/PlanChecklist.vue'
-import PlanExecutionAccordion from '@/components/plan/PlanExecutionAccordion.vue'
 import TaskExecutionPanel from '@/components/plan/TaskExecutionPanel.vue'
 import GateCard from '@/components/plan/GateCard.vue'
-import PlanStatusCard from '@/components/plan/PlanStatusCard.vue'
 import LearningPlanPreview from '@/components/plan/LearningPlanPreview.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import WebSearchSources from '@/components/agent/WebSearchSources.vue'
+import RagSources from '@/components/agent/RagSources.vue'
+import MindMapCard from '@/components/agent/MindMapCard.vue'
+import LearningSpaceCards from '@/components/agent/LearningSpaceCards.vue'
 import { useWindowSize } from '@/composables/useWindowSize'
 import { useAgentAttachmentUpload } from '@/composables/useAgentAttachmentUpload'
+import { useVoiceInput } from '@/composables/useVoiceInput'
 import RagReferenceSelector from '@/components/agent/RagReferenceSelector.vue'
 import type { RagReference } from '@/composables/useAgentChat'
+import AssistantPanel from '@/components/AssistantPanel.vue'
+import { ArrowLeft } from '@element-plus/icons-vue'
+import { getAvatarAuthInfo, type AvatarAuthInfo } from '@/api/avatar'
+import type { LearningSpaceType } from '@/api/learningSpace'
 
 const userStore = useUserStore()
 const agentStore = useAgentStore()
+const learningSpaceStore = useLearningSpaceStore()
+const route = useRoute()
 
 const inputMessage = ref('')
 const chatContainer = ref<HTMLElement>()
+const chatFlowRef = ref<HTMLElement>()
 const inputRef = ref<HTMLTextAreaElement>()
 const fileInputRef = ref<HTMLInputElement>()
-const activeContext = ref('global')
 const historySidebarOpen = ref(false)
 const copiedIndex = ref<number | null>(null)
 const attachments = ref<AttachmentStatus[]>([])
 const pollingTimers = new Map<number, number>()
 const { upload: uploadAttachment, uploadProgress, resetProgress } = useAgentAttachmentUpload()
 const selectedReferences = ref<RagReference[]>([])
+const spaceSelectorVisible = ref(false)
+const selectedSpaceId = ref<string | null>(null)
+
+// 数字人面板状态
+const isAssistantCollapsed = ref(false)
+const latestAiMessageForAvatar = ref('')
+const avatarAuthInfo = ref<AvatarAuthInfo | null>(null)
+const avatarAuthLoading = ref(true)
 
 const { width: windowWidth } = useWindowSize()
 const isMobile = computed(() => windowWidth.value < 768)
@@ -606,8 +754,8 @@ const currentConvTitle = computed(() => {
 
 const scrollToBottom = () => {
   nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    if (chatFlowRef.value) {
+      chatFlowRef.value.scrollTop = chatFlowRef.value.scrollHeight
     }
   })
 }
@@ -622,35 +770,167 @@ const {
   cancelPlan,
   loadConversation,
   startNewConversation,
-  deleteConversation
+  deleteConversation,
+  answerClarificationViaSSE,
+  confirmGateViaSSE,
 } = useAgentChat(scrollToBottom)
 
-// 用户手动选择的对话模式
-const currentMode = ref<'REACT' | 'PLAN_AND_EXECUTE'>('REACT')
+type ChatMode = 'AUTO' | 'REACT' | 'PLAN_AND_EXECUTE'
 
-const switchMode = (mode: 'REACT' | 'PLAN_AND_EXECUTE') => {
+// 默认使用后端意图路由，让系统按用户问题选择工具集
+const currentMode = ref<ChatMode>('AUTO')
+
+const switchMode = (mode: ChatMode) => {
   currentMode.value = mode
-  currentForceMode.value = mode
+  currentForceMode.value = mode === 'AUTO' ? null : mode
 }
 
-const contextOptions = ref([
-  { id: 'global', label: '全局学习', color: '#6b7280' },
-  { id: 'math', label: '高等数学', color: '#3b82f6' },
-  { id: 'english', label: '英语四级', color: '#10b981' },
-  { id: 'se', label: '软件工程', color: '#f59e0b' },
-  { id: 'os', label: '操作系统', color: '#8b5cf6' }
-])
+// 监听最后一条 AI 消息的内容变化（流式时逐字更新），同步给数字人。
+// 不做 deep watch：现在流式文本直接写进消息对象，deep 会在每个 token 上遍历整个列表。
+watch(
+  () => {
+    const last = messages.value[messages.value.length - 1]
+    return last && last.role === 'ai' ? last.content : ''
+  },
+  (content) => {
+    if (content) latestAiMessageForAvatar.value = content
+  },
+)
 
-const switchContext = (ctxId: string) => {
-  activeContext.value = ctxId
-  const ctx = contextOptions.value.find(c => c.id === ctxId)
-  if (ctxId === 'global') {
-    ElMessage.success('已切换到全局学习上下文。总 Agent 将为你统筹所有学习空间。')
-  } else if (ctx) {
-    ElMessage.success(`已切换到"${ctx.label}"学习空间。空间 Agent 将专注于该领域的解答。`)
+const preloadAvatarAuthInfo = async () => {
+  avatarAuthLoading.value = true
+  try {
+    const response: any = await getAvatarAuthInfo()
+    const result = response?.data || response || {}
+    const authInfo = result?.wssUrl ? result : (result?.data || {})
+    if (authInfo?.wssUrl) {
+      avatarAuthInfo.value = {
+        wssUrl: authInfo.wssUrl,
+        appId: authInfo.appId || '',
+        sceneId: authInfo.sceneId || '',
+        uid: authInfo.uid || '',
+        scene: authInfo.scene || '',
+        interactMode: authInfo.interactMode || '',
+        avatarId: authInfo.avatarId || '',
+        voice: authInfo.voice || ''
+      }
+    }
+  } catch (error) {
+    console.warn('[AITutor] preload avatar auth info failed:', error)
+  } finally {
+    avatarAuthLoading.value = false
   }
 }
 
+type TutorContext = 'global' | 'evaluation' | 'space'
+
+const activeContext = ref<TutorContext>('global')
+
+const availableLearningSpaces = computed(() => {
+  const activeSpaces = learningSpaceStore.activeSpaces
+  return activeSpaces.length > 0 ? activeSpaces : learningSpaceStore.spaces
+})
+
+const selectedLearningSpace = computed(() => {
+  if (!selectedSpaceId.value) return null
+  return learningSpaceStore.spaces.find(space => String(space.id) === selectedSpaceId.value) || null
+})
+
+const hasFocusedContext = computed(() => activeContext.value !== 'global')
+
+const contextButtonLabel = computed(() => {
+  if (selectedLearningSpace.value) return selectedLearningSpace.value.name
+  if (activeContext.value === 'space') return '已选择学习空间'
+  if (activeContext.value === 'evaluation') return '练习评测'
+  return '选择学习空间'
+})
+
+const contextButtonTitle = computed(() => {
+  if (selectedLearningSpace.value) return `当前学习空间：${selectedLearningSpace.value.name}`
+  if (activeContext.value === 'evaluation') return '当前上下文：练习评测'
+  return '选择学习空间上下文'
+})
+
+const selectedContextChipText = computed(() => {
+  if (selectedLearningSpace.value) return `当前学习空间：${selectedLearningSpace.value.name}`
+  if (activeContext.value === 'evaluation') return '当前上下文：练习评测'
+  return ''
+})
+
+const selectedContextStyle = computed(() => {
+  if (selectedLearningSpace.value) {
+    return { background: selectedLearningSpace.value.color }
+  }
+  if (activeContext.value === 'evaluation') {
+    return { background: '#ec4899' }
+  }
+  return { background: '#6b7280' }
+})
+
+const formatSpaceType = (type: LearningSpaceType) => {
+  const labelMap: Record<LearningSpaceType, string> = {
+    course: '课程',
+    exam: '考试',
+    project: '项目',
+    career: '职业',
+    competition: '竞赛',
+  }
+  return labelMap[type] || '学习'
+}
+
+const ensureLearningSpacesLoaded = async () => {
+  if (learningSpaceStore.loading || learningSpaceStore.spaces.length > 0) return
+  await learningSpaceStore.fetchSpaces()
+}
+
+const refreshLearningSpaces = async () => {
+  await learningSpaceStore.fetchSpaces()
+  if (learningSpaceStore.error) {
+    ElMessage.error(learningSpaceStore.error)
+    return
+  }
+  ElMessage.success('学习空间列表已刷新')
+}
+
+const selectGlobalContext = () => {
+  activeContext.value = 'global'
+  selectedSpaceId.value = null
+  spaceSelectorVisible.value = false
+  ElMessage.success('已切换到全局学习上下文。总 Agent 将为你统筹所有学习空间。')
+}
+
+const selectEvaluationContext = () => {
+  activeContext.value = 'evaluation'
+  selectedSpaceId.value = null
+  spaceSelectorVisible.value = false
+  ElMessage.success('已切换到"练习评测"模式。测评 Agent 将协助你进行针对性小练与错题攻坚。')
+}
+
+const selectLearningSpace = (spaceId: string, notify = true) => {
+  selectedSpaceId.value = spaceId
+  activeContext.value = 'space'
+  spaceSelectorVisible.value = false
+  if (!notify) return
+
+  const space = learningSpaceStore.spaces.find(item => String(item.id) === spaceId)
+  ElMessage.success(
+    space
+      ? `已切换到"${space.name}"学习空间。空间 Agent 将专注于该领域的解答。`
+      : '已切换到指定学习空间。'
+  )
+}
+
+const switchContext = (ctxId: string) => {
+  if (ctxId === 'global') {
+    selectGlobalContext()
+    return
+  }
+  if (ctxId === 'evaluation') {
+    selectEvaluationContext()
+    return
+  }
+  selectLearningSpace(ctxId)
+}
 const greetingText = computed(() => {
   const hour = new Date().getHours()
   const name = userStore.userName || '同学'
@@ -665,40 +945,79 @@ const greetingText = computed(() => {
 
 // 动态欢迎数据（后续接入 API 后可实时更新）
 const learningSpaceCount = computed(() => {
-  // TODO: 从 learningSpace store 获取真实数量
-  return 4
+  return learningSpaceStore.activeSpaces.length || learningSpaceStore.spaces.length
 })
 const todayAvailableHours = computed(() => {
   // TODO: 从每日计划 API 获取真实数据
   return '2小时30分钟'
 })
 const todayFocusText = computed(() => {
-  // TODO: 从学习计划 API 获取真实重点
-  return '高等数学和软件工程今天是重点，操作系统昨天已完成复习可以暂缓。'
+  if (selectedLearningSpace.value) {
+    return `当前聚焦「${selectedLearningSpace.value.name}」，我会优先围绕这个学习空间回答。`
+  }
+  const focusNames = learningSpaceStore.activeSpaces.slice(0, 2).map(space => space.name)
+  if (focusNames.length > 0) {
+    return `${focusNames.join('和')}今天是重点，你也可以切换到某个学习空间继续深入。`
+  }
+  return '选择一个学习空间后，我会优先围绕该空间回答。'
 })
 
-const welcomeFeatures = [
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
-    label: '解释知识点'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-    label: '生成练习题'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
-    label: '生成思维导图'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
-    label: '整理学习笔记'
-  },
-  {
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
-    label: '分析薄弱点'
+const welcomeSummary = computed(() => {
+  if (activeContext.value === 'evaluation') {
+    return '我是你的测评智友。在这里，你可以让我为你进行针对性的随堂小练，或者帮你想办法吃透错题、诊断你的能力薄弱环节。准备好开始了吗？'
   }
-]
+  return `我正在管理你的 <strong>${learningSpaceCount.value} 个学习空间</strong>。今天你预计可用 <strong>${todayAvailableHours.value}</strong>。<br/>${todayFocusText.value}`
+})
+
+const welcomeFeatures = computed(() => {
+  if (activeContext.value === 'evaluation') {
+    return [
+      {
+        icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M320.618717 709.570751l311.023685-316.464605-159.049412-162.715919-320.259024 320.694953-3.094478 19.460214L312.765865 710.198038l7.852852-0.627287z m365.842198-372.018875l110.612237-112.471584 7.225565-44.74918L685.639201 62.11571l-47.529503 2.531659-116.408244 116.51569 164.759461 156.388817zM100.216981 789.613762l138.302903-59.706847-112.839975-92.719728-46.859237 112.450095-14.23419 51.919487 35.630499-11.943007z m9.216919 79.440283c-24.663726 0.084934-44.587498 20.031219-44.608987 44.694945 0.021489 24.659633 19.946284 44.649919 44.608987 44.75839h806.904567c24.661679 0 44.651966-19.990287 44.651965-44.649919v-0.108471c0-24.663726-19.990287-44.654013-44.61001-44.694945H109.4339z m806.450219-111.931278c24.856108 0 45.105291-20.206204 45.10529-45.128827s-20.249183-45.083801-45.10529-45.083801H468.374922c-24.90011 0-45.083801 20.24816-45.083801 45.299719 0 24.74866 20.183691 44.912909 45.083801 44.912909h447.509197z" fill="#59C666"></path></svg>',
+        label: '生成微测验随堂练'
+      },
+      {
+        icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M537.152 414.72h-288.64a29.44 29.44 0 0 1-26.24-30.72 29.44 29.44 0 0 1 26.24-32h288.64a29.44 29.44 0 0 1 26.24 32 29.44 29.44 0 0 1-26.24 30.72z m209.92 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z m0 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z" fill="#333333"></path><path d="M192.832 0a128 128 0 0 0-128 128v768a128 128 0 0 0 128 128h640a128 128 0 0 0 128-128l7.04-670.72L748.992 0h-556.16z m512 64l192 192h-160.64a31.36 31.36 0 0 1-31.36-31.36V64z m128 896h-640a64 64 0 0 1-64-64V128a64 64 0 0 1 64-64h448v192a64 64 0 0 0 64 64h192v576a64 64 0 0 1-64 64z" fill="#333333"></path></svg>',
+        label: '诊断我的错题'
+      },
+      {
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+        label: '帮我分析薄弱知识点'
+      },
+      {
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+        label: '查看已做测评历史'
+      }
+    ]
+  }
+
+  return [
+    {
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+      label: '解释知识点'
+    },
+    {
+      icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M320.618717 709.570751l311.023685-316.464605-159.049412-162.715919-320.259024 320.694953-3.094478 19.460214L312.765865 710.198038l7.852852-0.627287z m365.842198-372.018875l110.612237-112.471584 7.225565-44.74918L685.639201 62.11571l-47.529503 2.531659-116.408244 116.51569 164.759461 156.388817zM100.216981 789.613762l138.302903-59.706847-112.839975-92.719728-46.859237 112.450095-14.23419 51.919487 35.630499-11.943007z m9.216919 79.440283c-24.663726 0.084934-44.587498 20.031219-44.608987 44.694945 0.021489 24.659633 19.946284 44.649919 44.608987 44.75839h806.904567c24.661679 0 44.651966-19.990287 44.651965-44.649919v-0.108471c0-24.663726-19.990287-44.654013-44.61001-44.694945H109.4339z m806.450219-111.931278c24.856108 0 45.105291-20.206204 45.10529-45.128827s-20.249183-45.083801-45.10529-45.083801H468.374922c-24.90011 0-45.083801 20.24816-45.083801 45.299719 0 24.74866 20.183691 44.912909 45.083801 44.912909h447.509197z" fill="#59C666"></path></svg>',
+      label: '生成练习题'
+    },
+    {
+      icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><g stroke="#701A75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="25" y="42" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><path d="M41 50 H52 V32 H62 M52 50 V68 H62" stroke-width="5"/><rect x="62" y="24" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><rect x="62" y="60" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/></g></svg>',
+      label: '生成思维导图'
+    },
+    {
+      icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M537.152 414.72h-288.64a29.44 29.44 0 0 1-26.24-30.72 29.44 29.44 0 0 1 26.24-32h288.64a29.44 29.44 0 0 1 26.24 32 29.44 29.44 0 0 1-26.24 30.72z m209.92 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z m0 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z" fill="#B8860B"></path><path d="M192.832 0a128 128 0 0 0-128 128v768a128 128 0 0 0 128 128h640a128 128 0 0 0 128-128l7.04-670.72L748.992 0h-556.16z m512 64l192 192h-160.64a31.36 31.36 0 0 1-31.36-31.36V64z m128 896h-640a64 64 0 0 1-64-64V128a64 64 0 0 1 64-64h448v192a64 64 0 0 0 64 64h192v576a64 64 0 0 1-64 64z" fill="#B8860B"></path></svg>',
+      label: '整理学习笔记'
+    },
+    {
+      icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+      label: '分析薄弱点'
+    },
+    {
+      icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M1024 512l-241.365333 241.365333-60.330667-60.330666L903.338667 512l-181.034667-181.034667 60.330667-60.330666L1024 512zM120.661333 512l181.034667 181.034667-60.330667 60.330666L0 512l241.365333-241.365333L301.653333 330.965333 120.661333 512z m296.96 384H326.826667l279.552-768h90.794666L417.621333 896z" fill="#5AADBB"></path></svg>',
+      label: '代码示例'
+    }
+  ]
+})
 
 const inputPlaceholder = computed(() =>
   currentMode.value === 'PLAN_AND_EXECUTE'
@@ -706,10 +1025,18 @@ const inputPlaceholder = computed(() =>
     : '输入你的问题，AI 会结合你的学习画像给出个性化回答…'
 )
 
+const gateSubmitting = ref(false)
+
 const clarificationPauseInfo = computed(() => {
+  if (agentStore.showLearningPlanPreview) return null
   const pauseInfo = agentStore.planPauseInfo
   if (!pauseInfo || pauseInfo.reason !== 'CLARIFICATION') return null
   return pauseInfo
+})
+
+// 当暂停状态变化（next question / resumed）时，重置 submitting
+watch(() => agentStore.planPauseInfo?.clarification?.clarificationId, () => {
+  gateSubmitting.value = false
 })
 
 const quickHints = computed(() =>
@@ -733,28 +1060,28 @@ const quickHints = computed(() =>
 const quickTools = [
   {
     id: 1,
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
     label: '知识讲解',
     desc: '深入讲解概念',
     prompt: '请详细讲解进程和线程的区别，包括它们的定义、特点、优缺点和使用场景'
   },
   {
     id: 2,
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M320.618717 709.570751l311.023685-316.464605-159.049412-162.715919-320.259024 320.694953-3.094478 19.460214L312.765865 710.198038l7.852852-0.627287z m365.842198-372.018875l110.612237-112.471584 7.225565-44.74918L685.639201 62.11571l-47.529503 2.531659-116.408244 116.51569 164.759461 156.388817zM100.216981 789.613762l138.302903-59.706847-112.839975-92.719728-46.859237 112.450095-14.23419 51.919487 35.630499-11.943007z m9.216919 79.440283c-24.663726 0.084934-44.587498 20.031219-44.608987 44.694945 0.021489 24.659633 19.946284 44.649919 44.608987 44.75839h806.904567c24.661679 0 44.651966-19.990287 44.651965-44.649919v-0.108471c0-24.663726-19.990287-44.654013-44.61001-44.694945H109.4339z m806.450219-111.931278c24.856108 0 45.105291-20.206204 45.10529-45.128827s-20.249183-45.083801-45.10529-45.083801H468.374922c-24.90011 0-45.083801 20.24816-45.083801 45.299719 0 24.74866 20.183691 44.912909 45.083801 44.912909h447.509197z" fill="#59C666"></path></svg>',
     label: '生成练习',
     desc: '针对薄弱点',
     prompt: '请根据我的学习记录，生成10道关于进程同步与互斥的专项练习题'
   },
   {
     id: 3,
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
+    icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100"><g stroke="#701A75" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="25" y="42" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><path d="M41 50 H52 V32 H62 M52 50 V68 H62" stroke-width="5"/><rect x="62" y="24" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/><rect x="62" y="60" width="16" height="16" rx="3" fill="#E8D5E8" stroke-width="5"/></g></svg>',
     label: '思维导图',
     desc: '知识可视化',
     prompt: '请为我生成一份"操作系统进程管理"的知识思维导图'
   },
   {
     id: 4,
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>',
+    icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M537.152 414.72h-288.64a29.44 29.44 0 0 1-26.24-30.72 29.44 29.44 0 0 1 26.24-32h288.64a29.44 29.44 0 0 1 26.24 32 29.44 29.44 0 0 1-26.24 30.72z m209.92 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z m0 165.76h-498.56a32.64 32.64 0 0 1 0-64h498.56a32.64 32.64 0 0 1 0 64z" fill="#B8860B"></path><path d="M192.832 0a128 128 0 0 0-128 128v768a128 128 0 0 0 128 128h640a128 128 0 0 0 128-128l7.04-670.72L748.992 0h-556.16z m512 64l192 192h-160.64a31.36 31.36 0 0 1-31.36-31.36V64z m128 896h-640a64 64 0 0 1-64-64V128a64 64 0 0 1 64-64h448v192a64 64 0 0 0 64 64h192v576a64 64 0 0 1-64 64z" fill="#B8860B"></path></svg>',
     label: '整理笔记',
     desc: '自动归纳',
     prompt: '请根据我们之前的对话，帮我整理一份"线程同步"的学习笔记'
@@ -768,7 +1095,7 @@ const quickTools = [
   },
   {
     id: 6,
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/></svg>',
+    icon: '<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><path d="M1024 512l-241.365333 241.365333-60.330667-60.330666L903.338667 512l-181.034667-181.034667 60.330667-60.330666L1024 512zM120.661333 512l181.034667 181.034667-60.330667 60.330666L0 512l241.365333-241.365333L301.653333 330.965333 120.661333 512z m296.96 384H326.826667l279.552-768h90.794666L417.621333 896z" fill="#5AADBB"></path></svg>',
     label: '代码示例',
     desc: '代码辅助',
     prompt: '请给我一个用Python实现哲学家就餐问题的代码示例，并加上详细注释'
@@ -782,14 +1109,37 @@ const autoResize = () => {
   }
 }
 
+const { isListening, voiceUnsupported, toggleVoice, stopVoice } = useVoiceInput(inputMessage, {
+  onUpdate: autoResize,
+  onEnd: () => nextTick(() => inputRef.value?.focus()),
+})
+
 const sendMessage = async () => {
   if (!inputMessage.value.trim() || agentStore.loading) return
+  if (isListening.value) stopVoice()
   if (attachments.value.some(a => a.status === 'processing' || a.status === 'uploading')) {
     ElMessage.warning('附件仍在解析中，请稍后再提问')
     return
   }
   const msg = inputMessage.value
   inputMessage.value = ''
+
+  // PAUSED_CLARIFICATION 态走专用澄清接口（有 draftId 和 clarificationId）
+  const pausedClarId = agentStore.planPauseInfo?.clarification?.clarificationId
+  if (!agentStore.showLearningPlanPreview
+      && agentStore.planPauseInfo?.reason === 'CLARIFICATION'
+      && agentStore.currentTaskList?.status === 'PAUSED_CLARIFICATION'
+      && agentStore.currentDraftId
+      && pausedClarId) {
+    gateSubmitting.value = true
+    try {
+      await answerClarificationViaSSE(agentStore.currentDraftId, pausedClarId, msg)
+    } finally {
+      gateSubmitting.value = false
+    }
+    return
+  }
+
   // 从 ready 附件构造 RagReference 列表
   const attachmentRefs: RagReference[] = attachments.value
     .filter(a => a.status === 'ready')
@@ -810,10 +1160,13 @@ const sendQuickMessage = (msg: string) => {
   sendMessage()
 }
 
-const handleNewChat = async () => {
+const handleNewChat = () => {
+  // 只做本地重置：清空当前会话与附件，立刻给出新对话界面
   startNewConversation()
   clearAttachmentState()
-  await agentStore.fetchConversations()
+  // 后台静默增量同步：有新会话才插进来，没变化就完全不动，
+  // 不置 loading，侧边栏不会闪"加载中..."（旧实现是整表刷新）
+  agentStore.syncConversations()
 }
 
 const handleStopGeneration = () => {
@@ -838,7 +1191,8 @@ const handleDeleteConversation = async (conv: ConversationVO) => {
   try {
     await deleteConversation(conv.conversationId)
     ElMessage.success('对话已删除')
-    await agentStore.fetchConversations()
+    // 本地已移除该项，这里只做静默增量同步兜底，不整表刷新
+    agentStore.syncConversations()
   } catch {
     ElMessage.error('删除失败，请重试')
   }
@@ -967,7 +1321,7 @@ const clearAttachmentState = () => {
 }
 
 const handleContextClick = () => {
-  ElMessage.info('上下文设置功能即将上线，敬请期待')
+  void ensureLearningSpacesLoaded()
 }
 
 const removeReference = (ref: RagReference) => {
@@ -1035,36 +1389,6 @@ const hasTraceEventsForMsg = (msg: any): boolean => {
   return !!(msg.traceEvents?.length) || !!msg.traceId
 }
 
-/**
- * 判断计划是否正在等待用户确认执行。
- */
-function isPlanAwaitingConfirmation(taskList: TaskList): boolean {
-  return taskList.status === 'DRAFT'
-    || taskList.status === 'PENDING_CONFIRM'
-    || taskList.status === 'PAUSED_CONFIRMATION'
-}
-
-/** PlanStatusCard 所需的计算属性 */
-const planCompletedCount = computed(() => {
-  let count = 0
-  for (const [, state] of agentStore.taskExecutionMap) {
-    if (state.status === 'completed') count++
-  }
-  return count
-})
-
-const planTotalCount = computed(() => {
-  return agentStore.currentTaskList?.tasks.length || 0
-})
-
-const planCurrentRunningDesc = computed(() => {
-  for (const [, state] of agentStore.taskExecutionMap) {
-    if (state.status === 'running') return state.taskItem.description
-  }
-  // 规划阶段或全部完成时返回空
-  return ''
-})
-
 /** 判断消息是否包含推理过程（思考或工具调用） */
 function hasReasoningContent(msg: ChatMessage): boolean {
   return !!(
@@ -1074,13 +1398,20 @@ function hasReasoningContent(msg: ChatMessage): boolean {
   )
 }
 
-/** 判断当前流式状态是否有推理内容 */
-function hasLiveReasoningContent(): boolean {
-  return !!(
-    agentStore.reasoningSegments.length ||
-    agentStore.thinkingText ||
-    agentStore.toolCalls.length
-  )
+/**
+ * 是否是"空的占位气泡"：正在生成，但还没有任何可见内容。
+ * 此时显示「正在思考…」，避免出现一个空白的 AI 气泡。
+ */
+function isThinkingPlaceholder(msg: ChatMessage): boolean {
+  if (msg.status !== 'streaming') return false
+  // 学习计划草稿有自己的展示卡片，此时不需要"正在思考"
+  if (agentStore.learningPlanDraft && agentStore.showLearningPlanPreview) return false
+  return !msg.content
+    && !hasReasoningContent(msg)
+    && !msg.webSearchReferences?.length
+    && !msg.ragSources?.chunks?.length
+    && !msg.learningSpaceCards?.length
+    && !msg.mindMaps?.length
 }
 
 /** 取消自动执行倒计时 */
@@ -1129,19 +1460,55 @@ const openMsgTrace = async (msg: any) => {
 
 // === Plan-and-Execute Gate 事件处理 ===
 
-const handleGateAnswer = (taskId: string, answer: string) => {
-  // CLARIFICATION gate: 用户回答后通过普通聊天发送
-  agentSend(answer, [])
+const handleGateAnswer = async (clarificationId: string, answer: string) => {
+  const draftId = agentStore.currentDraftId
+  if (clarificationId && draftId) {
+    gateSubmitting.value = true
+    try {
+      await answerClarificationViaSSE(draftId, clarificationId, answer)
+    } finally {
+      gateSubmitting.value = false
+    }
+  } else {
+    // 回退：尝试从 store 取 active clarificationId
+    const sid = agentStore.planPauseInfo?.clarification?.clarificationId
+    if (sid && draftId) {
+      gateSubmitting.value = true
+      try {
+        await answerClarificationViaSSE(draftId, sid, answer)
+      } finally {
+        gateSubmitting.value = false
+      }
+    } else {
+      // 最后回退：普通聊天路径
+      agentSend(answer, [])
+    }
+  }
 }
 
 const handleGateConfirm = (taskId: string) => {
-  // CONFIRMATION gate: 确认执行
-  confirmPlan(agentStore.currentDraftId)
+  // 区分 CONFIRMATION gate 和 LEARNING_PLAN / DRAFT 确认
+  const draftId = agentStore.currentDraftId
+  const taskList = agentStore.currentTaskList
+  if (taskList?.status === 'PAUSED_CONFIRMATION' && draftId) {
+    // CONFIRMATION gate：使用专用 API
+    confirmGateViaSSE(draftId)
+  } else {
+    // LEARNING_PLAN / DRAFT / PENDING_CONFIRM：走原有 plan/confirm
+    confirmPlan(draftId)
+  }
 }
 
 const handleGateCancel = (_taskId: string) => {
   // 取消执行
   cancelPlan()
+}
+
+/** 取消学习计划预览，清空相关状态 */
+const handleLearningPlanCancel = () => {
+  agentStore.showLearningPlanPreview = false
+  agentStore.learningPlanDraft = null
+  ElMessage.info('已取消，你可以重新描述学习目标')
 }
 
 /**
@@ -1285,10 +1652,35 @@ const autoConfirmPending = ref(false)
 const autoConfirmCountdown = ref(0)
 let autoConfirmTimer: ReturnType<typeof setInterval> | null = null
 
+function shouldAutoConfirmTaskList(taskList: TaskList | null): boolean {
+  const allNormalPending = !!taskList
+    && taskList.status === 'PENDING_CONFIRM'
+    && taskList.tasks.every(t => t.gate === 'NORMAL' && t.status === 'PENDING')
+
+  return !!(
+    taskList &&
+    allNormalPending &&
+    !agentStore.planPauseInfo &&
+    !agentStore.planExecuting &&
+    !agentStore.planNeedsConfirmation &&
+    !agentStore.showLearningPlanPreview &&
+    !agentStore.loading &&
+    agentStore.currentDraftId
+  )
+}
+
 // 监听 currentTaskList 变化，标记是否需要自动确认
 watch(
-  () => agentStore.currentTaskList,
-  (taskList) => {
+  () => [
+    agentStore.currentTaskList,
+    agentStore.loading,
+    agentStore.planExecuting,
+    agentStore.planNeedsConfirmation,
+    agentStore.showLearningPlanPreview,
+    agentStore.currentDraftId,
+    agentStore.planPauseInfo,
+  ] as const,
+  ([taskList]) => {
     // 清除上一次的定时器
     if (autoConfirmTimer) {
       clearInterval(autoConfirmTimer)
@@ -1297,16 +1689,7 @@ watch(
     autoConfirmCountdown.value = 0
     autoConfirmPending.value = false
 
-    // 只有纯 NORMAL 门（无 CONFIRMATION/CLARIFICATION）计划才能自动执行
-    const allNormal = taskList
-      && taskList.tasks.every(t => t.gate === 'NORMAL' && t.status === 'PENDING')
-
-    if (
-      taskList &&
-      allNormal &&
-      !agentStore.planExecuting &&
-      !agentStore.planNeedsConfirmation
-    ) {
+    if (shouldAutoConfirmTaskList(taskList)) {
       autoConfirmPending.value = true
       autoConfirmCountdown.value = 3
       autoConfirmTimer = setInterval(() => {
@@ -1316,49 +1699,72 @@ watch(
             clearInterval(autoConfirmTimer)
             autoConfirmTimer = null
           }
-          if (autoConfirmPending.value && agentStore.currentTaskList && agentStore.currentDraftId && !agentStore.loading) {
+          // 触发时再次检查所有条件，避免状态变化后确认错对象。
+          if (autoConfirmPending.value && shouldAutoConfirmTaskList(agentStore.currentTaskList)) {
             autoConfirmPending.value = false
             confirmPlan(agentStore.currentDraftId)
           }
         }
-      }, 750)
-    }
-  },
-)
-
-// 监听 loading 变化：当 SSE 流结束且需要自动确认时，立即触发
-watch(
-  () => agentStore.loading,
-  (loading) => {
-    if (!loading && autoConfirmPending.value && agentStore.currentDraftId) {
-      // 清除倒计时
-      if (autoConfirmTimer) {
-        clearInterval(autoConfirmTimer)
-        autoConfirmTimer = null
-      }
-      autoConfirmCountdown.value = 0
-      autoConfirmPending.value = false
-      confirmPlan(agentStore.currentDraftId)
+      }, 1000) // 3s 倒计时，每秒减 1
     }
   },
 )
 
 onMounted(() => {
+  isAssistantCollapsed.value = window.innerWidth < 1280
+  preloadAvatarAuthInfo()
   agentStore.fetchConversations()
+  document.addEventListener('visibilitychange', handleVisibilitySync)
+  ensureLearningSpacesLoaded().then(() => {
+    const routeSpaceId = route.query.spaceId
+    if (typeof routeSpaceId === 'string' && routeSpaceId) {
+      selectLearningSpace(routeSpaceId, false)
+    }
+  })
   if (window.innerWidth < 768) {
     historySidebarOpen.value = false
+  }
+
+  // 检测路由 query 参数，实现错题回顾快捷对话唤起
+  const action = route.query.action
+  const jobId = route.query.jobId
+  const title = route.query.title
+  if (action === 'review_wrong' && jobId) {
+    // 1. 切换上下文到练习评测
+    switchContext('evaluation')
+    // 2. 自动发起错题讲解对话
+    nextTick(() => {
+      ElMessage.info(`正在为您加载 "${title || '本次'}" 测评的错题回顾...`)
+      setTimeout(() => {
+        sendQuickMessage(`分析我的测评错题，试卷ID为 ${jobId}`)
+      }, 500)
+    })
   }
 })
 
 onUnmounted(() => {
   clearAttachmentState()
+  document.removeEventListener('visibilitychange', handleVisibilitySync)
   if (autoConfirmTimer) {
     clearInterval(autoConfirmTimer)
     autoConfirmTimer = null
   }
 })
 
-watch(windowWidth, (newWidth) => {
+/**
+ * 兜底对齐：窗口重新可见时静默同步一次会话列表。
+ * 覆盖"事件驱动拿不到"的场景（SSE 断线、在别的标签页/设备新建了会话）。
+ * 60s 节流，切换标签页不会每次都打接口。
+ */
+function handleVisibilitySync() {
+  if (document.visibilityState !== 'visible') return
+  agentStore.syncConversations({ minIntervalMs: 60_000 })
+}
+
+watch(windowWidth, (newWidth, oldWidth) => {
+  if (newWidth < 1280 && oldWidth >= 1280) {
+    isAssistantCollapsed.value = true
+  }
   if (newWidth < 768) {
     historySidebarOpen.value = false
   }
@@ -1371,70 +1777,40 @@ watch(windowWidth, (newWidth) => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  margin: calc(var(--spacing-xl) * -1) calc(var(--spacing-2xl) * -1) calc(var(--spacing-xl) * -1);
-  padding: var(--spacing-xs) var(--spacing-2xl) 0;
-}
-
-/* 上下文选择器 */
-.context-switcher {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-lg);
-  background: white;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-}
-
-.context-label {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.context-chips {
-  display: flex;
-  gap: var(--spacing-xs);
-  flex-wrap: wrap;
-}
-
-.context-chip {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-light);
-  background: white;
-  font-size: 0.6875rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-
-  .chip-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); }
-
-  &.active {
-    background: rgba(59, 91, 219, 0.08);
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-    font-weight: 600;
-  }
+  margin: calc(var(--spacing-xl) * -1) auto calc(var(--spacing-xl) * -1);
+  padding: var(--spacing-xs) 0 0;
 }
 
 .tutor-container {
   display: grid;
-  grid-template-columns: auto 1fr 280px;
-  gap: var(--spacing-md);
+  grid-template-columns: auto minmax(0, 1fr) clamp(292px, 19vw, 320px) 280px;
+  grid-template-areas: "history chat assistant sidebar";
+  gap: 0;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  position: relative;
+}
+
+.tutor-container.assistant-collapsed {
+  grid-template-columns: auto minmax(0, 1fr) 280px;
+  grid-template-areas: "history chat sidebar";
+}
+
+.assistant-panel-slot {
+  grid-area: assistant;
+  width: calc(100% - 12px);
+  margin-left: 12px;
+  align-self: stretch;
+}
+
+.tutor-container.assistant-collapsed .assistant-panel-slot {
+  display: none !important;
 }
 
 /* 历史会话侧边栏 */
 .history-sidebar {
+  grid-area: history;
   width: 0;
   overflow: hidden;
   opacity: 0;
@@ -1442,9 +1818,12 @@ watch(windowWidth, (newWidth) => {
               opacity 0.2s ease;
   display: flex;
   flex-direction: column;
-  background: white;
+  background: #f8fafc;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-light);
+  border-right: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
 }
 
 .history-sidebar.open {
@@ -1457,7 +1836,8 @@ watch(windowWidth, (newWidth) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  min-height: 48px;
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
 }
@@ -1475,7 +1855,7 @@ watch(windowWidth, (newWidth) => {
   padding: 4px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--primary-color);
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   font-size: 0.6875rem;
   font-weight: 600;
   color: var(--primary-color);
@@ -1484,7 +1864,7 @@ watch(windowWidth, (newWidth) => {
 }
 
 .new-chat-btn-sidebar:hover {
-  background: rgba(59, 91, 219, 0.12);
+  background: rgba(11, 183, 170, 0.12);
 }
 
 .history-sidebar-list {
@@ -1498,19 +1878,53 @@ watch(windowWidth, (newWidth) => {
 
 /* 聊天区域 */
 .chat-area {
+  grid-area: chat;
   background: white;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
   min-height: 0;
+}
+
+.chat-area.sidebar-open {
+  border-left: none;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.chat-area.sidebar-open .chat-area-top-bar {
+  border-top-left-radius: 0;
 }
 
 .chat-flow {
   flex: 1;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.chat-flow::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+
+.chat-flow::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-flow::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 999px;
+  min-height: 8px;
+}
+
+.chat-flow::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;
 }
 
 .chat-flow-inner {
@@ -1519,11 +1933,17 @@ watch(windowWidth, (newWidth) => {
   width: 100%;
 }
 
+/* 收起历史侧边栏后，扩大聊天内容区域以填充多出的空间 */
+.chat-area:not(.sidebar-open) .chat-flow-inner {
+  max-width: min(1150px, 100%);
+}
+
 .chat-area-top-bar {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-md);
+  min-height: 48px;
   border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
   background: white;
@@ -1559,6 +1979,50 @@ watch(windowWidth, (newWidth) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.avatar-top-toggle {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  background: rgba(99, 102, 241, 0.08);
+  color: #4f46e5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.avatar-top-toggle:hover {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.38);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.12);
+  transform: translateY(-1px);
+}
+
+.avatar-top-toggle .el-icon {
+  font-size: 14px;
+}
+
+.avatar-top-toggle-status {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+
+.avatar-top-toggle-status.active {
+  background: #22c55e;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.75);
 }
 
 .chat-messages {
@@ -1568,12 +2032,33 @@ watch(windowWidth, (newWidth) => {
   gap: var(--spacing-lg);
 }
 
+.planning-execution-shelf {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  width: 100%;
+  max-width: 920px;
+  align-self: stretch;
+  padding-bottom: 2px;
+  background: linear-gradient(180deg, var(--background-color, #f8fafc) 0%, rgba(248, 250, 252, 0.88) 78%, rgba(248, 250, 252, 0) 100%);
+}
+
+.chat-area:not(.sidebar-open) .planning-execution-shelf {
+  max-width: min(1150px, 100%);
+}
+
+.planning-execution-shelf :deep(.task-execution-panel) {
+  max-height: min(48vh, 520px);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
 /* 欢迎消息 */
 .welcome-message {
   display: flex;
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.04), rgba(18, 184, 134, 0.04));
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.04), rgba(18, 184, 134, 0.04));
   border-radius: var(--radius-xl);
 }
 
@@ -1668,6 +2153,10 @@ watch(windowWidth, (newWidth) => {
   max-width: 820px;
 }
 
+.chat-area:not(.sidebar-open) .message-wrapper.ai .message-content {
+  max-width: 1050px;
+}
+
 .message-avatar {
   display: none;
 }
@@ -1692,7 +2181,7 @@ watch(windowWidth, (newWidth) => {
 }
 
 .user-bubble {
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   color: var(--text-dark);
   border-bottom-right-radius: 4px;
   padding: var(--spacing-sm) var(--spacing-md);
@@ -1716,15 +2205,49 @@ watch(windowWidth, (newWidth) => {
   width: fit-content;
 }
 
-/* 流式光标 */
-.streaming-cursor {
+/* 流式光标：跟在最后一段文字尾部（而不是单独占一行） */
+.message-wrapper.is-streaming :deep(.markdown-renderer) > *:last-child::after {
+  content: '';
   display: inline-block;
-  width: 8px;
-  height: 16px;
-  background: var(--primary-color);
+  width: 7px;
+  height: 15px;
   margin-left: 2px;
+  background: var(--primary-color);
   vertical-align: text-bottom;
   animation: blink 0.8s step-end infinite;
+}
+
+/* 正在思考… 占位气泡 */
+.thinking-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 2px 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.thinking-label {
+  letter-spacing: 0.02em;
+}
+
+.thinking-placeholder .loading-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* 生成失败/中断：气泡给一点轻微提示色 */
+.message-bubble-error {
+  background: rgba(239, 68, 68, 0.04);
+  border-radius: var(--radius-lg);
+  padding: 4px 8px;
+}
+
+/* 流式中的消息不再有淡入动画，避免每个 delta 都闪一下 */
+.message-wrapper.is-streaming {
+  animation: none;
 }
 
 @keyframes blink {
@@ -1739,7 +2262,7 @@ watch(windowWidth, (newWidth) => {
   gap: 8px;
   padding: 8px 14px;
   margin-bottom: var(--spacing-sm);
-  background: linear-gradient(135deg, rgba(18, 184, 134, 0.06), rgba(59, 91, 219, 0.04));
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.06), rgba(11, 183, 170, 0.04));
   border: 1px solid rgba(18, 184, 134, 0.15);
   border-radius: var(--radius-lg);
   font-size: 0.8125rem;
@@ -1880,7 +2403,6 @@ watch(windowWidth, (newWidth) => {
 /* 输入区域 */
 .chat-input-area {
   padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
-  border-top: 1px solid var(--border-light);
   background: white;
 }
 
@@ -1894,7 +2416,7 @@ watch(windowWidth, (newWidth) => {
 
 .input-composer:focus-within {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(59, 91, 219, 0.08);
+  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.08);
 }
 
 /* 模式选择器 */
@@ -1926,7 +2448,7 @@ watch(windowWidth, (newWidth) => {
 .mode-btn:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(11, 183, 170, 0.04);
 }
 
 .mode-btn.active {
@@ -1936,8 +2458,8 @@ watch(windowWidth, (newWidth) => {
 }
 
 .mode-btn.active:hover {
-  background: #2c4fcc;
-  border-color: #2c4fcc;
+  background: #0a9e94;
+  border-color: #0a9e94;
 }
 
 .composer-toolbar {
@@ -1967,7 +2489,226 @@ watch(windowWidth, (newWidth) => {
 
 .toolbar-btn svg { width: 14px; height: 14px; }
 .toolbar-btn:hover {
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
+  color: var(--primary-color);
+}
+
+.context-toolbar-btn {
+  max-width: 180px;
+}
+
+.context-toolbar-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-toolbar-btn.active {
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--primary-color);
+}
+
+:deep(.space-context-popover) {
+  padding: 0;
+  border-radius: 8px;
+}
+
+.space-context-panel {
+  padding: 10px;
+}
+
+.space-context-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 8px;
+}
+
+.space-context-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.space-context-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.space-context-refresh svg {
+  width: 14px;
+  height: 14px;
+}
+
+.space-context-refresh:hover {
+  background: #f1f5f9;
+  color: var(--primary-color);
+}
+
+.space-context-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.space-context-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.space-context-option:hover {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.space-context-option.active {
+  background: rgba(11, 183, 170, 0.08);
+  border-color: rgba(11, 183, 170, 0.25);
+}
+
+.space-option-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.space-option-icon.global {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.space-option-icon.evaluation {
+  background: #fce7f3;
+  color: #db2777;
+}
+
+.space-option-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.space-option-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.space-option-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.space-option-check {
+  flex: 0 0 auto;
+  color: var(--primary-color);
+  font-weight: 800;
+}
+
+.space-context-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: #eef2f7;
+}
+
+.space-context-loading,
+.space-context-empty {
+  padding: 16px 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.selected-space-strip {
+  display: flex;
+  padding: 6px 10px 0;
+}
+
+.selected-space-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid rgba(11, 183, 170, 0.2);
+  border-radius: 8px;
+  background: rgba(11, 183, 170, 0.08);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.selected-space-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.selected-space-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selected-space-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.selected-space-clear svg {
+  width: 12px;
+  height: 12px;
+}
+
+.selected-space-clear:hover {
+  background: rgba(11, 183, 170, 0.12);
   color: var(--primary-color);
 }
 
@@ -2104,7 +2845,7 @@ watch(windowWidth, (newWidth) => {
 }
 
 .send-action.active:hover {
-  background: #2c4fcc;
+  background: #0a9e94;
   transform: scale(1.05);
 }
 
@@ -2120,6 +2861,33 @@ watch(windowWidth, (newWidth) => {
 .stop-action:hover {
   background: #dc2626;
   transform: scale(1.05);
+}
+
+.mic-action {
+  background: transparent;
+  color: #64748b;
+  margin-right: 6px;
+}
+
+.mic-action:hover:not(:disabled) {
+  color: var(--primary-color);
+  background: rgba(11, 183, 170, 0.1);
+}
+
+.mic-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mic-action.listening {
+  color: white;
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  animation: micPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
 }
 
 .composer-footer {
@@ -2166,16 +2934,19 @@ watch(windowWidth, (newWidth) => {
 .hint-chip:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
-  background: rgba(59, 91, 219, 0.04);
+  background: rgba(11, 183, 170, 0.04);
 }
 
 /* 侧边栏 */
 .tutor-sidebar {
+  grid-area: sidebar;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
   min-height: 0;
   overflow-y: auto;
+  padding-left: var(--spacing-md);
+  box-sizing: border-box;
 }
 
 .sidebar-section {
@@ -2220,6 +2991,7 @@ watch(windowWidth, (newWidth) => {
 
 .tool-icon { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; }
 .tool-icon :deep(svg) { width: 100%; height: 100%; }
+.tool-icon-lg { width: 26px; height: 26px; }
 .tool-label { font-size: 0.6875rem; font-weight: 600; color: var(--text-dark); }
 .tool-desc { font-size: 0.5625rem; color: var(--text-muted); }
 
@@ -2419,7 +3191,7 @@ watch(windowWidth, (newWidth) => {
 .rag-selector-container :deep(.rag-reference-selector .el-button svg) { color: white; }
 
 .rag-selector-container :deep(.rag-reference-selector .el-button):hover {
-  background: #2c4fcc;
+  background: #0a9e94;
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
 }
@@ -2474,8 +3246,8 @@ watch(windowWidth, (newWidth) => {
 .history-item:hover { background: var(--background-color-base); }
 
 .history-item.active {
-  background: rgba(59, 91, 219, 0.08);
-  border: 1px solid rgba(59, 91, 219, 0.15);
+  background: rgba(11, 183, 170, 0.08);
+  border: 1px solid rgba(11, 183, 170, 0.15);
 }
 
 .history-icon { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--primary-color); flex-shrink: 0; }
@@ -2508,9 +3280,50 @@ watch(windowWidth, (newWidth) => {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@media (max-width: 1280px) {
+  .tutor-container {
+    grid-template-columns: auto minmax(0, 1fr) 280px;
+    grid-template-areas: "history chat sidebar";
+  }
+
+  .tutor-container.assistant-collapsed {
+    grid-template-columns: auto minmax(0, 1fr) 280px;
+    grid-template-areas: "history chat sidebar";
+  }
+
+  .assistant-panel-slot {
+    position: absolute;
+    top: 0;
+    right: 280px;
+    bottom: 0;
+    z-index: 35;
+    width: min(320px, calc(100% - 300px));
+    min-width: 292px;
+    height: 100%;
+    margin-left: 0;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+  }
+}
+
 @media (max-width: 768px) {
-  .tutor-container { grid-template-columns: 1fr; }
+  .tutor-container,
+  .tutor-container.assistant-collapsed {
+    grid-template-columns: 1fr;
+    grid-template-areas: "chat";
+  }
   .tutor-sidebar { display: none; }
+  .assistant-panel-slot {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    top: auto;
+    z-index: 210;
+    width: auto;
+    min-width: 0;
+    height: min(70vh, 620px);
+    margin-left: 0;
+  }
   .history-sidebar {
     position: fixed;
     top: 0;
@@ -2541,6 +3354,226 @@ watch(windowWidth, (newWidth) => {
   }
   .footer-hints {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .avatar-top-toggle {
+    position: fixed;
+    right: 16px;
+    bottom: 88px;
+    z-index: 210;
+    height: 44px;
+    padding: 8px 12px;
+    border-radius: 16px;
+    background: var(--color-card-bg);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(16px);
+  }
+
+  .avatar-top-toggle:hover {
+    transform: translateY(-2px);
+  }
+}
+
+/* ==================== 深色主题覆盖（AITutor 页面）==================== */
+:global(html[data-theme='dark']) {
+  /* 聊天主区域 */
+  .chat-area {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  /* 历史会话侧边栏 */
+  .history-sidebar {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  .history-sidebar-header {
+    border-bottom-color: var(--border-color) !important;
+  }
+
+  .history-sidebar-title {
+    color: var(--text-primary) !important;
+  }
+
+  /* 聊天顶部导航栏 */
+  .chat-area-top-bar {
+    background: var(--panel-bg) !important;
+    border-bottom-color: var(--border-color) !important;
+  }
+
+  /* 输入区域 */
+  .chat-input-area,
+  .input-wrapper,
+  .input-footer {
+    background: var(--panel-bg) !important;
+    border-top-color: var(--border-color) !important;
+  }
+
+  .chat-textarea {
+    background: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  /* 消息气泡 */
+  .message-bubble {
+    &.assistant {
+      background: var(--panel-bg-secondary) !important;
+      border-color: var(--border-color) !important;
+      color: var(--text-primary) !important;
+    }
+  }
+
+  /* 资源卡片 */
+  .resource-card-mini {
+    background: var(--panel-bg-secondary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  .res-title {
+    color: var(--text-primary) !important;
+  }
+
+  /* 右侧边栏 */
+  .right-sidebar,
+  .context-sidebar {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  /* 消息操作按钮 */
+  .msg-action-btn {
+    border-color: var(--border-color) !important;
+    color: var(--text-muted) !important;
+    &:hover {
+      background: var(--item-hover-bg) !important;
+      color: var(--text-secondary) !important;
+    }
+  }
+
+  /* 新增：输入框容器深色 */
+  .input-composer {
+    background: var(--input-bg) !important;
+    border-color: var(--border-color) !important;
+    
+    &:focus-within {
+      border-color: var(--primary-color) !important;
+    }
+  }
+
+  /* 新增：快捷按钮与提问标签 */
+  .feature-item {
+    background: var(--button-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+
+    &:hover {
+      background: var(--button-hover-bg) !important;
+      border-color: var(--border-strong) !important;
+      color: var(--text-primary) !important;
+    }
+  }
+
+  .hint-chip {
+    background: var(--button-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+
+    &:hover {
+      background: var(--button-hover-bg) !important;
+      border-color: var(--border-strong) !important;
+      color: var(--text-primary) !important;
+    }
+  }
+
+  /* 新增：右侧面板与内部工具 */
+  .sidebar-section {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .tool-card {
+    background: var(--panel-bg-secondary) !important;
+    border-color: var(--border-color) !important;
+
+    &:hover {
+      background: var(--button-hover-bg) !important;
+      border-color: var(--border-strong) !important;
+    }
+    
+    .tool-label {
+      color: var(--text-primary) !important;
+    }
+    .tool-desc {
+      color: var(--text-muted) !important;
+    }
+  }
+
+  /* 新增：知识库引用项和清空按钮 */
+  .reference-item {
+    background: var(--panel-bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    
+    &:hover {
+      background: var(--button-hover-bg) !important;
+      border-color: var(--border-strong) !important;
+    }
+    
+    .ref-name {
+      color: var(--text-primary) !important;
+    }
+    .ref-meta {
+      color: var(--text-muted) !important;
+    }
+  }
+
+  .clear-all-btn-bottom {
+    background: var(--button-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+
+    &:hover {
+      border-color: var(--danger-color) !important;
+      color: var(--danger-color) !important;
+      background: rgba(239, 68, 68, 0.1) !important;
+    }
+  }
+
+  /* 新增：附件条 */
+  .attachment-chip {
+    background: var(--panel-bg-secondary) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+  }
+
+  /* 新增：空状态样式 */
+  .empty-text {
+    color: var(--text-primary) !important;
+  }
+  .empty-hint {
+    color: var(--text-muted) !important;
+  }
+
+  /* 新增：历史列表 hover 态 */
+  .history-item:hover {
+    background: var(--item-hover-bg) !important;
+  }
+  .history-title {
+    color: var(--text-primary) !important;
+  }
+
+  /* 新增：placeholder 与 textarea 文字适配 */
+  .composer-body textarea {
+    color: var(--text-primary) !important;
+    
+    &::placeholder {
+      color: var(--text-muted) !important;
+    }
   }
 }
 </style>

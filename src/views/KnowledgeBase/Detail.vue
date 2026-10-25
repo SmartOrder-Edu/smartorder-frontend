@@ -643,12 +643,12 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 24px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(16px);
   padding: 20px 24px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 20px  var(--color-shadow);
 
   .header-left {
     display: flex;
@@ -659,7 +659,7 @@ onMounted(() => {
       border: 1px solid rgba(148, 163, 184, 0.15);
       background: #ffffff;
       color: #64748b;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+      box-shadow: 0 2px 6px  var(--color-shadow);
       transition: all 0.2s ease;
       &:hover {
         background: var(--el-fill-color-light);
@@ -742,7 +742,7 @@ onMounted(() => {
 }
 
 .stat-card {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--color-card-bg-secondary);
   backdrop-filter: blur(16px);
   border-radius: 16px;
   padding: 20px 24px;
@@ -750,7 +750,7 @@ onMounted(() => {
   align-items: center;
   gap: 20px;
   border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 4px 20px  var(--color-shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   
   &:hover {
@@ -812,7 +812,7 @@ onMounted(() => {
   border-radius: 16px;
   padding: 24px;
   border: 1px solid rgba(148, 163, 184, 0.08);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.01);
+  box-shadow: 0 4px 24px  var(--color-shadow);
   height: calc(100vh - 270px);
   min-height: 500px;
   overflow-y: auto;
@@ -934,7 +934,7 @@ onMounted(() => {
       align-items: center;
       justify-content: center;
       color: #64748b;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+      box-shadow: 0 2px 4px  var(--color-shadow);
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       
       :deep(.el-icon) {
@@ -1000,7 +1000,7 @@ onMounted(() => {
       max-width: 95%;
       max-height: 95%;
       border-radius: 8px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+      box-shadow: 0 4px 20px  var(--color-shadow);
     }
 
     .preview-media {

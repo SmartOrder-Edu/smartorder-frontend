@@ -4,7 +4,7 @@
       <svg v-if="task.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16">
         <polyline points="20,6 9,17 4,12"/>
       </svg>
-      <svg v-else-if="task.status === 'in_progress'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+      <svg v-else-if="task.status === 'in_progress' || task.status === 'doing'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
         <circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>
       </svg>
       <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
@@ -15,6 +15,7 @@
     <div class="task-body">
       <div class="task-header">
         <span class="task-type-badge" :class="task.taskType">{{ typeLabel }}</span>
+        <span class="task-action-badge" :class="task.actionType || 'learn_script'">{{ actionLabel }}</span>
         <span class="task-priority" v-if="task.priority >= 4">
           <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="12,2 15,11 24,11 17,17 20,24 12,19 4,24 7,17 0,11 9,11"/></svg>
         </span>
@@ -37,15 +38,22 @@
         class="task-btn start"
         @click.stop="$emit('start', task)"
       >
-        开始
+        {{ startButtonLabel }}
       </button>
-      <button
-        v-else-if="task.status === 'in_progress'"
-        class="task-btn complete"
-        @click.stop="$emit('complete', task)"
-      >
-        完成
-      </button>
+      <template v-else-if="task.status === 'in_progress' || task.status === 'doing'">
+        <button
+          class="task-btn continue"
+          @click.stop="$emit('start', task)"
+        >
+          {{ continueButtonLabel }}
+        </button>
+        <button
+          class="task-btn complete"
+          @click.stop="$emit('complete', task)"
+        >
+          完成
+        </button>
+      </template>
       <span v-else-if="task.status === 'completed'" class="task-done-label">已完成</span>
       <span v-else-if="task.status === 'overdue'" class="task-overdue-label">已逾期</span>
     </div>
@@ -65,9 +73,37 @@ defineEmits<{
 
 const typeLabel = computed(() => {
   const m: Record<string, string> = {
-    daily: '日常', milestone: '里程碑', exam: '测验', review: '复习',
+    daily: '日常', milestone: '里程碑', exam: '测验', review: '复习', remedial: '补救', project: '项目',
   }
   return m[props.task.taskType] || props.task.taskType
+})
+
+const actionLabel = computed(() => {
+  const m: Record<string, string> = {
+    learn_script: '脚本学习',
+    read_resource: '资源阅读',
+    watch_video: '视频讲解',
+    practice_set: '专项练习',
+    assessment: '阶段测评',
+    mistake_review: '错题复盘',
+    project_practice: '项目实践',
+    summary_reflection: '总结复盘',
+  }
+  return m[props.task.actionType || 'learn_script'] || props.task.actionType || '学习'
+})
+
+const startButtonLabel = computed(() => {
+  if (props.task.actionType === 'practice_set') return '开始练习'
+  if (props.task.actionType === 'assessment') return '开始测评'
+  if (props.task.actionType === 'read_resource') return '阅读资源'
+  if (props.task.actionType === 'watch_video') return '观看讲解'
+  return '开始这次学习'
+})
+
+const continueButtonLabel = computed(() => {
+  if (props.task.actionType === 'practice_set') return '继续练习'
+  if (props.task.actionType === 'assessment') return '继续测评'
+  return '继续学习'
 })
 </script>
 
@@ -77,38 +113,130 @@ export default { name: 'TaskCard' }
 
 <style scoped lang="scss">
 .task-card {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 14px;
-  padding: 16px 20px;
-  background: white;
-  border-radius: 14px;
-  border: 1px solid #f0f0f0;
-  transition: all 0.2s;
+  padding: 16px 18px;
+  background: var(--color-card-bg);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    opacity 0.3s ease;
+  overflow: hidden;
 
-  &:hover { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); }
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 14px;
+    bottom: 14px;
+    width: 3px;
+    border-radius: 0 999px 999px 0;
+    background: #cbd5e1;
+    transition: background 0.3s ease;
+  }
+
+  /* 进度光环 — 进行中 */
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+    background: transparent;
+    transition: background 0.35s ease, opacity 0.35s ease;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &:hover {
+    border-color: rgba(11, 183, 170, 0.26);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.075);
+    transform: translateY(-1px);
+  }
 
   &.status-completed { opacity: 0.7; }
-  &.status-overdue { border-color: #fecaca; background: #fff5f5; }
+
+  &.status-overdue {
+    border-color: rgba(248, 113, 113, 0.34);
+    background: linear-gradient(135deg, #fff, #fff7f7);
+    animation: overduePulse 2.4s ease-in-out infinite;
+  }
+
+  &.status-in_progress,
+  &.status-doing {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px rgba(11, 183, 170, 0.08);
+
+    &::before { background: #0bb7aa; }
+
+    &::after {
+      opacity: 1;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        #0bb7aa 20%,
+        #38bdf8 50%,
+        #0bb7aa 80%,
+        transparent 100%
+      );
+      background-size: 200% 100%;
+      animation: progressBarShimmer 2s ease-in-out infinite;
+    }
+
+    &:hover {
+      box-shadow: 0 16px 34px rgba(11, 183, 170, 0.12);
+      transform: translateY(-2px);
+    }
+  }
+
+  &.status-completed::before { background: #10b981; }
+  &.status-overdue::before { background: #ef4444; }
+}
+
+@keyframes progressBarShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes overduePulse {
+  0%, 100% {
+    border-color: rgba(248, 113, 113, 0.34);
+    box-shadow: 0 8px 22px rgba(248, 113, 113, 0.06);
+  }
+  50% {
+    border-color: rgba(248, 113, 113, 0.55);
+    box-shadow: 0 8px 26px rgba(248, 113, 113, 0.14);
+  }
 }
 
 .task-status-indicator {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-top: 2px;
+  transition: all 0.3s ease;
 
   &.pending {
-    border: 2px solid #d0d5dd;
-    color: #d0d5dd;
+    border: 2px solid #cbd5e1;
+    color: #94a3b8;
+    background: #f8fafc;
   }
-  &.in_progress {
-    background: #eff6ff;
-    border: 2px solid #3b82f6;
-    color: #3b82f6;
+  &.in_progress,
+  &.doing {
+    background: #ecfdfb;
+    border: 2px solid #0bb7aa;
+    color: #0a9e94;
+    animation: indicatorBreathe 2s ease-in-out infinite;
   }
   &.completed {
     background: #10b981;
@@ -119,7 +247,18 @@ export default { name: 'TaskCard' }
     background: #fef2f2;
     border: 2px solid #ef4444;
     color: #ef4444;
+    animation: indicatorPulse 2.4s ease-in-out infinite;
   }
+}
+
+@keyframes indicatorBreathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(11, 183, 170, 0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(11, 183, 170, 0); }
+}
+
+@keyframes indicatorPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.25); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
 }
 
 .task-body {
@@ -131,18 +270,53 @@ export default { name: 'TaskCard' }
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
 .task-type-badge {
   font-size: 0.6875rem;
-  padding: 1px 8px;
+  padding: 2px 8px;
   border-radius: 99px;
+  font-weight: 700;
 
-  &.daily { background: #eff6ff; color: #3b82f6; }
+  &.daily { background: #ecfdfb; color: #0a9e94; }
   &.milestone { background: #fef3c7; color: #d97706; }
   &.exam { background: #fce7f3; color: #db2777; }
   &.review { background: #ede9fe; color: #7c3aed; }
+  &.remedial { background: #fee2e2; color: #dc2626; }
+  &.project { background: #ffedd5; color: #ea580c; }
+}
+
+.task-action-badge {
+  font-size: 0.6875rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #475569;
+
+  &.practice_set,
+  &.assessment {
+    background: #e0f2fe;
+    color: #0284c7;
+  }
+
+  &.read_resource,
+  &.watch_video {
+    background: #fef3c7;
+    color: #b45309;
+  }
+
+  &.mistake_review,
+  &.summary_reflection {
+    background: #fce7f3;
+    color: #be185d;
+  }
+
+  &.project_practice {
+    background: #ede9fe;
+    color: #7c3aed;
+  }
 }
 
 .task-priority {
@@ -151,17 +325,18 @@ export default { name: 'TaskCard' }
 }
 
 .task-title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #1a1a2e;
-  margin: 0 0 4px;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 5px;
+  line-height: 1.45;
 }
 
 .task-suggestion {
-  font-size: 0.75rem;
-  color: #8c8ca1;
-  margin: 0 0 8px;
-  line-height: 1.4;
+  font-size: 0.78rem;
+  color: #64748b;
+  margin: 0 0 10px;
+  line-height: 1.55;
 }
 
 .task-meta {
@@ -172,7 +347,7 @@ export default { name: 'TaskCard' }
 
 .task-duration {
   font-size: 0.75rem;
-  color: #8c8ca1;
+  color: #64748b;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -192,26 +367,41 @@ export default { name: 'TaskCard' }
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  padding-top: 4px;
 }
 
 .task-btn {
-  padding: 6px 18px;
-  border-radius: 99px;
+  min-width: 72px;
+  padding: 7px 16px;
+  border-radius: 11px;
   font-size: 0.8125rem;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.18s ease;
   border: none;
 
   &.start {
-    background: #3b82f6;
+    background: linear-gradient(135deg, #0bb7aa, #0284c7);
     color: white;
-    &:hover { background: #2563eb; }
+    box-shadow: 0 8px 18px rgba(11, 183, 170, 0.2);
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(11, 183, 170, 0.26);
+    }
   }
   &.complete {
-    background: #10b981;
+    background: linear-gradient(135deg, #10b981, #059669);
     color: white;
-    &:hover { background: #059669; }
+    &:hover { transform: translateY(-1px); }
+  }
+  &.continue {
+    background: #fff;
+    color: #0bb7aa;
+    border: 1px solid rgba(11, 183, 170, 0.4);
+    &:hover {
+      background: rgba(11, 183, 170, 0.08);
+      border-color: #0bb7aa;
+    }
   }
 }
 
@@ -225,5 +415,21 @@ export default { name: 'TaskCard' }
   font-size: 0.8125rem;
   color: #ef4444;
   font-weight: 500;
+}
+
+@media (max-width: 640px) {
+  .task-card {
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+
+  .task-actions {
+    width: 100%;
+    padding-left: 44px;
+  }
+
+  .task-btn {
+    width: 100%;
+  }
 }
 </style>

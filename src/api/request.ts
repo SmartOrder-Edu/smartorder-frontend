@@ -1,5 +1,9 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
+import JSONBig from 'json-bigint'
+
+
+const JSONBigString = JSONBig({ storeAsString: true })
 
 export interface RequestConfig extends AxiosRequestConfig {
   showError?: boolean
@@ -60,6 +64,18 @@ class Request {
       headers: {
         'Content-Type': 'application/json;charset=UTF-8'
       },
+      transformResponse: [
+        function (data) {
+          if (typeof data === 'string') {
+            try {
+              return JSONBigString.parse(data)
+            } catch (e) {
+              return data
+            }
+          }
+          return data
+        }
+      ],
       ...config
     })
 
@@ -83,6 +99,7 @@ class Request {
     this.instance.interceptors.response.use(
       (response: AxiosResponse) => {
         const { data } = response
+        const requestConfig = response.config as RequestConfig
         
         // 兼容后端直接返回非标准结构数据（如上传图片直接返回 OSS URL 字符串）
         if (typeof data === 'string' || (data && data.code === undefined)) {
@@ -90,13 +107,16 @@ class Request {
         }
 
         if (data.code !== 200 && data.code !== 0) {
-          ElMessage.error(data.msg || data.message || '请求失败')
+          if (requestConfig.showError !== false) {
+            ElMessage.error(data.msg || data.message || '请求失败')
+          }
           return Promise.reject(new Error(data.msg || data.message || '请求失败'))
         }
         return data.data
       },
       async (error) => {
         const { response, config } = error
+        const requestConfig = config as RequestConfig | undefined
 
         if (response?.status === 401 && config && !config._retry) {
           // refreshToken请求本身失败，不再重试
@@ -137,23 +157,29 @@ class Request {
 
         // 其他错误处理
         if (response) {
-          switch (response.status) {
-            case 403:
-              ElMessage.error('拒绝访问')
-              break
-            case 404:
-              ElMessage.error('请求地址不存在')
-              break
-            case 500:
-              ElMessage.error('服务器内部错误')
-              break
-            default:
-              ElMessage.error(response.data?.msg || response.data?.message || '请求失败')
+          if (requestConfig?.showError !== false) {
+            switch (response.status) {
+              case 403:
+                ElMessage.error('拒绝访问')
+                break
+              case 404:
+                ElMessage.error('请求地址不存在')
+                break
+              case 500:
+                ElMessage.error('服务器内部错误')
+                break
+              default:
+                ElMessage.error(response.data?.msg || response.data?.message || '请求失败')
+            }
           }
         } else if (error.code === 'ECONNABORTED') {
-          ElMessage.error('请求超时')
+          if (requestConfig?.showError !== false) {
+            ElMessage.error('请求超时')
+          }
         } else {
-          ElMessage.error('网络异常，请检查网络连接')
+          if (requestConfig?.showError !== false) {
+            ElMessage.error('网络异常，请检查网络连接')
+          }
         }
         return Promise.reject(error)
       }
@@ -171,28 +197,28 @@ class Request {
     window.location.href = '/login'
   }
 
-  public request<T = any>(config: RequestConfig): Promise<T> {
+  public async request<T = any>(config: RequestConfig): Promise<T> {
     return this.instance.request(config)
   }
 
   public get<T = any>(url: string, config?: RequestConfig): Promise<T> {
-    return this.instance.get(url, config)
+    return this.request<T>({ ...config, method: 'get', url })
   }
 
   public post<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> {
-    return this.instance.post(url, data, config)
+    return this.request<T>({ ...config, method: 'post', url, data })
   }
 
   public put<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> {
-    return this.instance.put(url, data, config)
+    return this.request<T>({ ...config, method: 'put', url, data })
   }
 
   public delete<T = any>(url: string, config?: RequestConfig): Promise<T> {
-    return this.instance.delete(url, config)
+    return this.request<T>({ ...config, method: 'delete', url })
   }
 
   public patch<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> {
-    return this.instance.patch(url, data, config)
+    return this.request<T>({ ...config, method: 'patch', url, data })
   }
 }
 

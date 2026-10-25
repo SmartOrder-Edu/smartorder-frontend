@@ -85,7 +85,9 @@ class Request {
         }
 
         if (data.code !== 200 && data.code !== 0) {
-          ElMessage.error(data.msg || data.message || '请求失败')
+          if ((response.config as RequestConfig).showError !== false) {
+            ElMessage.error(data.msg || data.message || '请求失败')
+          }
           return Promise.reject(new Error(data.msg || data.message || '请求失败'))
         }
         return data.data
@@ -131,6 +133,10 @@ class Request {
         }
 
         // 其他错误处理
+        if ((config as RequestConfig | undefined)?.showError === false) {
+          return Promise.reject(error)
+        }
+
         if (response) {
           switch (response.status) {
             case 403:

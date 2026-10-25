@@ -20,8 +20,25 @@ export interface PathProgress {
 
 // ---- Task ----
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'overdue' | 'cancelled'
-export type TaskType = 'daily' | 'milestone' | 'exam' | 'review'
+export type TaskStatus = 'pending' | 'in_progress' | 'doing' | 'completed' | 'overdue' | 'cancelled'
+export type TaskType = 'daily' | 'milestone' | 'exam' | 'review' | 'remedial' | 'project'
+export type TaskActionType =
+  | 'learn_script'
+  | 'read_resource'
+  | 'watch_video'
+  | 'practice_set'
+  | 'assessment'
+  | 'mistake_review'
+  | 'project_practice'
+  | 'summary_reflection'
+export type TaskTargetType =
+  | 'lesson_bundle'
+  | 'resource'
+  | 'practice_session'
+  | 'assessment_session'
+  | 'knowledge_node'
+  | 'path_node'
+  | string
 
 export interface TaskVO {
   id: string
@@ -30,6 +47,9 @@ export interface TaskVO {
   title: string
   description: string
   taskType: TaskType
+  actionType?: TaskActionType
+  targetType?: TaskTargetType | null
+  targetId?: string | number | null
   priority: number // 1-5
   status: TaskStatus
   dueDate: string
@@ -38,9 +58,11 @@ export interface TaskVO {
   actualDurationMinutes: number | null
   completedAt: string | null
   aiSuggestion: string | null
+  agentReason?: string | null
   isOverdue: boolean
   isToday: boolean
-  metadata: Record<string, any>
+  spaceName?: string
+  metadata: string | Record<string, any> | null
 }
 
 // ---- Learning Path ----
@@ -76,9 +98,11 @@ export interface PathEdgeVO {
 // ---- Resource ----
 
 export type ResourceType =
-  | 'ppt' | 'doc' | 'video' | 'mind_map' | 'quiz'
-  | 'case_study' | 'flashcard_set' | 'image' | 'audio' | 'link'
+  | 'ppt' | 'doc' | 'html' | 'video' | 'mind_map' | 'quiz'
+  | 'animation_video' | 'case_study' | 'flashcard_set' | 'image' | 'audio' | 'link'
 export type ResourceSource = 'ai' | 'user' | 'curated'
+export type ResourceStatus = 'planned' | 'generating' | 'generated' | 'failed'
+export type ResourceGenerationJobStatus = 'pending' | 'generating' | 'generated' | 'failed'
 
 export interface ResourceVO {
   id: string
@@ -89,8 +113,74 @@ export interface ResourceVO {
   description: string
   resourceType: ResourceType
   url: string
+  fileFormat?: string
+  coverUrl?: string
   isAiGenerated: boolean
   source: ResourceSource
+  status?: ResourceStatus
+  metadata?: string
+  agentReason?: string
+  knowledgePoint?: string
+  studyScenario?: string
+}
+
+export interface ResourcePackageGenerateDTO {
+  taskId?: string | null
+  pathNodeId?: string | null
+  knowledgePoint?: string
+  resourceTypes?: ResourceType[]
+  userIntent?: string
+  packageMode?: 'task' | 'weakness' | 'review' | 'exam' | 'custom'
+  targetMinutes?: number
+}
+
+export interface ResourcePackageVO {
+  packageId: string
+  spaceId: string
+  taskId: string | null
+  pathNodeId: string | null
+  title: string
+  reason: string
+  knowledgePoint: string
+  packageMode: string
+  status: 'preview' | 'generating' | 'generated' | 'failed'
+  resources: ResourceVO[]
+  agentActions: AgentActionVO[]
+}
+
+export interface ResourceGenerationJobVO {
+  id: string
+  spaceId: string
+  resourceId: string
+  packageId: string | null
+  resourceType: ResourceType
+  title: string
+  reason: string
+  status: ResourceGenerationJobStatus
+  retryCount: number
+  errorMessage: string | null
+  traceId: string | null
+  createTime: string
+  updateTime: string
+}
+
+export interface ResourceContentVO {
+  id: string
+  resourceId: string
+  contentType: 'markdown' | 'html' | 'json' | 'external_link' | 'ppt_embed'
+  content: string
+  version: number
+  status: string
+  reviewResult: string | null
+  createTime: string
+  updateTime: string
+}
+
+export interface ResourceDetailVO {
+  resource: ResourceVO
+  content: ResourceContentVO | null
+  spaceName: string
+  taskTitle: string | null
 }
 
 // ---- Learning Record ----

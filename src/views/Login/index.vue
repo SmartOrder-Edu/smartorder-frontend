@@ -88,6 +88,11 @@
                   <stop offset="0%" style="stop-color:#12b886"/>
                   <stop offset="100%" style="stop-color:#38d9a9"/>
                 </linearGradient>
+                <radialGradient id="ambientGlow" cx="50%" cy="48%" r="62%">
+                  <stop offset="0%" style="stop-color:#5c7cfa;stop-opacity:0.18"/>
+                  <stop offset="48%" style="stop-color:#12b886;stop-opacity:0.08"/>
+                  <stop offset="100%" style="stop-color:#12b886;stop-opacity:0"/>
+                </radialGradient>
                 <filter id="graphGlow" x="-50%" y="-50%" width="200%" height="200%">
                   <feGaussianBlur stdDeviation="4" result="blur"/>
                   <feMerge>
@@ -104,9 +109,12 @@
                 </filter>
               </defs>
 
+              <ellipse cx="200" cy="102" rx="160" ry="82" fill="url(#ambientGlow)" class="ambient-glow"/>
+
               <!-- 外层光环 -->
               <circle cx="200" cy="100" r="90" fill="none" stroke="url(#lineGradient)" stroke-width="1" opacity="0.15" class="orbit-ring"/>
               <circle cx="200" cy="100" r="70" fill="none" stroke="url(#lineGradient)" stroke-width="1" opacity="0.2" class="orbit-ring" style="animation-delay: -5s"/>
+              <circle cx="200" cy="100" r="50" fill="none" stroke="url(#lineGradient)" stroke-width="0.8" opacity="0.12" class="orbit-ring orbit-ring-soft" style="animation-delay: -9s"/>
 
               <!-- 连接线（带动画） -->
               <g class="connections" stroke="url(#lineGradient)" fill="none" stroke-width="2" stroke-linecap="round">
@@ -114,30 +122,36 @@
                 <path d="M200,100 Q250,55 305,45" class="connection-path" opacity="0.7" style="animation-delay: 0.3s"/>
                 <path d="M200,100 Q150,145 95,155" class="connection-path" opacity="0.7" style="animation-delay: 0.6s"/>
                 <path d="M200,100 Q250,145 305,155" class="connection-path" opacity="0.7" style="animation-delay: 0.9s"/>
-                <path d="M200,100 L200,175" class="connection-path connection-vertical" opacity="0.7" style="animation-delay: 1.2s"/>
               </g>
 
               <!-- 数据流动点 -->
               <g class="flow-dots">
-                <circle r="3" fill="#3b5bdb" class="flow-dot" style="animation-delay: 0s">
-                  <animateMotion dur="3s" repeatCount="indefinite" path="M200,100 Q150,55 95,45"/>
+                <circle r="3" fill="#3b5bdb" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.9;0" dur="5.8s" begin="0s" repeatCount="indefinite"/>
+                  <animateMotion dur="5.8s" begin="0s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,100 Q150,55 95,45"/>
                 </circle>
-                <circle r="3" fill="#12b886" class="flow-dot" style="animation-delay: 1.5s">
-                  <animateMotion dur="3s" repeatCount="indefinite" path="M200,100 Q250,55 305,45"/>
+                <circle r="3" fill="#12b886" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.9;0" dur="6.1s" begin="1.15s" repeatCount="indefinite"/>
+                  <animateMotion dur="6.1s" begin="1.15s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,100 Q250,55 305,45"/>
                 </circle>
-                <circle r="3" fill="#12b886" class="flow-dot" style="animation-delay: 0.5s">
-                  <animateMotion dur="3s" repeatCount="indefinite" path="M200,100 Q150,145 95,155"/>
+                <circle r="3" fill="#12b886" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.82;0" dur="6.4s" begin="0.55s" repeatCount="indefinite"/>
+                  <animateMotion dur="6.4s" begin="0.55s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,100 Q150,145 95,155"/>
                 </circle>
-                <circle r="3" fill="#3b5bdb" class="flow-dot" style="animation-delay: 2s">
-                  <animateMotion dur="3s" repeatCount="indefinite" path="M200,100 Q250,145 305,155"/>
+                <circle r="3" fill="#3b5bdb" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.82;0" dur="6s" begin="1.75s" repeatCount="indefinite"/>
+                  <animateMotion dur="6s" begin="1.75s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,100 Q250,145 305,155"/>
                 </circle>
-                <circle r="3" fill="#5c7cfa" class="flow-dot" style="animation-delay: 1s">
-                  <animateMotion dur="2.5s" repeatCount="indefinite" path="M200,100 L200,175"/>
+                <circle r="2.6" fill="#5c7cfa" class="flow-dot">
+                  <animate attributeName="opacity" values="0;0.78;0" dur="5.5s" begin="0.95s" repeatCount="indefinite"/>
+                  <animateMotion dur="5.5s" begin="0.95s" repeatCount="indefinite" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.2 1" path="M200,132 L200,176"/>
                 </circle>
               </g>
 
               <!-- 中心节点 -->
               <g class="center-node" filter="url(#nodeGlow)">
+                <circle cx="200" cy="100" r="46" fill="#5c7cfa" opacity="0.1" class="center-aura"/>
+                <circle cx="200" cy="100" r="37" fill="#12b886" opacity="0.12" class="center-aura center-aura-inner"/>
                 <circle cx="200" cy="100" r="32" fill="url(#nodeGradientBlue)"/>
                 <circle cx="200" cy="100" r="32" fill="none" stroke="white" stroke-width="2" opacity="0.3"/>
                 <text x="200" y="106" text-anchor="middle" fill="white" font-size="14" font-weight="700" font-family="system-ui">AI</text>
@@ -146,31 +160,38 @@
               <!-- 外围节点 -->
               <g class="outer-nodes">
                 <g class="node-group" style="animation-delay: 0s">
+                  <circle cx="95" cy="45" r="30" fill="#5c7cfa" opacity="0.08" class="node-aura"/>
                   <circle cx="95" cy="45" r="22" fill="url(#nodeGradientBlue)" filter="url(#graphGlow)"/>
                   <circle cx="95" cy="45" r="22" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
                   <text x="95" y="49" text-anchor="middle" fill="white" font-size="11" font-weight="600">画像</text>
                 </g>
                 <g class="node-group" style="animation-delay: 0.4s">
+                  <circle cx="305" cy="45" r="30" fill="#38d9a9" opacity="0.08" class="node-aura"/>
                   <circle cx="305" cy="45" r="22" fill="url(#nodeGradientGreen)" filter="url(#graphGlow)"/>
                   <circle cx="305" cy="45" r="22" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
                   <text x="305" y="49" text-anchor="middle" fill="white" font-size="11" font-weight="600">计划</text>
                 </g>
                 <g class="node-group" style="animation-delay: 0.8s">
+                  <circle cx="95" cy="155" r="30" fill="#38d9a9" opacity="0.08" class="node-aura"/>
                   <circle cx="95" cy="155" r="22" fill="url(#nodeGradientGreen)" filter="url(#graphGlow)"/>
                   <circle cx="95" cy="155" r="22" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
                   <text x="95" y="159" text-anchor="middle" fill="white" font-size="11" font-weight="600">任务</text>
                 </g>
                 <g class="node-group" style="animation-delay: 1.2s">
+                  <circle cx="305" cy="155" r="30" fill="#5c7cfa" opacity="0.08" class="node-aura"/>
                   <circle cx="305" cy="155" r="22" fill="url(#nodeGradientBlue)" filter="url(#graphGlow)"/>
                   <circle cx="305" cy="155" r="22" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
                   <text x="305" y="159" text-anchor="middle" fill="white" font-size="11" font-weight="600">资源</text>
                 </g>
                 <g class="node-group" style="animation-delay: 1.6s">
-                  <circle cx="200" cy="175" r="18" fill="url(#nodeGradientGreen)" filter="url(#graphGlow)"/>
-                  <circle cx="200" cy="175" r="18" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
-                  <text x="200" y="179" text-anchor="middle" fill="white" font-size="10" font-weight="600">评估</text>
+                  <circle cx="200" cy="194" r="25" fill="#38d9a9" opacity="0.08" class="node-aura"/>
+                  <circle cx="200" cy="194" r="18" fill="url(#nodeGradientGreen)" filter="url(#graphGlow)"/>
+                  <circle cx="200" cy="194" r="18" fill="none" stroke="white" stroke-width="1.5" opacity="0.25"/>
+                  <text x="200" y="198" text-anchor="middle" fill="white" font-size="10" font-weight="600">评估</text>
                 </g>
               </g>
+
+              <path d="M200,132 L200,176" class="evaluation-link" stroke="url(#lineGradient)" fill="none" stroke-width="2.4" stroke-linecap="round"/>
 
               <!-- 漂浮粒子 -->
               <g class="floating-particles">
@@ -309,11 +330,17 @@
           </div>
 
           <div class="social-login">
-            <button type="button" class="social-btn" title="使用GitHub邮箱登录">
+            <button type="button" class="social-btn" title="使用GitHub登录" @click="handleGithubLogin">
               <svg viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
               </svg>
-              <span>GitHub邮箱</span>
+              <span>GitHub登录</span>
+            </button>
+            <button type="button" class="social-btn gitee-btn" title="使用Gitee登录" @click="handleGiteeLogin">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.984 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.016 0zm6.09 5.333c.328 0 .593.266.592.593v1.482a.594.594 0 0 1-.593.592H9.777c-.982 0-1.778.796-1.778 1.778v5.63c0 .327.266.592.593.592h5.63c.982 0 1.778-.796 1.778-1.778v-.296a.593.593 0 0 0-.592-.593h-4.15a.592.592 0 0 1-.592-.592v-1.482a.593.593 0 0 1 .593-.592h6.815c.327 0 .593.265.593.592v3.408a4 4 0 0 1-4 4H5.926a.593.593 0 0 1-.593-.593V9.778a4.444 4.444 0 0 1 4.445-4.444h8.296Z"/>
+              </svg>
+              <span>Gitee登录</span>
             </button>
           </div>
 
@@ -333,7 +360,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { userApi } from '@/api/user'
@@ -443,16 +470,83 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
+// GitHub 登录相关配置
+const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID
+const GITHUB_REDIRECT_URI = import.meta.env.VITE_GITHUB_REDIRECT_URI || `${window.location.origin}/oauth/callback/github`
+
+const handleGithubLogin = async () => {
+  if (!GITHUB_CLIENT_ID) {
+    ElMessage.error('系统未配置 GitHub 登录参数')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      '系统需要读取您 <span style="color: #1890ff; font-weight: 500;">Github</span> 的 <span style="color: #1890ff; font-weight: 500;">用户名</span> 以及 <span style="color: #1890ff; font-weight: 500;">邮箱</span> 进行第三方登录，是否同意并继续？',
+      '授权确认',
+      {
+        dangerouslyUseHTMLString: true,
+        confirmButtonText: '同意',
+        cancelButtonText: '取消',
+        type: 'info',
+      }
+    )
+  } catch {
+    return
+  }
+  try {
+    // 先获取 state 防 CSRF 参数，再由后端校验
+    const state = await userApi.getGithubOAuthState()
+    const authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITHUB_REDIRECT_URI)}&scope=read:user%20user:email&state=${encodeURIComponent(state)}`
+    window.location.href = authorizeUrl
+  } catch {
+    ElMessage.error('获取登录参数失败，请稍后再试')
+  }
+}
+
+// Gitee 登录相关配置
+const GITEE_CLIENT_ID = import.meta.env.VITE_GITEE_CLIENT_ID
+const GITEE_REDIRECT_URI = import.meta.env.VITE_GITEE_REDIRECT_URI || `${window.location.origin}/oauth/callback/gitee`
+
+const handleGiteeLogin = async () => {
+  if (!GITEE_CLIENT_ID) {
+    ElMessage.error('系统未配置 Gitee 登录参数')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      '系统需要读取您 <span style="color: #1890ff; font-weight: 500;">Gitee</span> 的 <span style="color: #1890ff; font-weight: 500;">用户名</span> 以及 <span style="color: #1890ff; font-weight: 500;">邮箱</span> 进行第三方登录，是否同意并继续？',
+      '授权确认',
+      {
+        dangerouslyUseHTMLString: true,
+        confirmButtonText: '同意',
+        cancelButtonText: '取消',
+        type: 'info',
+      }
+    )
+  } catch {
+    return
+  }
+  try {
+    const state = await userApi.getGiteeOAuthState()
+    const authorizeUrl = `https://gitee.com/oauth/authorize?client_id=${GITEE_CLIENT_ID}&redirect_uri=${encodeURIComponent(GITEE_REDIRECT_URI)}&response_type=code&scope=user_info%20emails&state=${encodeURIComponent(state)}`
+    window.location.href = authorizeUrl
+  } catch {
+    ElMessage.error('获取登录参数失败，请稍后再试')
+  }
+}
 </script>
 
 <style scoped>
 .login-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f1f5f9 100%);
 }
 
@@ -468,9 +562,9 @@ const handleLogin = async () => {
   position: absolute;
   inset: 0;
   background: linear-gradient(135deg,
-    rgba(59, 91, 219, 0.05) 0%,
+    rgba(11, 183, 170, 0.05) 0%,
     rgba(18, 184, 134, 0.05) 50%,
-    rgba(59, 91, 219, 0.08) 100%
+    rgba(11, 183, 170, 0.08) 100%
   );
 }
 
@@ -484,7 +578,7 @@ const handleLogin = async () => {
 .login-bg .blob-1 {
   width: 700px;
   height: 700px;
-  background: rgba(59, 91, 219, 0.15);
+  background: rgba(11, 183, 170, 0.15);
   top: -200px;
   right: -150px;
 }
@@ -514,7 +608,7 @@ const handleLogin = async () => {
 .login-bg .particle {
   position: absolute;
   bottom: -10px;
-  background: rgba(59, 91, 219, 0.2);
+  background: rgba(11, 183, 170, 0.2);
   border-radius: 50%;
   animation: floatUp 15s ease-in-out infinite;
 }
@@ -540,29 +634,38 @@ const handleLogin = async () => {
 .login-container {
   display: flex;
   width: 100%;
-  max-width: 1100px;
-  min-height: 100vh;
+  max-width: 1240px;
+  min-height: min(100vh, 840px);
+  min-height: min(100dvh, 840px);
   position: relative;
   z-index: 1;
-  padding: var(--spacing-xl);
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(2rem, 5vw, 5rem);
+  padding: clamp(1.5rem, 4vw, 4rem);
+  margin: auto;
 }
 
 @media (max-width: 992px) {
   .login-container {
     flex-direction: column;
-    padding: var(--spacing-lg);
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: clamp(1rem, 5vw, 2rem);
     align-items: center;
     justify-content: center;
+    gap: 0;
   }
 }
 
 /* 左侧品牌区域 */
 .brand-section {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: var(--spacing-2xl);
+  justify-content: flex-start;
+  padding: clamp(1rem, 3vw, 3rem) 0;
 }
 
 @media (max-width: 992px) {
@@ -572,7 +675,9 @@ const handleLogin = async () => {
 }
 
 .brand-content {
-  max-width: 420px;
+  width: 100%;
+  max-width: 520px;
+  transform: translateY(clamp(1rem, 2vh, 1.75rem));
 }
 
 /* Logo */
@@ -580,7 +685,7 @@ const handleLogin = async () => {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: clamp(1.25rem, 2.4vw, 2rem);
 }
 
 .logo-img {
@@ -639,11 +744,11 @@ const handleLogin = async () => {
 
 /* 主标题 */
 .main-title {
-  font-size: 1.375rem;
+  font-size: clamp(1.25rem, 1.4vw, 1.5rem);
   font-weight: 500;
-  line-height: 1.7;
+  line-height: 1.68;
   color: var(--text-dark);
-  margin-bottom: var(--spacing-xl);
+  margin-bottom: clamp(1.25rem, 2.2vw, 2rem);
 }
 
 .main-title .title-line {
@@ -657,29 +762,33 @@ const handleLogin = async () => {
 
 /* 卖点标签 */
 .feature-tags {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-2xl);
+  width: min(100%, 430px);
+  margin-bottom: clamp(1.5rem, 3vw, 2.75rem);
 }
 
 .feature-tag {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
+  min-width: 0;
   background: white;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-full);
   font-size: 0.8125rem;
   color: var(--text-regular);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  white-space: nowrap;
+  box-shadow: 0 2px 8px  var(--color-shadow);
   transition: all 0.3s ease;
 }
 
 .feature-tag:hover {
   border-color: var(--primary-color);
-  box-shadow: 0 4px 12px rgba(59, 91, 219, 0.1);
+  box-shadow: 0 4px 12px rgba(11, 183, 170, 0.1);
   transform: translateY(-2px);
 }
 
@@ -697,19 +806,45 @@ const handleLogin = async () => {
 /* 知识图谱 */
 .knowledge-graph {
   width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
+  max-width: 430px;
+  margin: 0;
 }
 
 .knowledge-graph .graph-svg {
   width: 100%;
   height: auto;
+  overflow: visible;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: graphBreath 8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  will-change: transform;
+}
+
+.knowledge-graph .ambient-glow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ambientBreath 7.5s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+@keyframes graphBreath {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.012); }
+}
+
+@keyframes ambientBreath {
+  0%, 100% { opacity: 0.72; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1.04); }
 }
 
 /* 外层轨道环 */
 .knowledge-graph .orbit-ring {
-  animation: orbitRotate 30s linear infinite;
+  animation: orbitRotate 46s linear infinite, orbitBreath 7s ease-in-out infinite;
+  transform-box: fill-box;
   transform-origin: center;
+}
+
+.knowledge-graph .orbit-ring-soft {
+  animation-duration: 58s, 8.5s;
 }
 
 @keyframes orbitRotate {
@@ -717,44 +852,92 @@ const handleLogin = async () => {
   to { transform: rotate(360deg); }
 }
 
+@keyframes orbitBreath {
+  0%, 100% { opacity: 0.12; }
+  50% { opacity: 0.28; }
+}
+
 /* 连接线动画 */
 .knowledge-graph .connection-path {
-  stroke-dasharray: 8 4;
-  animation: dashMove 2s linear infinite;
+  stroke-dasharray: 10 8;
+  animation: dashMove 5.6s linear infinite, lineBreath 4.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 2px rgba(59, 91, 219, 0.22));
 }
 
 .knowledge-graph .connection-vertical {
-  stroke-dasharray: 6 4;
-  animation: dashMoveVertical 1.8s linear infinite;
+  stroke-dasharray: 5 5;
+  animation: dashMoveVertical 4.8s linear infinite, lineBreath 4.8s ease-in-out infinite;
+}
+
+.knowledge-graph .evaluation-link {
+  opacity: 0.78;
+  filter: drop-shadow(0 0 5px rgba(18, 184, 134, 0.35));
+  animation: evaluationLinkBreath 4.8s ease-in-out infinite;
 }
 
 @keyframes dashMove {
-  to { stroke-dashoffset: -24; }
+  to { stroke-dashoffset: -36; }
 }
 
 @keyframes dashMoveVertical {
   to { stroke-dashoffset: -20; }
 }
 
+@keyframes lineBreath {
+  0%, 100% { opacity: 0.42; }
+  50% { opacity: 0.82; }
+}
+
+@keyframes evaluationLinkBreath {
+  0%, 100% { opacity: 0.56; stroke-width: 2.1; }
+  50% { opacity: 0.9; stroke-width: 2.6; }
+}
+
 /* 数据流动点 */
 .knowledge-graph .flow-dot {
-  filter: drop-shadow(0 0 4px currentColor);
+  filter: drop-shadow(0 0 6px currentColor);
 }
 
 /* 中心节点 */
 .knowledge-graph .center-node {
-  animation: centerPulse 3s ease-in-out infinite;
+  animation: centerPulse 5.8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.knowledge-graph .center-aura {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: auraBreath 5.8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+}
+
+.knowledge-graph .center-aura-inner {
+  animation-delay: -2.2s;
 }
 
 @keyframes centerPulse {
-  0%, 100% { transform: scale(1); filter: url(#nodeGlow); }
-  50% { transform: scale(1.08); filter: url(#nodeGlow); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+
+@keyframes auraBreath {
+  0%, 100% { opacity: 0.06; transform: scale(0.92); }
+  50% { opacity: 0.18; transform: scale(1.08); }
 }
 
 /* 外围节点 */
 .knowledge-graph .node-group {
-  animation: nodePulse 3s ease-in-out infinite;
+  animation: nodePulse 5.2s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  transform-box: fill-box;
   transform-origin: center;
+  will-change: transform;
+}
+
+.knowledge-graph .node-aura {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: nodeAuraBreath 5.2s cubic-bezier(0.45, 0, 0.2, 1) infinite;
 }
 
 .knowledge-graph .node-group:nth-child(1) { animation-delay: 0s; }
@@ -764,51 +947,106 @@ const handleLogin = async () => {
 .knowledge-graph .node-group:nth-child(5) { animation-delay: 1.6s; }
 
 @keyframes nodePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1px) scale(1.045); }
+}
+
+@keyframes nodeAuraBreath {
+  0%, 100% { opacity: 0.04; transform: scale(0.9); }
+  50% { opacity: 0.16; transform: scale(1.12); }
 }
 
 /* 漂浮粒子 */
 .knowledge-graph .float-particle {
-  animation: floatParticle 6s ease-in-out infinite;
+  animation: floatParticle 9s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 @keyframes floatParticle {
-  0%, 100% { transform: translateY(0) translateX(0); opacity: 0.3; }
-  25% { transform: translateY(-8px) translateX(4px); opacity: 0.6; }
-  50% { transform: translateY(-4px) translateX(-4px); opacity: 0.4; }
-  75% { transform: translateY(-12px) translateX(2px); opacity: 0.5; }
+  0%, 100% { transform: translateY(0) translateX(0) scale(0.9); opacity: 0.18; }
+  35% { transform: translateY(-7px) translateX(4px) scale(1.08); opacity: 0.56; }
+  70% { transform: translateY(-3px) translateX(-4px) scale(1); opacity: 0.34; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knowledge-graph .graph-svg,
+  .knowledge-graph .ambient-glow,
+  .knowledge-graph .orbit-ring,
+  .knowledge-graph .connection-path,
+  .knowledge-graph .evaluation-link,
+  .knowledge-graph .center-node,
+  .knowledge-graph .center-aura,
+  .knowledge-graph .node-group,
+  .knowledge-graph .node-aura,
+  .knowledge-graph .float-particle {
+    animation: none;
+  }
 }
 
 /* 右侧表单区域 */
 .form-section {
-  flex: 0 0 440px;
+  flex: 0 0 clamp(420px, 36vw, 480px);
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-xl);
+  padding: 0;
 }
 
 @media (max-width: 992px) {
   .form-section {
     flex: none;
     width: 100%;
-    max-width: 420px;
-    padding: var(--spacing-lg) 0;
+    max-width: 440px;
+    padding: 0;
   }
 }
 
 /* 登录卡片 */
 .login-card {
   width: 100%;
-  padding: var(--spacing-2xl);
+  padding: clamp(2rem, 3vw, 3rem);
   background: white;
   border-radius: var(--radius-2xl);
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.05),
     0 10px 15px -3px rgba(0, 0, 0, 0.05),
     0 20px 25px -5px rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--color-border);
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-xl);
+  }
+}
+
+@media (max-height: 780px) and (min-width: 993px) {
+  .login-container {
+    padding-top: var(--spacing-xl);
+    padding-bottom: var(--spacing-xl);
+  }
+
+  .brand-content {
+    max-width: 500px;
+    transform: translateY(0.75rem);
+  }
+
+  .logo-wrapper,
+  .main-title,
+  .feature-tags {
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .knowledge-graph {
+    max-width: 370px;
+  }
+
+  .login-card {
+    padding: var(--spacing-xl);
+  }
 }
 
 /* 卡片头部 */
@@ -865,7 +1103,7 @@ const handleLogin = async () => {
 .tab-btn.active {
   background: white;
   color: var(--primary-color);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 4px  var(--color-shadow);
 }
 
 .tab-btn:hover:not(.active) {
@@ -923,7 +1161,7 @@ const handleLogin = async () => {
 
 .login-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 91, 219, 0.3);
+  box-shadow: 0 8px 20px rgba(11, 183, 170, 0.3);
 }
 
 .login-btn:active {
@@ -955,20 +1193,23 @@ const handleLogin = async () => {
 .social-login {
   display: flex;
   justify-content: center;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 .social-btn {
+  flex: 1;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-lg);
+  justify-content: center;
+  gap: 6px;
+  padding: var(--spacing-sm) 12px;
   background: white;
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   font-size: 0.875rem;
   color: var(--text-regular);
   cursor: pointer;
+  white-space: nowrap;
   transition: all var(--transition-base);
 }
 
@@ -981,6 +1222,11 @@ const handleLogin = async () => {
   background: var(--background-color-base);
   border-color: var(--primary-light);
   color: var(--primary-color);
+}
+
+.gitee-btn:hover {
+  border-color: #c71d23;
+  color: #c71d23;
 }
 
 /* 注册入口 */
@@ -1021,5 +1267,356 @@ const handleLogin = async () => {
 @keyframes nodeGlow {
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.3); }
+}
+</style>
+
+<style lang="scss">
+/* =============================================================
+   深色模式覆盖样式 - html[data-theme='dark'] 且仅作用于 .login-page
+   ============================================================= */
+html[data-theme='dark'] {
+  /* 登录页专用 CSS 变量 */
+  --login-page-bg: #0a1e22;
+  --login-panel-bg: #191d27;
+
+  --login-input-bg: #14171d;
+  --login-input-hover-bg: #181c23;
+  --login-input-focus-bg: #171b22;
+
+  --login-text-primary: #f4f6f8;
+  --login-text-secondary: #aab2c0;
+  --login-placeholder: #6f7887;
+
+  --login-border: #303641;
+  --login-border-hover: #424a58;
+  --login-border-focus: #4f7cff;
+
+  --login-icon-color: #8d97a8;
+}
+
+/* 整体登录页背景 - 深蓝青渐变 */
+html[data-theme='dark'] .login-page {
+  background:
+    radial-gradient(
+      circle at 30% 50%,
+      rgba(25, 85, 100, 0.18),
+      transparent 46%
+    ),
+    linear-gradient(
+      135deg,
+      #07171b 0%,
+      #0a2023 52%,
+      #082326 100%
+    ) !important;
+  color: var(--login-text-primary);
+
+  /* 左侧主标题 */
+  .main-title {
+    color: var(--login-text-primary) !important;
+  }
+
+  .main-title .title-line.accent {
+    color: var(--primary-color) !important;
+  }
+
+  /* Logo 副标题 */
+  .logo-subtitle {
+    color: var(--login-text-secondary) !important;
+  }
+
+  /* 四个功能标签 */
+  .feature-tag {
+    background: #171c22 !important;
+    color: #cbd3de !important;
+    border: 1px solid #303742 !important;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22) !important;
+
+    &:hover {
+      background: #20262f !important;
+      color: #f5f7fa !important;
+      border-color: #414956 !important;
+    }
+  }
+
+  .feature-tag .tag-icon {
+    color: #16c6bd !important;
+  }
+
+  /* 登录卡片 */
+  .login-card {
+    background: #191d27 !important;
+    color: var(--login-text-primary) !important;
+    border: 1px solid #2d3440 !important;
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.42) !important;
+  }
+
+  .card-title {
+    color: var(--login-text-primary) !important;
+  }
+
+  .card-subtitle {
+    color: var(--login-text-secondary) !important;
+  }
+
+  /* 记住我 */
+  .el-checkbox {
+    --el-checkbox-text-color: var(--login-text-secondary) !important;
+    --el-checkbox-font-weight: 500 !important;
+
+    &.is-checked {
+      .el-checkbox__label {
+        color: var(--login-border-focus) !important;
+      }
+      .el-checkbox__inner {
+        background-color: var(--login-border-focus) !important;
+        border-color: var(--login-border-focus) !important;
+      }
+    }
+
+    .el-checkbox__inner {
+      background-color: transparent !important;
+      border-color: var(--login-border) !important;
+    }
+  }
+
+  /* 链接 */
+  .forgot-link {
+    color: var(--login-text-secondary) !important;
+    &:hover {
+      color: var(--login-border-focus) !important;
+    }
+  }
+
+  .register-text {
+    color: var(--login-text-secondary) !important;
+  }
+
+  .register-link {
+    color: var(--login-border-focus) !important;
+    &:hover {
+      color: #7fa4ff !important;
+    }
+  }
+
+  /* 登录方式切换区域 */
+  .login-type-tabs {
+    background: var(--login-input-bg) !important;
+  }
+
+  .tab-btn {
+    color: var(--login-text-secondary) !important;
+    &:hover:not(.active) {
+      color: var(--login-text-primary) !important;
+    }
+  }
+
+  .tab-btn.active {
+    background: #20242e !important;
+    color: var(--login-border-focus) !important;
+    box-shadow: none !important;
+  }
+
+  /* 第三方登录按钮 */
+  .social-btn {
+    background: transparent !important;
+    color: var(--login-text-secondary) !important;
+    border: 1px solid var(--login-border) !important;
+
+    &:hover {
+      background: var(--login-input-hover-bg) !important;
+      border-color: var(--login-border-hover) !important;
+      color: var(--login-text-primary) !important;
+    }
+  }
+
+  /* 普通输入框 */
+  .el-input:not(.el-input-group) .el-input__wrapper {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    height: 44px !important;
+    padding: 0 !important;
+
+    background: var(--login-input-bg) !important;
+    border: 1px solid var(--login-border) !important;
+    border-radius: 12px !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease !important;
+
+    &:hover {
+      background: var(--login-input-hover-bg) !important;
+      border-color: var(--login-border-hover) !important;
+      box-shadow: none !important;
+    }
+
+    &.is-focus {
+      background: var(--login-input-focus-bg) !important;
+      border-color: var(--login-border-focus) !important;
+      box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.14) !important;
+    }
+  }
+
+  .el-input__inner {
+    flex: 1 !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    padding: 0 12px !important;
+
+    background: transparent !important;
+    color: var(--login-text-primary) !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+
+    &::placeholder {
+      color: var(--login-placeholder) !important;
+    }
+  }
+
+  /* 输入框前后缀容器透明化 */
+  .el-input__prefix,
+  .el-input__suffix {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 42px !important;
+    height: 100% !important;
+    flex-shrink: 0 !important;
+    background: transparent !important;
+    color: var(--login-icon-color) !important;
+    border: none !important;
+  }
+
+  .el-input__prefix-inner,
+  .el-input__suffix-inner {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: transparent !important;
+    border: none !important;
+    color: inherit !important;
+  }
+
+  /* 清除按钮及密码切换按钮 */
+  .el-input__suffix-inner button,
+  .el-input__suffix-inner svg {
+    background: transparent !important;
+    color: var(--login-icon-color) !important;
+    border: none !important;
+    box-shadow: none !important;
+
+    &:hover {
+      color: var(--login-text-primary) !important;
+    }
+  }
+
+  .input-icon {
+    color: var(--login-icon-color) !important;
+  }
+
+  /* 验证码输入框 (带 append) */
+  .el-input-group--append {
+    display: inline-flex !important;
+    width: 100% !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+    border: 1px solid var(--login-border) !important;
+    background: var(--login-input-bg) !important;
+    overflow: hidden !important;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      box-shadow 160ms ease !important;
+
+    &:hover {
+      background: var(--login-input-hover-bg) !important;
+      border-color: var(--login-border-hover) !important;
+    }
+
+    &:focus-within {
+      background: var(--login-input-focus-bg) !important;
+      border-color: var(--login-border-focus) !important;
+      box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.14) !important;
+    }
+
+    .el-input__wrapper {
+      background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
+      height: 100% !important;
+      border-radius: 0 !important;
+    }
+
+    .el-input-group__append {
+      background: transparent !important;
+      border: none !important;
+      border-left: 1px solid var(--login-border) !important;
+      border-radius: 0 !important;
+      height: 100% !important;
+      padding: 0 var(--spacing-md) !important;
+      display: flex !important;
+      align-items: center !important;
+
+      button.send-code-btn {
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        color: var(--login-border-focus) !important;
+        font-weight: 500 !important;
+
+        &:hover:not(:disabled) {
+          color: #7fa4ff !important;
+        }
+
+        &:disabled {
+          color: var(--login-placeholder) !important;
+        }
+      }
+    }
+  }
+
+  /* 自动填充处理 */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: var(--login-text-primary) !important;
+    caret-color: var(--login-text-primary);
+    -webkit-box-shadow: 0 0 0 1000px var(--login-input-bg) inset !important;
+    box-shadow: 0 0 0 1000px var(--login-input-bg) inset !important;
+    transition: background-color 9999s ease-out 0s;
+  }
+
+  /* Logo 样式适配 */
+  .logo-wrapper {
+    display: flex;
+    align-items: center;
+    background: transparent !important;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+  }
+
+  .logo-img {
+    display: block;
+    width: auto;
+    height: 66px;
+    object-fit: contain;
+
+    background: transparent !important;
+    border: none;
+    box-shadow: none;
+    filter: none !important;
+    mix-blend-mode: normal;
+  }
 }
 </style>

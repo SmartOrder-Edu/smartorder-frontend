@@ -50,6 +50,8 @@ export interface FileFolderContentVO {
   folderName: string
   /** 父文件夹ID */
   folderParentId: string | null
+  /** 当前用户已用空间（字节，配额表预聚合） */
+  userSpace?: string | number
   /** 子文件夹列表 */
   folders: FileFolderVO[]
   /** 文件列表 */

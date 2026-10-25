@@ -1,0 +1,1064 @@
+<template>
+  <section class="heap-block" :class="[`heap-kind-${heapKind}`, `heap-action-${operationAction}`]">
+    <div class="lesson-block-header" v-if="block.title">
+      <div class="lesson-block-title">{{ block.title }}</div>
+      <div class="heap-badges">
+        <span class="structure-label">堆</span>
+        <span class="heap-kind-label">{{ heapKindLabel }}</span>
+      </div>
+    </div>
+
+    <div v-if="heapNodes.length" class="heap-layout">
+      <div class="heap-visual-panel">
+        <div class="heap-tree-scroll">
+          <div class="heap-tree-stage" :style="{ width: `${stageSize.width}px`, height: `${stageSize.height}px` }">
+            <svg
+              class="heap-lines"
+              :width="stageSize.width"
+              :height="stageSize.height"
+              :viewBox="`0 0 ${stageSize.width} ${stageSize.height}`"
+              aria-hidden="true"
+            >
+              <line
+                v-for="edge in heapEdges"
+                :key="`${edge.from}-${edge.to}`"
+                :x1="edge.fromX"
+                :y1="edge.fromY"
+                :x2="edge.toX"
+                :y2="edge.toY"
+                class="heap-edge"
+                :class="{
+                  compare: isCompareEdge(edge.from, edge.to),
+                  path: isPathEdge(edge.from, edge.to),
+                  swap: isSwapEdge(edge.from, edge.to),
+                  violation: isViolationEdge(edge.from, edge.to),
+                  muted: !edge.inHeap,
+                }"
+              />
+            </svg>
+
+            <div
+              v-for="node in heapNodes"
+              :key="node.id"
+              class="heap-node"
+              :class="nodeClass(node)"
+              :style="{ left: `${node.x}px`, top: `${node.y}px` }"
+              :title="`index ${node.displayIndex}: ${node.label}`"
+            >
+              <span class="node-value">{{ node.label }}</span>
+              <span class="node-index">{{ node.displayIndex }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="heap-array-map">
+          <div
+            v-for="item in items"
+            :key="`heap-array-${item.index}`"
+            class="array-cell"
+            :class="indexClass(item.index)"
+            :title="`index ${item.displayIndex}: ${item.label}`"
+          >
+            <span class="array-value">{{ item.label }}</span>
+            <span class="array-index">{{ item.displayIndex }}</span>
+          </div>
+        </div>
+      </div>
+
+      <aside class="heap-inspector">
+        <div class="heap-rule">
+          <span class="rule-title">{{ heapKindLabel }}性质</span>
+          <span class="rule-text">{{ heapRuleText }}</span>
+        </div>
+
+        <div class="heap-formulas">
+          <span v-for="formula in heapFormulaRows" :key="formula">{{ formula }}</span>
+        </div>
+
+        <div class="heap-focus-list" v-if="focusRows.length">
+          <div v-for="row in focusRows" :key="row.key" class="focus-row" :class="row.key">
+            <span class="focus-label">{{ row.label }}</span>
+            <span class="focus-value">{{ row.value }}</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div v-else class="empty-structure">暂无堆元素</div>
+
+    <div v-if="phaseDots.length" class="heap-phase-strip">
+      <span
+        v-for="phase in phaseDots"
+        :key="phase.name"
+        class="phase-dot"
+        :class="{ active: phase.name === currentPhase.name }"
+      >
+        {{ phase.label }}
+      </span>
+    </div>
+
+    <p v-if="phaseNarration" class="heap-narration">{{ phaseNarration }}</p>
+    <p v-else-if="block.caption || block.content" class="lesson-block-caption">
+      {{ block.caption || block.content }}
+    </p>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import type {
+  LessonSceneAction,
+  TeachingStructureAnimation,
+  TeachingStructureAnimationPhase,
+  TeachingStructureBoardBlock,
+} from '@/types/study'
+
+const props = defineProps<{
+  block: TeachingStructureBoardBlock
+  sceneAction?: LessonSceneAction | null
+}>()
+
+interface HeapItem {
+  label: string
+  index: number
+  displayIndex: number
+}
+
+interface HeapNode extends HeapItem {
+  id: string
+  depth: number
+  order: number
+  inHeap: boolean
+  x: number
+  y: number
+}
+
+interface HeapEdge {
+  from: string
+  to: string
+  fromX: number
+  fromY: number
+  toX: number
+  toY: number
+  inHeap: boolean
+}
+
+interface FocusRow {
+  key: string
+  label: string
+  value: string
+}
+
+interface HeapTreeLayout {
+  stageSize: {
+    width: number
+    height: number
+  }
+  nodes: HeapNode[]
+}
+
+const NODE_SIZE = 52
+const LEVEL_GAP = 88
+const LEVEL_SLOT_WIDTH = 74
+const MIN_STAGE_WIDTH = 520
+const STAGE_PADDING_X = 34
+const STAGE_PADDING_Y = 24
+
+const currentPhaseName = ref('after')
+let timers: Array<ReturnType<typeof setTimeout>> = []
+
+const blockRecord = computed<Record<string, unknown>>(() => props.block as unknown as Record<string, unknown>)
+const animation = computed<TeachingStructureAnimation>(() => {
+  const payloadAnimation = readPayloadValue('animation')
+  return (payloadAnimation && typeof payloadAnimation === 'object'
+    ? payloadAnimation as TeachingStructureAnimation
+    : props.block.animation) || {}
+})
+const durationMs = computed(() => Math.max(Number(animation.value.durationMs || props.sceneAction?.durationMs) || 1800, 720))
+const phaseDefinitions = computed<TeachingStructureAnimationPhase[]>(() => {
+  if (animation.value.phases?.length) return normalizePhases(animation.value.phases)
+  return [{ name: 'after', startRatio: 0 }]
+})
+const currentPhase = computed<TeachingStructureAnimationPhase>(() => (
+  phaseDefinitions.value.find((phase) => phase.name === currentPhaseName.value)
+  || phaseDefinitions.value[0]
+  || { name: 'after', startRatio: 0 }
+))
+const rawItems = computed(() => currentPhase.value.items || readPayloadArray('items') || props.block.items || props.block.nodes || [])
+const indexBase = computed<0 | 1>(() => resolveIndexBase(rawItems.value))
+const items = computed<HeapItem[]>(() => normalizeHeapItems(rawItems.value, indexBase.value))
+const heapKind = computed(() => {
+  const raw = stringValue(readPayloadValue('heapType') ?? blockRecord.value.heapType ?? '')
+    .toLowerCase()
+    .replace(/\s/g, '')
+  if (raw === 'min' || raw === 'minheap' || raw === '小根堆' || raw === '最小堆') return 'min'
+  return 'max'
+})
+const heapKindLabel = computed(() => heapKind.value === 'min' ? '最小堆' : '最大堆')
+const heapRuleText = computed(() => heapKind.value === 'min'
+  ? '父节点值不大于任一孩子节点值'
+  : '父节点值不小于任一孩子节点值')
+const heapFormulaRows = computed(() => indexBase.value === 1
+  ? ['parent(i) = floor(i / 2)', 'left(i) = 2i', 'right(i) = 2i + 1']
+  : ['parent(i) = floor((i - 1) / 2)', 'left(i) = 2i + 1', 'right(i) = 2i + 2'])
+const effectiveHeapSize = computed(() => {
+  const rawValue = currentPhase.value.heapSize ?? readPayloadValue('heapSize') ?? blockRecord.value.heapSize
+  const raw = numberValue(rawValue, items.value.length)
+  const normalized = indexBase.value === 1 && raw > items.value.length ? raw - 1 : raw
+  return Math.max(0, Math.min(items.value.length, normalized))
+})
+const activeIndices = computed(() => normalizeHeapIndexArray(currentPhase.value.activeIndices || readPayloadArray('activeIndices') || props.block.activeIndices || []))
+const compareIds = computed(() => normalizeStringArray(currentPhase.value.compareIds || readPayloadArray('compareIds') || props.block.compareIds || []))
+const compareIndices = computed(() => normalizeHeapIndexArray(compareIds.value))
+const pathIds = computed(() => normalizeStringArray(currentPhase.value.pathIds || readPayloadArray('pathIds') || props.block.pathIds || []))
+const pathIndices = computed(() => normalizeHeapIndexArray(pathIds.value))
+const parentIndex = computed(() => {
+  const raw = normalizeHeapIndex(currentPhase.value.parentIndex ?? readPayloadValue('parentIndex') ?? blockRecord.value.parentIndex)
+  if (Number.isFinite(raw)) return raw
+  if (compareIndices.value.length >= 2) return Math.min(...compareIndices.value)
+  return Number.NaN
+})
+const childIndices = computed(() => {
+  const explicit = normalizeHeapIndexArray(currentPhase.value.childIndices || readPayloadArray('childIndices') || blockRecord.value.childIndices || [])
+  if (explicit.length) return explicit
+  if (!Number.isFinite(parentIndex.value)) return []
+  return [parentIndex.value * 2 + 1, parentIndex.value * 2 + 2].filter((index) => index < items.value.length)
+})
+const swapIndices = computed(() => {
+  const explicit = normalizeHeapIndexArray(currentPhase.value.swapIndices || readPayloadArray('swapIndices') || blockRecord.value.swapIndices || [])
+  if (explicit.length) return explicit
+  if (String(animation.value.action || '').toLowerCase() !== 'swap') return []
+  return normalizeHeapIndexArray([animation.value.from, animation.value.to])
+})
+const violationIndices = computed(() => normalizeHeapIndexArray(
+  currentPhase.value.violationIndices || readPayloadArray('violationIndices') || blockRecord.value.violationIndices || [],
+))
+const sortedRange = computed(() => {
+  const explicit = normalizeRange(currentPhase.value.sortedRange || readPayloadArray('sortedRange') || blockRecord.value.sortedRange)
+  if (explicit) return explicit
+  if (effectiveHeapSize.value < items.value.length) {
+    return [effectiveHeapSize.value, items.value.length - 1] as [number, number]
+  }
+  return null
+})
+const operationLabel = computed(() => {
+  const action = operationAction.value
+  const labels: Record<string, string> = {
+    compare: '比较父子节点',
+    swap: '交换节点',
+    sift_up: '上浮调整',
+    siftup: '上浮调整',
+    sift_down: '下沉调整',
+    siftdown: '下沉调整',
+    heapify: '建堆调整',
+    insert: '插入元素',
+    delete: '删除堆顶',
+    extract: '取出堆顶',
+  }
+  return labels[action] || ''
+})
+const operationAction = computed(() => String(animation.value.action || readPayloadValue('action') || '').toLowerCase().replace(/[-\s]/g, '_') || 'state')
+const treeLayout = computed<HeapTreeLayout>(() => buildHeapTreeLayout(items.value))
+const stageSize = computed(() => treeLayout.value.stageSize)
+const heapNodes = computed<HeapNode[]>(() => treeLayout.value.nodes)
+const nodeById = computed(() => new Map(heapNodes.value.map((node) => [node.id, node])))
+const heapEdges = computed<HeapEdge[]>(() => heapNodes.value
+  .filter((node) => node.index > 0)
+  .map((node) => {
+    const parentId = String(Math.floor((node.index - 1) / 2))
+    const parent = nodeById.value.get(parentId)
+    if (!parent) return null
+    const clipped = clipEdge(parent, node)
+    return {
+      from: parent.id,
+      to: node.id,
+      ...clipped,
+      inHeap: parent.inHeap && node.inHeap,
+    }
+  })
+  .filter((edge): edge is HeapEdge => !!edge))
+const focusRows = computed<FocusRow[]>(() => {
+  const rows: FocusRow[] = []
+  if (operationLabel.value) rows.push({ key: 'operation', label: '当前动作', value: operationLabel.value })
+  if (Number.isFinite(parentIndex.value)) rows.push({ key: 'parent', label: '父节点', value: formatIndex(parentIndex.value) })
+  if (childIndices.value.length) rows.push({ key: 'child', label: '孩子节点', value: childIndices.value.map(formatIndex).join(', ') })
+  if (compareIndices.value.length) rows.push({ key: 'compare', label: '比较节点', value: compareIndices.value.map(formatIndex).join(', ') })
+  if (swapIndices.value.length) rows.push({ key: 'swap', label: '交换节点', value: swapIndices.value.map(formatIndex).join(', ') })
+  if (violationIndices.value.length) rows.push({ key: 'violation', label: '待修复', value: violationIndices.value.map(formatIndex).join(', ') })
+  if (sortedRange.value) rows.push({
+    key: 'sorted',
+    label: '有序区间',
+    value: `[${displayIndex(sortedRange.value[0])}, ${displayIndex(sortedRange.value[1])}]`,
+  })
+  if (effectiveHeapSize.value < items.value.length) rows.push({ key: 'heap-size', label: '有效堆区', value: `[0, ${Math.max(effectiveHeapSize.value - 1, 0)}]` })
+  return rows
+})
+const phaseDots = computed(() => phaseDefinitions.value.length > 1
+  ? phaseDefinitions.value.map((phase) => ({ name: phase.name, label: phaseLabel(phase.name) }))
+  : [])
+const phaseNarration = computed(() => currentPhase.value.narrationHint || '')
+
+watch(
+  () => animationSignature(animation.value, props.sceneAction?.actionId || ''),
+  () => restartAnimation(),
+)
+
+onMounted(restartAnimation)
+onUnmounted(clearTimers)
+
+function restartAnimation() {
+  clearTimers()
+  const phases = phaseDefinitions.value
+  currentPhaseName.value = phases[0]?.name || 'after'
+  phases.slice(1).forEach((phase) => {
+    const delay = Math.max(0, Math.round((phase.startRatio ?? 0) * durationMs.value))
+    timers.push(setTimeout(() => {
+      currentPhaseName.value = phase.name
+    }, delay))
+  })
+}
+
+function clearTimers() {
+  timers.forEach((timer) => clearTimeout(timer))
+  timers = []
+}
+
+function normalizePhases(phases: TeachingStructureAnimationPhase[]): TeachingStructureAnimationPhase[] {
+  return phases
+    .filter((phase) => !!phase?.name)
+    .map((phase, index) => ({
+      ...phase,
+      startRatio: phase.startRatio ?? (index === 0 ? 0 : index / phases.length),
+    }))
+    .sort((a, b) => (a.startRatio ?? 0) - (b.startRatio ?? 0))
+}
+
+function phaseLabel(name: string): string {
+  const labels: Record<string, string> = {
+    before: '操作前',
+    moving: '执行中',
+    compare: '比较',
+    swap: '交换',
+    sift: '调整',
+    after: '完成后',
+    done: '完成',
+  }
+  return labels[name] || name
+}
+
+function animationSignature(value: TeachingStructureAnimation, actionId: string): string {
+  return `${actionId}:${JSON.stringify(value)}`
+}
+
+function nodeClass(node: HeapNode): Record<string, boolean> {
+  return {
+    active: isActiveIndex(node.index),
+    compare: isCompareIndex(node.index),
+    path: isPathIndex(node.index),
+    parent: node.index === parentIndex.value,
+    child: childIndices.value.includes(node.index),
+    swap: swapIndices.value.includes(node.index),
+    violation: violationIndices.value.includes(node.index),
+    sorted: isSortedIndex(node.index),
+    muted: !node.inHeap,
+  }
+}
+
+function indexClass(index: number): Record<string, boolean> {
+  return {
+    active: isActiveIndex(index),
+    compare: isCompareIndex(index),
+    path: isPathIndex(index),
+    parent: index === parentIndex.value,
+    child: childIndices.value.includes(index),
+    swap: swapIndices.value.includes(index),
+    violation: violationIndices.value.includes(index),
+    sorted: isSortedIndex(index),
+    muted: index >= effectiveHeapSize.value,
+  }
+}
+
+function isActiveIndex(index: number): boolean {
+  return activeIndices.value.includes(index)
+}
+
+function isCompareIndex(index: number): boolean {
+  return compareIndices.value.includes(index)
+}
+
+function isPathIndex(index: number): boolean {
+  return pathIndices.value.includes(index)
+}
+
+function isSortedIndex(index: number): boolean {
+  return !!sortedRange.value && index >= sortedRange.value[0] && index <= sortedRange.value[1]
+}
+
+function isCompareEdge(from: string, to: string): boolean {
+  return isCompareIndex(Number(from)) && isCompareIndex(Number(to))
+}
+
+function isPathEdge(from: string, to: string): boolean {
+  return isPathIndex(Number(from)) && isPathIndex(Number(to))
+}
+
+function isSwapEdge(from: string, to: string): boolean {
+  return swapIndices.value.includes(Number(from)) && swapIndices.value.includes(Number(to))
+}
+
+function isViolationEdge(from: string, to: string): boolean {
+  return violationIndices.value.includes(Number(from)) || violationIndices.value.includes(Number(to))
+}
+
+function formatIndex(index: number): string {
+  const item = items.value[index]
+  return item ? `${item.displayIndex}:${item.label}` : String(displayIndex(index))
+}
+
+function buildHeapTreeLayout(values: HeapItem[]): HeapTreeLayout {
+  if (!values.length) {
+    return {
+      stageSize: { width: MIN_STAGE_WIDTH, height: 180 },
+      nodes: [],
+    }
+  }
+
+  const maxIndex = Math.max(...values.map((item) => item.index))
+  const maxDepth = Math.floor(Math.log2(maxIndex + 1))
+  const bottomSlotCount = 2 ** maxDepth
+  const baseWidth = Math.max(MIN_STAGE_WIDTH, bottomSlotCount * LEVEL_SLOT_WIDTH + STAGE_PADDING_X * 2)
+  const innerWidth = baseWidth - STAGE_PADDING_X * 2
+
+  const rawNodes = values.map((item) => {
+    const depth = Math.floor(Math.log2(item.index + 1))
+    const firstIndex = 2 ** depth - 1
+    const order = item.index - firstIndex
+    const span = 2 ** (maxDepth - depth)
+    return {
+      ...item,
+      id: String(item.index),
+      depth,
+      order,
+      inHeap: item.index < effectiveHeapSize.value,
+      x: STAGE_PADDING_X + ((order * span + span / 2) * innerWidth) / bottomSlotCount,
+      y: STAGE_PADDING_Y + NODE_SIZE / 2 + depth * LEVEL_GAP,
+    }
+  })
+
+  const minX = Math.min(...rawNodes.map((node) => node.x))
+  const maxX = Math.max(...rawNodes.map((node) => node.x))
+  const centerSpan = maxX - minX
+  const stageWidth = Math.max(MIN_STAGE_WIDTH, centerSpan + (STAGE_PADDING_X + NODE_SIZE) * 2)
+  const stageHeight = Math.max(180, STAGE_PADDING_Y * 2 + NODE_SIZE + maxDepth * LEVEL_GAP)
+  const xOffset = centerSpan <= 0 ? stageWidth / 2 : (stageWidth - centerSpan) / 2
+  const normalizedNodes = rawNodes.map((node) => ({
+    ...node,
+    x: node.x - minX + xOffset,
+  }))
+
+  return {
+    stageSize: {
+      width: Math.ceil(stageWidth),
+      height: Math.ceil(stageHeight),
+    },
+    nodes: normalizedNodes,
+  }
+}
+
+function clipEdge(from: HeapNode, to: HeapNode) {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const length = Math.max(Math.sqrt(dx * dx + dy * dy), 1)
+  const offset = NODE_SIZE / 2
+  return {
+    fromX: from.x + (dx / length) * offset,
+    fromY: from.y + (dy / length) * offset,
+    toX: to.x - (dx / length) * offset,
+    toY: to.y - (dy / length) * offset,
+  }
+}
+
+function itemLabel(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    const label = record.label ?? record.value ?? record.name ?? record.id
+    return label === undefined ? JSON.stringify(value) : String(label)
+  }
+  return String(value)
+}
+
+function normalizeHeapItems(values: unknown[], base: 0 | 1): HeapItem[] {
+  const skipSentinel = base === 1 && hasLeadingHeapSentinel(values)
+  const source = skipSentinel ? values.slice(1) : values
+  return source
+    .map((value, index) => ({
+      label: itemLabel(value),
+      index,
+      displayIndex: base === 1 ? index + 1 : index,
+    }))
+    .filter((item) => item.label !== '')
+}
+
+function resolveIndexBase(values: unknown[]): 0 | 1 {
+  const raw = readPayloadValue('indexBase') ?? blockRecord.value.indexBase
+  const explicit = Number(raw)
+  if (explicit === 1) return 1
+  if (explicit === 0) return 0
+  return hasLeadingHeapSentinel(values) ? 1 : 0
+}
+
+function hasLeadingHeapSentinel(values: unknown[]): boolean {
+  if (values.length <= 1) return false
+  const first = values[0]
+  return first === null
+    || first === undefined
+    || first === ''
+    || first === '-'
+    || first === '_'
+}
+
+function normalizeHeapIndexArray(values: unknown): number[] {
+  const list = Array.isArray(values) ? values : []
+  return Array.from(new Set(list
+    .map((value) => normalizeHeapIndex(value))
+    .filter((value) => Number.isInteger(value) && value >= 0)))
+}
+
+function normalizeHeapIndex(value: unknown): number {
+  const index = Number(value)
+  if (!Number.isFinite(index)) return Number.NaN
+  if (indexBase.value !== 1) return index
+  return index > 0 ? index - 1 : index
+}
+
+function displayIndex(index: number): number {
+  return indexBase.value === 1 ? index + 1 : index
+}
+
+function normalizeStringArray(values: unknown[]): string[] {
+  return values.map((value) => String(value)).filter(Boolean)
+}
+
+function normalizeRange(value: unknown): [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return null
+  const start = normalizeHeapIndex(value[0])
+  const end = normalizeHeapIndex(value[1])
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) return null
+  return [start, Math.min(end, Math.max(items.value.length - 1, 0))]
+}
+
+function numberValue(value: unknown, fallback: number): number {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : fallback
+}
+
+function stringValue(value: unknown): string {
+  return value === null || value === undefined ? '' : String(value)
+}
+
+function readPayloadValue(key: string): unknown {
+  return props.sceneAction?.payload?.[key]
+}
+
+function readPayloadArray(key: string): unknown[] | null {
+  const value = readPayloadValue(key)
+  return Array.isArray(value) ? value : null
+}
+</script>
+
+<style scoped lang="scss">
+.heap-block {
+  display: grid;
+  gap: 12px;
+}
+
+.lesson-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.lesson-block-title {
+  min-width: 0;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 820;
+  line-height: 1.34;
+}
+
+.heap-badges {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.structure-label,
+.heap-kind-label,
+.phase-dot {
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.45;
+}
+
+.structure-label {
+  padding: 3px 9px;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+}
+
+.heap-kind-label {
+  padding: 3px 8px;
+  border: 1px solid rgba(15, 118, 110, 0.18);
+  background: rgba(240, 253, 250, 0.9);
+  color: #0f766e;
+}
+
+.heap-layout {
+  display: grid;
+  grid-template-columns: minmax(560px, 1fr) minmax(220px, 280px);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.heap-visual-panel,
+.heap-inspector {
+  border: 1px solid rgba(203, 213, 225, 0.76);
+  border-radius: 8px;
+  background: var(--color-card-bg-secondary);
+}
+
+.heap-visual-panel {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.heap-tree-scroll {
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+}
+
+.heap-tree-stage {
+  position: relative;
+  flex: 0 0 auto;
+  margin: 0 auto;
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.heap-lines {
+  position: absolute;
+  inset: 0;
+}
+
+.heap-edge {
+  stroke: #cbd5e1;
+  stroke-width: 2;
+
+  &.compare {
+    stroke: #d97706;
+    stroke-width: 3;
+    animation: heapEdgePulse 0.74s ease-out;
+  }
+
+  &.path {
+    stroke: #2563eb;
+    stroke-width: 3;
+  }
+
+  &.swap {
+    stroke: #7c3aed;
+    stroke-width: 3;
+    animation: heapEdgeTrace 0.78s ease-out;
+  }
+
+  &.violation {
+    stroke: #dc2626;
+    stroke-width: 3;
+    animation: heapViolationPulse 0.84s ease-out;
+  }
+
+  &.muted {
+    stroke-dasharray: 5 5;
+    opacity: 0.45;
+  }
+}
+
+.heap-node {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-left: -26px;
+  margin-top: -26px;
+  border: 2px solid #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  color: #0f172a;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+
+  &.parent {
+    border-color: #0f766e;
+    background: #f0fdfa;
+    animation: heapFocusPop 0.62s ease-out;
+  }
+
+  &.child {
+    border-color: #0284c7;
+    background: #f0f9ff;
+    animation: heapFocusPop 0.62s ease-out;
+  }
+
+  &.path {
+    border-color: #2563eb;
+    background: #eff6ff;
+  }
+
+  &.compare {
+    border-color: #d97706;
+    background: #fffbeb;
+    animation: heapComparePulse 0.72s ease-out;
+  }
+
+  &.swap {
+    border-color: #7c3aed;
+    background: #f5f3ff;
+    animation: heapSwapHop 0.76s ease-out;
+  }
+
+  &.violation {
+    border-color: #dc2626;
+    background: #fef2f2;
+    animation: heapViolationPulse 0.84s ease-out;
+  }
+
+  &.sorted,
+  &.muted {
+    opacity: 0.56;
+    background: #f8fafc;
+  }
+
+  &.active {
+    z-index: 2;
+    transform: scale(1.08);
+    border-color: #0f766e;
+    background: #ecfdf5;
+    box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.14), 0 10px 18px rgba(15, 118, 110, 0.12);
+    animation: heapFocusPop 0.62s ease-out;
+  }
+}
+
+.node-value,
+.array-value {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #0f172a;
+  font-weight: 780;
+  line-height: 1.05;
+}
+
+.node-value {
+  max-width: 42px;
+  font-size: 15px;
+}
+
+.node-index {
+  margin-top: -5px;
+  color: #94a3b8;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.heap-array-map {
+  display: flex;
+  align-items: stretch;
+  overflow-x: auto;
+  padding: 2px 2px 8px;
+}
+
+.array-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 54px;
+  min-height: 48px;
+  padding: 8px 10px 17px;
+  border: 1px solid #cbd5e1;
+  border-right-width: 0;
+  background: #fff;
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+
+  &:first-child {
+    border-radius: 8px 0 0 8px;
+  }
+
+  &:last-child {
+    border-right-width: 1px;
+    border-radius: 0 8px 8px 0;
+  }
+
+  &.parent {
+    background: #f0fdfa;
+    border-color: #0f766e;
+    animation: heapComparePulse 0.72s ease-out;
+  }
+
+  &.child {
+    background: #f0f9ff;
+    border-color: #0284c7;
+    animation: heapComparePulse 0.72s ease-out;
+  }
+
+  &.compare {
+    background: #fffbeb;
+    border-color: #d97706;
+    animation: heapComparePulse 0.72s ease-out;
+  }
+
+  &.swap {
+    background: #f5f3ff;
+    border-color: #7c3aed;
+    animation: heapArraySwap 0.76s ease-out;
+  }
+
+  &.violation {
+    background: #fef2f2;
+    border-color: #dc2626;
+    animation: heapViolationPulse 0.84s ease-out;
+  }
+
+  &.sorted,
+  &.muted {
+    background: #f8fafc;
+    color: #94a3b8;
+    opacity: 0.68;
+  }
+
+  &.active {
+    z-index: 1;
+    background: #ecfdf5;
+    border-color: #0f766e;
+    box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12);
+    animation: heapComparePulse 0.72s ease-out;
+  }
+}
+
+.heap-action-sift_up .heap-node.swap,
+.heap-action-siftup .heap-node.swap {
+  animation: heapSiftUp 0.82s ease-out;
+}
+
+.heap-action-sift_down .heap-node.swap,
+.heap-action-siftdown .heap-node.swap,
+.heap-action-heapify .heap-node.swap {
+  animation: heapSiftDown 0.82s ease-out;
+}
+
+.heap-action-extract .heap-node.active,
+.heap-action-delete .heap-node.active {
+  animation: heapExtractLift 0.84s ease-out;
+}
+
+.array-value {
+  max-width: 42px;
+  font-size: 14px;
+}
+
+.array-index {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  color: #94a3b8;
+  font-size: 10px;
+  text-align: center;
+}
+
+.heap-inspector {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 12px;
+}
+
+.heap-rule {
+  display: grid;
+  gap: 5px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.rule-title {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 820;
+}
+
+.rule-text {
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.heap-formulas {
+  display: grid;
+  gap: 5px;
+  color: #334155;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.heap-focus-list {
+  display: grid;
+  gap: 6px;
+}
+
+.heap-phase-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.phase-dot {
+  padding: 3px 8px;
+  background: #f1f5f9;
+  color: #64748b;
+
+  &.active {
+    background: #ecfdf5;
+    color: #0f766e;
+  }
+}
+
+.focus-row {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 12px;
+
+  &.compare {
+    background: #fffbeb;
+    color: #92400e;
+  }
+
+  &.swap {
+    background: #f5f3ff;
+    color: #6d28d9;
+  }
+
+  &.violation {
+    background: #fef2f2;
+    color: #b91c1c;
+  }
+}
+
+.focus-label {
+  color: #64748b;
+  font-weight: 740;
+}
+
+.focus-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 760;
+}
+
+.empty-structure {
+  padding: 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #94a3b8;
+  text-align: center;
+  font-size: 13px;
+}
+
+.heap-narration,
+.lesson-block-caption {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.heap-narration {
+  padding: 8px 10px;
+  border-left: 3px solid #0f766e;
+  border-radius: 0 8px 8px 0;
+  background: rgba(20, 184, 166, 0.08);
+  color: #475569;
+}
+
+@keyframes heapFocusPop {
+  0% { transform: scale(0.94); }
+  54% { transform: scale(1.12); }
+  100% { transform: scale(1.08); }
+}
+
+@keyframes heapComparePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.15); }
+}
+
+@keyframes heapSwapHop {
+  0%, 100% { transform: translate(0, 0); }
+  38% { transform: translateY(-12px) scale(1.05); }
+  72% { transform: translateY(3px) scale(1.02); }
+}
+
+@keyframes heapArraySwap {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(-8px); }
+  70% { transform: translateX(8px); }
+}
+
+@keyframes heapSiftUp {
+  0% { transform: translateY(8px) scale(1); }
+  55% { transform: translateY(-16px) scale(1.07); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes heapSiftDown {
+  0% { transform: translateY(-8px) scale(1); }
+  55% { transform: translateY(16px) scale(1.07); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes heapExtractLift {
+  0% { opacity: 1; transform: scale(1.08); }
+  68% { opacity: 0.32; transform: translateY(-18px) scale(0.94); }
+  100% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes heapEdgePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@keyframes heapEdgeTrace {
+  from { stroke-dasharray: 220; stroke-dashoffset: 220; }
+  to { stroke-dasharray: 220; stroke-dashoffset: 0; }
+}
+
+@keyframes heapViolationPulse {
+  0%, 100% { filter: none; }
+  50% { filter: drop-shadow(0 0 8px rgba(220, 38, 38, 0.22)); }
+}
+</style>

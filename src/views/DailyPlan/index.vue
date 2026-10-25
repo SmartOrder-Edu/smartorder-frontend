@@ -5,27 +5,33 @@
     <section class="agent-summary glass">
       <div class="agent-header">
         <div class="agent-avatar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-            <line x1="9" y1="9" x2="9.01" y2="9"/>
-            <line x1="15" y1="9" x2="15.01" y2="9"/>
+          <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+            <path d="M483.002182 188.043636h51.2v114.036364H483.002182z" fill="#40e3c2"/>
+            <path d="M510.929455 143.825455m-128 0a128 128 0 1 0 256 0 128 128 0 1 0-256 0Z" fill="#40e3c2"/>
+            <path d="M475.83125977 148.45865723v5.05620769h37.07885744v11.79781821h-16.8540259v23.59563642h16.8540259v11.79781817h-16.8540259V207.44774823l8.42701331 28.65184483h8.42701259v10.1124154h-15.16862307l-5.05620773-20.22483152L485.94367591 246.21200846H469.08964929v-11.7978182h11.79781818L485.94367591 207.44774823v-8.42701259H469.08964929v-11.79781893h18.5394287V163.62728031h-15.1686231L465.71884437 156.88566981v-8.42701258h10.1124154z m82.58472817 3.37080486v82.58472817l-10.1124154 11.79781822H519.65172773V151.82946209h38.76426021z m-11.79781819 11.79781822h-16.85402591v70.78690995h16.85402591V163.62728031z" fill="#40e3c2"/>
+            <path d="M679.098182 301.963636c139.636364 13.963636 223.418182 79.127273 253.672727 197.818182 46.545455 179.2 34.909091 267.636364 32.581818 283.927273-2.327273 18.618182-30.254545 123.345455-160.581818 174.545454-83.781818 32.581818-172.218182 55.854545-293.236364 53.527273v-535.272727 535.272727c-116.363636 2.327273-204.8-18.618182-286.254545-48.872727l-9.309091-4.654546c-130.327273-53.527273-158.254545-158.254545-160.581818-174.545454-4.654545-16.290909-13.963636-104.727273 30.254545-283.927273 30.254545-118.690909 114.036364-186.181818 251.345455-200.145454 37.236364-2.327273 93.090909-6.981818 172.218182-6.981819h9.309091c74.472727 0 128 4.654545 160.581818 9.309091z" fill="#C5C5C5"/>
+            <path d="M139.170909 723.2c0 2.327273 0 2.327273 0 0 0 4.654545 2.327273 6.981818 2.327273 9.309091 4.654545 9.309091 9.309091 16.290909 16.290909 25.6 18.618182 23.272727 46.545455 44.218182 83.781818 58.181818l4.654546 2.327273 4.654545 2.327273c53.527273 18.618182 107.054545 30.254545 165.236364 37.236363 58.181818 4.654545 123.345455 4.654545 183.854545 0 58.181818-4.654545 111.709091-18.618182 165.236364-37.236363l4.654545-2.327273c41.890909-13.963636 69.818182-34.909091 88.436364-60.509091 6.981818-9.309091 11.636364-18.618182 16.290909-25.6 0-2.327273 2.327273-4.654545 2.327273-6.981818v-2.327273c0-2.327273 0-6.981818 2.327272-11.636364v-2.327272-39.563637c-2.327273-44.218182-13.963636-97.745455-32.581818-162.909091-18.618182-74.472727-72.145455-111.709091-174.545454-121.018181-53.527273-4.654545-93.090909-6.981818-148.945455-6.981819H502.225455c-58.181818 0-97.745455 2.327273-155.927273 6.981819-102.4 9.309091-153.6 46.545455-174.545455 118.690909-18.618182 65.163636-27.927273 118.690909-32.581818 162.909091 0 16.290909-2.327273 30.254545 0 39.563636v16.290909z" fill="#14254E"/>
+            <path d="M509.207273 695.272727c-27.927273 0-55.854545 11.636364-55.854546 20.945455s11.636364 39.563636 55.854546 39.563636c41.890909 0 51.2-23.272727 55.854545-39.563636 0-13.963636-27.927273-20.945455-55.854545-20.945455z" fill="#40E3C2"/>
+            <path d="M295.936 578.373818a72.145455 53.527273 90 1 0 107.054545 0 72.145455 53.527273 90 1 0-107.054545 0Z" fill="#40E3C2"/>
+            <path d="M617.099636 578.373818a72.145455 53.527273 90 1 0 107.054546 0 72.145455 53.527273 90 1 0-107.054546 0Z" fill="#40E3C2"/>
           </svg>
         </div>
         <div class="agent-info">
           <span class="agent-title">总学习 Agent</span>
           <span class="agent-think">
             <span class="think-dot"></span>
-            已检查你的 4 个学习空间
+            已检查你的 {{ checkedSpaceCount }} 个学习空间
           </span>
         </div>
       </div>
       <div class="agent-message">
         <p class="agent-greeting">早上好，{{ userName }}。今天是 {{ todayStr }}，我已经为你整理好今日的跨空间学习计划。</p>
         <p class="agent-insight">
-          今日建议优先处理<strong>高等数学</strong>的极限专项练习（你在这部分连续出错），
-          其次是<strong>软件工程</strong>的需求分析文档（已延期 1 天）。
-          <strong>操作系统</strong>和<strong>英语四级</strong>可以放后面，时间有余再做。
+          <template v-if="primaryDailyTask">
+            今日建议优先处理<strong>{{ primaryDailyTask.spaceName }}</strong>的「{{ primaryDailyTask.title }}」。
+            {{ primaryDailyTask.agentReason }}
+          </template>
+          <template v-else>{{ dailyInsight }}</template>
         </p>
       </div>
     </section>
@@ -34,7 +40,7 @@
     <section class="time-allocation">
       <div class="section-header">
         <h3 class="section-title">今日建议时间分配</h3>
-        <span class="section-badge">总计约 2 小时 20 分钟</span>
+        <span class="section-badge">总计约 {{ totalPlannedMinutes }} 分钟</span>
       </div>
       <div class="time-bars">
         <div class="time-bar-item" v-for="alloc in timeAllocations" :key="alloc.spaceId">
@@ -45,7 +51,7 @@
           <div class="time-bar-track">
             <div
               class="time-bar-fill"
-              :style="{ width: (alloc.minutes / 140) * 100 + '%', background: alloc.color }"
+              :style="{ width: (alloc.minutes / maxTimeAllocation) * 100 + '%', background: alloc.color }"
             ></div>
           </div>
           <span class="time-bar-reason">{{ alloc.reason }}</span>
@@ -127,7 +133,7 @@
                 <p class="task-reason">{{ task.agentReason }}</p>
                 <div class="task-footer">
                   <span class="task-status" :class="task.status">{{ statusLabel(task.status) }}</span>
-                  <button class="task-start-btn" @click="startTask(task)">开始</button>
+                  <button class="task-start-btn" @click="startTask(task)">开始这次学习</button>
                 </div>
               </div>
             </div>
@@ -177,11 +183,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { useStudyEntry } from '@/composables/useStudyEntry'
+import { learningSpaceApi } from '@/api/learningSpace'
+import { fetchLearningState } from '@/api/algorithm'
+import type { LearningSpaceVO } from '@/api/learningSpace'
+import type { LearningAlgorithmState } from '@/api/algorithm'
+
+const { enterStudy, enterTodayFirst } = useStudyEntry()
+const router = useRouter()
 
 const userName = ref('谢同学')
+const algorithmLoading = ref(false)
+const algorithmPlans = ref<Array<{ space: LearningSpaceVO; state: LearningAlgorithmState }>>([])
 const todayStr = computed(() => {
   const d = new Date()
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
@@ -193,12 +210,23 @@ const showReasonDialog = ref(false)
 const redistributeMinutes = ref(140)
 const redistributeStrategy = ref('deadline_first')
 
+const checkedSpaceCount = computed(() => algorithmPlans.value.length || 4)
+
 const strategyLabel = computed(() => {
   const map = { deadline_first: '截止时间优先', weakness_first: '薄弱点优先', balanced: '均衡分配' }
   return map[strategy.value]
 })
 
 const timeAllocations = computed(() => {
+  if (algorithmPlanTasks.value.length) {
+    return algorithmPlanTasks.value.map(task => ({
+      spaceId: task.spaceId,
+      spaceName: task.spaceName,
+      minutes: task.estimatedMinutes,
+      color: task.color,
+      reason: task.agentReason,
+    }))
+  }
   const base = [
     { spaceId: 'math', spaceName: '高等数学', minutes: 35, color: '#3b82f6', reason: '薄弱点需集中攻克' },
     { spaceId: 'se', spaceName: '软件工程', minutes: 45, color: '#f59e0b', reason: '项目延期，优先补齐' },
@@ -214,6 +242,14 @@ const timeAllocations = computed(() => {
   return base
 })
 
+const totalPlannedMinutes = computed(() =>
+  timeAllocations.value.reduce((sum, item) => sum + Number(item.minutes || 0), 0)
+)
+
+const maxTimeAllocation = computed(() =>
+  Math.max(...timeAllocations.value.map(item => Number(item.minutes || 0)), 1)
+)
+
 interface PlanTask {
   id: string
   spaceId: string
@@ -225,9 +261,40 @@ interface PlanTask {
   estimatedMinutes: number
   agentReason: string
   status: string
+  algorithmGenerated?: boolean
+  actionType?: string
 }
 
+const palette = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#0ea5e9']
+const algorithmPlanTasks = computed<PlanTask[]>(() =>
+  algorithmPlans.value
+    .filter(item => item.state.nextAction)
+    .map((item, index) => {
+      const action = item.state.nextAction
+      const mastery = Number(action.mastery ?? 0.5)
+      const confidence = Number(action.confidence ?? 0)
+      const highPriority = mastery < 0.35 || confidence < 0.35
+      return {
+        id: `alg-${item.space.id}-${action.knowledgeNodeId || index}`,
+        spaceId: String(item.space.id),
+        spaceName: item.space.name,
+        color: palette[index % palette.length],
+        title: action.knowledgeName ? `${actionTypeLabel(action.type)}：${action.knowledgeName}` : actionTypeLabel(action.type),
+        type: actionTaskType(action.type),
+        priority: highPriority ? 'high' : mastery < 0.6 ? 'medium' : 'low',
+        estimatedMinutes: highPriority ? 30 : 20,
+        agentReason: action.reason || '算法证据不足，建议先安排一次验证。',
+        status: 'todo',
+        algorithmGenerated: true,
+        actionType: action.type,
+      }
+    })
+)
+
 const tasks = computed<PlanTask[]>(() => {
+  if (algorithmPlanTasks.value.length) {
+    return sortTasksByStrategy(algorithmPlanTasks.value)
+  }
   const base: PlanTask[] = [
     { id: 't1', spaceId: 'math', spaceName: '高等数学', color: '#3b82f6', title: '极限专项练习', type: 'practice', priority: 'high', estimatedMinutes: 35, agentReason: '在洛必达法则适用条件上连续出错，需针对性练习', status: 'todo' },
     { id: 't2', spaceId: 'math', spaceName: '高等数学', color: '#3b82f6', title: '连续性与间断点复习', type: 'review', priority: 'medium', estimatedMinutes: 20, agentReason: '极限前置基础，巩固后可提升解题速度', status: 'todo' },
@@ -237,10 +304,7 @@ const tasks = computed<PlanTask[]>(() => {
     { id: 't6', spaceId: 'os', spaceName: '操作系统', color: '#8b5cf6', title: '同步互斥 PV 操作复习', type: 'review', priority: 'low', estimatedMinutes: 20, agentReason: '昨日已完成重点复习，今日可选做', status: 'todo' }
   ]
   if (strategy.value === 'weakness_first') {
-    return base.sort((a, b) => {
-      const order = { high: 0, medium: 1, low: 2 }
-      return order[a.priority as keyof typeof order] - order[b.priority as keyof typeof order]
-    })
+    return sortTasksByStrategy(base)
   }
   return base
 })
@@ -256,16 +320,63 @@ const groupedTasks = computed(() => {
   return Object.values(groups)
 })
 
-const rankingReasons = computed(() => [
-  { spaceId: 'math', spaceName: '高等数学', color: '#3b82f6', priorityLevel: 'high', reason: '你在"洛必达法则适用条件"上连续 3 次出错，正确率降至 40%。根据遗忘曲线和学习记录，今天是最佳巩固窗口。' },
-  { spaceId: 'se', spaceName: '软件工程', color: '#f59e0b', priorityLevel: 'high', reason: '需求分析文档已延期 1 天，且后续原型设计依赖此文档完成。任务路径上存在阻塞。' },
-  { spaceId: 'english', spaceName: '英语四级', color: '#10b981', priorityLevel: 'medium', reason: '词汇保持稳定但听力持续偏弱。每天保持一定输入对长期记忆效果最佳。' },
-  { spaceId: 'os', spaceName: '操作系统', color: '#8b5cf6', priorityLevel: 'low', reason: '昨天已完成进程同步与 PV 操作的复习，今日可暂缓。距离截止还有 6 天。' }
-])
+const rankingReasons = computed(() => {
+  if (algorithmPlanTasks.value.length) {
+    return algorithmPlanTasks.value.map(task => ({
+      spaceId: task.spaceId,
+      spaceName: task.spaceName,
+      color: task.color,
+      priorityLevel: task.priority === 'high' ? 'high' : task.priority === 'medium' ? 'medium' : 'low',
+      reason: task.agentReason,
+    }))
+  }
+  return [
+    { spaceId: 'math', spaceName: '高等数学', color: '#3b82f6', priorityLevel: 'high', reason: '你在"洛必达法则适用条件"上连续 3 次出错，正确率降至 40%。根据遗忘曲线和学习记录，今天是最佳巩固窗口。' },
+    { spaceId: 'se', spaceName: '软件工程', color: '#f59e0b', priorityLevel: 'high', reason: '需求分析文档已延期 1 天，且后续原型设计依赖此文档完成。任务路径上存在阻塞。' },
+    { spaceId: 'english', spaceName: '英语四级', color: '#10b981', priorityLevel: 'medium', reason: '词汇保持稳定但听力持续偏弱。每天保持一定输入对长期记忆效果最佳。' },
+    { spaceId: 'os', spaceName: '操作系统', color: '#8b5cf6', priorityLevel: 'low', reason: '昨天已完成进程同步与 PV 操作的复习，今日可暂缓。距离截止还有 6 天。' }
+  ]
+})
+
+const dailyInsight = computed(() => {
+  if (algorithmLoading.value) return '正在读取各学习空间的掌握度和薄弱点。'
+  return '今日建议优先处理高等数学的极限专项练习，其次处理已延期项目。当前没有读取到算法诊断时，页面会保留原有计划。'
+})
+
+const primaryDailyTask = computed(() => algorithmPlanTasks.value[0] || null)
 
 const typeLabel = (type: string) => {
   const map: Record<string, string> = { practice: '练习', review: '复习', project: '项目', learn: '学习', test: '测试', resource: '资源' }
   return map[type] || type
+}
+
+const actionTypeLabel = (type?: string) => {
+  const map: Record<string, string> = {
+    diagnostic_quiz: '诊断测评',
+    weakness_practice: '补弱练习',
+    verification_quiz: '验证测评',
+    advance_or_review: '推进或复习',
+  }
+  return map[type || ''] || '学习动作'
+}
+
+const actionTaskType = (type?: string) => {
+  if (type === 'diagnostic_quiz' || type === 'verification_quiz') return 'test'
+  if (type === 'weakness_practice') return 'practice'
+  return 'review'
+}
+
+const sortTasksByStrategy = (items: PlanTask[]) => {
+  const priorityOrder = { high: 0, medium: 1, low: 2 }
+  if (strategy.value === 'balanced') {
+    return [...items].sort((a, b) => a.spaceName.localeCompare(b.spaceName, 'zh-CN'))
+  }
+  if (strategy.value === 'weakness_first') {
+    return [...items].sort((a, b) =>
+      priorityOrder[a.priority as keyof typeof priorityOrder] - priorityOrder[b.priority as keyof typeof priorityOrder]
+    )
+  }
+  return [...items]
 }
 
 const statusLabel = (status: string) => {
@@ -274,17 +385,58 @@ const statusLabel = (status: string) => {
 }
 
 const startTask = (task: PlanTask) => {
-  ElMessage.success(`开始任务：${task.title}`)
+  if (task.algorithmGenerated) {
+    router.push({
+      path: '/ai-tutor',
+      query: {
+        spaceId: task.spaceId,
+        message: `请根据算法诊断为我创建今日学习动作：${task.title}。依据：${task.agentReason}`,
+      },
+    })
+    return
+  }
+  enterStudy(task.id, { spaceId: task.spaceId, source: 'daily_plan_task' })
 }
 
 const startAllTasks = () => {
-  ElMessage.success('已为你打开今日学习流程，开始第一个任务！')
+  if (tasks.value[0]?.algorithmGenerated) {
+    startTask(tasks.value[0])
+    return
+  }
+  enterTodayFirst(tasks.value[0], 'daily_plan_total')
 }
 
 const doRedistribute = () => {
   showRedistributeDialog.value = false
   ElMessage.success('已根据最新设定重新分配今日任务时间')
 }
+
+async function loadAlgorithmPlans() {
+  algorithmLoading.value = true
+  try {
+    const spaces = await learningSpaceApi.list('active')
+    const limited = spaces.slice(0, 6)
+    const results = await Promise.allSettled(
+      limited.map(async space => ({
+        space,
+        state: await fetchLearningState(space.id),
+      }))
+    )
+    algorithmPlans.value = results
+      .filter((item): item is PromiseFulfilledResult<{ space: LearningSpaceVO; state: LearningAlgorithmState }> =>
+        item.status === 'fulfilled'
+      )
+      .map(item => item.value)
+      .filter(item => item.state.assessedCount > 0 || item.state.weakPoints.length > 0)
+  } catch (e) {
+    console.warn('Failed to load daily algorithm plans:', e)
+    algorithmPlans.value = []
+  } finally {
+    algorithmLoading.value = false
+  }
+}
+
+onMounted(loadAlgorithmPlans)
 </script>
 
 <style scoped lang="scss">
@@ -301,8 +453,8 @@ const doRedistribute = () => {
 .agent-summary {
   padding: var(--spacing-xl);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%);
-  border: 1px solid rgba(59, 91, 219, 0.1);
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%);
+  border: 1px solid rgba(11, 183, 170, 0.1);
 }
 
 .agent-header {
@@ -448,9 +600,9 @@ const doRedistribute = () => {
   align-items: center;
   justify-content: space-between;
   padding: var(--spacing-md) var(--spacing-lg);
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
 }
 
 .strategy-info {
@@ -471,8 +623,8 @@ const doRedistribute = () => {
 .strategy-btn {
   padding: 4px 14px;
   border-radius: var(--radius-full);
-  border: 1px solid var(--border-light);
-  background: white;
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
   font-size: 0.75rem;
   color: var(--text-secondary);
   cursor: pointer;
@@ -482,10 +634,11 @@ const doRedistribute = () => {
 .strategy-btn:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
+  background: var(--button-hover-bg);
 }
 
 .strategy-btn.active {
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   border-color: var(--primary-color);
   color: var(--primary-color);
   font-weight: 500;
@@ -493,10 +646,10 @@ const doRedistribute = () => {
 
 /* 任务列表 */
 .task-list-section {
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-xl);
   padding: var(--spacing-xl);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
 }
 
 .section-actions {
@@ -510,14 +663,14 @@ const doRedistribute = () => {
   gap: 6px;
   padding: 8px 16px;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  background: white;
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
   font-size: 0.8125rem;
-  color: var(--text-regular);
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
 
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); background: rgba(59, 91, 219, 0.02); }
+  &:hover { border-color: var(--primary-color); color: var(--primary-color); background: var(--button-hover-bg); }
 
   &.primary {
     background: linear-gradient(135deg, #3b5bdb 0%, #5c7cfa 100%);
@@ -567,13 +720,14 @@ const doRedistribute = () => {
 
 .task-card {
   display: flex;
+  background: var(--item-bg);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
   overflow: hidden;
   transition: all var(--transition-fast);
 
   &:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    box-shadow: 0 2px 8px  var(--color-shadow);
     transform: translateY(-1px);
   }
 
@@ -652,7 +806,7 @@ const doRedistribute = () => {
 
   &.todo { color: var(--text-muted); background: var(--background-color-base); }
   &.delayed { color: var(--danger-color); background: rgba(239, 68, 68, 0.06); }
-  &.doing { color: var(--primary-color); background: rgba(59, 91, 219, 0.06); }
+  &.doing { color: var(--primary-color); background: rgba(11, 183, 170, 0.06); }
   &.done { color: var(--accent-color); background: rgba(16, 185, 129, 0.06); }
 }
 
@@ -660,7 +814,7 @@ const doRedistribute = () => {
   padding: 4px 14px;
   border-radius: var(--radius-full);
   border: 1px solid var(--primary-color);
-  background: white;
+  background: transparent;
   color: var(--primary-color);
   font-size: 0.75rem;
   cursor: pointer;

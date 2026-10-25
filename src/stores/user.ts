@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { userApi } from '@/api/user'
-import type { UserInfoResponse, UpdateUserParams } from '@/api/user'
+import type { UserInfoResponse, UpdateUserParams, AuthIdentity } from '@/api/user'
 import { studentProfileApi } from '@/api/studentProfile'
 import { chatWebSocket } from '@/utils/websocket'
 
@@ -10,7 +10,7 @@ const SHORT_TOKEN_KEY = 'shortToken'
 const ACCOUNT_KEY = 'remembered_account'
 
 export interface UserInfo {
-  id: number
+  id: string
   username: string
   email: string
   phone?: string
@@ -24,6 +24,7 @@ export interface UserInfo {
   vipExpireTime?: string
   status?: number
   profileInitialized?: boolean
+  authIdentities?: AuthIdentity[]
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -52,8 +53,26 @@ export const useUserStore = defineStore('user', () => {
 
   async function login(email: string, password: string) {
     const response = await userApi.login({ email, password })
+    // 后端 Result.success(tokens.get("accessToken"), ...) 返回纯字符串，拦截器解包后也是字符串
+    if (typeof response === 'string') {
+      setToken(response)
+    } else {
+      setToken(response.accessToken)
+      setShortToken(response.shortToken)
+    }
+  }
+
+  async function githubLogin(code: string, state?: string) {
+    const response: any = await userApi.githubLogin(code, state)
+    // 后端返回 { accessToken, isNewUser }，提取 accessToken 存储
     setToken(response.accessToken)
-    setShortToken(response.shortToken)
+  }
+
+  /** Gitee OAuth 登录，返回 isNewUser 供回调页展示欢迎文案 */
+  async function giteeLogin(code: string, state?: string): Promise<boolean> {
+    const response: any = await userApi.giteeLogin(code, state)
+    setToken(response.accessToken)
+    return !!response.isNewUser
   }
 
   async function register(params: {
@@ -121,6 +140,20 @@ export const useUserStore = defineStore('user', () => {
     await userApi.changePassword(params)
   }
 
+  async function bindAuth(providerCode: string, code: string, state: string) {
+    await userApi.bindAuth({ providerCode, code, state })
+    await fetchUserInfo()
+  }
+
+  async function unbindAuth(providerCode: string) {
+    await userApi.unbindAuth(providerCode)
+    if (userInfo.value) {
+      userInfo.value.authIdentities = (userInfo.value.authIdentities || []).filter(
+        (i) => i.providerCode !== providerCode
+      )
+    }
+  }
+
   return {
     token,
     shortToken,
@@ -133,6 +166,8 @@ export const useUserStore = defineStore('user', () => {
     setShortToken,
     setUserInfo,
     login,
+    githubLogin,
+    giteeLogin,
     register,
     fetchUserInfo,
     logout,
@@ -142,6 +177,8 @@ export const useUserStore = defineStore('user', () => {
     updateUserInfo,
     updateProfile,
     uploadAvatar,
-    changePassword
+    changePassword,
+    bindAuth,
+    unbindAuth
   }
 })

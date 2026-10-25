@@ -6,18 +6,22 @@
       <div class="agent-hero-content">
         <div class="agent-hero-left">
           <div class="agent-hero-avatar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-              <line x1="9" y1="9" x2="9.01" y2="9"/>
-              <line x1="15" y1="9" x2="15.01" y2="9"/>
+            <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" width="36" height="36">
+              <path d="M483.002182 188.043636h51.2v114.036364H483.002182z" fill="#40e3c2"/>
+              <path d="M510.929455 143.825455m-128 0a128 128 0 1 0 256 0 128 128 0 1 0-256 0Z" fill="#40e3c2"/>
+              <path d="M475.83125977 148.45865723v5.05620769h37.07885744v11.79781821h-16.8540259v23.59563642h16.8540259v11.79781817h-16.8540259V207.44774823l8.42701331 28.65184483h8.42701259v10.1124154h-15.16862307l-5.05620773-20.22483152L485.94367591 246.21200846H469.08964929v-11.7978182h11.79781818L485.94367591 207.44774823v-8.42701259H469.08964929v-11.79781893h18.5394287V163.62728031h-15.1686231L465.71884437 156.88566981v-8.42701258h10.1124154z m82.58472817 3.37080486v82.58472817l-10.1124154 11.79781822H519.65172773V151.82946209h38.76426021z m-11.79781819 11.79781822h-16.85402591v70.78690995h16.85402591V163.62728031z" fill="#40e3c2"/>
+              <path d="M679.098182 301.963636c139.636364 13.963636 223.418182 79.127273 253.672727 197.818182 46.545455 179.2 34.909091 267.636364 32.581818 283.927273-2.327273 18.618182-30.254545 123.345455-160.581818 174.545454-83.781818 32.581818-172.218182 55.854545-293.236364 53.527273v-535.272727 535.272727c-116.363636 2.327273-204.8-18.618182-286.254545-48.872727l-9.309091-4.654546c-130.327273-53.527273-158.254545-158.254545-160.581818-174.545454-4.654545-16.290909-13.963636-104.727273 30.254545-283.927273 30.254545-118.690909 114.036364-186.181818 251.345455-200.145454 37.236364-2.327273 93.090909-6.981818 172.218182-6.981819h9.309091c74.472727 0 128 4.654545 160.581818 9.309091z" fill="#C5C5C5"/>
+              <path d="M139.170909 723.2c0 2.327273 0 2.327273 0 0 0 4.654545 2.327273 6.981818 2.327273 9.309091 4.654545 9.309091 9.309091 16.290909 16.290909 25.6 18.618182 23.272727 46.545455 44.218182 83.781818 58.181818l4.654546 2.327273 4.654545 2.327273c53.527273 18.618182 107.054545 30.254545 165.236364 37.236363 58.181818 4.654545 123.345455 4.654545 183.854545 0 58.181818-4.654545 111.709091-18.618182 165.236364-37.236363l4.654545-2.327273c41.890909-13.963636 69.818182-34.909091 88.436364-60.509091 6.981818-9.309091 11.636364-18.618182 16.290909-25.6 0-2.327273 2.327273-4.654545 2.327273-6.981818v-2.327273c0-2.327273 0-6.981818 2.327272-11.636364v-2.327272-39.563637c-2.327273-44.218182-13.963636-97.745455-32.581818-162.909091-18.618182-74.472727-72.145455-111.709091-174.545454-121.018181-53.527273-4.654545-93.090909-6.981818-148.945455-6.981819H502.225455c-58.181818 0-97.745455 2.327273-155.927273 6.981819-102.4 9.309091-153.6 46.545455-174.545455 118.690909-18.618182 65.163636-27.927273 118.690909-32.581818 162.909091 0 16.290909-2.327273 30.254545 0 39.563636v16.290909z" fill="#14254E"/>
+              <path d="M509.207273 695.272727c-27.927273 0-55.854545 11.636364-55.854546 20.945455s11.636364 39.563636 55.854546 39.563636c41.890909 0 51.2-23.272727 55.854545-39.563636 0-13.963636-27.927273-20.945455-55.854545-20.945455z" fill="#40E3C2"/>
+              <path d="M295.936 578.373818a72.145455 53.527273 90 1 0 107.054545 0 72.145455 53.527273 90 1 0-107.054545 0Z" fill="#40E3C2"/>
+              <path d="M617.099636 578.373818a72.145455 53.527273 90 1 0 107.054546 0 72.145455 53.527273 90 1 0-107.054546 0Z" fill="#40E3C2"/>
             </svg>
           </div>
           <div class="agent-hero-text">
             <h1 class="agent-greeting">早上好，{{ userName }}</h1>
             <p class="agent-summary" v-if="spaceStore.spaceCount > 0">
               我已经检查了你正在进行的 <strong>{{ spaceStore.spaceCount }} 个学习空间</strong>。
-              点击空间卡片进入学习，或与 Agent 对话制定今日计划。
+              与 Agent 对话制定今日计划，开始高效学习。
             </p>
             <p class="agent-summary" v-else>
               你还没有进行中的学习空间，点击<strong>新建学习空间</strong>开始你的学习之旅。
@@ -25,106 +29,26 @@
           </div>
         </div>
         <div class="agent-hero-right">
-          <div class="hero-time-stat">
-            <span class="time-big">2h 30m</span>
-            <span class="time-label">今日可用时间</span>
+          <div class="hero-stats-row">
+            <div class="hero-time-stat">
+              <span class="time-big">2h 30m</span>
+              <span class="time-label">今日可用时间</span>
+            </div>
+            <div class="hero-space-stat">
+              <span class="space-count">{{ spaceStore.spaceCount }}</span>
+              <span class="space-label">进行中的学习空间</span>
+            </div>
           </div>
-          <div class="hero-space-stat">
-            <span class="space-count">{{ spaceStore.spaceCount }}</span>
-            <span class="space-label">进行中的学习空间</span>
-          </div>
+          <button class="start-today-btn" @click="enterTodayFirst(priorityTasks[0], 'dashboard_hero')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <polygon points="5,3 19,12 5,21"/>
+            </svg>
+            开始今日学习
+          </button>
         </div>
       </div>
     </section>
 
-    <!-- 学习空间卡片组 -->
-    <section class="space-cards-section">
-      <div class="section-header">
-        <h2 class="section-title">我的学习空间</h2>
-        <button class="add-space-btn" @click="$router.push('/ai-tutor')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          新建学习空间
-        </button>
-      </div>
-
-      <div v-loading="spaceStore.loading" class="space-cards-grid">
-        <div
-          v-for="space in spaceStore.spaces"
-          :key="space.id"
-          class="space-card"
-          :class="space.healthStatus"
-          @click="$router.push(`/space/${space.id}`)"
-        >
-          <div class="space-card-top">
-            <div class="space-card-header">
-              <el-image 
-                class="space-card-cover" 
-                :src="space.coverUrl" 
-                fit="cover"
-              >
-                <template #error>
-                  <div class="space-cover-placeholder">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                      <circle cx="8.5" cy="8.5" r="1.5"/>
-                      <polyline points="21 15 16 10 5 21"/>
-                    </svg>
-                  </div>
-                </template>
-              </el-image>
-              <div class="space-card-title-group">
-                <h3 class="space-card-name">{{ space.name }}</h3>
-                <span class="space-card-status" :class="space.healthStatus">{{ healthStatusLabel(space.healthStatus) }}</span>
-              </div>
-            </div>
-            <p class="space-card-goal" v-if="space.goal">目标：{{ space.goal }}</p>
-
-            <div class="space-card-progress">
-              <div class="progress-header">
-                <span>完成进度</span>
-                <span class="progress-value">{{ Math.round(space.progress) }}%</span>
-              </div>
-              <div class="progress-track">
-                <div class="progress-fill" :style="{ width: Math.round(space.progress) + '%', background: space.color }"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="space-card-bottom">
-            <div class="space-card-today" v-if="space.todaySuggestion">
-              <span class="today-label">今日建议</span>
-              <p class="today-suggestion">{{ space.todaySuggestion }}</p>
-            </div>
-            <div class="space-card-alert" v-if="space.alert">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
-              {{ space.alert }}
-            </div>
-            <div class="space-card-actions">
-              <button class="space-action-btn primary" @click.stop="$router.push(`/space/${space.id}`)">
-                进入空间
-              </button>
-              <button class="space-action-btn" @click.stop="startSpaceToday(space)">
-                开始今日任务
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 空状态 -->
-        <el-empty
-          v-if="!spaceStore.loading && spaceStore.spaces.length === 0"
-          description="暂无学习空间"
-          :image-size="120"
-          style="grid-column: 1 / -1"
-        >
-          <el-button type="primary" @click="$router.push('/ai-tutor')">新建学习空间</el-button>
-        </el-empty>
-      </div>
-    </section>
 
     <!-- 画像未完成提醒横幅 -->
     <section
@@ -157,7 +81,7 @@
             </svg>
             今日优先任务
           </h2>
-          <button class="section-link" @click="$router.push('/daily-plan')">查看全部 →</button>
+          <button class="section-link" @click="$router.push('/tasks')">查看全部 →</button>
         </div>
 
         <div class="priority-task-list">
@@ -178,16 +102,16 @@
               <h4 class="task-title">{{ task.title }}</h4>
               <p class="task-reason">{{ task.reason }}</p>
             </div>
-            <button class="task-go-btn" @click="doTask(task)">开始</button>
+            <button class="task-go-btn" @click="doTask(task)">开始这次学习</button>
           </div>
         </div>
 
         <div class="start-all-bar">
-          <button class="start-all-btn" @click="$router.push('/daily-plan')">
+          <button class="start-all-btn" @click="enterTodayFirst(priorityTasks[0], 'dashboard_hero')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
               <polygon points="5,3 19,12 5,21"/>
             </svg>
-            开始今日总计划
+            开始今日任务
           </button>
           <button class="why-btn" @click="showWhyDialog = true">为什么这样安排？</button>
         </div>
@@ -254,13 +178,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useLearningSpaceStore } from '@/stores/learningSpace'
+import { useStudyEntry } from '@/composables/useStudyEntry'
 import AppLayout from '@/components/layout/AppLayout.vue'
 
 const userStore = useUserStore()
 const spaceStore = useLearningSpaceStore()
+const { enterStudy, enterTodayFirst } = useStudyEntry()
 const userName = ref(userStore.userName || '谢同学')
 const showWhyDialog = ref(false)
 const showProfileReminder = ref(true)
@@ -270,9 +195,9 @@ onMounted(() => {
 })
 
 const priorityTasks = ref([
-  { id: 't1', spaceName: '高等数学', spaceColor: '#3b82f6', title: '洛必达法则 10 道专项练习', typeName: '练习', minutes: 35, reason: '连续 3 次出错，正确率降至 40%，今日是最佳巩固窗口' },
-  { id: 't2', spaceName: '软件工程', spaceColor: '#f59e0b', title: '补齐用户故事与用例图', typeName: '项目', minutes: 45, reason: '已延期 1 天，阻塞后续原型设计' },
-  { id: 't3', spaceName: '英语四级', spaceColor: '#10b981', title: '听力精听 + 词汇复习 40 个', typeName: '复习', minutes: 20, reason: '听力持续偏弱，需保持每日训练节奏' }
+  { id: 't1', spaceId: 's1', spaceName: '高等数学', spaceColor: '#3b82f6', title: '洛必达法则 10 道专项练习', typeName: '练习', minutes: 35, reason: '连续 3 次出错，正确率降至 40%，今日是最佳巩固窗口' },
+  { id: 't2', spaceId: 's2', spaceName: '软件工程', spaceColor: '#f59e0b', title: '补齐用户故事与用例图', typeName: '项目', minutes: 45, reason: '已延期 1 天，阻塞后续原型设计' },
+  { id: 't3', spaceId: 's3', spaceName: '英语四级', spaceColor: '#10b981', title: '听力精听 + 词汇复习 40 个', typeName: '复习', minutes: 20, reason: '听力持续偏弱，需保持每日训练节奏' }
 ])
 
 const timeAllocations = ref([
@@ -296,23 +221,15 @@ const rankingReasons = ref([
   { spaceId: 'os', spaceName: '操作系统', color: '#8b5cf6', level: 'low', levelLabel: '低优先', reason: '昨日已完成进程同步与 PV 操作复习，距离截止还有 6 天，今日可暂缓。' }
 ])
 
-import type { LearningSpaceDisplay } from '@/api/learningSpace'
-
-const healthStatusLabel = (s: string) => {
-  const m: Record<string, string> = { normal: '正常', warning: '需关注', danger: '有风险', good: '良好' }
-  return m[s] || s
-}
-
-const doTask = (task: any) => ElMessage.success(`开始任务：${task.title}`)
-const startSpaceToday = (space: LearningSpaceDisplay) => {
-  ElMessage.success(`开始 ${space.name} 的今日任务`)
+const doTask = (task: any) => {
+  enterStudy(task.id, { spaceId: task.spaceId, source: 'dashboard_priority' })
 }
 </script>
 
 <style scoped lang="scss">
 .dashboard-page {
   width: 100%;
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -321,7 +238,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 
 /* 画像提醒横幅 */
 .profile-reminder-banner {
-  background: linear-gradient(135deg, rgba(18, 184, 134, 0.08) 0%, rgba(59, 91, 219, 0.08) 100%);
+  background: linear-gradient(135deg, rgba(18, 184, 134, 0.08) 0%, rgba(11, 183, 170, 0.08) 100%);
   border: 1px solid rgba(18, 184, 134, 0.2);
   border-radius: var(--radius-lg);
   padding: var(--spacing-md) var(--spacing-lg);
@@ -388,8 +305,8 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 .agent-hero {
   padding: var(--spacing-xl);
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(59, 91, 219, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%);
-  border: 1px solid rgba(59, 91, 219, 0.1);
+  background: linear-gradient(135deg, rgba(11, 183, 170, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%);
+  border: 1px solid rgba(11, 183, 170, 0.1);
 }
 
 .agent-hero-content {
@@ -420,7 +337,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 .agent-greeting {
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-dark);
+  color: var(--text-primary);
   margin: 0 0 var(--spacing-sm);
 }
 
@@ -434,229 +351,57 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 
 .agent-hero-right {
   display: flex;
-  gap: var(--spacing-2xl);
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
   flex-shrink: 0;
+}
+
+.hero-stats-row {
+  display: flex;
+  gap: var(--spacing-2xl);
+}
+
+.start-today-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 28px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #0bb7aa, #0284c7);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(11, 183, 170, 0.32);
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 30px rgba(11, 183, 170, 0.42);
+  }
+  &:active { transform: translateY(0); }
 }
 
 .hero-time-stat, .hero-space-stat {
   text-align: center;
   padding: var(--spacing-md) var(--spacing-lg);
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
 }
 
 .time-big, .space-count {
   display: block;
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-dark);
+  color: var(--text-primary);
 }
 
 .time-label, .space-label {
   font-size: 0.6875rem;
   color: var(--text-muted);
-}
-
-/* 学习空间卡片 */
-.space-cards-section {
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--spacing-lg);
-  }
-
-  .section-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--text-dark);
-    margin: 0;
-  }
-
-  .add-space-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 16px;
-    border-radius: var(--radius-lg);
-    border: 1px dashed var(--primary-color);
-    background: transparent;
-    color: var(--primary-color);
-    font-size: 0.8125rem;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    &:hover { background: rgba(59, 91, 219, 0.04); }
-  }
-}
-
-.space-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--spacing-lg);
-}
-
-.space-card {
-  background: white;
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border-light);
-  overflow: hidden;
-  cursor: pointer;
-  transition: all var(--transition-base);
-  display: flex;
-  flex-direction: column;
-
-  &:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-    transform: translateY(-2px);
-  }
-
-  &.warning { border-top: 3px solid var(--warn-color); }
-  &.danger { border-top: 3px solid var(--danger-color); }
-  &.good { border-top: 3px solid var(--accent-color); }
-  &.normal { border-top: 3px solid var(--primary-color); }
-}
-
-.space-card-top {
-  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
-}
-
-.space-card-header {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-sm);
-}
-
-.space-card-cover { width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; border: 1px solid var(--border-light); background: #f8fafc; }
-  .space-cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f1f5f9; color: #94a3b8; border-radius: 10px; }
-
-.space-card-title-group {
-  flex: 1;
-  min-width: 0;
-}
-
-.space-card-name {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  margin: 0;
-}
-
-.space-card-status {
-  font-size: 0.625rem;
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  font-weight: 500;
-
-  &.normal { color: var(--primary-color); background: rgba(59, 91, 219, 0.06); }
-  &.warning { color: var(--warn-color); background: rgba(245, 158, 11, 0.06); }
-  &.danger { color: var(--danger-color); background: rgba(239, 68, 68, 0.06); }
-  &.good { color: var(--accent-color); background: rgba(16, 185, 129, 0.06); }
-}
-
-.space-card-goal {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  margin: 0 0 var(--spacing-md);
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.space-card-progress {
-  .progress-header {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.6875rem;
-    color: var(--text-muted);
-    margin-bottom: 4px;
-  }
-  .progress-value {
-    font-weight: 600;
-    color: var(--text-dark);
-  }
-  .progress-track {
-    height: 6px;
-    background: var(--border-light);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    border-radius: var(--radius-full);
-    transition: width 0.6s ease;
-  }
-}
-
-.space-card-bottom {
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: rgba(0,0,0,0.01);
-  border-top: 1px solid rgba(0,0,0,0.04);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.today-label {
-  font-size: 0.625rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-muted);
-}
-
-.today-suggestion {
-  font-size: 0.75rem;
-  color: var(--text-regular);
-  margin: 2px 0 0;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.space-card-alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-  font-size: 0.6875rem;
-  color: var(--danger-color);
-  padding: 6px 8px;
-  background: rgba(239, 68, 68, 0.04);
-  border-radius: var(--radius-sm);
-  svg { flex-shrink: 0; margin-top: 1px; }
-}
-
-.space-card-actions {
-  display: flex;
-  gap: var(--spacing-xs);
-  margin-top: auto;
-  padding-top: var(--spacing-sm);
-}
-
-.space-action-btn {
-  flex: 1;
-  padding: 6px 0;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-light);
-  background: white;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); }
-
-  &.primary {
-    background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
-    border-color: transparent;
-    color: white;
-    &:hover { opacity: 0.9; }
-  }
 }
 
 /* 双列 */
@@ -667,10 +412,11 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 }
 
 .section {
-  background: white;
+  background: var(--panel-bg);
   border-radius: var(--radius-xl);
   padding: var(--spacing-xl);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-color);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .section-header {
@@ -686,7 +432,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   gap: var(--spacing-sm);
   font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-dark);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -718,7 +464,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   border: 1px solid var(--border-light);
   transition: all var(--transition-fast);
 
-  &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  &:hover { box-shadow: 0 2px 8px  var(--color-shadow); }
 }
 
 .task-rank {
@@ -770,7 +516,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 .task-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: var(--text-dark);
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
@@ -785,7 +531,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   padding: 6px 14px;
   border-radius: var(--radius-full);
   border: 1px solid var(--primary-color);
-  background: white;
+  background: var(--panel-bg);
   color: var(--primary-color);
   font-size: 0.75rem;
   cursor: pointer;
@@ -815,14 +561,14 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-base);
-  &:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 91, 219, 0.3); }
+  &:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(11, 183, 170, 0.3); }
 }
 
 .why-btn {
   padding: 10px 20px;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-light);
-  background: white;
+  border: 1px solid var(--border-color);
+  background: var(--panel-bg);
   font-size: 0.875rem;
   color: var(--text-secondary);
   cursor: pointer;
@@ -844,7 +590,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 
 .time-chunk {
   padding-bottom: var(--spacing-md);
-  border-bottom: 1px solid rgba(0,0,0,0.04);
+  border-bottom: 1px solid var(--color-border);
 
   &:last-child { border-bottom: none; padding-bottom: 0; }
 }
@@ -866,7 +612,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 .chunk-name {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text-dark);
+  color: var(--text-primary);
 }
 
 .chunk-minutes {
@@ -912,7 +658,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
 .mini-agent-name {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text-dark);
+  color: var(--text-primary);
   white-space: nowrap;
 }
 
@@ -937,7 +683,7 @@ const startSpaceToday = (space: LearningSpaceDisplay) => {
     gap: var(--spacing-sm);
     font-size: 0.875rem;
     margin: 0 0 var(--spacing-xs);
-    color: var(--text-dark);
+    color: var(--text-primary);
   }
   p {
     font-size: 0.8125rem;

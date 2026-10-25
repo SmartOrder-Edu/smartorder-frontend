@@ -1,11 +1,10 @@
 <template>
-  <AppLayout>
-    <div class="prize-management-container">
+  <div class="prize-management-view animate__animated animate__fadeIn">
     <!-- 顶部极简精美头部 -->
-    <div class="page-header animate__animated animate__fadeIn">
+    <div class="page-header">
       <div class="header-left">
-        <h2>反馈奖品与卡密管理大厅</h2>
-        <p>管理员在此批量导入卡密、处理库存、并审计所有中奖兑换码的发放流水。</p>
+        <h2 class="gradient-title">反馈奖品与卡密管理大厅</h2>
+        <p class="subtitle">管理员在此进行卡密大宗录入、库存审计、兑换发放流水监管及风控作废操作</p>
       </div>
       <div class="header-actions">
         <el-button 
@@ -20,49 +19,63 @@
       </div>
     </div>
 
-    <!-- 顶部磨砂卡片指标看板 -->
-    <el-row :gutter="20" class="stats-row animate__animated animate__fadeInUp">
-      <el-col :span="8">
-        <div class="stats-card card-available">
-          <div class="card-icon-box">
-            <el-icon><Ticket /></el-icon>
+    <!-- 顶部磨砂 Bento 看板大盘 (指标卡 + 库存 ECharts 环形占比) -->
+    <el-row :gutter="20" class="stats-row">
+      <!-- 左侧指标栏 -->
+      <el-col :span="14">
+        <div class="bento-grid">
+          <div class="stats-card card-available glass-item">
+            <div class="card-icon-box">
+              <el-icon><Ticket /></el-icon>
+            </div>
+            <div class="card-info">
+              <span class="card-label">可用卡密库存</span>
+              <h3 class="card-value">{{ stats.availableInventory }}</h3>
+            </div>
+            <div class="glow-effect"></div>
           </div>
-          <div class="card-info">
-            <span class="card-label">可用卡密库存</span>
-            <h3 class="card-value">{{ stats.availableInventory }}</h3>
+          <div class="stats-card card-allocated glass-item">
+            <div class="card-icon-box">
+              <el-icon><CircleCheck /></el-icon>
+            </div>
+            <div class="card-info">
+              <span class="card-label">累计已发放</span>
+              <h3 class="card-value">{{ stats.allocatedCount }}</h3>
+            </div>
+            <div class="glow-effect"></div>
+          </div>
+          <div class="stats-card card-discarded glass-item">
+            <div class="card-icon-box">
+              <el-icon><CircleClose /></el-icon>
+            </div>
+            <div class="card-info">
+              <span class="card-label">已风控作废</span>
+              <h3 class="card-value">{{ stats.discardedCount }}</h3>
+            </div>
+            <div class="glow-effect"></div>
           </div>
         </div>
       </el-col>
-      <el-col :span="8">
-        <div class="stats-card card-allocated">
-          <div class="card-icon-box">
-            <el-icon><Checked /></el-icon>
+      <!-- 右侧图表栏 -->
+      <el-col :span="10">
+        <div class="chart-card glass-item">
+          <div class="chart-header">
+            <span class="chart-title">各品类可用库存占比</span>
+            <el-tooltip content="实时可用库存(未发放状态)卡密在总库存中的占比" placement="top">
+              <el-icon class="info-icon"><Warning /></el-icon>
+            </el-tooltip>
           </div>
-          <div class="card-info">
-            <span class="card-label">累计已发放卡密</span>
-            <h3 class="card-value">{{ stats.allocatedCount }}</h3>
-          </div>
-        </div>
-      </el-col>
-      <el-col :span="8">
-        <div class="stats-card card-discarded">
-          <div class="card-icon-box">
-            <el-icon><Failed /></el-icon>
-          </div>
-          <div class="card-info">
-            <span class="card-label">已作废卡密</span>
-            <h3 class="card-value">{{ stats.discardedCount }}</h3>
-          </div>
+          <div ref="pieChartRef" class="inventory-pie-chart"></div>
         </div>
       </el-col>
     </el-row>
 
     <!-- 卡密总账列表区 -->
-    <el-card class="glass-card list-card animate__animated animate__fadeIn" shadow="hover">
+    <el-card class="glass-card list-card" shadow="hover">
       <template #header>
         <div class="card-header-title">
           <el-icon class="header-icon"><List /></el-icon>
-          <span>奖品兑换码总账台</span>
+          <span>卡密发放与流水总账台</span>
           
           <!-- 快捷过滤 -->
           <div class="header-filters">
@@ -71,12 +84,12 @@
               placeholder="状态筛选" 
               clearable 
               @change="handleQuery"
-              style="width: 130px; margin-right: 12px;"
+              style="width: 140px; margin-right: 12px;"
               size="small"
             >
-              <el-option label="未发放 (可用)" :value="0" />
+              <el-option label="可用 (未发放)" :value="0" />
               <el-option label="已发放" :value="1" />
-              <el-option label="已废弃" :value="2" />
+              <el-option label="已作废" :value="2" />
             </el-select>
             <el-input 
               v-model="queryParams.name" 
@@ -84,7 +97,7 @@
               clearable
               :prefix-icon="Search"
               @input="handleQuery"
-              style="width: 200px;"
+              style="width: 180px;"
               size="small"
             />
           </div>
@@ -95,74 +108,126 @@
         v-loading="loading" 
         :data="prizeList" 
         style="width: 100%"
-        class="premium-table"
+        class="admin-table premium-table"
       >
-        <el-table-column prop="name" label="奖品名称" min-width="150" show-overflow-tooltip>
+        <el-table-column prop="name" label="奖品名称" min-width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="prize-name-text">{{ row.name }}</span>
           </template>
         </el-table-column>
         
-        <el-table-column prop="prizeCode" label="卡密兑换码" min-width="180">
+        <el-table-column prop="prizeCode" label="卡密兑换码" min-width="200">
           <template #default="{ row }">
-            <code class="code-badge">{{ row.prizeCode }}</code>
+            <div class="code-badge-wrap">
+              <code class="code-badge">{{ row.prizeCode }}</code>
+              <el-button 
+                type="primary" 
+                link 
+                :icon="DocumentCopy" 
+                class="copy-btn"
+                @click="copyToClipboard(row.prizeCode)"
+                title="复制卡密"
+              />
+            </div>
           </template>
         </el-table-column>
 
-        <el-table-column prop="status" label="状态" width="120">
+        <el-table-column prop="status" label="卡密状态" width="110">
           <template #default="{ row }">
-            <el-tag :type="getStatusTagType(row.status)" effect="dark" style="border-radius: 6px;">
+            <span class="status-indicator" :class="getStatusClass(row.status)">
+              <span class="dot"></span>
               {{ getStatusText(row.status) }}
-            </el-tag>
+            </span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="userId" label="获得者" width="130">
+        <el-table-column prop="username" label="中奖者" width="130">
           <template #default="{ row }">
-            <span v-if="row.userId" class="user-id-text">
+            <span v-if="row.username" class="user-id-text">
               <el-icon style="vertical-align: middle; margin-right: 4px;"><User /></el-icon>
-              用户 ID: {{ row.userId }}
+              {{ row.username }}
             </span>
             <span v-else class="empty-holder">-</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="feedbackTitle" label="关联反馈标题" min-width="180" show-overflow-tooltip>
+        <el-table-column prop="feedbackTitle" label="关联反馈与中奖原因" min-width="220" show-overflow-tooltip>
           <template #default="{ row }">
-            <span v-if="row.feedbackId" class="feedback-link">
-              <el-icon style="vertical-align: middle; margin-right: 4px;"><ChatLineRound /></el-icon>
-              {{ row.feedbackTitle || ('反馈 ID: ' + row.feedbackId) }}
-            </span>
+            <div v-if="row.feedbackId">
+              <!-- 引入 el-popover 悬浮穿透展示反馈细节 -->
+              <el-popover
+                placement="left"
+                :width="360"
+                trigger="hover"
+                @before-enter="loadFeedbackDetail(row.feedbackId)"
+                popper-class="premium-popover"
+              >
+                <template #reference>
+                  <span class="feedback-link">
+                    <el-icon style="vertical-align: middle; margin-right: 4px;"><ChatLineRound /></el-icon>
+                    {{ row.feedbackTitle || ('反馈 ID: ' + row.feedbackId) }}
+                  </span>
+                </template>
+                
+                <!-- 悬浮弹窗内容 -->
+                <div v-loading="loadingFeedback" class="popover-feedback-detail">
+                  <div v-if="hoverFeedbackDetail" class="popover-content">
+                    <div class="popover-header">
+                      <span class="popover-type-tag">
+                        {{ getFeedbackTypeText(hoverFeedbackDetail.type) }}
+                      </span>
+                      <span class="popover-score" v-if="hoverFeedbackDetail.aiAnalysisResult">
+                        AI可信度: <strong>{{ JSON.parse(hoverFeedbackDetail.aiAnalysisResult).score }}分</strong>
+                      </span>
+                    </div>
+                    <div class="popover-desc">
+                      <p class="desc-title">用户反馈内容：</p>
+                      <p class="desc-text">“{{ hoverFeedbackDetail.content }}”</p>
+                    </div>
+                    <div class="popover-reply" v-if="hoverFeedbackDetail.reviewRemark">
+                      <p class="desc-title">人工审核意见：</p>
+                      <p class="desc-text reply-remark">“{{ hoverFeedbackDetail.reviewRemark }}”</p>
+                    </div>
+                  </div>
+                  <div v-else class="popover-empty">
+                    <span>暂未加载到对应的反馈归档记录</span>
+                  </div>
+                </div>
+              </el-popover>
+            </div>
             <span v-else class="empty-holder">-</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="allocateTime" label="发放时间" width="160">
+        <el-table-column prop="allocateTime" label="发放时间" width="140">
           <template #default="{ row }">
             <span>{{ formatDateTime(row.allocateTime) || '-' }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="createTime" label="录入时间" width="160">
+        <el-table-column prop="createTime" label="录入时间" width="140">
           <template #default="{ row }">
             <span>{{ formatDateTime(row.createTime) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="90" fixed="right">
           <template #default="{ row }">
             <el-popconfirm
               v-if="row.status === 0"
-              title="确定要作废该条未发放卡密吗？作废后不可撤销。"
-              confirm-button-text="确定"
+              title="确定作废该卡密吗？作废后不可恢复且不予发放。"
+              confirm-button-text="作废"
               cancel-button-text="取消"
+              confirm-button-type="danger"
               @confirm="handleDiscard(row.id)"
             >
               <template #reference>
-                <el-button type="danger" link :icon="Delete">作废</el-button>
+                <el-button type="danger" link :icon="Delete" class="discard-action-btn">作废</el-button>
               </template>
             </el-popconfirm>
-            <span v-else class="empty-holder">已锁定</span>
+            <span v-else class="locked-text">
+              <el-icon style="vertical-align: middle; margin-right: 2px;"><Lock /></el-icon>已锁定
+            </span>
           </template>
         </el-table-column>
       </el-table>
@@ -173,10 +238,11 @@
           v-model:current-page="queryParams.page"
           v-model:page-size="queryParams.size"
           :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next, jumper"
+          layout="total, sizes, prev, pager, next"
           :total="total"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
+          small
         />
       </div>
     </el-card>
@@ -188,7 +254,7 @@
       width="520px"
       center
       align-center
-      class="premium-dialog"
+      class="premium-dialog glass-dialog"
     >
       <el-form 
         ref="formRef" 
@@ -207,28 +273,28 @@
 
         <el-form-item prop="rawCodes">
           <template #label>
-            <span style="font-weight: 600; display: flex; align-items: center; justify-content: space-between; width: 100%;">
-              <span>批量录入卡密码 <span style="color: #ef4444;">*</span></span>
-              <span style="font-weight: normal; font-size: 12px; color: #94a3b8;">每行输入一个卡密</span>
+            <span class="dialog-textarea-label">
+              <span>批量录入卡密码 <span style="color: #f43f5e;">*</span></span>
+              <span class="label-hint">每行或使用英文逗号隔开一个卡密</span>
             </span>
           </template>
           <el-input
             v-model="form.rawCodes"
             type="textarea"
             :rows="8"
-            placeholder="卡密_001&#10;卡密_002&#10;卡密_003"
+            placeholder="JD-E-10-XXXXXXXX&#10;JD-E-10-YYYYYYYY&#10;JD-E-10-ZZZZZZZZ"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 10px;">
-          <el-button @click="dialogVisible = false" size="large" style="border-radius: 10px; width: 120px;">取消</el-button>
+        <div class="dialog-actions">
+          <el-button @click="dialogVisible = false" size="large" class="dialog-cancel-btn">取消</el-button>
           <el-button 
             type="primary" 
             size="large" 
             :loading="submitting" 
             @click="handleSubmit"
-            style="border-radius: 10px; width: 140px; background-color: #3b82f6; border-color: #3b82f6;"
+            class="dialog-confirm-btn"
           >
             确认录入
           </el-button>
@@ -236,16 +302,15 @@
       </template>
     </el-dialog>
   </div>
-  </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import AppLayout from '@/components/layout/AppLayout.vue'
-import { Plus, List, Search, Delete, Ticket, Checked, Failed, User, ChatLineRound } from '@element-plus/icons-vue'
+import { ref, reactive, onMounted, watch, inject, nextTick, onBeforeUnmount } from 'vue'
+import { Plus, List, Search, Delete, Ticket, CircleCheck, CircleClose, User, ChatLineRound, DocumentCopy, Lock, Warning } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import request from '@/api/request'
+import * as echarts from 'echarts'
 
 // 基础变量
 const loading = ref(false)
@@ -286,6 +351,144 @@ const rules = reactive<FormRules>({
   ]
 })
 
+// 注入全局的主题状态
+const isDark = inject('isDark', ref(true))
+
+// ECharts 饼图相关
+const pieChartRef = ref<HTMLDivElement>()
+let chartInstance: echarts.ECharts | null = null
+
+// 穿透 hover 反馈相关
+const hoverFeedbackDetail = ref<any>(null)
+const loadingFeedback = ref(false)
+
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text).then(() => {
+    ElMessage.success('卡密兑换码已成功复制到剪贴板！')
+  }).catch(() => {
+    ElMessage.error('复制失败，请手动选取')
+  })
+}
+
+// 异步加载穿透反馈
+const loadFeedbackDetail = async (feedbackId: string) => {
+  if (!feedbackId) return
+  loadingFeedback.value = true
+  hoverFeedbackDetail.value = null
+  try {
+    const res = await request.get('/admin/feedback/page', { params: { page: 1, size: 50 } })
+    if (res && res.records) {
+      const found = res.records.find((f: any) => String(f.id) === String(feedbackId))
+      if (found) {
+        hoverFeedbackDetail.value = found
+      }
+    }
+  } catch (e) {
+    console.error('获取穿透反馈失败', e)
+  } finally {
+    loadingFeedback.value = false
+  }
+}
+
+const getFeedbackTypeText = (type: number) => {
+  switch (type) {
+    case 1: return '体验评价'
+    case 2: return '功能建议'
+    case 3: return 'Bug反馈'
+    default: return '用户反馈'
+  }
+}
+
+// 初始化 ECharts 看板饼图
+const initChart = () => {
+  if (!pieChartRef.value) return
+  if (chartInstance) {
+    chartInstance.dispose()
+  }
+
+  chartInstance = echarts.init(pieChartRef.value, isDark.value ? 'dark' : undefined)
+
+  // 整理数据大盘：可用库存的各品类比例
+  const countMap: Record<string, number> = {}
+  
+  // 提取可用状态(status === 0)的卡密
+  prizeList.value.forEach((p: any) => {
+    if (p.status === 0) {
+      countMap[p.name] = (countMap[p.name] || 0) + 1
+    }
+  })
+
+  let chartData = Object.keys(countMap).map(key => ({
+    name: key,
+    value: countMap[key]
+  }))
+
+  if (chartData.length === 0) {
+    chartData = [{ name: '暂无可用库存', value: 0 }]
+  }
+
+  const option = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c} 个 ({d}%)',
+      backgroundColor: isDark.value ? '#1e293b' : '#ffffff',
+      borderColor: 'rgba(99, 102, 241, 0.2)',
+      textStyle: {
+        color: isDark.value ? '#ffffff' : '#0f172a'
+      }
+    },
+    legend: {
+      orient: 'vertical',
+      right: '0%',
+      top: 'center',
+      textStyle: {
+        color: isDark.value ? '#94a3b8' : '#475569',
+        fontSize: 10,
+        fontFamily: 'Inter'
+      },
+      itemWidth: 8,
+      itemHeight: 8,
+      itemGap: 6
+    },
+    series: [
+      {
+        name: '卡密可用占比',
+        type: 'pie',
+        radius: ['52%', '78%'],
+        center: ['38%', '50%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 6,
+          borderColor: isDark.value ? '#0f172a' : '#ffffff',
+          borderWidth: 2
+        },
+        label: {
+          show: false
+        },
+        labelLine: {
+          show: false
+        },
+        data: chartData
+      }
+    ]
+  }
+
+  chartInstance.setOption(option)
+}
+
+// 监听主题切换，重新绘制图表以改变色系
+watch(isDark, () => {
+  nextTick(() => {
+    initChart()
+  })
+})
+
+// 监听窗口大小缩放
+const handleResize = () => {
+  chartInstance?.resize()
+}
+
 // 格式化时间
 const formatDateTime = (dateTimeStr: string) => {
   if (!dateTimeStr) return ''
@@ -302,12 +505,12 @@ const getStatusText = (status: number) => {
   }
 }
 
-const getStatusTagType = (status: number) => {
+const getStatusClass = (status: number) => {
   switch (status) {
-    case 0: return 'success'
-    case 1: return 'primary'
-    case 2: return 'info'
-    default: return ''
+    case 0: return 'status-available'
+    case 1: return 'status-allocated'
+    case 2: return 'status-discarded'
+    default: return 'status-unknown'
   }
 }
 
@@ -332,7 +535,17 @@ const fetchList = async () => {
     const res = await request.get('/admin/prize/page', { params: queryParams })
     if (res) {
       prizeList.value = res.records || []
+      prizeList.value.forEach(item => {
+        if (item.id !== undefined && item.id !== null) {
+          item.id = String(item.id)
+        }
+      })
       total.value = res.total || 0
+      
+      // 数据变动后，更新 ECharts 图表
+      nextTick(() => {
+        initChart()
+      })
     }
   } catch (error) {
     console.error(error)
@@ -369,8 +582,9 @@ const handleSubmit = async () => {
   
   await formRef.value.validate(async (valid) => {
     if (valid) {
-      // 一行一个提取卡密
+      // 兼容英文逗号、分号及换行分割提取卡密
       const codes = form.rawCodes
+        .replace(/[,;，；]/g, '\n')
         .split('\n')
         .map(c => c.trim())
         .filter(c => c.length > 0)
@@ -386,7 +600,7 @@ const handleSubmit = async () => {
           name: form.name,
           prizeCodes: codes
         })
-        ElMessage.success(`成功导入 ${codes.length} 条卡密库存！`)
+        ElMessage.success(`成功批量录入 ${codes.length} 条可用卡密！`)
         dialogVisible.value = false
         fetchStats()
         fetchList()
@@ -400,10 +614,10 @@ const handleSubmit = async () => {
 }
 
 // 作废卡密
-const handleDiscard = async (id: number) => {
+const handleDiscard = async (id: string) => {
   try {
     await request.post(`/admin/prize/${id}/discard`)
-    ElMessage.success('卡密已成功废弃作废')
+    ElMessage.success('卡密作废风控操作成功')
     fetchStats()
     fetchList()
   } catch (error) {
@@ -414,84 +628,89 @@ const handleDiscard = async (id: number) => {
 onMounted(() => {
   fetchList()
   fetchStats()
+  window.addEventListener('resize', handleResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  chartInstance?.dispose()
 })
 </script>
 
 <style scoped>
-.prize-management-container {
-  max-width: 1300px;
-  margin: 0 auto;
-  padding: 10px 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+.prize-management-view {
+  min-height: 100%;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
-.header-left h2 {
+.gradient-title {
   font-size: 24px;
   font-weight: 700;
-  color: #0f172a;
-  margin: 0 0 6px 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 4px 0;
+  background: linear-gradient(135deg, #000000 0%, #6366f1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-.header-left p {
-  font-size: 14px;
-  color: #64748b;
+.subtitle {
+  color: var(--admin-text-secondary);
+  font-size: 13px;
   margin: 0;
 }
 
 .create-btn {
-  height: 44px;
-  border-radius: 12px;
+  height: 40px;
+  border-radius: 10px;
   font-weight: 600;
-  font-size: 14px;
-  background-color: #3b82f6 !important;
+  font-size: 13px;
+  background-color: var(--admin-accent) !important;
   border: none !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
-  transition: all 0.2s;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .create-btn:hover {
-  background-color: #2563eb !important;
   transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
 }
 
-/* 磨砂卡片指标看板 */
+/* Bento 大盘 */
 .stats-row {
-  margin-bottom: 30px;
+  margin-bottom: 20px;
+}
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  height: 100%;
 }
 
 .stats-card {
-  background: #ffffff;
-  border-radius: 20px;
-  padding: 24px 20px;
+  position: relative;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.01), 0 1px 3px rgba(0, 0, 0, 0.01);
-  border: 1px solid #f1f5f9;
-  transition: all 0.3s ease;
-}
-
-.stats-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.03);
+  padding: 24px 20px;
+  overflow: hidden;
+  height: 110px;
+  box-sizing: border-box;
 }
 
 .card-icon-box {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .card-info {
@@ -500,55 +719,110 @@ onMounted(() => {
 }
 
 .card-label {
-  font-size: 13px;
-  color: #94a3b8;
+  font-size: 12px;
+  color: var(--admin-text-secondary);
   font-weight: 500;
   margin-bottom: 4px;
 }
 
 .card-value {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--admin-text-primary);
   margin: 0;
 }
 
-/* 各卡片微光定制 */
-.card-available .card-icon-box {
-  background-color: #eff6ff;
-  color: #3b82f6;
+/* 微光流向 */
+.glow-effect {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.03) 50%,
+    rgba(255, 255, 255, 0) 100__
+  );
+  transform: skewX(-25deg);
+  transition: 0.75s;
 }
-.card-allocated .card-icon-box {
-  background-color: #ecfdf5;
-  color: #10b981;
-}
-.card-discarded .card-icon-box {
-  background-color: #fef2f2;
-  color: #ef4444;
+.stats-card:hover .glow-effect {
+  left: 150%;
 }
 
-/* 总账大卡片 */
-.glass-card {
-  border-radius: 24px;
-  background: #ffffff;
-  border: none !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.02);
-  padding: 24px;
+/* 卡片定制微光颜色 */
+.card-available .card-icon-box { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.card-allocated .card-icon-box { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.card-discarded .card-icon-box { background: rgba(244, 63, 94, 0.15); color: #f43f5e; }
+
+/* 图表卡片 */
+.chart-card {
+  height: 110px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--admin-text-secondary);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.info-icon {
+  cursor: help;
+}
+
+.inventory-pie-chart {
+  flex: 1;
+  width: 100%;
+}
+
+/* 磨砂大底盘 */
+.glass-item {
+  background: var(--admin-card-bg);
+  border: 1px solid var(--admin-card-border);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  box-shadow: var(--admin-shadow);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-item:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+.glass-card {
+  background: var(--admin-card-bg) !important;
+  border: 1px solid var(--admin-card-border) !important;
+  backdrop-filter: blur(20px);
+  border-radius: 16px !important;
+  box-shadow: var(--admin-shadow) !important;
+}
+
+
 
 .card-header-title {
   display: flex;
   align-items: center;
   font-size: 16px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--admin-text-primary);
   width: 100%;
 }
 
 .header-icon {
   margin-right: 8px;
   font-size: 18px;
-  color: #3b82f6;
+  color: var(--admin-accent);
 }
 
 .header-filters {
@@ -558,80 +832,257 @@ onMounted(() => {
 }
 
 /* 表格定制 */
-.premium-table :deep(.el-table__header-wrapper) th {
-  background-color: #f8fafc !important;
-  color: #475569 !important;
+.admin-table {
+  background-color: transparent !important;
+}
+.admin-table :deep(tr) {
+  background-color: transparent !important;
+  color: var(--admin-text-primary);
+}
+.admin-table :deep(th.el-table__cell) {
+  background-color: var(--admin-table-header-bg) !important;
+  color: var(--admin-text-secondary) !important;
+  border-bottom: 1px solid var(--admin-card-border) !important;
   font-weight: 600;
   font-size: 13px;
-  padding: 12px 0;
 }
-
-.premium-table :deep(.el-table__row) td {
-  padding: 14px 0;
+.admin-table :deep(td.el-table__cell) {
+  border-bottom: 1px solid var(--admin-card-border) !important;
+}
+.admin-table :deep(.el-table__body tr:hover td) {
+  background-color: var(--admin-table-hover-bg) !important;
 }
 
 .prize-name-text {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--admin-text-primary);
+}
+
+/* 代码微章复制 */
+.code-badge-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .code-badge {
   font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
-  background-color: #f1f5f9;
-  color: #0f172a;
+  background-color: rgba(15, 23, 42, 0.3);
+  color: var(--admin-text-primary);
   padding: 4px 8px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--admin-card-border);
 }
 
+.copy-btn {
+  font-size: 14px;
+  color: var(--admin-text-secondary) !important;
+}
+.copy-btn:hover {
+  color: var(--admin-accent) !important;
+}
+
+/* 状态指示点 */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.status-indicator .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+}
+.status-available { color: #10b981; }
+.status-available .dot { background-color: #10b981; }
+.status-allocated { color: #818cf8; }
+.status-allocated .dot { background-color: #818cf8; }
+.status-discarded { color: #94a3b8; }
+.status-discarded .dot { background-color: #94a3b8; }
+
 .user-id-text {
-  font-size: 13px;
-  color: #64748b;
+  font-size: 12px;
+  color: var(--admin-text-secondary);
 }
 
 .feedback-link {
-  font-size: 13px;
-  color: #3b82f6;
+  font-size: 12px;
+  color: var(--admin-accent);
   font-weight: 500;
+  cursor: pointer;
+  border-bottom: 1px dashed var(--admin-accent);
+  padding-bottom: 1px;
+}
+.feedback-link:hover {
+  color: #818cf8;
 }
 
 .empty-holder {
-  color: #94a3b8;
-  font-size: 13px;
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+}
+
+.locked-text {
+  font-size: 12px;
+  color: var(--admin-text-secondary);
+}
+
+.discard-action-btn {
+  color: #f43f5e !important;
+}
+.discard-action-btn:hover {
+  color: #ef4444 !important;
 }
 
 .pagination-container {
   display: flex;
-  justify-content: center;
-  margin-top: 24px;
+  justify-content: flex-end;
+  margin-top: 18px;
 }
 
-/* 输入框圆角与边框对齐 */
+/* 悬浮 Popover 样式定制 */
+.popover-feedback-detail {
+  padding: 8px 4px;
+}
+
+.popover-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--admin-card-border);
+  padding-bottom: 6px;
+}
+
+.popover-type-tag {
+  background: rgba(99, 102, 241, 0.1);
+  color: #818cf8;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.popover-score {
+  font-size: 11px;
+  color: var(--admin-text-secondary);
+}
+
+.popover-desc {
+  margin-bottom: 8px;
+}
+
+.desc-title {
+  font-size: 11px;
+  color: var(--admin-text-secondary);
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.desc-text {
+  font-size: 12px;
+  color: var(--admin-text-primary);
+  line-height: 1.4;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.reply-remark {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.popover-empty {
+  text-align: center;
+  color: var(--admin-text-secondary);
+  font-size: 11px;
+  padding: 10px 0;
+}
+
+/* 覆盖输入框样式 */
 :deep(.el-input__wrapper),
 :deep(.el-textarea__inner) {
-  border-radius: 10px !important;
-  background-color: #ffffff;
-  border: 1px solid #cbd5e1 !important;
+  background-color: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-input-border) !important;
+  color: var(--admin-text-primary) !important;
   box-shadow: none !important;
-  padding: 8px 12px;
+  border-radius: 8px !important;
 }
-
-:deep(.el-textarea__inner) {
-  padding: 12px;
-  font-family: inherit;
+:deep(.el-input__inner) {
+  color: var(--admin-text-primary) !important;
 }
-
 :deep(.el-input__wrapper:hover),
 :deep(.el-textarea__inner:hover) {
-  border-color: #94a3b8 !important;
+  border-color: rgba(99, 102, 241, 0.4) !important;
 }
-
 :deep(.el-input__wrapper.is-focus),
 :deep(.el-textarea__inner:focus) {
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08) !important;
+  border-color: var(--admin-accent) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+}
+
+:deep(.el-select__wrapper) {
+  background-color: var(--admin-input-bg) !important;
+  border: 1px solid var(--admin-input-border) !important;
+  color: var(--admin-text-primary) !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+}
+:deep(.el-select__wrapper:hover) {
+  border-color: rgba(99, 102, 241, 0.4) !important;
+}
+:deep(.el-select__wrapper.is-focused) {
+  border-color: var(--admin-accent) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+}
+:deep(.el-select__placeholder) {
+  color: var(--admin-text-secondary) !important;
+}
+
+/* 批量录入弹窗高级定制 */
+.dialog-textarea-label {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.label-hint {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--admin-text-secondary);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.dialog-cancel-btn {
+  border-radius: 8px;
+  width: 110px;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--admin-card-border) !important;
+  color: var(--admin-text-primary) !important;
+}
+.dialog-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.dialog-confirm-btn {
+  border-radius: 8px;
+  width: 130px;
+  background-color: var(--admin-accent) !important;
+  border: none !important;
 }
 </style>

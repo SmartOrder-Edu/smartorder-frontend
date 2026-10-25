@@ -4,15 +4,15 @@
       <!-- 页面标题 -->
       <div class="page-header">
         <div class="header-left">
-          <h1 class="page-title">资源中心</h1>
-          <p class="page-desc">系统为你推荐和生成的学习资源，AI 会根据你的画像匹配合适的资料</p>
+          <h1 class="page-title">资源广场</h1>
+          <p class="page-desc">浏览学习资源广场，发布你的资源与同学共享；Agent 会根据你的学习画像为你精选一个推荐资源</p>
         </div>
         <div class="header-right">
-          <el-button @click="showGenerateDialog = true">
+          <el-button type="primary" @click="showFilePicker = true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <path d="M12 2a10 10 0 1 0 10 10H12V2z"/>
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            AI 生成资源
+            发布资源到广场
           </el-button>
         </div>
       </div>
@@ -36,58 +36,124 @@
           </div>
         </div>
         <el-select v-model="sortBy" style="width: 140px;">
-          <el-option label="智能排序" value="relevance" />
           <el-option label="最新资源" value="newest" />
-          <el-option label="最短时长" value="shortest" />
+          <el-option label="最多转存" value="download" />
           <el-option label="最高推荐" value="rating" />
         </el-select>
       </div>
 
-      <!-- 推荐资源横幅 -->
-      <section class="featured-banner" v-if="featuredResource">
+      <!-- Agent 精选横幅：loading / 数据就绪 / 空 -->
+      <section
+        v-if="featuredLoading"
+        class="featured-banner featured-skeleton"
+        aria-busy="true"
+        aria-label="正在加载精选资源"
+      >
+        <div class="featured-orb featured-orb--teal" aria-hidden="true"></div>
+        <div class="featured-orb featured-orb--cyan" aria-hidden="true"></div>
         <div class="featured-content">
-          <div class="featured-badge">本周精选</div>
-          <h2 class="featured-title">{{ featuredResource.title }}</h2>
-          <p class="featured-desc">{{ featuredResource.description }}</p>
-          <div class="featured-meta">
-            <span class="meta-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
-              {{ featuredResource.minutes }}分钟
+          <div class="skel-badge-line"></div>
+          <div class="skel-title-line"></div>
+          <div class="skel-desc-line"></div>
+          <div class="skel-desc-line short"></div>
+          <div class="skel-stats-row">
+            <div class="skel-stat"></div>
+            <div class="skel-stat"></div>
+            <div class="skel-stat"></div>
+            <div class="skel-stat"></div>
+          </div>
+          <div class="skel-cta-line"></div>
+        </div>
+        <div class="featured-visual" aria-hidden="true">
+          <div class="visual-card"></div>
+        </div>
+      </section>
+
+      <section
+        v-else-if="featuredResource"
+        class="featured-banner"
+        aria-labelledby="featured-title"
+      >
+        <div class="featured-orb featured-orb--teal" aria-hidden="true"></div>
+        <div class="featured-orb featured-orb--cyan" aria-hidden="true"></div>
+
+        <div class="featured-content">
+          <div class="featured-eyebrow">
+            <span class="featured-badge" :class="featuredReason">
+              <span class="badge-dot" aria-hidden="true"></span>
+              <svg v-if="featuredReason === 'agent'" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2l1.6 5.9L19.5 9.5 13.6 11.1 12 17l-1.6-5.9L4.5 9.5 10.4 7.9z"/></svg>
+              <svg v-else viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2c1 3.2 4 4.5 4 8.5a4 4 0 0 1-8 0c0-2 1-3 1-3-2.2 1.2-3 3-3 5a6 6 0 0 0 12 0c0-5.2-4-7.5-6-10.5z"/></svg>
+              {{ featuredReason === 'agent' ? 'Agent 精选' : '热门精选' }}
             </span>
-            <span class="meta-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
-              {{ featuredResource.rating }} 推荐指数
-            </span>
-            <span class="meta-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-              {{ featuredResource.learners }} 人学习
+            <span class="type-chip">
+              <span class="sr-only">资源类型：</span>{{ getCategoryName(featuredResource.category) }}
             </span>
           </div>
-          <el-button type="primary" @click="openResource(featuredResource)">
-            开始学习
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <polygon points="5,3 19,12 5,21"/>
-            </svg>
-          </el-button>
+
+          <h2 id="featured-title" class="featured-title">{{ featuredResource.title }}</h2>
+          <p class="featured-desc">
+            {{ featuredResource.description || '暂无详细描述，点击「查看详情」了解资源内容。' }}
+          </p>
+
+          <div class="featured-stats">
+            <div class="stat-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+              <div class="stat-chip-body">
+                <span class="stat-value">{{ formatFileSize(featuredResource.fileSize) }}</span>
+                <span class="stat-label">大小</span>
+              </div>
+            </div>
+            <div class="stat-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
+              <div class="stat-chip-body">
+                <span class="stat-value">{{ featuredResource.ratingAvg }}</span>
+                <span class="stat-label">推荐指数</span>
+              </div>
+            </div>
+            <div class="stat-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <div class="stat-chip-body">
+                <span class="stat-value">{{ featuredResource.viewCount ?? 0 }}</span>
+                <span class="stat-label">浏览</span>
+              </div>
+            </div>
+            <div class="stat-chip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <div class="stat-chip-body">
+                <span class="stat-value">{{ featuredResource.downloadCount }}</span>
+                <span class="stat-label">人转存</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="featured-actions">
+            <button type="button" class="featured-cta" @click="openResource(featuredResource)">
+              查看详情
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+            </button>
+            <button
+              type="button"
+              class="featured-ghost"
+              :disabled="featuredResource.hasDownloaded"
+              :title="featuredResource.hasDownloaded ? '该资源已在你的云盘中' : '转存到云盘'"
+              @click="collectResource(featuredResource)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+              {{ featuredResource.hasDownloaded ? '已转存' : '转存到云盘' }}
+            </button>
+          </div>
         </div>
-        <div class="featured-visual">
+
+        <div class="featured-visual" aria-hidden="true">
+          <div class="visual-ring"></div>
           <div class="visual-card">
             <div class="card-glow"></div>
             <div class="card-content">
-              <div class="card-icon-large">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <circle cx="12" cy="12" r="3"/>
-                  <circle cx="19" cy="5" r="2"/>
-                  <circle cx="5" cy="5" r="2"/>
-                  <circle cx="19" cy="19" r="2"/>
-                  <circle cx="5" cy="19" r="2"/>
-                  <line x1="12" y1="9" x2="12" y2="3"/>
-                  <line x1="14.5" y1="13.5" x2="17.5" y2="17.5"/>
-                  <line x1="9.5" y1="13.5" x2="6.5" y2="17.5"/>
-                </svg>
-              </div>
-              <span class="card-type">思维导图</span>
+              <div class="card-icon-large" v-html="getResourceIcon(featuredResource.category)"></div>
+              <span class="card-type">{{ getCategoryName(featuredResource.category) }}</span>
             </div>
+            <div class="card-spark spark-1"></div>
+            <div class="card-spark spark-2"></div>
           </div>
         </div>
       </section>
@@ -95,34 +161,69 @@
       <!-- 资源网格 -->
       <section class="resources-grid-section">
         <div class="grid-header">
-          <h3 class="grid-title">为你推荐的资源</h3>
-          <span class="grid-count">共 {{ filteredResources.length }} 个资源</span>
+          <h3 class="grid-title">广场资源</h3>
+          <span class="grid-count">共 {{ totalCount }} 个资源</span>
         </div>
 
-        <div class="resources-grid">
+        <!-- 加载状态 -->
+        <div v-if="isLoading" class="resources-grid">
+          <div v-for="n in 6" :key="n" class="resource-card skeleton-card">
+            <div class="card-header-section">
+              <div class="skel-icon"></div>
+              <div class="skel-badge"></div>
+            </div>
+            <div class="card-body">
+              <div class="skel-line skel-title"></div>
+              <div class="skel-line skel-desc"></div>
+              <div class="skel-line skel-desc-short"></div>
+              <div class="skel-line skel-publisher"></div>
+              <div class="skel-tags-row">
+                <span class="skel-tag"></span>
+                <span class="skel-tag"></span>
+                <span class="skel-tag skel-tag-sm"></span>
+              </div>
+              <div class="skel-meta-row">
+                <span class="skel-meta"></span>
+                <span class="skel-meta"></span>
+                <span class="skel-meta skel-meta-sm"></span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <span class="skel-btn"></span>
+              <span class="skel-btn skel-btn-sm"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 空状态 -->
+        <div v-else-if="squareResources.length === 0" class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 60px 0;">
+          <p class="empty-title" style="font-size: 1rem; color: #64748b;">暂无资源</p>
+          <p class="empty-desc" style="font-size: 0.8125rem; color: #94a3b8;">还没有人发布资源到广场</p>
+        </div>
+
+        <div v-else class="resources-grid">
           <div
-            v-for="resource in filteredResources"
+            v-for="resource in squareResources"
             :key="resource.id"
             class="resource-card"
-            :class="`type-${resource.type}`"
+            :class="`type-${resource.category}`"
           >
             <div class="card-header-section">
-              <div class="card-type-icon" :class="resource.type">
-                <span v-html="getResourceIcon(resource.type)"></span>
+              <div class="card-type-icon" :class="resource.category">
+                <span v-html="getResourceIcon(resource.category)"></span>
               </div>
               <div class="card-badges">
-                <span v-if="resource.isAI" class="ai-badge">AI 生成</span>
-                <span class="type-badge">{{ resource.typeName }}</span>
+                <span class="type-badge">{{ getCategoryName(resource.category) }}</span>
               </div>
             </div>
 
             <div class="card-body">
               <h4 class="card-title">{{ resource.title }}</h4>
-              <p class="card-desc">{{ resource.description }}</p>
+              <p class="card-desc">{{ resource.description || '暂无描述' }}</p>
 
-              <div class="card-reason">
-                <span class="reason-label">推荐原因：</span>
-                <span class="reason-text">{{ resource.reason }}</span>
+              <div class="card-publisher">
+                <span class="publisher-label">发布者：</span>
+                <span class="publisher-name-text">{{ resource.publisherName || '未知用户' }}</span>
               </div>
 
               <div class="card-tags">
@@ -132,217 +233,195 @@
               <div class="card-meta">
                 <span class="meta-item">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
-                  {{ resource.minutes }}分钟
+                  {{ formatFileSize(resource.fileSize) }}
                 </span>
                 <span class="meta-item">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                  {{ resource.learners }}
+                  {{ resource.downloadCount }}
+                </span>
+                <span class="meta-item views">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  {{ resource.viewCount ?? 0 }}
                 </span>
                 <span class="meta-item rating">
                   <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
-                  {{ resource.rating }}
+                  {{ resource.ratingAvg }}
                 </span>
               </div>
             </div>
 
             <div class="card-footer">
               <el-button size="small" type="primary" @click="openResource(resource)">
-                打开学习
+                查看详情
               </el-button>
-              <el-button size="small" text @click="collectResource(resource)">
+              <el-button size="small" text @click="collectResource(resource)" :disabled="resource.hasDownloaded">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
                 </svg>
-                收藏
+                {{ resource.hasDownloaded ? '已转存' : '转存' }}
               </el-button>
             </div>
           </div>
         </div>
+
+        <!-- 分页 -->
+        <div v-if="totalCount > 0" class="pagination-wrap">
+          <el-pagination
+            v-model:current-page="currentPage"
+            v-model:page-size="pageSize"
+            :page-sizes="[12, 24, 48]"
+            :total="totalCount"
+            layout="total, sizes, prev, pager, next, jumper"
+            @current-change="fetchList"
+            @size-change="onSizeChange"
+          />
+        </div>
       </section>
 
-      <!-- AI 生成资源对话框 -->
-      <el-dialog v-model="showGenerateDialog" title="AI 生成学习资源" width="560px">
-        <div class="generate-form">
-          <div class="form-item">
-            <label>资源类型</label>
-            <el-radio-group v-model="generateType">
-              <el-radio label="doc">讲解文档</el-radio>
-              <el-radio label="mindmap">思维导图</el-radio>
-              <el-radio label="video">视频讲义</el-radio>
-              <el-radio label="quiz">练习题集</el-radio>
-            </el-radio-group>
-          </div>
-          <div class="form-item">
-            <label>知识点</label>
-            <el-input v-model="generateTopic" placeholder="例如：进程同步与互斥、PV操作、死锁" />
-          </div>
-          <div class="form-item">
-            <label>风格偏好</label>
-            <el-checkbox-group v-model="generateStyles">
-              <el-checkbox label="visual">可视化（图解、图表）</el-checkbox>
-              <el-checkbox label="simple">简洁易懂</el-checkbox>
-              <el-checkbox label="detail">详细深入</el-checkbox>
-              <el-checkbox label="code">代码示例</el-checkbox>
-            </el-checkbox-group>
-          </div>
-          <div class="form-item">
-            <label>生成说明（可选）</label>
-            <el-input type="textarea" v-model="generateNote" placeholder="描述你希望资源包含的具体内容..." :rows="2" />
-          </div>
-        </div>
-        <template #footer>
-          <el-button @click="showGenerateDialog = false">取消</el-button>
-          <el-button type="primary" :loading="generating" @click="generateResource">
-            {{ generating ? '生成中...' : '开始生成' }}
-          </el-button>
-        </template>
-      </el-dialog>
     </div>
+
+    <!-- 发布流：文件选择 -> 发布表单 -->
+    <CloudFilePickerDialog
+      v-model:visible="showFilePicker"
+      @select="onPickerSelect"
+    />
+    <PublishToSquareDialog
+      v-model:visible="showPublishDialog"
+      :file="publishFileTarget"
+      @success="onPublishSuccess"
+    />
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import CloudFilePickerDialog, { type PickedFile } from './components/CloudFilePickerDialog.vue'
+import PublishToSquareDialog from '@/views/CloudDrive/components/PublishToSquareDialog.vue'
+import { getSquareList, downloadFromSquare, getFeatured } from '@/api/resource-square'
+import type { ResourceSquareVO, SquareSortBy } from '@/types/resource-square'
+import { resourceTypes, getCategoryName, getResourceIcon, formatFileSize } from './constants'
+
+const router = useRouter()
 
 const searchKeyword = ref('')
 const activeType = ref('all')
-const sortBy = ref('relevance')
-const showGenerateDialog = ref(false)
-const generating = ref(false)
-const generateType = ref('mindmap')
-const generateTopic = ref('')
-const generateStyles = ref(['visual'])
-const generateNote = ref('')
+const sortBy = ref<SquareSortBy>('newest')
+const isLoading = ref(false)
 
-const resourceTypes = [
-  { value: 'all', label: '全部', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>' },
-  { value: 'doc', label: '文档', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>' },
-  { value: 'mindmap', label: '导图', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>' },
-  { value: 'video', label: '视频', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23,7 16,12 23,17"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>' },
-  { value: 'quiz', label: '练习', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' },
-  { value: 'case', label: '案例', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg>' }
-]
+// 列表数据
+const squareResources = ref<ResourceSquareVO[]>([])
+const totalCount = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(12)
 
-const featuredResource = ref({
-  id: 0,
-  title: '进程与线程完整知识图谱',
-  description: 'AI 生成的思维导图，覆盖进程、线程、同步互斥的核心知识点，适合期末复习使用',
-  minutes: 25,
-  rating: 4.9,
-  learners: 1234,
-  type: 'mindmap'
+// Agent 精选
+const featuredResource = ref<ResourceSquareVO | null>(null)
+const featuredReason = ref<'agent' | 'hot'>('hot')
+const featuredLoading = ref(false)
+
+// 发布流
+const showFilePicker = ref(false)
+const showPublishDialog = ref(false)
+const publishFileTarget = ref<PickedFile | null>(null)
+
+const fetchList = async () => {
+  isLoading.value = true
+  try {
+    const res = await getSquareList({
+      keyword: searchKeyword.value || undefined,
+      category: activeType.value !== 'all' ? activeType.value : undefined,
+      sortBy: sortBy.value,
+      pageNum: currentPage.value,
+      pageSize: pageSize.value,
+    })
+    squareResources.value = res.records || []
+    totalCount.value = res.total || 0
+  } catch {
+    // 错误由请求拦截器统一弹 toast
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const fetchFeatured = async () => {
+  featuredLoading.value = true
+  try {
+    const res = await getFeatured()
+    if (res) {
+      featuredResource.value = res.resource
+      featuredReason.value = res.reason
+    } else {
+      featuredResource.value = null
+    }
+  } catch {
+    // 精选加载失败不影响主列表
+    featuredResource.value = null
+  } finally {
+    featuredLoading.value = false
+  }
+}
+
+// 搜索防抖 300ms（与筛选/排序分离，避免每次按键都打后端）
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+watch(searchKeyword, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    currentPage.value = 1
+    fetchList()
+  }, 300)
 })
 
-const resources = ref([
-  {
-    id: 1, type: 'mindmap', typeName: '思维导图', title: '进程与线程对比图', description: '清晰对比进程与线程的概念、区别、优缺点',
-    minutes: 8, learners: 856, rating: 4.8, isAI: true,
-    reason: '你更偏好可视化学习方式，且当前处于进程与线程学习阶段',
-    tags: ['进程', '线程', '对比', '可视化']
-  },
-  {
-    id: 2, type: 'quiz', typeName: '练习题', title: '同步互斥专项测试（10题）', description: '涵盖 PV 操作、临界区、信号量等核心考点',
-    minutes: 15, learners: 623, rating: 4.7, isAI: true,
-    reason: '测评发现你的 PV 操作正确率偏低，需要专项训练',
-    tags: ['PV操作', '同步', '互斥', '专项']
-  },
-  {
-    id: 3, type: 'video', typeName: '视频讲义', title: '信号量机制动画演示', description: '通过动画直观展示信号量 P/V 操作的执行过程',
-    minutes: 10, learners: 1205, rating: 4.9, isAI: true,
-    reason: '结合你的测验薄弱点，动画讲解更容易理解',
-    tags: ['信号量', '动画', 'PV操作']
-  },
-  {
-    id: 4, type: 'doc', typeName: '文档', title: '进程同步与互斥详解', description: '从理论到实践，系统讲解同步互斥的各种方法',
-    minutes: 20, learners: 432, rating: 4.6, isAI: false,
-    reason: '理论基础需要扎实，建议结合练习题一起学习',
-    tags: ['理论', '同步', '互斥', '经典']
-  },
-  {
-    id: 5, type: 'mindmap', typeName: '思维导图', title: '操作系统内存管理知识图', description: '覆盖分页、分段、虚拟内存等核心概念',
-    minutes: 12, learners: 567, rating: 4.7, isAI: true,
-    reason: '下一章节为内存管理，提前预习有助理解',
-    tags: ['内存', '虚拟内存', '分页', '预习']
-  },
-  {
-    id: 6, type: 'case', typeName: '案例', title: '哲学家就餐问题代码实现', description: 'Python 实现哲学家就餐问题，深入理解死锁',
-    minutes: 30, learners: 345, rating: 4.5, isAI: true,
-    reason: '你偏好代码示例学习，且已学习相关理论',
-    tags: ['死锁', '代码', 'Python', '实践']
-  },
-  {
-    id: 7, type: 'doc', typeName: '文档', title: 'PCB 进程控制块详解', description: '详细介绍 PCB 的组成、作用和操作系统中的实现',
-    minutes: 12, learners: 298, rating: 4.4, isAI: false,
-    reason: '复习任务关联资源，加深理解',
-    tags: ['PCB', '进程', '基础']
-  },
-  {
-    id: 8, type: 'quiz', typeName: '练习题', title: '进程调度算法练习题', description: 'FIFO、SJF、时间片轮转等调度算法练习',
-    minutes: 18, learners: 412, rating: 4.6, isAI: false,
-    reason: '本周学习任务包含调度算法复习',
-    tags: ['调度', '算法', 'FIFO', 'SJF']
-  },
-  {
-    id: 9, type: 'video', typeName: '视频讲义', title: '线程同步与互斥动画讲解', description: '用生活实例和动画讲解互斥锁、条件变量等概念',
-    minutes: 15, learners: 789, rating: 4.8, isAI: true,
-    reason: '你的学习画像显示视频学习效果最好',
-    tags: ['线程', '同步', '动画', '生活实例']
-  }
-])
-
-const filteredResources = computed(() => {
-  let result = resources.value
-
-  if (activeType.value !== 'all') {
-    result = result.filter(r => r.type === activeType.value)
-  }
-
-  if (searchKeyword.value) {
-    const kw = searchKeyword.value.toLowerCase()
-    result = result.filter(r =>
-      r.title.toLowerCase().includes(kw) ||
-      r.tags.some(t => t.toLowerCase().includes(kw)) ||
-      r.description.toLowerCase().includes(kw)
-    )
-  }
-
-  if (sortBy.value === 'newest') {
-    result = [...result].sort((a, b) => b.id - a.id)
-  } else if (sortBy.value === 'rating') {
-    result = [...result].sort((a, b) => b.rating - a.rating)
-  } else if (sortBy.value === 'shortest') {
-    result = [...result].sort((a, b) => a.minutes - b.minutes)
-  }
-
-  return result
+// 类型/排序变化即时刷新
+watch([activeType, sortBy], () => {
+  currentPage.value = 1
+  fetchList()
 })
 
-const getResourceIcon = (type: string) => {
-  const icons: Record<string, string> = {
-    doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
-    mindmap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="5" cy="19" r="2"/><line x1="12" y1="9" x2="12" y2="3"/></svg>',
-    video: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23,7 16,12 23,17"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>',
-    quiz: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
-    case: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16,18 22,12 16,6"/><polyline points="8,6 2,12 8,18"/></svg>'
+const onSizeChange = () => {
+  currentPage.value = 1
+  fetchList()
+}
+
+onMounted(() => {
+  fetchList()
+  fetchFeatured()
+})
+
+const openResource = (resource: ResourceSquareVO) => {
+  router.push(`/resource-square/${resource.id}`)
+}
+
+const collectResource = async (resource: ResourceSquareVO) => {
+  if (resource.hasDownloaded) {
+    ElMessage.info('您已转存过该资源，可在云盘根目录查看')
+    return
   }
-  return icons[type] || icons.doc
+  try {
+    await downloadFromSquare(resource.id)
+    ElMessage.success('已转存到您的云盘')
+    // 仅在请求成功后更新本地态；失败时拦截器已弹 toast，此处不变更
+    resource.hasDownloaded = true
+    resource.downloadCount++
+  } catch {
+    // 错误由请求拦截器处理，不乐观变更
+  }
 }
 
-const openResource = (resource: any) => {
-  console.log('Open resource:', resource.title)
+// 发布流处理
+const onPickerSelect = (file: PickedFile) => {
+  publishFileTarget.value = file
+  showPublishDialog.value = true
 }
 
-const collectResource = (resource: any) => {
-  console.log('Collect resource:', resource.title)
-}
-
-const generateResource = () => {
-  generating.value = true
-  setTimeout(() => {
-    generating.value = false
-    showGenerateDialog.value = false
-  }, 2500)
+const onPublishSuccess = () => {
+  showPublishDialog.value = false
+  publishFileTarget.value = null
+  // 新资源可能入选精选，列表与精选均刷新
+  fetchList()
+  fetchFeatured()
 }
 </script>
 
@@ -351,8 +430,6 @@ const generateResource = () => {
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  height: 100%;
-  overflow-y: auto;
 }
 
 .page-header {
@@ -380,6 +457,19 @@ const generateResource = () => {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
+}
+
+/* 页头窄屏：按钮换行下沉，避免与描述文字叠压 */
+@media (max-width: 640px) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+  .header-right .el-button {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* 筛选栏 */
@@ -436,114 +526,573 @@ const generateResource = () => {
 
 .type-icon { font-size: 0.875rem; }
 
-/* 推荐横幅 */
+/* ==================== Agent 精选横幅 ==================== */
+/**
+ * 设计规范（对齐页面「治愈薄荷」浅色主题）
+ * 1. 表面：白 → 薄荷浅底渐变，取代原深色 #0b1424；层级由阴影与边框表达，不再用暗底反白。
+ * 2. 品牌：--fp-brand #0a7470 用于小字号文字（徽标底色上 ≥5.0:1）；#0d7d76→#0f766e 用于主按钮实底（白字 ≥4.9:1）。
+ * 3. 文字：标题 #0f172a / 正文 #475569 / 辅助 #64748b（在 #ffffff 与 #ecfdfb 上均 ≥4.5:1）。
+ * 4. 权重：标题 700 > 实心主按钮 > 数据 chips > 描边次按钮 > 装饰光斑，避免多点抢焦。
+ * 5. 尺寸：断点 1100 / 900 / 600 / 420，网格列随宽度收缩，≤900 隐藏纯装饰视觉卡（类型信息已前置为 chip）。
+ */
 .featured-banner {
-  display: flex;
+  /* 局部令牌：本板块唯一配色入口 */
+  --fp-ink: #0f172a;
+  --fp-ink-body: #475569;
+  --fp-ink-muted: #64748b;
+  --fp-brand: #0a7470;
+  --fp-brand-deep: #0f766e;
+  --fp-border: rgba(11, 183, 170, 0.18);
+  --fp-border-soft: rgba(148, 163, 184, 0.22);
+  --fp-chip-bg: rgba(255, 255, 255, 0.92);
+  --fp-shadow: 0 18px 40px -26px rgba(15, 23, 42, 0.3), 0 2px 6px rgba(15, 23, 42, 0.04);
+
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 196px;
   align-items: center;
-  gap: var(--spacing-2xl);
-  padding: var(--spacing-2xl);
-  background: linear-gradient(135deg, #0f1629 0%, #1a1f4e 50%, #2d3a8c 100%);
-  border-radius: var(--radius-xl);
+  gap: clamp(16px, 2.2vw, 32px);
+  padding: clamp(20px, 2.6vw, 32px);
+  background:
+    radial-gradient(120% 150% at 100% 0%, rgba(11, 183, 170, 0.12) 0%, rgba(11, 183, 170, 0) 62%),
+    linear-gradient(135deg, #ffffff 0%, #f8fefd 52%, #ecfdfb 100%);
+  border: 1px solid var(--fp-border);
+  border-radius: var(--radius-2xl);
   margin-bottom: var(--spacing-xl);
   overflow: hidden;
-  position: relative;
+  box-shadow: var(--fp-shadow);
+  isolation: isolate;
 }
 
-.featured-badge {
+/* 氛围光斑：低饱和薄荷/青色，仅作背景肌理 */
+.featured-orb {
   position: absolute;
-  top: var(--spacing-lg);
-  left: var(--spacing-lg);
-  padding: 4px 12px;
-  background: rgba(18, 184, 134, 0.2);
-  color: #38d9a9;
-  border-radius: var(--radius-full);
-  font-size: 0.75rem;
-  font-weight: 600;
+  border-radius: 50%;
+  filter: blur(64px);
+  pointer-events: none;
+  z-index: 0;
+}
+.featured-orb--teal {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(11, 183, 170, 0.3) 0%, rgba(11, 183, 170, 0) 70%);
+  top: -140px;
+  right: -60px;
+}
+.featured-orb--cyan {
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.22) 0%, rgba(6, 182, 212, 0) 70%);
+  bottom: -150px;
+  left: 4%;
+}
+
+/* 细密网格底纹：极低对比，提供质感而不干扰文字 */
+.featured-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(11, 183, 170, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(11, 183, 170, 0.055) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* 屏幕阅读器专用文本 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .featured-content {
-  flex: 1;
-  color: white;
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  color: var(--fp-ink);
+}
+
+/* 徽标行：主标签（Agent/热门）+ 资源类型，信息前置，移动端不依赖右侧装饰卡 */
+.featured-eyebrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.featured-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px 4px 9px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+.featured-badge .badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: featuredDotPulse 2.4s ease-in-out infinite;
+}
+.featured-badge svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+.featured-badge.agent {
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--fp-brand);
+  border: 1px solid rgba(11, 183, 170, 0.24);
+}
+.featured-badge.hot {
+  background: #fff7ed;
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+@keyframes featuredDotPulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--fp-ink-muted);
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--fp-border-soft);
 }
 
 .featured-title {
-  font-size: 1.5rem;
+  font-size: clamp(1.25rem, 1.02rem + 0.95vw, 1.75rem);
   font-weight: 700;
-  margin: 0 0 var(--spacing-md);
+  line-height: 1.32;
+  margin: 0 0 10px;
+  color: var(--fp-ink);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .featured-desc {
+  max-width: 62ch;
   font-size: 0.9375rem;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0 0 var(--spacing-lg);
-  line-height: 1.6;
+  color: var(--fp-ink-body);
+  margin: 0 0 20px;
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.featured-meta {
+/* 数据指标 chips：白底 + 细边框，弱于标题与主按钮 */
+.featured-stats {
   display: flex;
-  gap: var(--spacing-xl);
-  margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
 }
-
-.meta-item {
+.stat-chip {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 0.8125rem;
-  color: rgba(255, 255, 255, 0.6);
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 12px;
+  background: var(--fp-chip-bg);
+  border: 1px solid var(--fp-border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-
-.meta-item svg {
-  width: 14px;
-  height: 14px;
+.stat-chip:hover {
+  background: #ffffff;
+  border-color: rgba(11, 183, 170, 0.38);
+  box-shadow: 0 6px 16px -12px rgba(15, 118, 110, 0.6);
 }
-
-.featured-visual {
+.stat-chip svg {
+  width: 15px;
+  height: 15px;
+  color: var(--fp-brand);
   flex-shrink: 0;
 }
+.stat-chip-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.stat-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fp-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stat-label {
+  font-size: 0.6875rem;
+  color: var(--fp-ink-muted);
+  white-space: nowrap;
+}
 
+/* 操作按钮：主按钮实心深青（白字 ≥4.9:1），次按钮白底描边 */
+.featured-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.featured-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 10px 20px;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0d7d76 0%, #0f766e 100%);
+  border: 1px solid transparent;
+  cursor: pointer;
+  box-shadow: 0 10px 24px -14px rgba(15, 118, 110, 0.9);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), filter var(--transition-fast);
+}
+.featured-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px -14px rgba(15, 118, 110, 1);
+  filter: brightness(0.96);
+}
+.featured-cta:active {
+  transform: translateY(0);
+  filter: brightness(0.92);
+}
+.featured-cta:focus-visible,
+.featured-ghost:focus-visible {
+  outline: 2px solid var(--fp-brand-deep);
+  outline-offset: 3px;
+}
+.featured-cta svg {
+  width: 16px;
+  height: 16px;
+}
+.featured-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 10px 16px;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.featured-ghost:hover:not(:disabled) {
+  background: #f0fdfa;
+  border-color: rgba(11, 183, 170, 0.45);
+  color: var(--fp-brand);
+}
+.featured-ghost:disabled {
+  color: #68748a;
+  background: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.24);
+  cursor: not-allowed;
+}
+.featured-ghost svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* 右侧视觉区：浅色“资源卡”剪影，纯装饰 */
+.featured-visual {
+  position: relative;
+  z-index: 2;
+  justify-self: end;
+  width: 196px;
+  height: 196px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.visual-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1px dashed rgba(11, 183, 170, 0.28);
+  animation: featuredSpin 24s linear infinite;
+}
+.visual-ring::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 4px rgba(11, 183, 170, 0.14);
+}
+@keyframes featuredSpin {
+  to { transform: rotate(360deg); }
+}
 .visual-card {
-  width: 160px;
-  height: 160px;
-  background: rgba(59, 91, 219, 0.2);
+  width: 150px;
+  height: 150px;
+  background: linear-gradient(150deg, #ffffff 0%, #f0fdfa 58%, #ccfbf1 100%);
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(59, 91, 219, 0.3);
+  border: 1px solid rgba(11, 183, 170, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
+  box-shadow:
+    0 18px 34px -22px rgba(15, 118, 110, 0.55),
+    inset 0 1px 0 #ffffff;
+  animation: featuredFloat 6s ease-in-out infinite;
 }
-
+@keyframes featuredFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
 .card-glow {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at center, rgba(59, 91, 219, 0.3), transparent 70%);
-  animation: glowPulse 3s ease-in-out infinite;
+  background: radial-gradient(circle at 50% 45%, rgba(11, 183, 170, 0.16), transparent 70%);
+  animation: glowPulse 4s ease-in-out infinite;
 }
-
 .card-content {
   position: relative;
   text-align: center;
 }
-
 .card-icon-large {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto var(--spacing-sm);
-  color: rgba(255, 255, 255, 0.8);
+  width: 54px;
+  height: 54px;
+  margin: 0 auto var(--spacing-xs);
+  color: var(--fp-brand);
 }
-
-.card-icon-large svg { width: 100%; height: 100%; }
-
+.card-icon-large svg {
+  width: 100%;
+  height: 100%;
+}
 .card-type {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+  color: var(--fp-ink-muted);
+  letter-spacing: 0.02em;
 }
-
+.card-spark {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(11, 183, 170, 0.14);
+  opacity: 0;
+  animation: featuredSpark 3.5s ease-in-out infinite;
+}
+.spark-1 {
+  top: 14px;
+  right: 18px;
+  animation-delay: 0.4s;
+}
+.spark-2 {
+  bottom: 20px;
+  left: 16px;
+  animation-delay: 1.8s;
+}
+@keyframes featuredSpark {
+  0%, 100% { opacity: 0; transform: scale(0.6); }
+  50% { opacity: 1; transform: scale(1); }
+}
 @keyframes glowPulse {
   0%, 100% { opacity: 0.5; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.1); }
+}
+
+/* 通用 .meta-item（供资源网格使用） */
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.meta-item svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ==================== 精选横幅 loading 骨架 ==================== */
+.featured-skeleton {
+  pointer-events: none;
+}
+.featured-skeleton .featured-orb {
+  display: none;
+}
+.featured-skeleton .visual-card {
+  animation: none;
+  background: linear-gradient(110deg, #eef7f6 30%, #f8fefd 50%, #eef7f6 70%);
+  background-size: 200% 100%;
+  border-color: rgba(11, 183, 170, 0.12);
+  box-shadow: none;
+}
+.featured-skeleton .skel-badge-line,
+.featured-skeleton .skel-title-line,
+.featured-skeleton .skel-desc-line,
+.featured-skeleton .skel-cta-line,
+.featured-skeleton .skel-stat {
+  background: linear-gradient(110deg, var(--skeleton-bg-start) 30%, var(--skeleton-bg-middle) 50%, var(--skeleton-bg-end) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 6px;
+}
+.featured-skeleton .skel-badge-line {
+  width: 92px;
+  height: 24px;
+  border-radius: 99px;
+  margin-bottom: 18px;
+}
+.featured-skeleton .skel-title-line {
+  width: 62%;
+  height: 28px;
+  margin-bottom: 14px;
+}
+.featured-skeleton .skel-desc-line {
+  width: 90%;
+  height: 15px;
+  margin-bottom: 10px;
+}
+.featured-skeleton .skel-desc-line.short {
+  width: 55%;
+  margin-bottom: 22px;
+}
+.featured-skeleton .skel-stats-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+.featured-skeleton .skel-stat {
+  width: 96px;
+  height: 44px;
+  border-radius: 10px;
+}
+.featured-skeleton .skel-cta-line {
+  width: 132px;
+  height: 40px;
+  border-radius: 99px;
+}
+
+/* 精选横幅响应式 */
+@media (max-width: 1100px) {
+  .featured-banner {
+    grid-template-columns: minmax(0, 1fr) 168px;
+  }
+  .featured-visual {
+    width: 168px;
+    height: 168px;
+  }
+  .visual-card {
+    width: 132px;
+    height: 132px;
+  }
+  .card-icon-large {
+    width: 46px;
+    height: 46px;
+  }
+}
+
+/* ≤900：类型信息已由 .type-chip 承载，隐藏纯装饰视觉卡，单列排版 */
+@media (max-width: 900px) {
+  .featured-banner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .featured-visual {
+    display: none;
+  }
+  .featured-desc {
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .featured-banner {
+    padding: 18px;
+    border-radius: var(--radius-xl);
+  }
+  .featured-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stat-chip {
+    padding: 8px 10px;
+  }
+  .featured-actions {
+    gap: 8px;
+  }
+  .featured-cta,
+  .featured-ghost {
+    flex: 1 1 132px;
+  }
+}
+
+@media (max-width: 420px) {
+  .featured-title {
+    font-size: 1.1875rem;
+  }
+  .featured-actions {
+    flex-direction: column;
+  }
+  .featured-cta,
+  .featured-ghost {
+    /* 纵向排列时清掉横向的 flex-basis，避免被当作高度拉伸 */
+    flex: 0 0 auto;
+    width: 100%;
+  }
+}
+
+/* 尊重系统“减少动态效果”偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .visual-ring,
+  .visual-card,
+  .card-glow,
+  .card-spark,
+  .featured-badge .badge-dot,
+  .featured-banner::before {
+    animation: none !important;
+  }
+  .featured-cta,
+  .featured-ghost,
+  .stat-chip {
+    transition: none;
+  }
 }
 
 /* 资源网格 */
@@ -573,7 +1122,7 @@ const generateResource = () => {
 }
 
 .resource-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: var(--radius-xl);
   border: 1px solid var(--border-light);
   overflow: hidden;
@@ -604,7 +1153,7 @@ const generateResource = () => {
   justify-content: center;
 }
 
-.card-type-icon.doc { background: rgba(59, 91, 219, 0.08); color: var(--primary-color); }
+.card-type-icon.doc { background: rgba(11, 183, 170, 0.08); color: var(--primary-color); }
 .card-type-icon.mindmap { background: rgba(18, 184, 134, 0.08); color: var(--accent-color); }
 .card-type-icon.video { background: rgba(245, 158, 11, 0.08); color: var(--warning-color); }
 .card-type-icon.quiz { background: rgba(168, 85, 247, 0.08); color: #a855f7; }
@@ -616,15 +1165,6 @@ const generateResource = () => {
   display: flex;
   gap: var(--spacing-sm);
   align-items: center;
-}
-
-.ai-badge {
-  padding: 2px 8px;
-  background: linear-gradient(135deg, #3b5bdb, #5c7cfa);
-  color: white;
-  border-radius: var(--radius-full);
-  font-size: 0.5625rem;
-  font-weight: 600;
 }
 
 .type-badge {
@@ -655,8 +1195,8 @@ const generateResource = () => {
   line-height: 1.5;
 }
 
-.card-reason {
-  background: rgba(59, 91, 219, 0.04);
+.card-publisher {
+  background: rgba(11, 183, 170, 0.04);
   border-radius: var(--radius-md);
   padding: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
@@ -664,8 +1204,8 @@ const generateResource = () => {
   line-height: 1.5;
 }
 
-.reason-label { color: var(--primary-color); font-weight: 600; }
-.reason-text { color: var(--text-secondary); }
+.publisher-label { color: var(--primary-color); font-weight: 600; }
+.publisher-name-text { color: var(--text-secondary); }
 
 .card-tags {
   display: flex;
@@ -676,7 +1216,7 @@ const generateResource = () => {
 
 .card-tag {
   padding: 2px 8px;
-  background: rgba(59, 91, 219, 0.06);
+  background: rgba(11, 183, 170, 0.06);
   border-radius: var(--radius-sm);
   font-size: 0.5625rem;
   color: var(--primary-color);
@@ -686,6 +1226,7 @@ const generateResource = () => {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  flex-wrap: wrap;
 }
 
 .card-meta .meta-item {
@@ -699,6 +1240,10 @@ const generateResource = () => {
 .card-meta .meta-item svg {
   width: 12px;
   height: 12px;
+}
+
+.card-meta .views {
+  color: var(--text-muted);
 }
 
 .card-meta .rating {
@@ -724,16 +1269,129 @@ const generateResource = () => {
   gap: 4px;
 }
 
-.generate-form .form-item {
-  margin-bottom: var(--spacing-lg);
+.pagination-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
 }
 
-.generate-form label {
-  display: block;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-dark);
-  margin-bottom: var(--spacing-sm);
+/* ==================== 骨架屏加载动画 ==================== */
+.skeleton-card {
+  pointer-events: none;
+  border: 1px solid var(--border-light) !important;
+  box-shadow: none !important;
+}
+
+.skeleton-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 全局骨架扫光动画 */
+.skeleton-card .skel-icon,
+.skeleton-card .skel-badge,
+.skeleton-card .skel-line,
+.skeleton-card .skel-tag,
+.skeleton-card .skel-meta,
+.skeleton-card .skel-btn {
+  background: linear-gradient(110deg, var(--skeleton-bg-start) 30%, var(--skeleton-bg-middle) 50%, var(--skeleton-bg-end) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* 骨架图标 */
+.skel-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px !important;
+}
+
+.skel-badge {
+  width: 48px;
+  height: 18px;
+  border-radius: 99px !important;
+}
+
+/* 骨架文本行 */
+.skel-line {
+  height: 14px;
+  margin-bottom: 10px;
+}
+
+.skel-title {
+  width: 75%;
+  height: 16px;
+}
+
+.skel-desc {
+  width: 92%;
+}
+
+.skel-desc-short {
+  width: 55%;
+}
+
+.skel-publisher {
+  width: 40%;
+  height: 12px;
+  margin-top: 12px;
+  margin-bottom: 10px;
+  background: var(--skeleton-publisher-bg) !important;
+  animation: none !important;
+}
+
+/* 骨架标签行 */
+.skel-tags-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.skel-tag {
+  width: 42px;
+  height: 20px;
+  border-radius: 4px !important;
+}
+
+.skel-tag-sm {
+  width: 30px;
+}
+
+/* 骨架元信息行 */
+.skel-meta-row {
+  display: flex;
+  gap: 16px;
+}
+
+.skel-meta {
+  width: 56px;
+  height: 12px;
+}
+
+.skel-meta-sm {
+  width: 32px;
+}
+
+/* 骨架按钮 */
+.skeleton-card .card-footer {
+  display: flex;
+  justify-content: space-between;
+}
+
+.skel-btn {
+  width: 64px;
+  height: 28px;
+  border-radius: 6px !important;
+}
+
+.skel-btn-sm {
+  width: 48px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 @media (max-width: 1024px) {

@@ -1,48 +1,172 @@
 <template>
-  <div ref="rootRef" class="markdown-renderer" v-html="renderedHtml"></div>
+  <iframe
+    v-if="isHtmlPreview"
+    ref="htmlFrameRef"
+    class="html-preview-frame"
+    title="HTML 预览"
+    :srcdoc="htmlPreviewSrcdoc"
+    :style="{ height: `${htmlPreviewHeight}px` }"
+    sandbox="allow-scripts allow-forms allow-modals allow-popups"
+  ></iframe>
+  <div v-else ref="rootRef" class="markdown-renderer" v-html="renderedHtml"></div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, onUpdated, ref } from 'vue'
+import { computed, onMounted, onUnmounted, onUpdated, ref, watch } from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github.css'
 
-// 自定义代码渲染器：语法高亮 + 语言标签 + 复制按钮
+type CodeLineTone = 'normal' | 'highlight' | 'error' | 'note'
+type TeachingMarker =
+  | 'highlight-next-line'
+  | 'error-next-line'
+  | 'note-next-line'
+  | 'highlight-start'
+  | 'highlight-end'
+
+interface TeachingCodeLine {
+  content: string
+  tone: CodeLineTone
+}
+
+// 自定义代码渲染器：语法高亮 + 行号 + 教学标记 + 复制按钮
 const renderer = new marked.Renderer()
 
 renderer.code = function ({ text, lang }: { text: string; lang?: string }) {
+  const rawLanguage = (lang || '').trim()
+  const language = rawLanguage.split(/\s+/)[0] || ''
+
   // Mermaid 代码块：输出占位符，后续异步渲染
-  if (lang === 'mermaid') {
+  if (language === 'mermaid') {
     const encodedSource = btoa(unescape(encodeURIComponent(text)))
     return `<div class="mermaid-block" data-mermaid-source="${encodedSource}">
   <div class="mermaid-loading">正在渲染图表…</div>
 </div>`
   }
 
-  const language = lang || ''
-  let highlighted: string
+  const parsed = parseTeachingCode(text)
+  const encodedSource = btoa(unescape(encodeURIComponent(parsed.cleanText)))
+  const langLabel = language ? formatLanguageLabel(language) : '代码'
+  const codeLines = parsed.lines
+    .map((line, index) => renderTeachingCodeLine(line, index + 1, language))
+    .join('')
 
-  if (language && hljs.getLanguage(language)) {
-    highlighted = hljs.highlight(text, { language }).value
-  } else {
-    highlighted = hljs.highlightAuto(text).value
-  }
-
-  const langLabel = language
-    ? `<span class="code-lang">${escapeHtml(language)}</span>`
-    : ''
-
-  return `<div class="code-block-wrapper">
+  return `<div class="code-block-wrapper${parsed.hasTeachingMarkers ? ' has-teaching-markers' : ''}">
   <div class="code-block-header">
-    ${langLabel}
-    <button class="code-copy-btn" title="复制代码">
+    <div class="code-title-group">
+      <span class="code-lang">${escapeHtml(langLabel)}</span>
+      <span class="code-caption">示例代码</span>
+    </div>
+    <button class="code-copy-btn" title="复制代码" data-code-source="${encodedSource}">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
       <span>复制</span>
     </button>
   </div>
-  <pre><code class="hljs${language ? ` language-${escapeHtml(language)}` : ''}">${highlighted}</code></pre>
+  <pre class="code-teaching-pre"><code class="hljs${language ? ` language-${escapeHtml(language)}` : ''}">${codeLines}</code></pre>
 </div>`
+}
+
+function parseTeachingCode(text: string): {
+  lines: TeachingCodeLine[]
+  cleanText: string
+  hasTeachingMarkers: boolean
+} {
+  const sourceLines = text.replace(/\r\n/g, '\n').split('\n')
+  const lines: TeachingCodeLine[] = []
+  let nextTone: CodeLineTone | null = null
+  let rangeTone: CodeLineTone | null = null
+  let hasTeachingMarkers = false
+
+  sourceLines.forEach((sourceLine) => {
+    const marker = readTeachingMarker(sourceLine)
+    if (marker) {
+      hasTeachingMarkers = true
+      if (marker === 'highlight-start') {
+        rangeTone = 'highlight'
+      } else if (marker === 'highlight-end') {
+        rangeTone = null
+      } else if (marker === 'highlight-next-line') {
+        nextTone = 'highlight'
+      } else if (marker === 'error-next-line') {
+        nextTone = 'error'
+      } else if (marker === 'note-next-line') {
+        nextTone = 'note'
+      }
+      return
+    }
+
+    lines.push({
+      content: sourceLine,
+      tone: nextTone || rangeTone || 'normal',
+    })
+    nextTone = null
+  })
+
+  return {
+    lines,
+    cleanText: lines.map((line) => line.content).join('\n'),
+    hasTeachingMarkers,
+  }
+}
+
+function readTeachingMarker(line: string): TeachingMarker | null {
+  const slashOrHash = line.match(
+    /^\s*(?:\/\/|#)\s*(highlight-next-line|error-next-line|note-next-line|highlight-start|highlight-end)\s*$/,
+  )
+  if (slashOrHash) return slashOrHash[1] as TeachingMarker
+
+  const html = line.match(
+    /^\s*<!--\s*(highlight-next-line|error-next-line|note-next-line|highlight-start|highlight-end)\s*-->\s*$/,
+  )
+  return html ? (html[1] as TeachingMarker) : null
+}
+
+function renderTeachingCodeLine(line: TeachingCodeLine, lineNumber: number, language: string): string {
+  const lineClass = line.tone === 'normal' ? '' : ` code-line-${line.tone}`
+  const highlighted = highlightCodeLine(line.content, language) || '&nbsp;'
+
+  return `<span class="code-line${lineClass}" data-line="${lineNumber}">
+  <span class="code-line-no">${lineNumber}</span>
+  <span class="code-line-content">${highlighted}</span>
+</span>`
+}
+
+function highlightCodeLine(line: string, language: string): string {
+  if (!line) return ''
+  if (language && hljs.getLanguage(language)) {
+    return hljs.highlight(line, { language, ignoreIllegals: true }).value
+  }
+  return escapeHtml(line)
+}
+
+function formatLanguageLabel(language: string): string {
+  const labels: Record<string, string> = {
+    js: 'JavaScript',
+    javascript: 'JavaScript',
+    ts: 'TypeScript',
+    typescript: 'TypeScript',
+    py: 'Python',
+    python: 'Python',
+    java: 'Java',
+    c: 'C',
+    cpp: 'C++',
+    csharp: 'C#',
+    cs: 'C#',
+    go: 'Go',
+    rust: 'Rust',
+    sql: 'SQL',
+    html: 'HTML',
+    css: 'CSS',
+    json: 'JSON',
+    shell: 'Shell',
+    bash: 'Bash',
+    sh: 'Shell',
+    xml: 'XML',
+    yaml: 'YAML',
+    yml: 'YAML',
+  }
+  return labels[language.toLowerCase()] || language
 }
 
 function escapeHtml(str: string): string {
@@ -63,14 +187,121 @@ const props = defineProps<{
   content: string
 }>()
 
+const htmlFrameRef = ref<HTMLIFrameElement>()
+const htmlPreviewHeight = ref(720)
+
+const renderableHtmlDocument = computed(() => extractRenderableHtmlDocument(props.content))
+
+const isHtmlPreview = computed(() => !!renderableHtmlDocument.value)
+
+const htmlPreviewSrcdoc = computed(() => {
+  if (!renderableHtmlDocument.value) return ''
+  return injectHtmlPreviewBridge(renderableHtmlDocument.value)
+})
+
 const renderedHtml = computed(() => {
   if (!props.content) return ''
+  if (isHtmlPreview.value) return ''
   try {
     return marked.parse(props.content) as string
   } catch {
     return props.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   }
 })
+
+function extractRenderableHtmlDocument(content: string): string {
+  const normalized = content.trim()
+  if (!normalized) return ''
+
+  if (isRunnableHtmlContent(normalized)) {
+    return normalizeHtmlDocument(normalized)
+  }
+
+  const fenced = normalized.match(/^```\s*(?:html)?[^\n]*\n([\s\S]*?)\n```\s*$/i)
+    || normalized.match(/```\s*html[^\n]*\n([\s\S]*?)\n```/i)
+  const fencedContent = fenced?.[1]?.trim() || ''
+  if (fencedContent && isRunnableHtmlContent(fencedContent)) {
+    return normalizeHtmlDocument(fencedContent)
+  }
+
+  return ''
+}
+
+function isRunnableHtmlContent(content: string): boolean {
+  const normalized = content.trim()
+
+  if (/^<!doctype\s+html[\s>]/i.test(normalized)
+    || /^<html[\s>]/i.test(normalized)
+    || (/<head[\s>]/i.test(normalized) && /<body[\s>]/i.test(normalized))) {
+    return true
+  }
+
+  return /<(script|style|canvas|svg)\b/i.test(normalized)
+    && /<\/?[a-z][\s\S]*>/i.test(normalized)
+}
+
+function normalizeHtmlDocument(html: string): string {
+  const normalized = html.trim()
+  if (/^<!doctype\s+html[\s>]/i.test(normalized) || /^<html[\s>]/i.test(normalized)) {
+    return normalized
+  }
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+  </style>
+</head>
+<body>
+${normalized}
+</body>
+</html>`
+}
+
+function injectHtmlPreviewBridge(html: string): string {
+  const bridge = `<script>
+;(() => {
+  const sendHeight = () => {
+    const doc = document.documentElement
+    const body = document.body
+    const height = Math.max(
+      doc ? doc.scrollHeight : 0,
+      doc ? doc.offsetHeight : 0,
+      body ? body.scrollHeight : 0,
+      body ? body.offsetHeight : 0,
+      320
+    )
+    window.parent.postMessage({ type: 'smartorder-html-preview-height', height }, '*')
+  }
+
+  window.addEventListener('load', sendHeight)
+  window.addEventListener('resize', sendHeight)
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(sendHeight).observe(document.documentElement)
+    if (document.body) new ResizeObserver(sendHeight).observe(document.body)
+  }
+  setTimeout(sendHeight, 0)
+  setTimeout(sendHeight, 300)
+})()
+</scr` + `ipt>`
+
+  if (/<\/body\s*>/i.test(html)) {
+    return html.replace(/<\/body\s*>/i, `${bridge}</body>`)
+  }
+
+  if (/<\/html\s*>/i.test(html)) {
+    return html.replace(/<\/html\s*>/i, `${bridge}</html>`)
+  }
+
+  return `${html}${bridge}`
+}
 
 // ─── Mermaid 渲染 ───────────────────────────────────────────
 const blobUrls: string[] = []
@@ -83,6 +314,7 @@ const ICON_FULLSCREEN = `<svg width="14" height="14" viewBox="0 0 24 24" fill="n
 const ICON_DOWNLOAD = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`
 const ICON_COPY = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`
 const ICON_CLOSE = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+const ICON_DIAGRAM = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="3" width="6" height="6" rx="1.5"/><rect x="9" y="15" width="6" height="6" rx="1.5"/><path d="M9 6h6M6 9v2.5A3.5 3.5 0 0 0 9.5 15H12M18 9v2.5A3.5 3.5 0 0 1 14.5 15H12"/></svg>`
 
 function isDarkTheme(): boolean {
   const el = document.documentElement
@@ -97,7 +329,20 @@ async function renderMermaidBlocks(el: HTMLElement) {
   mermaid.initialize({
     startOnLoad: false,
     securityLevel: 'strict',
-    theme: isDarkTheme() ? 'dark' : 'default',
+    theme: 'base',
+    themeVariables: getMermaidThemeVariables(),
+    flowchart: {
+      curve: 'basis',
+      htmlLabels: true,
+      nodeSpacing: 52,
+      rankSpacing: 58,
+      padding: 14,
+    },
+    sequence: {
+      boxMargin: 12,
+      messageMargin: 42,
+      mirrorActors: false,
+    },
   })
 
   for (const block of blocks) {
@@ -116,7 +361,11 @@ async function renderMermaidBlocks(el: HTMLElement) {
 
       block.innerHTML = `
   <div class="mermaid-diagram-header">
-    <span class="code-lang">Mermaid</span>
+    <div class="mermaid-title-group">
+      <span class="mermaid-title-icon">${ICON_DIAGRAM}</span>
+      <span class="code-lang">图解画布</span>
+      <span class="mermaid-caption">Mermaid</span>
+    </div>
     <div class="mermaid-toolbar">
       <button class="mermaid-tool-btn" data-action="toggle" title="查看源码">${ICON_TOGGLE}</button>
       <span class="mermaid-toolbar-divider"></span>
@@ -146,7 +395,11 @@ async function renderMermaidBlocks(el: HTMLElement) {
       block.setAttribute('data-view', 'source')
       block.innerHTML = `
   <div class="mermaid-diagram-header">
-    <span class="code-lang">Mermaid</span>
+    <div class="mermaid-title-group">
+      <span class="mermaid-title-icon">${ICON_DIAGRAM}</span>
+      <span class="code-lang">图解画布</span>
+      <span class="mermaid-caption">Mermaid</span>
+    </div>
     <div class="mermaid-toolbar">
       <button class="mermaid-tool-btn" data-action="toggle" title="查看图表">${ICON_TOGGLE}</button>
       <button class="mermaid-tool-btn" data-action="copy" title="复制源码">${ICON_COPY}</button>
@@ -160,6 +413,58 @@ async function renderMermaidBlocks(el: HTMLElement) {
   }
 
   bindMermaidActions(el)
+}
+
+function getMermaidThemeVariables() {
+  const dark = isDarkTheme()
+  if (dark) {
+    return {
+      background: 'transparent',
+      primaryColor: '#0f2f36',
+      primaryTextColor: '#e5f7f4',
+      primaryBorderColor: '#38bdf8',
+      secondaryColor: '#16243b',
+      secondaryTextColor: '#e2e8f0',
+      secondaryBorderColor: '#7dd3fc',
+      tertiaryColor: '#14261f',
+      tertiaryTextColor: '#dcfce7',
+      tertiaryBorderColor: '#34d399',
+      lineColor: '#67e8f9',
+      textColor: '#e2e8f0',
+      mainBkg: '#0f2f36',
+      secondBkg: '#16243b',
+      tertiaryBkg: '#14261f',
+      nodeBorder: '#38bdf8',
+      clusterBkg: '#0f172a',
+      clusterBorder: '#334155',
+      edgeLabelBackground: '#0f172a',
+      fontFamily: 'Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif',
+      fontSize: '15px',
+    }
+  }
+  return {
+    background: 'transparent',
+    primaryColor: '#e8fbf8',
+    primaryTextColor: '#0f172a',
+    primaryBorderColor: '#0bb7aa',
+    secondaryColor: '#eef6ff',
+    secondaryTextColor: '#0f172a',
+    secondaryBorderColor: '#38bdf8',
+    tertiaryColor: '#f7f4ff',
+    tertiaryTextColor: '#111827',
+    tertiaryBorderColor: '#8b5cf6',
+    lineColor: '#0891b2',
+    textColor: '#1e293b',
+    mainBkg: '#e8fbf8',
+    secondBkg: '#eef6ff',
+    tertiaryBkg: '#f7f4ff',
+    nodeBorder: '#0bb7aa',
+    clusterBkg: '#f8fafc',
+    clusterBorder: '#cbd5e1',
+    edgeLabelBackground: '#ffffff',
+    fontFamily: 'Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif',
+    fontSize: '15px',
+  }
 }
 
 function bindMermaidActions(el: HTMLElement) {
@@ -469,12 +774,14 @@ function bindCopyButtons(el: HTMLElement) {
     ;(btn as HTMLElement)._copyBound = true
 
     btn.addEventListener('click', async () => {
-      const codeEl = btn
-        .closest('.code-block-wrapper')
-        ?.querySelector('code')
-      if (!codeEl) return
+      const button = btn as HTMLElement
+      const encodedSource = button.dataset.codeSource
+      const codeEl = button.closest('.code-block-wrapper')?.querySelector('code')
+      const text = encodedSource
+        ? decodeURIComponent(escape(atob(encodedSource)))
+        : codeEl?.textContent || ''
+      if (!text) return
 
-      const text = codeEl.textContent || ''
       try {
         await navigator.clipboard.writeText(text)
         const span = btn.querySelector('span')!
@@ -500,7 +807,30 @@ function bindCopyButtons(el: HTMLElement) {
   })
 }
 
+function handleHtmlPreviewMessage(event: MessageEvent) {
+  if (event.source !== htmlFrameRef.value?.contentWindow) return
+
+  const data = event.data
+  if (!data || data.type !== 'smartorder-html-preview-height') return
+
+  const height = Number(data.height)
+  if (!Number.isFinite(height)) return
+
+  htmlPreviewHeight.value = Math.min(Math.max(Math.ceil(height), 320), 2400)
+}
+
+watch(
+  () => props.content,
+  () => {
+    if (isHtmlPreview.value) {
+      htmlPreviewHeight.value = 720
+    }
+  },
+)
+
 onMounted(() => {
+  window.addEventListener('message', handleHtmlPreviewMessage)
+
   if (rootRef.value) {
     bindCopyButtons(rootRef.value)
     renderMermaidBlocks(rootRef.value)
@@ -515,12 +845,23 @@ onUpdated(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('message', handleHtmlPreviewMessage)
+
   blobUrls.forEach((url) => URL.revokeObjectURL(url))
   blobUrls.length = 0
 })
 </script>
 
 <style scoped>
+.html-preview-frame {
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+}
+
 .markdown-renderer {
   line-height: 1.7;
   word-break: break-word;
@@ -565,11 +906,21 @@ onUnmounted(() => {
 
 /* 代码块容器 */
 .markdown-renderer :deep(.code-block-wrapper) {
-  margin: 0.8em 0;
-  border-radius: 10px;
+  --code-bg: #fbfcfd;
+  --code-gutter-bg: #f4f7fa;
+  --code-border: #d7dfe8;
+  --code-muted: #64748b;
+  --code-text: #1e293b;
+  margin: 1em 0;
+  border-radius: 8px;
   overflow: hidden;
-  background: #f8f9fa;
-  border: 1px solid #e2e6ea;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.96)),
+    var(--code-bg);
+  border: 1px solid var(--code-border);
+  box-shadow:
+    0 12px 30px rgba(15, 23, 42, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.9) inset;
 }
 
 /* 代码块头部：语言标签 + 复制按钮 */
@@ -577,28 +928,47 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 14px;
-  background: #eef0f3;
-  border-bottom: 1px solid #e2e6ea;
-  font-size: 0.75rem;
-  color: #6a737d;
+  gap: 12px;
+  min-height: 38px;
+  padding: 8px 12px 8px 14px;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.96));
+  border-bottom: 1px solid var(--code-border);
+  font-size: 0.78rem;
+  color: var(--code-muted);
+}
+
+.markdown-renderer :deep(.code-title-group) {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 8px;
 }
 
 .markdown-renderer :deep(.code-lang) {
   font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
-  text-transform: lowercase;
-  font-weight: 500;
+  font-weight: 650;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+.markdown-renderer :deep(.code-caption) {
+  color: var(--code-muted);
+  font-size: 0.75rem;
+  line-height: 1.2;
 }
 
 .markdown-renderer :deep(.code-copy-btn) {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border: none;
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 3px 9px;
+  border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: #6a737d;
+  color: var(--code-muted);
   font-size: 0.75rem;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -607,8 +977,10 @@ onUnmounted(() => {
 }
 
 .markdown-renderer :deep(.code-copy-btn:hover) {
-  background: rgba(0, 0, 0, 0.06);
-  color: #24292e;
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #1f2937;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
 }
 
 .markdown-renderer :deep(.code-copy-btn.copied) {
@@ -624,16 +996,185 @@ onUnmounted(() => {
   margin: 0;
   border-radius: 0;
   overflow-x: auto;
-  padding: 14px 16px;
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  background: #f8f9fa;
+  padding: 0;
+  font-size: 0.84rem;
+  line-height: 1.68;
+  background: var(--code-bg);
+  color: var(--code-text);
+  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-width: thin;
+}
+
+.markdown-renderer :deep(.code-block-wrapper pre::-webkit-scrollbar) {
+  height: 10px;
+}
+
+.markdown-renderer :deep(.code-block-wrapper pre::-webkit-scrollbar-track) {
+  background: #f1f5f9;
+}
+
+.markdown-renderer :deep(.code-block-wrapper pre::-webkit-scrollbar-thumb) {
+  border: 3px solid #f1f5f9;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.markdown-renderer :deep(.code-block-wrapper pre::-webkit-scrollbar-thumb:hover) {
+  background: #94a3b8;
 }
 
 .markdown-renderer :deep(.code-block-wrapper pre code) {
+  display: block;
+  min-width: max-content;
   font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
+  font-variant-ligatures: none;
+  tab-size: 2;
   background: none;
   padding: 0;
+}
+
+.markdown-renderer :deep(.code-line) {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  min-height: 1.68em;
+  border-left: 3px solid transparent;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.markdown-renderer :deep(.code-line:first-child .code-line-no),
+.markdown-renderer :deep(.code-line:first-child .code-line-content) {
+  padding-top: 12px;
+}
+
+.markdown-renderer :deep(.code-line:last-child .code-line-no),
+.markdown-renderer :deep(.code-line:last-child .code-line-content) {
+  padding-bottom: 12px;
+}
+
+.markdown-renderer :deep(.code-line:hover) {
+  background: rgba(14, 116, 144, 0.045);
+}
+
+.markdown-renderer :deep(.code-line-no) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  padding: 0 12px 0 10px;
+  color: #94a3b8;
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid #e2e8f0;
+  background: var(--code-gutter-bg);
+  font-size: 0.74rem;
+}
+
+.markdown-renderer :deep(.code-line-content) {
+  min-width: 0;
+  padding: 0 18px;
+  white-space: pre;
+}
+
+.markdown-renderer :deep(.code-line-highlight) {
+  border-left-color: #0f9f8f;
+  background:
+    linear-gradient(90deg, rgba(20, 184, 166, 0.18), rgba(20, 184, 166, 0.06) 68%, transparent);
+  box-shadow: 0 1px 0 rgba(15, 159, 143, 0.08) inset;
+}
+
+.markdown-renderer :deep(.code-line-highlight .code-line-no) {
+  color: #0f766e;
+  background: #e6f7f5;
+}
+
+.markdown-renderer :deep(.code-line-note) {
+  border-left-color: #2563eb;
+  background:
+    linear-gradient(90deg, rgba(37, 99, 235, 0.13), rgba(37, 99, 235, 0.045) 68%, transparent);
+}
+
+.markdown-renderer :deep(.code-line-note .code-line-no) {
+  color: #2563eb;
+  background: #edf4ff;
+}
+
+.markdown-renderer :deep(.code-line-error) {
+  border-left-color: #dc2626;
+  background:
+    linear-gradient(90deg, rgba(220, 38, 38, 0.13), rgba(220, 38, 38, 0.045) 68%, transparent);
+}
+
+.markdown-renderer :deep(.code-line-error .code-line-no) {
+  color: #dc2626;
+  background: #fff1f1;
+}
+
+.markdown-renderer :deep(.has-teaching-markers .code-block-header) {
+  background:
+    linear-gradient(180deg, rgba(239, 253, 250, 0.98), rgba(236, 250, 248, 0.96));
+  border-bottom-color: rgba(15, 159, 143, 0.22);
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-comment),
+.markdown-renderer :deep(.code-block-wrapper .hljs-quote) {
+  color: #64748b;
+  font-style: italic;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-keyword),
+.markdown-renderer :deep(.code-block-wrapper .hljs-selector-tag),
+.markdown-renderer :deep(.code-block-wrapper .hljs-built_in) {
+  color: #0f5cb6;
+  font-weight: 650;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-string),
+.markdown-renderer :deep(.code-block-wrapper .hljs-regexp),
+.markdown-renderer :deep(.code-block-wrapper .hljs-template-variable) {
+  color: #0f766e;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-number),
+.markdown-renderer :deep(.code-block-wrapper .hljs-literal),
+.markdown-renderer :deep(.code-block-wrapper .hljs-variable) {
+  color: #b45309;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-title),
+.markdown-renderer :deep(.code-block-wrapper .hljs-title.function_),
+.markdown-renderer :deep(.code-block-wrapper .hljs-function .hljs-title) {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.markdown-renderer :deep(.code-block-wrapper .hljs-attr),
+.markdown-renderer :deep(.code-block-wrapper .hljs-attribute),
+.markdown-renderer :deep(.code-block-wrapper .hljs-property) {
+  color: #0369a1;
+}
+
+@media (max-width: 640px) {
+  .markdown-renderer :deep(.code-block-header) {
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+
+  .markdown-renderer :deep(.code-caption) {
+    display: none;
+  }
+
+  .markdown-renderer :deep(.code-line) {
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+  }
+
+  .markdown-renderer :deep(.code-line-no) {
+    padding: 0 8px 0 6px;
+  }
+
+  .markdown-renderer :deep(.code-line-content) {
+    padding: 0 12px;
+  }
 }
 
 /* 兼容：没有经过 wrapper 的裸 pre */
@@ -721,17 +1262,26 @@ onUnmounted(() => {
 
 /* ─── Mermaid 图表 ─────────────────────────────────────── */
 .markdown-renderer :deep(.mermaid-block) {
-  margin: 0.8em 0;
-  border-radius: 10px;
+  --mermaid-border: rgba(15, 23, 42, 0.1);
+  --mermaid-muted: #64748b;
+  --mermaid-text: #0f172a;
+  --mermaid-accent: #0bb7aa;
+  margin: 1em 0;
+  border-radius: 12px;
   overflow: hidden;
-  background: #f8f9fa;
-  border: 1px solid #e2e6ea;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.98)),
+    #fff;
+  border: 1px solid var(--mermaid-border);
+  box-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.08),
+    0 1px 0 rgba(255, 255, 255, 0.92) inset;
 }
 
 .markdown-renderer :deep(.mermaid-loading) {
-  padding: 24px 16px;
+  padding: 28px 16px;
   text-align: center;
-  color: #6a737d;
+  color: var(--mermaid-muted);
   font-size: 0.8125rem;
 }
 
@@ -739,23 +1289,53 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 14px;
-  background: #eef0f3;
-  border-bottom: 1px solid #e2e6ea;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 12px 8px 14px;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(241, 245, 249, 0.92));
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   font-size: 0.75rem;
-  color: #6a737d;
+  color: var(--mermaid-muted);
+}
+
+.markdown-renderer :deep(.mermaid-title-group) {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.markdown-renderer :deep(.mermaid-title-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgba(11, 183, 170, 0.1);
+  color: var(--mermaid-accent);
+  flex-shrink: 0;
+}
+
+.markdown-renderer :deep(.mermaid-caption) {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .markdown-renderer :deep(.mermaid-toolbar) {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
+  flex: 0 0 auto;
 }
 
 .markdown-renderer :deep(.mermaid-toolbar-divider) {
   width: 1px;
   height: 14px;
-  background: #d0d5db;
+  background: #dbe3ea;
   margin: 0 4px;
 }
 
@@ -763,24 +1343,26 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  border: none;
-  border-radius: 4px;
+  border: 1px solid transparent;
+  border-radius: 7px;
   background: transparent;
-  color: #6a737d;
+  color: var(--mermaid-muted);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .markdown-renderer :deep(.mermaid-tool-btn:hover) {
-  background: rgba(0, 0, 0, 0.06);
-  color: #24292e;
+  background: #fff;
+  border-color: rgba(15, 23, 42, 0.08);
+  color: var(--mermaid-text);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 
 .markdown-renderer :deep(.mermaid-tool-btn.copied) {
-  color: #22863a;
+  color: #0f766e;
 }
 
 .markdown-renderer :deep(.mermaid-tool-btn svg) {
@@ -797,11 +1379,11 @@ onUnmounted(() => {
   position: absolute;
   right: 0;
   top: 100%;
-  margin-top: 4px;
+  margin-top: 6px;
   background: #fff;
-  border: 1px solid #e2e6ea;
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
   z-index: 100;
   min-width: 120px;
   overflow: hidden;
@@ -813,7 +1395,7 @@ onUnmounted(() => {
   padding: 8px 14px;
   border: none;
   background: #fff;
-  color: #24292e;
+  color: #334155;
   font-size: 0.75rem;
   cursor: pointer;
   text-align: left;
@@ -822,22 +1404,57 @@ onUnmounted(() => {
 }
 
 .markdown-renderer :deep(.mermaid-download-option:hover) {
-  background: #f0f2f5;
+  background: #f0fdfa;
+  color: #0f766e;
 }
 
 .markdown-renderer :deep(.mermaid-zoom-label) {
   font-size: 0.7rem;
-  color: #6a737d;
+  color: var(--mermaid-muted);
   min-width: 32px;
   text-align: center;
   font-family: 'Fira Code', 'Consolas', monospace;
 }
 
 .markdown-renderer :deep(.mermaid-diagram-body) {
-  padding: 16px;
+  padding: 20px;
   text-align: center;
-  max-height: 500px;
+  max-height: 560px;
   overflow: auto;
+  background:
+    radial-gradient(circle at 16px 16px, rgba(14, 165, 233, 0.14) 1px, transparent 1.5px),
+    linear-gradient(180deg, #ffffff, #f8fbfc);
+  background-size: 24px 24px, 100% 100%;
+  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-width: thin;
+}
+
+.markdown-renderer :deep(.mermaid-diagram-body::-webkit-scrollbar) {
+  width: 10px;
+  height: 10px;
+}
+
+.markdown-renderer :deep(.mermaid-diagram-body::-webkit-scrollbar-track) {
+  background: transparent;
+}
+
+.markdown-renderer :deep(.mermaid-diagram-body::-webkit-scrollbar-thumb) {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: #cbd5e1;
+  background-clip: content-box;
+}
+
+.markdown-renderer :deep(.mermaid-diagram-scroll) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: min(100%, 520px);
+  min-height: 220px;
+  padding: 18px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
 }
 
 .markdown-renderer :deep(.mermaid-diagram-body svg) {
@@ -845,20 +1462,40 @@ onUnmounted(() => {
   height: auto;
   transform-origin: center top;
   transition: transform 0.15s ease;
+  overflow: visible;
+  filter: drop-shadow(0 10px 18px rgba(15, 23, 42, 0.08));
+}
+
+.markdown-renderer :deep(.mermaid-diagram-body svg .node rect),
+.markdown-renderer :deep(.mermaid-diagram-body svg .node polygon),
+.markdown-renderer :deep(.mermaid-diagram-body svg .node circle),
+.markdown-renderer :deep(.mermaid-diagram-body svg .node ellipse) {
+  rx: 8px;
+  filter: drop-shadow(0 4px 10px rgba(15, 23, 42, 0.09));
+}
+
+.markdown-renderer :deep(.mermaid-diagram-body svg .edgePath .path) {
+  stroke-width: 2.2px;
+}
+
+.markdown-renderer :deep(.mermaid-diagram-body svg .edgeLabel) {
+  color: #334155;
+  font-weight: 600;
 }
 
 .markdown-renderer :deep(.mermaid-source-body) {
   display: none;
   max-height: 400px;
   overflow: auto;
+  border-top: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .markdown-renderer :deep(.mermaid-source-body pre) {
   margin: 0;
-  padding: 14px 16px;
+  padding: 16px 18px;
   font-size: 0.8125rem;
   line-height: 1.6;
-  background: #f8f9fa;
+  background: #f8fafc;
 }
 
 .markdown-renderer :deep(.mermaid-source-body pre code) {
@@ -868,7 +1505,8 @@ onUnmounted(() => {
 }
 
 .markdown-renderer :deep(.mermaid-error-body) {
-  padding: 12px 16px;
+  padding: 14px 16px 16px;
+  background: #fff7f7;
 }
 
 .markdown-renderer :deep(.mermaid-error-msg) {
@@ -880,19 +1518,50 @@ onUnmounted(() => {
 
 .markdown-renderer :deep(.mermaid-error-body pre) {
   margin: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow-x: auto;
   padding: 10px 14px;
   font-size: 0.8125rem;
   line-height: 1.5;
   background: #fff;
-  border: 1px solid #e2e6ea;
+  border: 1px solid rgba(220, 38, 38, 0.16);
 }
 
 .markdown-renderer :deep(.mermaid-error-body pre code) {
   font-family: 'Fira Code', 'Consolas', 'Courier New', monospace;
   background: none;
   padding: 0;
+}
+
+@media (max-width: 640px) {
+  .markdown-renderer :deep(.mermaid-block) {
+    border-radius: 10px;
+  }
+
+  .markdown-renderer :deep(.mermaid-diagram-header) {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 10px;
+  }
+
+  .markdown-renderer :deep(.mermaid-toolbar) {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 1px;
+  }
+
+  .markdown-renderer :deep(.mermaid-caption) {
+    display: none;
+  }
+
+  .markdown-renderer :deep(.mermaid-diagram-body) {
+    padding: 12px;
+  }
+
+  .markdown-renderer :deep(.mermaid-diagram-scroll) {
+    min-height: 180px;
+    padding: 12px;
+  }
 }
 </style>
 
@@ -908,48 +1577,56 @@ onUnmounted(() => {
   transition: background 0.2s ease;
 }
 .mermaid-fullscreen-overlay.visible {
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(7, 12, 22, 0.78);
+  backdrop-filter: blur(10px);
 }
 .mermaid-fullscreen-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
   padding: 12px 20px;
-  background: #1e1e1e;
-  color: #ccc;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.9));
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
   font-size: 0.8125rem;
 }
 .mermaid-fullscreen-title {
-  font-weight: 500;
+  font-weight: 650;
+  color: #f8fafc;
 }
 .mermaid-fullscreen-toolbar {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex: 0 0 auto;
 }
 .mermaid-fullscreen-divider {
   width: 1px;
   height: 16px;
-  background: #555;
+  background: rgba(148, 163, 184, 0.28);
   margin: 0 8px;
 }
 .mermaid-fullscreen-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 30px;
-  height: 30px;
+  min-width: 32px;
+  height: 32px;
   padding: 0 8px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #aaa;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  color: #cbd5e1;
   font-size: 0.7rem;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .mermaid-fullscreen-btn:hover {
   background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
 
@@ -962,11 +1639,11 @@ onUnmounted(() => {
   position: absolute;
   right: 0;
   top: 100%;
-  margin-top: 4px;
-  background: #2a2a2a;
-  border: 1px solid #444;
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  margin-top: 7px;
+  background: #111827;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.38);
   z-index: 100;
   min-width: 120px;
   overflow: hidden;
@@ -976,8 +1653,8 @@ onUnmounted(() => {
   width: 100%;
   padding: 8px 14px;
   border: none;
-  background: #2a2a2a;
-  color: #ccc;
+  background: #111827;
+  color: #cbd5e1;
   font-size: 0.75rem;
   cursor: pointer;
   text-align: left;
@@ -985,12 +1662,13 @@ onUnmounted(() => {
   font-family: inherit;
 }
 .mermaid-fs-download-option:hover {
-  background: #3a3a3a;
+  background: rgba(20, 184, 166, 0.18);
+  color: #f8fafc;
 }
 
 .mermaid-fullscreen-zoom {
   font-size: 0.75rem;
-  color: #999;
+  color: #cbd5e1;
   min-width: 38px;
   text-align: center;
   font-family: 'Fira Code', 'Consolas', monospace;
@@ -1002,17 +1680,48 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 32px;
+  background:
+    radial-gradient(circle at 24px 24px, rgba(125, 211, 252, 0.12) 1px, transparent 1.5px),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.36), rgba(2, 6, 23, 0.5));
+  background-size: 28px 28px, 100% 100%;
 }
 .mermaid-fullscreen-content {
   transform-origin: center center;
   transition: transform 0.15s ease;
+  padding: 22px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.36),
+    0 0 0 1px rgba(255, 255, 255, 0.72) inset;
 }
 .mermaid-fullscreen-content svg {
   max-width: 90vw;
   max-height: 80vh;
   height: auto;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  background: transparent;
+  border-radius: 10px;
+  filter: drop-shadow(0 12px 22px rgba(15, 23, 42, 0.12));
+}
+
+@media (max-width: 640px) {
+  .mermaid-fullscreen-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 12px;
+  }
+
+  .mermaid-fullscreen-toolbar {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .mermaid-fullscreen-body {
+    padding: 14px;
+  }
+
+  .mermaid-fullscreen-content {
+    padding: 12px;
+  }
 }
 </style>

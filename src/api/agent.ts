@@ -1,11 +1,16 @@
 import request from './request'
+import type { LearningPlanDraft, PlanPauseInfo, TaskList } from '@/types/planExecute'
 
 export interface AgentChatRequest {
   message: string
   conversationId?: string
   fileIds?: number[]
+  /** 学习执行页上下文：当前脚本步骤、教学段、画布、时间轴位置等 */
+  studyContext?: Record<string, unknown>
   /** 强制运行模式：'REACT' 快速回答 / 'PLAN_AND_EXECUTE' 目标规划，不传则走意图路由 */
   forceMode?: 'REACT' | 'PLAN_AND_EXECUTE'
+  /** 结构化澄清回答 JSON（可选），格式: {"clarificationId": "uuid", "answer": "用户回答"} */
+  clarificationAnswerJson?: string
 }
 
 export interface PlanConfirmRequest {
@@ -14,7 +19,7 @@ export interface PlanConfirmRequest {
 }
 
 export interface PlanSummary {
-  spaceId: number
+  spaceId: string
   spaceName: string
   spaceType: string
   nodeCount: number
@@ -63,6 +68,22 @@ export interface MessagePageResult {
   size: number
 }
 
+export interface PlanningSnapshot {
+  conversationId: string
+  runId?: string
+  executionDraftId?: string
+  learningPlanDraftId?: string
+  planType?: string
+  status?: string
+  taskList?: TaskList
+  pauseInfo?: PlanPauseInfo | null
+  learningPlanDraft?: LearningPlanDraft | null
+  spaceCreated?: {
+    spaceId: string
+    spaceName: string
+  } | null
+}
+
 /**
  * Agent 对话相关 API
  */
@@ -97,6 +118,31 @@ export const agentApi = {
   /** 删除指定对话 */
   deleteConversation(conversationId: string) {
     return request.delete<string>(`/agent/conversations/${conversationId}`)
+  },
+
+  /** 获取指定会话的澄清记录（历史回放用） */
+  getClarifications(conversationId: string) {
+    return request.get<any[]>(`/agent/clarifications/${conversationId}`)
+  },
+
+  /** 获取会话的活跃计划运行态——用于加载历史会话时恢复 agentStore 状态 */
+  getActiveRun(conversationId: string) {
+    return request.get<any>(`/agent/conversations/${conversationId}/active-run`)
+  },
+
+  /** 获取会话级目标规划快照——用于实时/历史会话顶部唯一执行面板 */
+  getPlanningSnapshot(conversationId: string) {
+    return request.get<PlanningSnapshot | null>(`/agent/conversations/${conversationId}/planning-snapshot`)
+  },
+
+  /** 获取创建某个学习空间时确认的 Agent 学习计划 */
+  getLearningPlanBySpace(spaceId: string) {
+    return request.get<LearningPlanDraft | null>(`/agent/learning-plans/by-space/${spaceId}`)
+  },
+
+  /** 获取 Run 的标准化 Timeline */
+  getRunTimeline(runId: string) {
+    return request.get<any[]>(`/agent/runs/${runId}/timeline`)
   },
 }
 

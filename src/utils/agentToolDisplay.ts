@@ -24,10 +24,14 @@ const TOOL_META: Record<string, ToolDisplayMeta> = {
   queryKnowledge:         { label: '知识图谱',  icon: 'Connection',  riskLevel: 'read' },
   queryLearningProgress:  { label: '学习进度',  icon: 'TrendCharts', riskLevel: 'read' },
   queryTasks:             { label: '学习任务',  icon: 'List',        riskLevel: 'read' },
+  listLearningSpaces:     { label: '学习空间',  icon: 'Collection',  riskLevel: 'read' },
+  resolveLearningSpace:   { label: '学习空间',  icon: 'Search',      riskLevel: 'read' },
+  getLearningSpaceDashboard: { label: '空间状态', icon: 'DataAnalysis', riskLevel: 'read' },
   manageLearningPlan:     { label: '学习规划',  icon: 'EditPen',     riskLevel: 'write_confirmed' },
   generateResource:       { label: '学习资料',  icon: 'Document',    riskLevel: 'write_confirmed' },
   generateQuiz:           { label: '练习题',    icon: 'Edit',        riskLevel: 'write_confirmed' },
   webSearch:              { label: '网络搜索',  icon: 'Search',      riskLevel: 'read' },
+  generateMindMap:        { label: '思维导图',  icon: 'Connection',  riskLevel: 'read' },
   // 兼容旧名字（LangChain4j @Tool 注册名）
   profile_tool:           { label: '学习画像',  icon: 'User',        riskLevel: 'read' },
   knowledge_search_tool:  { label: '知识图谱',  icon: 'Connection',  riskLevel: 'read' },
@@ -117,6 +121,19 @@ export function formatRunningText(toolName: string, args?: any): string {
         : '正在查看你的学习任务...'
     }
 
+    case 'listLearningSpaces':
+      return subject
+        ? `正在查找与「${subject}」相关的学习空间...`
+        : '正在读取你的学习空间...'
+
+    case 'resolveLearningSpace':
+      return subject
+        ? `正在匹配「${subject}」对应的学习空间...`
+        : '正在匹配学习空间...'
+
+    case 'getLearningSpaceDashboard':
+      return '正在分析这个学习空间的状态...'
+
     case 'learning_plan_tool':
       return subject
         ? `正在为你草拟关于「${subject}」的学习计划...`
@@ -138,6 +155,11 @@ export function formatRunningText(toolName: string, args?: any): string {
       return subject
         ? `正在搜索「${subject}」...`
         : '正在搜索网络...'
+
+    case 'generateMindMap':
+      return subject
+        ? `正在生成「${subject}」的思维导图...`
+        : '正在生成思维导图...'
 
     default:
       return `正在${meta.label}...`
@@ -177,6 +199,19 @@ export function formatCompletedText(toolName: string, args?: any): string {
         : '查看了你的学习任务'
     }
 
+    case 'listLearningSpaces':
+      return subject
+        ? `查找了与「${subject}」相关的学习空间`
+        : '读取了你的学习空间'
+
+    case 'resolveLearningSpace':
+      return subject
+        ? `匹配了「${subject}」对应的学习空间`
+        : '匹配了学习空间'
+
+    case 'getLearningSpaceDashboard':
+      return '分析了学习空间状态'
+
     case 'learning_plan_tool':
       return subject
         ? `为你草拟了关于「${subject}」的学习计划`
@@ -199,6 +234,11 @@ export function formatCompletedText(toolName: string, args?: any): string {
         ? `搜索了「${subject}」`
         : '搜索了网络'
 
+    case 'generateMindMap':
+      return subject
+        ? `生成了「${subject}」的思维导图`
+        : '生成了思维导图'
+
     default:
       return `完成了${getToolDisplayMeta(toolName).label}`
   }
@@ -209,15 +249,25 @@ export function formatCompletedText(toolName: string, args?: any): string {
  * 例："你有 3 个学习目标，2 个薄弱环节"
  *     "找到 12 个相关知识，18 条关联"
  */
+function normalizeResult(result: any): Record<string, any> | null {
+  if (!result) return null
+  if (typeof result === 'string') {
+    try { return JSON.parse(result) } catch { return null }
+  }
+  if (typeof result === 'object') return result
+  return null
+}
+
 export function formatResultText(toolName: string, result?: any): string | null {
-  if (!result || typeof result !== 'object') return null
+  const obj = normalizeResult(result)
+  if (!obj) return null
 
   switch (toolName) {
     case 'getStudentProfile':
     case 'profile_tool': {
       const parts: string[] = []
-      const goals = result.learningGoals ?? result.goals
-      const weaknesses = result.weaknesses
+      const goals = obj.learningGoals ?? obj.goals
+      const weaknesses = obj.weaknesses
       if (Array.isArray(goals)) parts.push(`${goals.length} 个学习目标`)
       if (Array.isArray(weaknesses)) parts.push(`${weaknesses.length} 个薄弱环节`)
       return parts.length ? parts.join('，') : null
@@ -225,8 +275,8 @@ export function formatResultText(toolName: string, result?: any): string | null 
 
     case 'queryKnowledge':
     case 'knowledge_search_tool': {
-      const nodeCount = result.nodeCount ?? result.nodes?.length ?? 0
-      const edgeCount = result.edgeCount ?? result.edges?.length ?? result.relations?.length ?? 0
+      const nodeCount = obj.nodeCount ?? obj.nodes?.length ?? 0
+      const edgeCount = obj.edgeCount ?? obj.edges?.length ?? obj.relations?.length ?? 0
       if (nodeCount === 0 && edgeCount === 0) return '暂未找到相关知识'
       const parts: string[] = []
       if (nodeCount > 0) parts.push(`${nodeCount} 个相关知识`)
@@ -236,11 +286,11 @@ export function formatResultText(toolName: string, result?: any): string | null 
 
     case 'queryLearningProgress': {
       const parts: string[] = []
-      const todayTotal = result.todayTasksCount ?? 0
-      const todayDone = result.todayCompletedCount ?? 0
-      const pending = result.pendingTasksCount ?? 0
-      const overdue = result.overdueTasksCount ?? 0
-      const minutes = result.totalStudyMinutes
+      const todayTotal = obj.todayTasksCount ?? 0
+      const todayDone = obj.todayCompletedCount ?? 0
+      const pending = obj.pendingTasksCount ?? 0
+      const overdue = obj.overdueTasksCount ?? 0
+      const minutes = obj.totalStudyMinutes
       if (todayTotal > 0) parts.push(`今天 ${todayDone}/${todayTotal} 个任务已完成`)
       if (pending > 0) parts.push(`${pending} 个待完成`)
       if (overdue > 0) parts.push(`${overdue} 个已延期`)
@@ -249,12 +299,12 @@ export function formatResultText(toolName: string, result?: any): string | null 
     }
 
     case 'queryTasks': {
-      const count = result.taskCount ?? result.tasks?.length ?? 0
-      const scope = result.scope
+      const count = obj.taskCount ?? obj.tasks?.length ?? 0
+      const scope = obj.scope
       const scopeText = scope === 'today' ? '今天' : scope === 'pending' ? '待完成' : scope === 'overdue' ? '已延期' : ''
       if (count === 0) return `${scopeText}没有任务`
       const parts: string[] = []
-      const tasks = result.tasks ?? result.list ?? []
+      const tasks = obj.tasks ?? obj.list ?? []
       if (Array.isArray(tasks)) {
         const done = tasks.filter((t: any) => t.status === 'done').length
         const inProgress = tasks.filter((t: any) => t.status === 'in_progress' || t.status === 'inProgress').length
@@ -266,15 +316,25 @@ export function formatResultText(toolName: string, result?: any): string | null 
         : `${scopeText}共 ${count} 个任务`
     }
 
+    case 'listLearningSpaces':
+    case 'resolveLearningSpace': {
+      if (obj.summary) return obj.summary
+      const count = obj.total ?? obj.spaces?.length ?? 0
+      return count > 0 ? `找到 ${count} 个学习空间` : '暂未找到匹配的学习空间'
+    }
+
+    case 'getLearningSpaceDashboard':
+      return obj.summary || null
+
     case 'learning_plan_tool': {
-      const success = result.success
-      if (success === false) return result.error ?? '生成失败'
+      const success = obj.success
+      if (success === false) return obj.error ?? '生成失败'
       return '学习计划草稿已准备好，需要你确认后才会生效'
     }
 
     case 'generateResource':
     case 'resource_gen_tool': {
-      const title = result.title
+      const title = obj.title
       return title
         ? `「${title}」已生成，需要你确认后才会保存`
         : '学习资料草稿已生成，需要你确认后才会保存'
@@ -282,21 +342,26 @@ export function formatResultText(toolName: string, result?: any): string | null 
 
     case 'generateQuiz':
     case 'assessment_tool': {
-      const count = result.questionCount ?? result.questions?.length ?? 0
+      const count = obj.questionCount ?? obj.questions?.length ?? 0
       return count > 0
-        ? `共 ${count} 道题，需要你确认后才会保存`
-        : '练习题已生成，需要你确认后才会保存'
+        ? `练习题已成功生成并保存（共 ${count} 道题），可直接前往测评中心或点击下方卡片立即挑战！`
+        : '练习题已成功生成并保存，快来挑战吧！'
     }
 
     case 'webSearch': {
-      const refs = result?.references ?? result?.webSearchReferences
+      const refs = obj.references ?? obj.webSearchReferences
       const refCount = Array.isArray(refs) ? refs.length : 0
-      return refCount > 0 ? `找到 ${refCount} 个来源` : '未找到相关结果'
+      return refCount > 0 ? `参考 ${refCount} 篇资料` : '未找到相关结果'
+    }
+
+    case 'generateMindMap': {
+      const count = obj.nodeCount ?? obj.nodes?.length ?? 0
+      return count > 0 ? `已生成 ${count} 个节点的思维导图` : '思维导图已生成'
     }
 
     default: {
       // 通用 fallback：尝试提取数量信息
-      const total = result.total ?? result.count
+      const total = obj.total ?? obj.count
       if (typeof total === 'number') return `共 ${total} 条`
       return null
     }
@@ -331,6 +396,12 @@ export function formatFailedText(toolName: string): string {
       return '分析学习进度失败'
     case 'queryTasks':
       return '查询学习任务失败'
+    case 'listLearningSpaces':
+      return '读取学习空间失败'
+    case 'resolveLearningSpace':
+      return '匹配学习空间失败'
+    case 'getLearningSpaceDashboard':
+      return '分析学习空间状态失败'
     case 'learning_plan_tool':
       return '生成学习计划失败'
     case 'generateResource':
@@ -341,6 +412,8 @@ export function formatFailedText(toolName: string): string {
       return '出题失败'
     case 'webSearch':
       return '搜索失败'
+    case 'generateMindMap':
+      return '生成思维导图失败'
     default:
       return `${meta.label}失败`
   }

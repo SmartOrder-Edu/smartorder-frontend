@@ -4,10 +4,10 @@ import type { TaskStepVO } from '@/types/learningSpace'
 // 洛必达法则专项练习 — 学习步骤 Mock 数据
 // ============================================================
 
-export function getMockTaskSteps(taskId: number): TaskStepVO[] {
+export function getMockTaskSteps(taskId: string): TaskStepVO[] {
   return [
     {
-      id: 1,
+      id: `${taskId}-step-1`,
       taskId,
       title: '概念回顾',
       description: '回顾洛必达法则的基本概念和适用条件',
@@ -42,7 +42,7 @@ $$\\lim_{x \\to a} \\frac{f(x)}{g(x)} = \\lim_{x \\to a} \\frac{f'(x)}{g'(x)}$$
       resourceId: null,
     },
     {
-      id: 2,
+      id: `${taskId}-step-2`,
       taskId,
       title: '例题讲解',
       description: '通过典型例题掌握洛必达法则的应用方法',
@@ -93,7 +93,7 @@ $$\\lim_{x \\to a} \\frac{f(x)}{g(x)} = \\lim_{x \\to a} \\frac{f'(x)}{g'(x)}$$
       resourceId: null,
     },
     {
-      id: 3,
+      id: `${taskId}-step-3`,
       taskId,
       title: '专项练习',
       description: '通过练习巩固洛必达法则的应用',
@@ -158,10 +158,10 @@ $\\lim_{x \\to 0} \\frac{x^2 \\sin \\frac{1}{x}}{x} = \\lim_{x \\to 0} \\frac{2x
       actualMinutes: null,
       status: 'pending',
       sortOrder: 3,
-      resourceId: 3,
+      resourceId: '3',
     },
     {
-      id: 4,
+      id: `${taskId}-step-4`,
       taskId,
       title: '总结复习',
       description: '回顾本任务学习要点，查漏补缺',

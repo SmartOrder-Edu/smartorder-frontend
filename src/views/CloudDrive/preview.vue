@@ -42,8 +42,8 @@
           <span style="margin-left: 8px;">{{ currentTheme === 'light' ? '白天模式' : '夜晚模式' }}</span>
         </el-button>
 
-        <!-- 下载按钮 -->
-        <el-button type="default" size="large" class="toolbar-btn" @click="handleDownload">
+        <!-- 下载按钮（广场预览不显示） -->
+        <el-button v-if="!isSquarePreview" type="default" size="large" class="toolbar-btn" @click="handleDownload">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right: 6px; vertical-align: middle;">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7,10 12,15 17,10" />
@@ -234,7 +234,7 @@
                 当前处于本地局域网或开发环境，微软 Office 在线预览服务无法直接读取您本地机的文件。
               </p>
               <div class="crystal-btn-container">
-                <button class="crystal-download-btn" @click="handleDownload">
+                <button v-if="!isSquarePreview" class="crystal-download-btn" @click="handleDownload">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18" style="margin-right: 8px;">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7,10 12,15 17,10" />
@@ -275,7 +275,7 @@
             <button class="md-bar-action-btn" title="演示模式">
               <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
             </button>
-            <button class="md-bar-action-btn" @click="handleDownload" title="导出文件">
+            <button v-if="!isSquarePreview" class="md-bar-action-btn" @click="handleDownload" title="导出文件">
               <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             </button>
             <button class="md-bar-action-btn" title="显示大纲" @click="showToc = true" v-if="!showToc && markdownToc.length > 0">
@@ -456,7 +456,17 @@
         </div>
       </div>
 
-      <!-- ==================== 9. 代码/纯文本预览 (搜索高亮、自动折行、浅色/深色高亮) ==================== -->
+      <!-- ==================== 9. HTML 预览 (独立 iframe，可执行交互动画) ==================== -->
+      <div v-else-if="isPreviewableHtml(fileExt)" class="standalone-viewport-html">
+        <iframe
+          class="preview-html-iframe"
+          title="HTML 文件预览"
+          :srcdoc="previewTextContent"
+          sandbox="allow-scripts allow-forms allow-modals allow-popups"
+        ></iframe>
+      </div>
+
+      <!-- ==================== 10. 代码/纯文本预览 (搜索高亮、自动折行、浅色/深色高亮) ==================== -->
       <div v-else-if="isPreviewableText(fileExt)" class="standalone-viewport-text">
         <div class="preview-text-header">
           <div class="header-left">
@@ -499,7 +509,7 @@
         </div>
       </div>
 
-      <!-- ==================== 10. 不支持的格式 (星环全息卡片) ==================== -->
+      <!-- ==================== 11. 不支持的格式 (星环全息卡片) ==================== -->
       <div v-else class="preview-unsupported">
         <div class="glass-container aurora-glowing-card">
           <div class="unsupported-space-orbit">
@@ -571,9 +581,74 @@ const handleToggleTheme = () => {
 
 // 路由 Query 信息
 const fileId = ref(String(route.query.id || ''))
+const squareId = ref(String(route.query.squareId || ''))
 const fileName = ref(String(route.query.name || ''))
 const fileSize = ref(Number(route.query.size || 0))
-const fileExt = ref(fileName.value.split('.').pop()?.toLowerCase() || '')
+const fileType = String(route.query.type || '').trim().replace(/^\./, '').toLowerCase()
+const fileExt = ref(fileType || fileName.value.split('.').pop()?.toLowerCase() || '')
+const isSquarePreview = ref(!!squareId.value)
+/** 网盘列表透传过来的 OSS 公共读直链：有它就直接渲染，不再回后端换链 */
+const directUrl = ref(String(route.query.url || ''))
+
+/** 获取文件内容的 API 路径：广场资源走 /resource-square/{id}/preview，云盘文件优先用 OSS 公共读直链 */
+const getFetchUrl = async (): Promise<string> => {
+  if (squareId.value) {
+    return `/resource-square/${squareId.value}/preview`
+  }
+  if (directUrl.value) {
+    return directUrl.value
+  }
+  return await getPreviewUrl(fileId.value)
+}
+
+/** 获取在线预览直链 URL（用于 iframe/office viewer 等场景） */
+const getSquarePreviewUrl = async (): Promise<string> => {
+  if (squareId.value) {
+    const base = import.meta.env.VITE_API_BASE_URL || '/api'
+    const token = localStorage.getItem('token')
+    return `${base}/resource-square/${squareId.value}/preview?token=${token}`
+  }
+  if (directUrl.value) {
+    return directUrl.value
+  }
+  return await getPreviewUrl(fileId.value)
+}
+
+/**
+ * 读取文件字节/文本：
+ * 直链场景必须用原生 fetch —— axios 实例会带上 Authorization 头，OSS 会拿它当签名校验而报错
+ */
+const fetchArrayBuffer = async (): Promise<ArrayBuffer> => {
+  const url = await getFetchUrl()
+  if (directUrl.value) {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return await res.arrayBuffer()
+    } catch (e) {
+      console.warn('OSS 直链读取失败，回退后端换链:', e)
+      const fallback = await getPreviewUrl(fileId.value)
+      return request.get<ArrayBuffer>(fallback, { responseType: 'arraybuffer' })
+    }
+  }
+  return request.get<ArrayBuffer>(url, { responseType: 'arraybuffer' })
+}
+
+const fetchText = async (): Promise<string> => {
+  const url = await getFetchUrl()
+  if (directUrl.value) {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return await res.text()
+    } catch (e) {
+      console.warn('OSS 直链读取失败，回退后端换链:', e)
+      const fallback = await getPreviewUrl(fileId.value)
+      return request.get<string>(fallback, { responseType: 'text' })
+    }
+  }
+  return request.get<string>(url, { responseType: 'text' })
+}
 
 // 状态声明
 const isEmbedded = ref(window.self !== window.top)
@@ -1081,7 +1156,8 @@ onBeforeUnmount(() => {
 })
 
 const isPreviewableImage = (ext: string) => ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'].includes(ext)
-const isPreviewableText = (ext: string) => ['txt', 'json', 'xml', 'yaml', 'yml', 'js', 'ts', 'py', 'java', 'sql', 'css', 'html'].includes(ext)
+const isPreviewableHtml = (ext: string) => ext === 'html' || ext === 'htm'
+const isPreviewableText = (ext: string) => ['txt', 'json', 'xml', 'yaml', 'yml', 'js', 'ts', 'py', 'java', 'sql', 'css'].includes(ext)
 const isPreviewableVideo = (ext: string) => ['mp4', 'webm', 'ogv'].includes(ext)
 const isPreviewableAudio = (ext: string) => ['mp3', 'wav', 'ogg'].includes(ext)
 const isPreviewablePdf = (ext: string) => ext === 'pdf'
@@ -1128,7 +1204,7 @@ onMounted(async () => {
     return
   }
 
-  if (!fileId.value) {
+  if (!fileId.value && !squareId.value && !directUrl.value) {
     ElMessage.error('无效的文件预览参数')
     loading.value = false
     return
@@ -1136,16 +1212,19 @@ onMounted(async () => {
 
   const ext = fileExt.value
   if (!isPreviewablePdf(ext)) {
-    previewUrl.value = getPreviewUrl(fileId.value) + `&t=${Date.now()}`
+    try {
+      const base = await getSquarePreviewUrl()
+      previewUrl.value = base + (base.includes('?') ? '&' : '?') + `t=${Date.now()}`
+    } catch {
+      // 直链获取失败：拦截器已提示，走下方统一兜底
+    }
   } else {
     previewUrl.value = ''
   }
 
   try {
     if (isPreviewableWord(ext)) {
-      const arrayBuffer = await request.get<ArrayBuffer>(`/yun-resource/preview/${fileId.value}`, {
-        responseType: 'arraybuffer'
-      })
+      const arrayBuffer = await fetchArrayBuffer()
       const docx = await import('docx-preview')
       initialized.value = true
       setTimeout(async () => {
@@ -1158,16 +1237,12 @@ onMounted(async () => {
         }
       }, 100)
     } else if (isPreviewableMarkdown(ext)) {
-      const text = await request.get<string>(`/yun-resource/preview/${fileId.value}`, {
-        responseType: 'text'
-      })
+      const text = await fetchText()
       previewMarkdownSource.value = text
       generateMarkdownToc()
       initialized.value = true
     } else if (isPreviewableText(ext)) {
-      let text = await request.get<string>(`/yun-resource/preview/${fileId.value}`, {
-        responseType: 'text'
-      })
+      let text = await fetchText()
       const MAX_PREVIEW_SIZE = 2 * 1024 * 1024
       if (text.length > MAX_PREVIEW_SIZE) {
         text = text.substring(0, MAX_PREVIEW_SIZE) + '\n\n...[内容过长已被部分截取展示]...'
@@ -1181,10 +1256,8 @@ onMounted(async () => {
         throw new Error('表格文件过大')
       }
 
-      const arrayBuffer = await request.get<ArrayBuffer>(`/yun-resource/preview/${fileId.value}`, {
-        responseType: 'arraybuffer'
-      })
-      
+      const arrayBuffer = await fetchArrayBuffer()
+
       const XLSX = await import('xlsx')
       const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true })
       
@@ -1227,18 +1300,15 @@ onMounted(async () => {
       initialized.value = true
     } else if (isPreviewablePpt(ext)) {
       if (!isLocalhostEnv.value) {
-        const absoluteUrl = window.location.origin + getPreviewUrl(fileId.value)
+        const target = await getSquarePreviewUrl()
+        // 云盘文件直链本身就是绝对地址；广场代理是相对路径，需补 origin
+        const absoluteUrl = target.startsWith('http') ? target : window.location.origin + target
         previewUrl.value = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(absoluteUrl)}`
       }
       initialized.value = true
     } else if (isPreviewablePdf(ext)) {
-      const blob = await request.get<Blob>(`/yun-resource/preview/${fileId.value}`, {
-        responseType: 'blob'
-      })
-      if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl.value)
-      }
-      previewUrl.value = URL.createObjectURL(new Blob([blob as any], { type: 'application/pdf' }))
+      // OSS 公共读直链：iframe 直接加载浏览器内置 PDF 查看器，无需再经后端转 blob
+      previewUrl.value = await getSquarePreviewUrl()
       initialized.value = true
     } else {
       initialized.value = true
@@ -1254,9 +1324,11 @@ onMounted(async () => {
 })
 
 const handleDownload = () => {
-  if (!fileId.value) return
+  if (isSquarePreview.value) return
+  if (!directUrl.value && !fileId.value) return
   ElMessage.success(`开始下载: ${fileName.value}`)
-  downloadFile(fileId.value, fileName.value)
+  // 有 OSS 公共读直链就直接下载，缺失时才回后端换链
+  downloadFile(fileId.value, fileName.value, directUrl.value)
 }
 
 const handleClose = () => {
@@ -2285,7 +2357,7 @@ const handleCopyText = async () => {
   display: flex;
   overflow-y: auto;
   font-family: monospace;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 1px 3px  var(--color-shadow);
   
   .editor-line-numbers {
     padding: 24px 12px;
@@ -2562,7 +2634,7 @@ const handleCopyText = async () => {
   &:hover {
     .hover-trigger-bar {
       opacity: 0.95;
-      background: rgba(255, 255, 255, 0.85);
+      background: var(--color-card-bg-secondary);
       color: #1677ff;
       border-color: rgba(22, 119, 255, 0.2);
       box-shadow: -4px 0 15px rgba(22, 119, 255, 0.15);
@@ -3103,7 +3175,26 @@ const handleCopyText = async () => {
 @keyframes audPulse { 0%, 100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-/* ==================== 9. 代码编辑器优化 ==================== */
+/* ==================== 9. HTML 独立预览 ==================== */
+.standalone-viewport-html {
+  width: min(1180px, calc(100% - 48px));
+  height: calc(100vh - 128px);
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 15px 40px var(--shadow-color);
+}
+
+.preview-html-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #ffffff;
+}
+
+/* ==================== 10. 代码编辑器优化 ==================== */
 .standalone-viewport-text {
   width: 90%;
   max-width: 1080px;
@@ -3311,7 +3402,7 @@ const handleCopyText = async () => {
   border-radius: 12px;
   padding: 12px;
   width: 130px;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 15px  var(--color-shadow);
   display: flex; flex-direction: column; align-items: center; gap: 8px;
   
   .qrcode-text { font-size: 0.68rem; color: var(--text-secondary); font-weight: 600; }

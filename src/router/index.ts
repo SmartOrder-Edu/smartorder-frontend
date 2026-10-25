@@ -13,6 +13,18 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '登录 - 知序智学', guest: true }
   },
   {
+    path: '/oauth/callback/github',
+    name: 'GithubCallback',
+    component: () => import('@/views/Login/GithubCallback.vue'),
+    meta: { title: 'GitHub 登录中 - 知序智学', guest: true }
+  },
+  {
+    path: '/oauth/callback/gitee',
+    name: 'GiteeCallback',
+    component: () => import('@/views/Login/GiteeCallback.vue'),
+    meta: { title: 'Gitee 登录中 - 知序智学', guest: true }
+  },
+  {
     path: '/register',
     name: 'Register',
     component: () => import('@/views/Register/index.vue'),
@@ -25,6 +37,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '学习画像引导 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/space-launch',
+    name: 'SpaceLaunch',
+    component: () => import('@/views/SpaceLaunch/index.vue'),
+    meta: { title: '学习空间生成中 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/views/Dashboard/index.vue'),
@@ -32,15 +50,31 @@ const routes: Array<RouteRecordRaw> = [
   },
   {
     path: '/daily-plan',
-    name: 'DailyPlan',
-    component: () => import('@/views/DailyPlan/index.vue'),
-    meta: { title: '今日总计划 - 知序智学', requiresAuth: true }
+    redirect: '/tasks'
   },
   {
     path: '/space/:spaceId',
     name: 'LearningSpace',
     component: () => import('@/views/LearningSpace/index.vue'),
     meta: { title: '学习空间 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/space/:spaceId/knowledge/:nodeId',
+    name: 'LearningSpaceKnowledgeDetail',
+    component: () => import('@/views/LearningSpace/KnowledgeDetail.vue'),
+    meta: { title: '知识点详情 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/space/:spaceId/plan-adjustment',
+    name: 'LearningSpacePlanAdjustment',
+    component: () => import('@/views/LearningSpace/PlanAdjustment.vue'),
+    meta: { title: 'Agent 调整计划 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/space/:spaceId/insight-report',
+    name: 'LearningSpaceInsightReport',
+    component: () => import('@/views/LearningSpace/InsightReport.vue'),
+    meta: { title: '学情报告详情 - 知序智学', requiresAuth: true }
   },
   {
     path: '/ai-tutor',
@@ -58,7 +92,19 @@ const routes: Array<RouteRecordRaw> = [
     path: '/tasks',
     name: 'Tasks',
     component: () => import('@/views/Tasks/index.vue'),
-    meta: { title: '任务中心 - 知序智学', requiresAuth: true }
+    meta: { title: '任务日程 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/next-week-plan',
+    name: 'NextWeekPlan',
+    component: () => import('@/views/NextWeekPlan/index.vue'),
+    meta: { title: '下周学习计划 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/learning-report/weekly',
+    name: 'WeeklyLearningReport',
+    component: () => import('@/views/LearningReport/index.vue'),
+    meta: { title: '最近 7 天学习报告 - 知序智学', requiresAuth: true }
   },
   {
     path: '/study/:taskId',
@@ -70,7 +116,19 @@ const routes: Array<RouteRecordRaw> = [
     path: '/resources',
     name: 'Resources',
     component: () => import('@/views/Resources/index.vue'),
-    meta: { title: '资源中心 - 知序智学', requiresAuth: true }
+    meta: { title: '资源广场 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/resources/:resourceId',
+    name: 'LearningResourceDetail',
+    component: () => import('@/views/LearningResourceDetail/index.vue'),
+    meta: { title: '学习资源详情 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/resource-square/:id',
+    name: 'ResourceSquareDetail',
+    component: () => import('@/views/ResourceSquareDetail/index.vue'),
+    meta: { title: '资源详情 - 知序智学', requiresAuth: true }
   },
   {
     path: '/spaces',
@@ -103,10 +161,22 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '测评中心 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/exam/questions',
+    name: 'ExamQuestions',
+    component: () => import('@/views/Exam/Questions.vue'),
+    meta: { title: '总题库专项刷题 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/exam/session',
     name: 'ExamSession',
     component: () => import('@/views/ExamSession/index.vue'),
     meta: { title: '开始测评 - 知序智学', requiresAuth: true }
+  },
+  {
+    path: '/exam/demo',
+    name: 'ExamDemoPreview',
+    component: () => import('@/views/Exam/PaperPreview.vue'),
+    meta: { title: 'AI 试卷重构预览 - 知序智学', requiresAuth: true }
   },
   {
     path: '/profile',
@@ -121,6 +191,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '个人云盘 - 知序智学', requiresAuth: true }
   },
   {
+    path: '/messages',
+    name: 'Messages',
+    component: () => import('@/views/Messages/index.vue'),
+    meta: { title: '消息 - 知序智学', requiresAuth: true }
+  },
+  {
     path: '/preview',
     name: 'FilePreview',
     component: () => import('@/views/CloudDrive/preview.vue'),
@@ -133,16 +209,48 @@ const routes: Array<RouteRecordRaw> = [
     meta: { title: '意见反馈 - 知序智学', requiresAuth: true }
   },
   {
-    path: '/admin/feedback',
-    name: 'FeedbackReviewList',
-    component: () => import('@/views/feedback/FeedbackReviewList.vue'),
-    meta: { title: '反馈智能管理台 - 知序智学', requiresAuth: true }
-  },
-  {
-    path: '/admin/prize',
-    name: 'PrizeManagement',
-    component: () => import('@/views/feedback/PrizeManagement.vue'),
-    meta: { title: '反馈奖品管理 - 知序智学', requiresAuth: true }
+    path: '/admin',
+    component: () => import('@/components/layout/AdminLayout.vue'),
+    redirect: '/admin/dashboard',
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: 'dashboard',
+        name: 'AdminDashboard',
+        component: () => import('@/views/admin/AdminDashboard.vue'),
+        meta: { title: '系统全局看板 - 知序智学', requiresAuth: true }
+      },
+      {
+        path: 'agent',
+        name: 'AgentObservability',
+        component: () => import('@/views/admin/AgentObservability.vue'),
+        meta: { title: '智能体观测中心 - 知序智学', requiresAuth: true }
+      },
+      {
+        path: 'rag',
+        name: 'RAGMonitor',
+        component: () => import('@/views/admin/RAGMonitor.vue'),
+        meta: { title: 'RAG 引擎监控 - 知序智学', requiresAuth: true }
+      },
+      {
+        path: 'users',
+        name: 'AdminUserManagement',
+        component: () => import('@/views/admin/UserManagement.vue'),
+        meta: { title: '用户管理 - 知序智学', requiresAuth: true }
+      },
+      {
+        path: 'feedback',
+        name: 'FeedbackReviewList',
+        component: () => import('@/views/feedback/FeedbackReviewList.vue'),
+        meta: { title: '用户反馈管理 - 知序智学', requiresAuth: true }
+      },
+      {
+        path: 'prize',
+        name: 'PrizeManagement',
+        component: () => import('@/views/feedback/PrizeManagement.vue'),
+        meta: { title: '反馈奖品管理 - 知序智学', requiresAuth: true }
+      }
+    ]
   },
   {
     path: '/:pathMatch(.*)*',

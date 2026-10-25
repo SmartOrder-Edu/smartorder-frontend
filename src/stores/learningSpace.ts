@@ -37,12 +37,12 @@ function extractPrimaryGoal(goalsJson: string | null | undefined): string {
   }
 }
 
-const TYPE_COLORS: Record<string, { color: string; gradient: string; icon: string }> = {
-  course:      { color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', icon: '📐' },
-  exam:        { color: '#10b981', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', icon: '📝' },
-  project:     { color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', icon: '💻' },
-  career:      { color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', icon: '🚀' },
-  competition: { color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', icon: '🏆' },
+const TYPE_COLORS: Record<string, { color: string; gradient: string; icon: string; bg: string }> = {
+  course:      { color: '#3b82f6', gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', icon: '📐', bg: '#e2eeff' },
+  exam:        { color: '#10b981', gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', icon: '📝', bg: '#ddfaeb' },
+  project:     { color: '#f59e0b', gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', icon: '💻', bg: '#fff5d6' },
+  career:      { color: '#8b5cf6', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)', icon: '🚀', bg: '#ede4ff' },
+  competition: { color: '#ef4444', gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)', icon: '🏆', bg: '#fde2e2' },
 }
 
 function deriveTodaySuggestion(space: LearningSpaceVO): string {
@@ -69,6 +69,7 @@ function toDisplaySpace(space: LearningSpaceVO): LearningSpaceDisplay {
     icon: theme.icon,
     color: theme.color,
     colorGradient: theme.gradient,
+    bgColor: theme.bg,
     goal: extractPrimaryGoal(space.goals),
     streakDays: 0,
     todaySuggestion: deriveTodaySuggestion(space),

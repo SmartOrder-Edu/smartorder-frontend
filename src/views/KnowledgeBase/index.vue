@@ -401,12 +401,12 @@ const formatDate = (dateStr?: string) => {
     .page-title {
       font-size: 24px;
       font-weight: 600;
-      color: var(--el-text-color-primary);
+      color: var(--text-primary);
       margin: 0 0 8px 0;
     }
     .page-desc {
       font-size: 14px;
-      color: var(--el-text-color-secondary);
+      color: var(--text-secondary);
       margin: 0;
     }
   }
@@ -420,8 +420,8 @@ const formatDate = (dateStr?: string) => {
   margin-bottom: 24px;
 
   .stat-card {
-    background-color: var(--el-bg-color);
-    border: 1px solid var(--el-border-color-lighter);
+    background-color: var(--panel-bg);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 20px;
     display: flex;
@@ -430,7 +430,7 @@ const formatDate = (dateStr?: string) => {
     transition: box-shadow 0.3s ease;
 
     &:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 4px 12px var(--color-shadow);
     }
     
     .stat-icon {
@@ -454,13 +454,13 @@ const formatDate = (dateStr?: string) => {
       
       .stat-label {
         font-size: 14px;
-        color: var(--el-text-color-secondary);
+        color: var(--text-secondary);
         margin-bottom: 4px;
       }
       .stat-value {
         font-size: 24px;
         font-weight: 600;
-        color: var(--el-text-color-primary);
+        color: var(--text-primary);
       }
     }
   }
@@ -471,15 +471,25 @@ const formatDate = (dateStr?: string) => {
   gap: 20px;
   align-items: center;
   margin-bottom: 24px;
-  background-color: var(--el-bg-color);
+  background-color: var(--panel-bg);
   padding: 16px 20px;
   border-radius: 12px;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--border-color);
 
   :deep(.search-input) {
     max-width: 300px;
     .el-input__wrapper {
       border-radius: 8px;
+      background-color: var(--input-bg) !important;
+      border: 1px solid var(--border-color) !important;
+      box-shadow: none !important;
+      
+      .el-input__inner {
+        color: var(--text-primary) !important;
+        &::placeholder {
+          color: var(--text-muted) !important;
+        }
+      }
     }
   }
 
@@ -491,18 +501,19 @@ const formatDate = (dateStr?: string) => {
       padding: 6px 16px;
       border-radius: 20px;
       font-size: 14px;
-      color: var(--el-text-color-regular);
-      background-color: var(--el-fill-color-light);
+      color: var(--text-secondary);
+      background-color: var(--button-bg);
       cursor: pointer;
       transition: all 0.3s;
 
       &:hover {
-        background-color: var(--el-fill-color);
+        background-color: var(--button-hover-bg);
+        color: var(--text-primary);
       }
 
       &.active {
-        background-color: var(--el-color-primary-light-9);
-        color: var(--el-color-primary);
+        background-color: var(--el-color-primary);
+        color: #ffffff;
         font-weight: 500;
       }
     }
@@ -517,13 +528,14 @@ const formatDate = (dateStr?: string) => {
 
 .kb-card {
   border-radius: 12px;
-  border: 1px solid var(--el-border-color-lighter);
+  border: 1px solid var(--border-color);
+  background-color: var(--panel-bg) !important;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   cursor: pointer;
 
   &:hover {
     transform: translateY(-4px);
-    box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12px 24px -12px rgba(0, 0, 0, 0.15);
     border-color: var(--kb-color, var(--el-color-primary));
   }
 
@@ -561,12 +573,12 @@ const formatDate = (dateStr?: string) => {
     .kb-settings-btn {
       border: none;
       background: transparent;
-      color: var(--el-text-color-secondary);
+      color: var(--text-secondary);
       font-size: 16px;
       transition: all 0.3s;
       
       &:hover {
-        background-color: var(--el-fill-color);
+        background-color: var(--button-hover-bg);
         color: var(--el-color-primary);
         transform: rotate(90deg);
       }
@@ -580,7 +592,7 @@ const formatDate = (dateStr?: string) => {
     .kb-name {
       font-size: 18px;
       font-weight: 600;
-      color: var(--el-text-color-primary);
+      color: var(--text-primary);
       margin: 0 0 8px 0;
       display: -webkit-box;
       -webkit-line-clamp: 1;
@@ -590,7 +602,7 @@ const formatDate = (dateStr?: string) => {
 
     .kb-desc {
       font-size: 13px;
-      color: var(--el-text-color-regular);
+      color: var(--text-secondary);
       margin: 0;
       line-height: 1.5;
       display: -webkit-box;
@@ -604,7 +616,7 @@ const formatDate = (dateStr?: string) => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-top: 1px solid var(--el-border-color-lighter);
+    border-top: 1px solid var(--border-color);
     padding-top: 12px;
 
     .kb-stats {
@@ -617,19 +629,19 @@ const formatDate = (dateStr?: string) => {
         align-items: center;
         gap: 4px;
         font-size: 13px;
-        color: var(--el-text-color-secondary);
+        color: var(--text-secondary);
       }
     }
 
     .kb-time {
       font-size: 12px;
-      color: var(--el-text-color-placeholder);
+      color: var(--text-muted);
     }
   }
 }
 
 .create-card {
-  border: 2px dashed var(--el-border-color);
+  border: 2px dashed var(--border-color);
   background-color: transparent;
   display: flex;
   align-items: center;
@@ -638,7 +650,7 @@ const formatDate = (dateStr?: string) => {
   
   &:hover {
     border-color: var(--el-color-primary);
-    background-color: var(--el-color-primary-light-9);
+    background-color: rgba(64, 158, 255, 0.1);
     
     .create-icon {
       color: var(--el-color-primary);
@@ -650,7 +662,7 @@ const formatDate = (dateStr?: string) => {
     
     .create-icon {
       font-size: 48px;
-      color: var(--el-text-color-secondary);
+      color: var(--text-secondary);
       margin-bottom: 12px;
       transition: color 0.3s;
     }
@@ -658,20 +670,20 @@ const formatDate = (dateStr?: string) => {
     h3 {
       font-size: 16px;
       font-weight: 500;
-      color: var(--el-text-color-primary);
+      color: var(--text-primary);
       margin: 0 0 8px 0;
     }
 
     p {
       font-size: 13px;
-      color: var(--el-text-color-regular);
+      color: var(--text-secondary);
       margin: 0 0 16px 0;
     }
   }
 }
 
 .cover-uploader {
-  border: 1px dashed var(--el-border-color);
+  border: 1px dashed var(--border-color);
   border-radius: 6px;
   cursor: pointer;
   position: relative;
@@ -729,11 +741,11 @@ const formatDate = (dateStr?: string) => {
 
 .advanced-settings {
   margin-top: 16px;
-  border-top: 1px solid var(--el-border-color-lighter);
+  border-top: 1px solid var(--border-color);
   
-  ::v-deep .el-collapse-item__header {
+  :deep(.el-collapse-item__header) {
     font-size: 14px;
-    color: var(--el-text-color-regular);
+    color: var(--text-secondary);
   }
 }
 </style>

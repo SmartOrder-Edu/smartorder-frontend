@@ -6,6 +6,7 @@
         <div class="header-left">
           <h1 class="page-title">知识图谱</h1>
           <p class="page-desc">可视化展示知识节点之间的依赖关系和掌握程度</p>
+          <p class="algorithm-state" v-if="algorithmSummary">{{ algorithmSummary }}</p>
         </div>
         <div class="header-right">
           <el-button @click="viewMode = viewMode === 'graph' ? 'tree' : 'graph'">
@@ -29,7 +30,7 @@
       <div class="graph-container">
         <!-- 图谱主体 -->
         <section class="graph-main">
-          <div class="graph-wrapper" ref="graphRef">
+          <div class="graph-wrapper">
             <!-- 图谱视图 -->
             <svg v-if="viewMode === 'graph'" viewBox="0 0 900 600" class="graph-svg">
               <defs>
@@ -153,6 +154,27 @@
               <div class="mastery-bar">
                 <div class="mastery-fill" :style="{ width: selectedNode.progress + '%', background: getMasteryColor(selectedNode.progress) }"></div>
               </div>
+              <div class="mastery-meta" v-if="selectedNode.algorithm">
+                <span>置信度 {{ Math.round((selectedNode.algorithm.confidence || 0) * 100) }}%</span>
+                <span>{{ selectedNode.algorithm.assessmentCount || 0 }} 条证据</span>
+              </div>
+            </div>
+
+            <div class="detail-section" v-if="selectedNode.algorithm?.recentEvidence?.length">
+              <h4>近期证据</h4>
+              <div class="evidence-list">
+                <div
+                  v-for="evidence in selectedNode.algorithm.recentEvidence"
+                  :key="`${evidence.sourceType}-${evidence.sourceId}-${evidence.questionId}`"
+                  class="evidence-item"
+                >
+                  <span :class="{ correct: evidence.isCorrect === true || evidence.isCorrect === 1 }">
+                    {{ evidence.isCorrect === true || evidence.isCorrect === 1 ? '正确' : '待巩固' }}
+                  </span>
+                  <em>得分 {{ Math.round(Number(evidence.score || 0) * 100) }}%</em>
+                  <strong v-if="evidence.errorType">{{ evidence.errorType }}</strong>
+                </div>
+              </div>
             </div>
 
             <div class="detail-section">
@@ -228,14 +250,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { fetchLearningState } from '@/api/algorithm'
+import type { AlgorithmKnowledgeState, LearningAlgorithmState } from '@/api/algorithm'
 
+const route = useRoute()
 const viewMode = ref('graph')
 const selectedNode = ref<any>(null)
-const graphRef = ref<HTMLElement>()
+const algorithmState = ref<LearningAlgorithmState | null>(null)
+const algorithmLoading = ref(false)
+const algorithmError = ref('')
 
-const knowledgeNodes = ref([
+const algorithmSummary = computed(() => {
+  if (algorithmLoading.value) return '正在读取当前学习空间的算法诊断...'
+  if (algorithmError.value) return algorithmError.value
+  if (!algorithmState.value) return '从学习空间进入知识图谱时，可叠加真实掌握度和证据置信度。'
+  const action = algorithmState.value.nextAction
+  if (action?.knowledgeName) return `算法建议先处理「${action.knowledgeName}」：${action.reason || '需要补充诊断证据'}`
+  return `已读取 ${algorithmState.value.assessedCount}/${algorithmState.value.knowledgeCount} 个知识点的诊断结果。`
+})
+
+const knowledgeNodes = ref<any[]>([
   { id: 1, name: '操作系统基础', shortName: 'OS基础', x: 450, y: 80, status: 'mastered', progress: 100, stroke: '#12b886', connections: ['bottom'], prerequisites: [], nextSteps: ['进程管理'], resources: [{ type: 'doc', title: 'OS概念详解', minutes: 15 }, { type: 'mind', title: '知识导图', minutes: 8 }], tasks: ['完成OS基础测试'] },
   { id: 2, name: '进程管理', shortName: '进程管理', x: 450, y: 180, status: 'mastered', progress: 100, stroke: '#12b886', connections: ['top', 'bottom'], prerequisites: ['操作系统基础'], nextSteps: ['线程同步'], resources: [{ type: 'doc', title: 'PCB详解', minutes: 12 }], tasks: ['进程状态转换练习'] },
   { id: 3, name: '线程同步', shortName: '线程同步', x: 450, y: 280, status: 'current', progress: 56, stroke: '#3b5bdb', isCurrent: true, connections: ['top', 'bottom'], prerequisites: ['进程管理'], nextSteps: ['内存管理', '死锁'], resources: [{ type: 'video', title: 'PV操作动画', minutes: 10 }, { type: 'quiz', title: '同步练习题', minutes: 15 }], tasks: ['PV操作练习', '同步互斥测试'] },
@@ -246,7 +283,7 @@ const knowledgeNodes = ref([
   { id: 8, name: '进程调度', shortName: '进程调度', x: 250, y: 280, status: 'learning', progress: 40, stroke: '#3b5bdb', connections: ['right'], prerequisites: ['进程管理'], nextSteps: [], resources: [{ type: 'doc', title: '调度算法对比', minutes: 20 }], tasks: ['调度算法练习'] }
 ])
 
-const knowledgeLinks = ref([
+const knowledgeLinks = ref<any[]>([
   { id: 1, from: 1, to: 2, path: 'M450,112 Q450,146 450,148', type: 'completed' },
   { id: 2, from: 2, to: 3, path: 'M450,212 Q450,246 450,248', type: 'completed' },
   { id: 3, from: 3, to: 4, path: 'M450,312 Q450,346 450,348', type: 'learning' },
@@ -257,7 +294,7 @@ const knowledgeLinks = ref([
   { id: 8, from: 2, to: 8, path: 'M418,200 Q334,240 282,280', type: 'completed' }
 ])
 
-const knowledgeTree = ref([
+const knowledgeTree = ref<any[]>([
   {
     id: 1, name: '操作系统基础', status: 'mastered', progress: 100, expanded: true,
     children: [
@@ -331,6 +368,80 @@ const selectNodeFromTree = (child: any) => {
 const toggleBranch = (branch: any) => {
   branch.expanded = !branch.expanded
 }
+
+function normalizeName(value: unknown) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function statusFromAlgorithm(state: AlgorithmKnowledgeState) {
+  const mastery = Number(state.mastery || 0)
+  const confidence = Number(state.confidence || 0)
+  if (confidence < 0.25) return 'current'
+  if (mastery >= 0.8) return 'mastered'
+  if (mastery >= 0.6) return 'learning'
+  if (mastery >= 0.35) return 'current'
+  return 'weak'
+}
+
+function applyAlgorithmState(state: LearningAlgorithmState) {
+  const byName = new Map<string, AlgorithmKnowledgeState>()
+  state.knowledgeStates.forEach(item => byName.set(normalizeName(item.name), item))
+
+  knowledgeNodes.value = knowledgeNodes.value.map(node => {
+    const algorithm = byName.get(normalizeName(node.name))
+    if (!algorithm) return node
+    const progress = Math.round(Number(algorithm.mastery || 0) * 100)
+    const status = statusFromAlgorithm(algorithm)
+    return {
+      ...node,
+      progress,
+      status,
+      stroke: getNodeStroke({ status }),
+      isCurrent: state.nextAction?.knowledgeNodeId === algorithm.knowledgeNodeId,
+      algorithm,
+    }
+  })
+
+  knowledgeTree.value = knowledgeTree.value.map(branch => syncTreeNode(branch, byName))
+  if (selectedNode.value) {
+    selectedNode.value = knowledgeNodes.value.find(node => node.id === selectedNode.value.id) || selectedNode.value
+  }
+}
+
+function syncTreeNode(node: any, byName: Map<string, AlgorithmKnowledgeState>): any {
+  const algorithm = byName.get(normalizeName(node.name))
+  const synced = algorithm
+    ? {
+        ...node,
+        progress: Math.round(Number(algorithm.mastery || 0) * 100),
+        status: statusFromAlgorithm(algorithm),
+        algorithm,
+      }
+    : { ...node }
+  if (Array.isArray(node.children)) {
+    synced.children = node.children.map((child: any) => syncTreeNode(child, byName))
+  }
+  return synced
+}
+
+async function loadAlgorithmOverlay() {
+  const spaceId = route.query.spaceId
+  if (!spaceId) return
+  algorithmLoading.value = true
+  algorithmError.value = ''
+  try {
+    const state = await fetchLearningState(String(spaceId))
+    algorithmState.value = state
+    applyAlgorithmState(state)
+  } catch (e) {
+    console.warn('Failed to load knowledge graph algorithm overlay:', e)
+    algorithmError.value = '无法读取算法诊断，当前显示基础知识图谱。'
+  } finally {
+    algorithmLoading.value = false
+  }
+}
+
+onMounted(loadAlgorithmOverlay)
 </script>
 
 <style scoped>
@@ -361,6 +472,13 @@ const toggleBranch = (branch: any) => {
   font-size: 0.875rem;
   color: var(--text-secondary);
   margin: 0;
+}
+
+.algorithm-state {
+  margin: 8px 0 0;
+  color: #0f766e;
+  font-size: 0.8125rem;
+  line-height: 1.55;
 }
 
 .header-right {
@@ -455,7 +573,7 @@ const toggleBranch = (branch: any) => {
 
 .branch-header:hover { background: var(--background-color-base); }
 .branch-header.mastered { border-left: 3px solid #12b886; }
-.branch-header.current { border-left: 3px solid #3b5bdb; background: rgba(59, 91, 219, 0.04); }
+.branch-header.current { border-left: 3px solid #3b5bdb; background: rgba(11, 183, 170, 0.04); }
 .branch-header.weak { border-left: 3px solid #f59e0b; }
 .branch-header.locked { border-left: 3px solid #cbd5e1; }
 
@@ -600,6 +718,15 @@ const toggleBranch = (branch: any) => {
   transition: width 0.5s ease;
 }
 
+.mastery-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+}
+
 .detail-section {
   margin-bottom: var(--spacing-lg);
 }
@@ -611,6 +738,43 @@ const toggleBranch = (branch: any) => {
   margin: 0 0 var(--spacing-sm);
 }
 
+.evidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evidence-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--background-color-base);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+
+  span {
+    color: #d97706;
+    font-weight: 700;
+
+    &.correct {
+      color: #059669;
+    }
+  }
+
+  em {
+    font-style: normal;
+    color: var(--text-muted);
+  }
+
+  strong {
+    color: var(--text-dark);
+    font-weight: 600;
+  }
+}
+
 .prereq-tags, .next-tags {
   display: flex;
   flex-wrap: wrap;
@@ -619,7 +783,7 @@ const toggleBranch = (branch: any) => {
 
 .prereq-tag {
   padding: 2px 10px;
-  background: rgba(59, 91, 219, 0.08);
+  background: rgba(11, 183, 170, 0.08);
   color: var(--primary-color);
   border-radius: var(--radius-full);
   font-size: 0.6875rem;

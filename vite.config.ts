@@ -5,6 +5,24 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [vue(), VueDevTools()],
+  define: {
+    // 自动检测并注入 Windows 本地系统环境变量 (支持 github_client_id / client_id 各种小写变体)
+    'import.meta.env.VITE_GITHUB_CLIENT_ID': JSON.stringify(
+      process.env.VITE_GITHUB_CLIENT_ID ||
+      process.env.github_client_id ||
+      process.env.client_id ||
+      process.env.GITHUB_CLIENT_ID ||
+      'MOCK'
+    ),
+    // Gitee OAuth 客户端 ID (支持 Client_ID_gitee / gitee_client_id / GITEE_CLIENT_ID)
+    'import.meta.env.VITE_GITEE_CLIENT_ID': JSON.stringify(
+      process.env.VITE_GITEE_CLIENT_ID ||
+      process.env.Client_ID_gitee ||
+      process.env.gitee_client_id ||
+      process.env.GITEE_CLIENT_ID ||
+      'MOCK'
+    )
+  },
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -36,6 +54,10 @@ export default defineConfig({
         target: 'http://localhost:9015',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
+      },
+      '/study-assets': {
+        target: 'http://localhost:9015',
+        changeOrigin: true
       }
     }
   },

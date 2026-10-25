@@ -10,7 +10,15 @@ const FIELD_LABELS: Record<string, string> = {
   analysis: '解析',
   explanation: '解析',
   difficulty: '难度',
-  score: '分值'
+  score: '分值',
+  type: '题型',
+  questionType: '题型',
+  knowledge_points: '知识点',
+  knowledgePoints: '知识点',
+  ability_tags: '能力标签',
+  abilityTags: '能力标签',
+  correct_reason: '正确解析',
+  wrong_reason: '错误分析'
 }
 
 const STRUCTURE_FIELDS = new Set(['questions', 'items', 'list'])
