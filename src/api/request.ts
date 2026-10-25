@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
 import JSONBig from 'json-bigint'
 
@@ -12,22 +12,33 @@ export interface RequestConfig extends AxiosRequestConfig {
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 /**
- * 独立 token 刷新函数，供 Axios 拦截器和 SSE（fetchEventSource）共用。
- * @returns 新的 accessToken
- * @throws 刷新失败时抛出异常
+ * 单飞的 token 刷新。
+ *
+ * <p>SSE 重连、Axios 拦截器、多个标签页可能同时触发刷新；并发刷新会互相覆盖
+ * refreshToken Cookie/返回值，造成“刚刷新完又 401”。这里把并发请求合并成一个 Promise。</p>
  */
-export async function refreshAccessToken(): Promise<string> {
-  const { data } = await axios.post(
-    `${BASE_URL}/auth/refreshToken`,
-    {},
-    { withCredentials: true }
-  )
-  const newToken = data.data
-  if (newToken) {
-    localStorage.setItem('token', newToken)
-    return newToken
-  }
-  throw new Error('刷新Token失败')
+let refreshTokenPromise: Promise<string> | null = null
+
+export function refreshAccessToken(): Promise<string> {
+  if (refreshTokenPromise) return refreshTokenPromise
+
+  refreshTokenPromise = (async () => {
+    const { data } = await axios.post(
+      `${BASE_URL}/auth/refreshToken`,
+      {},
+      { withCredentials: true }
+    )
+    const newToken = data.data
+    if (newToken) {
+      localStorage.setItem('token', newToken)
+      return newToken as string
+    }
+    throw new Error('刷新Token失败')
+  })().finally(() => {
+    refreshTokenPromise = null
+  })
+
+  return refreshTokenPromise
 }
 
 /**
