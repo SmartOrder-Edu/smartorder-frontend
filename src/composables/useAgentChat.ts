@@ -191,14 +191,99 @@ function nextMessageId(prefix: 'u' | 'a'): string {
 }
 
 /**
- * 生成幂等键：一次用户发送只生成一次。
- * 重试创建、断线重连后重新创建都必须复用同一个 key，服务端据此拒绝重复执行模型调用。
+ * 生成 UUID（conversation_uuid / message_uuid / draftId / clientRequestId 共用）。
+ * 重试必须复用同一个值，因此调用方只能在“新的一次发送”时调用一次。
  */
-function createClientRequestId(): string {
+function createUuid(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
-  return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  // 非安全上下文（http 内网 IP）没有 crypto.randomUUID，手工生成 v4 格式
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16)
+    const value = char === 'x' ? random : (random & 0x3) | 0x8
+    return value.toString(16)
+  })
+}
+
+function createClientRequestId(): string {
+  return createUuid()
+}
+
+/* ===== 新对话草稿：draftId ↔ conversationUuid 一对一 ===== */
+const PENDING_DRAFT_KEY = 'smartorder:agent:pendingDraft'
+
+interface PendingDraft {
+  draftId: string
+  conversationUuid: string
+  /** 最近一次未确认发送的 message_uuid；同内容重试必须复用它 */
+  lastMessageUuid?: string
+  /** 最近一次未确认发送的原文，用于判断“是不是同一次发送的重试” */
+  lastContent?: string
+}
+
+/** 草稿按用户隔离：同一浏览器切换账号时不能复用上一个用户的 UUID */
+function draftStorageKey(userId: string | null): string {
+  return userId ? `${PENDING_DRAFT_KEY}:${userId}` : PENDING_DRAFT_KEY
+}
+
+function readPendingDraft(userId: string | null): PendingDraft | null {
+  try {
+    const raw = localStorage.getItem(draftStorageKey(userId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<PendingDraft>
+    if (!parsed.draftId || !parsed.conversationUuid) return null
+    return {
+      draftId: parsed.draftId,
+      conversationUuid: parsed.conversationUuid,
+      lastMessageUuid: parsed.lastMessageUuid,
+      lastContent: parsed.lastContent,
+    }
+  } catch {
+    return null
+  }
+}
+
+function savePendingDraft(draft: PendingDraft, userId: string | null): void {
+  try {
+    localStorage.setItem(draftStorageKey(userId), JSON.stringify(draft))
+  } catch {
+    // 隐私模式/配额满：丢草稿只会让下一次发送换新 UUID，不影响主流程
+  }
+}
+
+function clearPendingDraft(userId: string | null): void {
+  try {
+    localStorage.removeItem(draftStorageKey(userId))
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * 取出/创建当前“新对话草稿”。
+ *
+ * <p>刷新页面、网络超时、手动重试都必须复用同一个 draftId + conversationUuid；
+ * 只有用户明确点“新建对话”或后端返回草稿冲突时才丢弃。</p>
+ */
+function ensurePendingDraft(userId: string | null): PendingDraft {
+  const existing = readPendingDraft(userId)
+  if (existing) return existing
+  const draft: PendingDraft = {
+    draftId: createUuid(),
+    conversationUuid: createUuid(),
+  }
+  savePendingDraft(draft, userId)
+  return draft
+}
+
+/** 服务端雪花 ID 到手后替换本地临时消息 ID（列表 key 与缓存都跟着走） */
+function applyServerMessageId(message: { id: string; messageId?: string }, serverId: unknown): void {
+  if (serverId === null || serverId === undefined) return
+  const normalized = String(serverId)
+  if (!normalized) return
+  message.messageId = normalized
+  message.id = `server:${normalized}`
 }
 
 /** 记住“最后打开的会话”，刷新页面后才能回到原来的对话，而不是停在欢迎页 */
@@ -245,7 +330,9 @@ async function createTaskWithRetry(
     } catch (err: any) {
       lastError = err
       const status = err?.response?.status
-      if (status === 401 || status === 403 || status === 404) {
+      // 4xx 是确定性拒绝（UUID 冲突 / 无权限 / 会话不存在），重试不会变好
+      if (typeof status === 'number' && status >= 400 && status < 500
+        && status !== 408 && status !== 429) {
         break
       }
       if (attempt < attempts) {
@@ -1519,7 +1606,22 @@ export function useAgentChat(scrollCallback?: () => void) {
     }
 
     // ③ 创建对话任务：执行与订阅解耦。
-    //    同一个 clientRequestId 重试只会命中同一任务，不会重复调用一次模型。
+    //    同一次发送重试必须复用 messageUuid / clientRequestId / conversationUuid，
+    //    服务端据此做任务级与消息级双重幂等。
+    const uid = cacheUserId()
+    const isNewConversation = !agentStore.currentConversationId
+    // 新对话：draftId 与 conversationUuid 一对一，刷新/重试都从本地草稿里取，
+    // 只有用户明确“新建对话”或服务端返回草稿冲突时才换新。
+    const pendingDraft = isNewConversation ? ensurePendingDraft(uid) : null
+    const conversationUuid = pendingDraft?.conversationUuid || agentStore.currentConversationId
+    const draftId = pendingDraft?.draftId
+    // 同一草稿 + 同一原文 = 同一次发送的重试：复用 message_uuid，服务端据此不再插入第二条
+    const messageUuid = pendingDraft?.lastMessageUuid && pendingDraft.lastContent === message
+      ? pendingDraft.lastMessageUuid
+      : createUuid()
+    if (pendingDraft) {
+      savePendingDraft({ ...pendingDraft, lastMessageUuid: messageUuid, lastContent: message }, uid)
+    }
     const clientRequestId = createClientRequestId()
 
     // ① 乐观更新：先把用户这句话显示成一个气泡
@@ -1558,6 +1660,11 @@ export function useAgentChat(scrollCallback?: () => void) {
 
     const requestPayload: Parameters<typeof agentApi.createTask>[0] = {
       message,
+      // 新链路：conversationUuid + messageUuid + draftId 三个 UUID 全部由前端生成
+      conversationUuid: conversationUuid || undefined,
+      messageUuid,
+      draftId,
+      // 旧字段只为兼容尚未升级的后端；新后端以 conversationUuid 为准
       conversationId: agentStore.currentConversationId || undefined,
       fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
       knowledgeBaseIds: knowledgeBaseIds && knowledgeBaseIds.length > 0 ? knowledgeBaseIds : undefined,
@@ -1565,8 +1672,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       clarificationAnswerJson,
       clientRequestId,
     }
-    const uid = cacheUserId()
-    const pendingConversationId = agentStore.currentConversationId || undefined
+    const pendingConversationId = conversationUuid || undefined
 
     // 先落发送意图：create 响应在网络上丢失时，下次进入页面用同一个 clientRequestId 重放，
     // 服务端幂等返回原任务，不会重复开轮/重复调用模型。
@@ -1589,8 +1695,9 @@ export function useAgentChat(scrollCallback?: () => void) {
     try {
       task = await createTaskWithRetry(requestPayload)
     } catch (err: any) {
-      const reason = err?.message || '请求失败，请重试'
       const status = err?.response?.status
+      // 409 等业务拒绝的正文在 response.data.msg；优先展示它，而不是 axios 的通用文案
+      const reason = err?.response?.data?.msg || err?.message || '请求失败，请重试'
       console.error('[useAgentChat] 创建对话任务失败:', err)
 
       if (uid) {
@@ -1602,6 +1709,11 @@ export function useAgentChat(scrollCallback?: () => void) {
           // 网络错误/超时/限流：保留意图，下次进入页面或联网后重放
           void markCachedOutboxFailed(uid, clientRequestId, reason)
         }
+      }
+      // 4xx 说明 draft/conversation/message 这组 UUID 已被服务端拒绝：
+      // 丢掉本地草稿，下一次发送必须重新生成 conversation_uuid + draftId，绝不复用。
+      if (typeof status === 'number' && status >= 400 && status < 500) {
+        clearPendingDraft(uid)
       }
 
       agentStore.finishTurn()
@@ -1620,16 +1732,20 @@ export function useAgentChat(scrollCallback?: () => void) {
 
     // 发送接口已经同步落库：会话与占位消息 ID 立即可用，不必等第一个 SSE 事件。
     // 即使随后 SSE 一次都没连上，页面也知道这段消息属于哪个会话、是哪一行。
-    if (task.conversationId) {
-      agentStore.currentConversationId = task.conversationId
-      agentStore.upsertConversation(task.conversationId, task.title || '')
-      rememberConversation(task.conversationId)
+    const serverConversationUuid = task.conversationUuid || task.conversationId || conversationUuid
+    if (serverConversationUuid) {
+      agentStore.currentConversationId = serverConversationUuid
+      agentStore.upsertConversation(serverConversationUuid, task.title || '')
+      rememberConversation(serverConversationUuid)
     }
-    if (task.userMessageId != null) {
-      userMsg.messageId = String(task.userMessageId)
+    // 会话已确认落库：本地草稿完成使命;下次“新建对话”必须换新的 draftId + conversationUuid
+    if (isNewConversation) {
+      clearPendingDraft(uid)
     }
+    // 雪花 ID 到手：用它替换本地临时消息 ID（v-for key / IndexedDB 缓存一起迁移）
+    applyServerMessageId(userMsg, task.userMessageId)
+    applyServerMessageId(assistantMsg, task.assistantMessageId)
     if (task.assistantMessageId != null) {
-      assistantMsg.messageId = String(task.assistantMessageId)
       agentStore.currentAssistantMessageId = String(task.assistantMessageId)
     }
     if (task.assistantSequenceNo != null) {
@@ -1640,7 +1756,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     }
 
     assistantMsg.taskId = task.taskId
-    const conversationId = task.conversationId || agentStore.currentConversationId
+    const conversationId = serverConversationUuid || agentStore.currentConversationId
     if (uid) {
       // 创建响应已拿到：删除发送意图，把本地占位迁移成服务端消息 key
       void removeCachedOutbox(uid, clientRequestId)
@@ -1649,6 +1765,15 @@ export function useAgentChat(scrollCallback?: () => void) {
       if (conversationId) {
         void saveCachedMessages(uid, conversationId, [userMsg, assistantMsg], { syncedAt: Date.now() })
       }
+    }
+
+    // 消息幂等命中但原任务已被清理：没有可订阅的事件流，直接以服务端历史为准
+    if (!task.taskId) {
+      if (conversationId) {
+        messages.value = []
+        await loadConversation(conversationId)
+      }
+      return
     }
 
     // 发送与刷新恢复共用同一套“应用事件 / 断线重连 / done 定稿”逻辑。
@@ -2099,6 +2224,11 @@ export function useAgentChat(scrollCallback?: () => void) {
    */
   const loadConversation = async (conversationId: string) => {
     const loadToken = ++conversationLoadToken
+    // 打开了真实会话：任何未确认的新对话草稿都不再适用（避免把旧 UUID 带到别的会话）
+    const pendingDraft = readPendingDraft(cacheUserId())
+    if (pendingDraft && pendingDraft.conversationUuid !== conversationId) {
+      clearPendingDraft(cacheUserId())
+    }
     // 切换会话：旧会话的快照不再适用；同会话刷新则保留，交给 resumeActiveTask 使用
     const previousConversationId = agentStore.currentConversationId
     const storedSnapshot = loadAgentStreamSnapshot()
@@ -2625,7 +2755,14 @@ export function useAgentChat(scrollCallback?: () => void) {
           await deleteCachedMessage(uid, buildLocalMessageKey(record.clientRequestId, 'user'))
           await deleteCachedMessage(uid, buildLocalMessageKey(record.clientRequestId, 'ai'))
 
-          const conversationId = task.conversationId || record.conversationId
+          const conversationId = task.conversationUuid || task.conversationId || record.conversationId
+          // 草稿已成功落库：清掉本地 pending draft，避免后续新对话复用旧 UUID
+          if (conversationId) {
+            const pendingDraft = readPendingDraft(uid)
+            if (pendingDraft && pendingDraft.conversationUuid === conversationId) {
+              clearPendingDraft(uid)
+            }
+          }
           if (conversationId && agentStore.currentConversationId === conversationId) {
             // 用服务端历史重建这一轮，并继续接收仍在运行的生成
             await loadConversation(conversationId)
@@ -2685,6 +2822,8 @@ export function useAgentChat(scrollCallback?: () => void) {
   }
 
   const startNewConversation = () => {
+    // 用户明确要新对话：丢掉上一个未确认草稿，下一次发送生成全新的 draftId + conversationUuid
+    clearPendingDraft(cacheUserId())
     resetConversationView()
   }
 

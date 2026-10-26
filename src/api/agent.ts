@@ -6,7 +6,17 @@ const TRACE_BATCH_SIZE = 50
 
 export interface AgentChatRequest {
   message: string
+  /**
+   * @deprecated 旧字段名；新链路使用 conversationUuid。
+   * 后端以 conversationUuid 为准，两者同时存在时忽略本字段。
+   */
   conversationId?: string
+  /** 前端生成的会话 UUID：新建对话时生成，重试必须复用同一个值 */
+  conversationUuid?: string
+  /** 前端生成的消息 UUID：同一 conversationUuid + messageUuid 只会入库一次 */
+  messageUuid?: string
+  /** 新对话草稿 ID：与 conversationUuid 一对一；同一 requestId 不允许更换 */
+  draftId?: string
   fileIds?: number[]
   /** 知识库 ID 列表（与 fileIds 分开传给后端） */
   knowledgeBaseIds?: number[]
@@ -23,7 +33,10 @@ export interface AgentChatRequest {
 /** 一次对话任务的状态视图（发送接口同步返回，含会话与消息 ID） */
 export interface AgentTaskVO {
   taskId: string
+  /** 会话 UUID（兼容旧字段名，值等于 conversationUuid） */
   conversationId?: string | null
+  /** 会话 UUID（后端 conversation_uuid） */
+  conversationUuid?: string | null
   /** 本轮追踪 ID */
   traceId?: string | null
   /** 用户消息行 ID（已落库） */
@@ -73,6 +86,8 @@ export interface ExecutionStep {
 
 export interface ConversationVO {
   conversationId: string
+  /** 会话 UUID（与 conversationId 同值） */
+  conversationUuid?: string
   title: string | null
   lastMessage: string | null
   messageCount: number
@@ -81,6 +96,8 @@ export interface ConversationVO {
 
 export interface MessageVO {
   id: number
+  /** 对外消息 UUID（= 写库时的 message_uuid） */
+  publicId?: string
   role: string
   content: string | null
   toolName: string | null
