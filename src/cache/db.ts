@@ -8,7 +8,7 @@
  * 上层自动退回内存 / sessionStorage，不影响主流程。</p>
  */
 
-export const AGENT_CACHE_VERSION = 1
+export const AGENT_CACHE_VERSION = 2
 
 export const AGENT_CACHE_DB_PREFIX = 'smartorder-agent-cache-u'
 
@@ -79,12 +79,12 @@ function createSchema(db: IDBDatabase): void {
   }
 
   if (!db.objectStoreNames.contains(AGENT_CACHE_STORE.streams)) {
-    const store = db.createObjectStore(AGENT_CACHE_STORE.streams, { keyPath: 'generationId' })
+    const store = db.createObjectStore(AGENT_CACHE_STORE.streams, { keyPath: 'taskId' })
     store.createIndex('byConversation', 'conversationId')
   }
 
   if (!db.objectStoreNames.contains(AGENT_CACHE_STORE.streamEvents)) {
-    db.createObjectStore(AGENT_CACHE_STORE.streamEvents, { keyPath: ['generationId', 'seq'] })
+    db.createObjectStore(AGENT_CACHE_STORE.streamEvents, { keyPath: ['taskId', 'seq'] })
   }
 
   if (!db.objectStoreNames.contains(AGENT_CACHE_STORE.outbox)) {
@@ -125,8 +125,18 @@ export function openAgentCacheDb(userId: string): Promise<IDBDatabase | null> {
       return
     }
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       try {
+        // v1 的流快照以 generationId 为主键；v2 统一为 taskId。
+        // 只丢弃这两张“进行中快照”表，会话与历史消息缓存保留。
+        if ((event as IDBVersionChangeEvent).oldVersion < 2) {
+          if (request.result.objectStoreNames.contains(AGENT_CACHE_STORE.streams)) {
+            request.result.deleteObjectStore(AGENT_CACHE_STORE.streams)
+          }
+          if (request.result.objectStoreNames.contains(AGENT_CACHE_STORE.streamEvents)) {
+            request.result.deleteObjectStore(AGENT_CACHE_STORE.streamEvents)
+          }
+        }
         createSchema(request.result)
       } catch (err) {
         console.warn('[agentCache] 初始化缓存表失败:', err)

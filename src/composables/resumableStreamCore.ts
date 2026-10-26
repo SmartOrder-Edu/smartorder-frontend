@@ -116,12 +116,12 @@ export function parseEventSeq(id: string | null | undefined): number | null {
 }
 
 /**
- * 刷新后是否需要把生成事件流接回来。
+ * 刷新后是否需要把任务事件流接回来。
  *
  * 只有 CREATED / RUNNING 需要：正文此时还只在事件日志里，MySQL 的 assistant 行要等
  * 生成结束才收尾。终态（COMPLETED/FAILED/CANCELLED）说明消息已落库，直接读历史即可。
  */
-export function shouldResumeGeneration(status: string | null | undefined): boolean {
+export function shouldResumeTask(status: string | null | undefined): boolean {
   return status === 'CREATED' || status === 'RUNNING'
 }
 

@@ -3,7 +3,7 @@ import type { ReasoningSegment, ToolCallState } from '@/stores/agent'
 /**
  * 刷新恢复用的流式快照。
  *
- * <p>为什么需要：生成中的正文只在服务端事件日志里，刷新后从 seq=0 回放整轮
+ * <p>为什么需要：任务进行中的正文只在服务端事件日志里，刷新后从 seq=0 回放整轮
  * 既慢又浪费。把“已应用到的 lastSeq + 当时可见的流式状态”一起落盘，
  * 恢复时先画快照，再只订阅 seq &gt; lastSeq 的增量。</p>
  *
@@ -12,9 +12,9 @@ import type { ReasoningSegment, ToolCallState } from '@/stores/agent'
  * 读取 store 与 lastSeq 后立即序列化，因此不会出现“新文本 + 旧游标”。</p>
  */
 
-export const AGENT_STREAM_SNAPSHOT_KEY = 'smartorder:agent:streamSnapshot:v1'
+export const AGENT_STREAM_SNAPSHOT_KEY = 'smartorder:agent:streamSnapshot:v2'
 
-export const AGENT_STREAM_SNAPSHOT_VERSION = 1
+export const AGENT_STREAM_SNAPSHOT_VERSION = 2
 
 /** 超过 sessionStorage 安全预算时放弃本次写入，继续用旧快照（旧游标仍然自洽） */
 export const AGENT_STREAM_SNAPSHOT_MAX_CHARS = 2_000_000
@@ -22,8 +22,8 @@ export const AGENT_STREAM_SNAPSHOT_MAX_CHARS = 2_000_000
 let snapshotWriteWarningLogged = false
 
 export interface AgentStreamSnapshot {
-  version: 1
-  generationId: string
+  version: 2
+  taskId: string
   conversationId: string
   lastSeq: number
   answerText: string
@@ -35,7 +35,7 @@ export interface AgentStreamSnapshot {
 }
 
 export interface AgentStreamSnapshotInput {
-  generationId: string
+  taskId: string
   conversationId: string
   lastSeq: number
   answerText: string
@@ -48,7 +48,7 @@ export interface AgentStreamSnapshotInput {
 export function buildAgentStreamSnapshot(input: AgentStreamSnapshotInput): AgentStreamSnapshot {
   return {
     version: AGENT_STREAM_SNAPSHOT_VERSION,
-    generationId: input.generationId,
+    taskId: input.taskId,
     conversationId: input.conversationId || '',
     lastSeq: Math.max(0, Math.floor(Number(input.lastSeq) || 0)),
     answerText: input.answerText || '',
@@ -66,7 +66,7 @@ export function buildAgentStreamSnapshot(input: AgentStreamSnapshotInput): Agent
 export function isValidAgentStreamSnapshot(value: any): value is AgentStreamSnapshot {
   if (!value || typeof value !== 'object') return false
   if (value.version !== AGENT_STREAM_SNAPSHOT_VERSION) return false
-  if (typeof value.generationId !== 'string' || value.generationId.length === 0) return false
+  if (typeof value.taskId !== 'string' || value.taskId.length === 0) return false
   if (value.conversationId != null && typeof value.conversationId !== 'string') return false
   if (!Number.isFinite(value.lastSeq) || value.lastSeq < 0) return false
   if (typeof value.answerText !== 'string' || typeof value.thinkingText !== 'string') return false

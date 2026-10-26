@@ -543,7 +543,7 @@
                   <button
                     v-if="agentStore.loading"
                     class="action-btn stop-action"
-                    @click="handleStopGeneration"
+                    @click="handleStopTask"
                     title="停止生成"
                   >
                     <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
@@ -786,7 +786,7 @@ const {
   loadOlderMessages,
   currentForceMode,
   sendMessage: agentSend,
-  stopGeneration,
+  stopTask,
   confirmPlan,
   cancelPlan,
   loadConversation,
@@ -1191,8 +1191,8 @@ const handleNewChat = () => {
   agentStore.syncConversations()
 }
 
-const handleStopGeneration = () => {
-  stopGeneration()
+const handleStopTask = () => {
+  stopTask()
 }
 
 const handleDeleteConversation = async (conv: ConversationVO) => {
@@ -1505,7 +1505,7 @@ const handleGateAnswer = async (clarificationId: string, answer: string) => {
   }
 }
 
-const handleGateConfirm = (taskId: string) => {
+const handleGateConfirm = (_taskId: string) => {
   // 区分 CONFIRMATION gate 和 LEARNING_PLAN / DRAFT 确认
   const draftId = agentStore.currentDraftId
   const taskList = agentStore.currentTaskList

@@ -74,7 +74,7 @@ export function toCachedMessage(
     content: message.content || '',
     status: message.status as CachedMessageStatus,
     reconnecting: message.reconnecting === true,
-    generationId: message.generationId,
+    taskId: message.taskId || (message as any).generationId,
     traceId: message.traceId,
     timestamp: Number(message.timestamp) || Date.now(),
     thinkingText: message.thinkingText,
@@ -112,7 +112,7 @@ export function fromCachedMessage(record: CachedMessageRecord): ChatMessage {
     content: record.content || '',
     status: record.status,
     reconnecting: record.reconnecting,
-    generationId: record.generationId,
+    taskId: record.taskId || (record as any).generationId,
     messageId: record.messageId,
     clientRequestId: record.clientRequestId,
     sequenceNo: record.sequenceNo,
@@ -216,7 +216,7 @@ function mergeOne(server: ChatMessage, cached: ChatMessage | undefined): ChatMes
   merged.cacheSyncedAt = cached.cacheSyncedAt
   // 服务端已经给出完整终态内容时，缓存里的“本地部分内容”标记必须摘掉
   merged.localOnly = server.content ? false : cached.localOnly
-  merged.generationId = server.generationId || cached.generationId
+  merged.taskId = server.taskId || cached.taskId
   merged.clientRequestId = server.clientRequestId || cached.clientRequestId
   return merged
 }
@@ -268,9 +268,9 @@ export function mergeChatMessages(
       continue
     }
 
-    // 正在流式的气泡（或已经拿到 generationId 但服务端页面还没读到）不能被合并掉：
+    // 正在流式的气泡（或已经拿到 taskId 但服务端页面还没读到）不能被合并掉：
     // 网络校验与用户发送可能并发，这里保留它，下一次页面会按 messageId 去重。
-    if (cachedMessage.status === 'streaming' || cachedMessage.generationId) {
+    if (cachedMessage.status === 'streaming' || cachedMessage.taskId) {
       merged.push(cachedMessage)
       continue
     }

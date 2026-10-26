@@ -14,7 +14,7 @@ import {
 } from './resumableStreamCore'
 
 /**
- * 可恢复的 Agent 事件流（SSE）。
+ * 可恢复的 Agent 任务事件流（SSE）。
  *
  * 相比旧实现，这一版补上了四个“极致”所需的细节：
  * 1. 自研解析器能看见 `:` 注释心跳，从而检测半开连接；
@@ -76,7 +76,7 @@ export interface ResumableStreamHandlers {
 }
 
 export interface RunStreamOptions extends ResumableStreamHandlers {
-  generationId: string
+  taskId: string
   /** 外部取消（切换会话 / 组件卸载） */
   signal?: AbortSignal
   /** 从指定游标之后开始（页面刷新恢复时可用） */
@@ -156,11 +156,11 @@ function parseJson(raw: string): any {
 function buildFailureMessage(status: number | null): string {
   switch (status) {
     case 403:
-      return '没有权限访问这次生成'
+      return '没有权限访问这次任务'
     case 404:
-      return '生成记录不存在或已过期'
+      return '任务记录不存在或已过期'
     case 410:
-      return '可以回放的事件已过期，无法继续接着生成'
+      return '可以回放的事件已过期，无法继续接着任务'
     case 400:
       return '断点游标无效，请重新发起对话'
     default:
@@ -365,7 +365,7 @@ export function createResumableStream(): ResumableStream {
           attemptController.abort()
         }, timing.connectTimeoutMs)
 
-        const response = await fetch(agentApi.generationEventsUrl(options.generationId, gate.lastSeq()), {
+        const response = await fetch(agentApi.taskEventsUrl(options.taskId, gate.lastSeq()), {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${token}`,

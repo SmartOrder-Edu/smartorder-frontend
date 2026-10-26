@@ -37,7 +37,7 @@ export interface CachedMessageRecord {
   content: string
   status: CachedMessageStatus
   reconnecting?: boolean
-  generationId?: string
+  taskId?: string
   traceId?: string
   timestamp: number
   thinkingText?: string
@@ -94,7 +94,7 @@ export interface ConversationSyncRecord {
 }
 
 export interface CachedStreamRecord {
-  generationId: string
+  taskId: string
   conversationId: string
   assistantMessageId?: string
   status: string
@@ -119,7 +119,7 @@ export interface CachedStreamRecord {
 }
 
 export interface CachedStreamEventRecord {
-  generationId: string
+  taskId: string
   seq: number
   eventName: string
   data: any

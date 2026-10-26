@@ -68,7 +68,7 @@ export async function beginCachedStream(userId: string, record: CachedStreamReco
   try {
     const tx = db.transaction(STREAMS, 'readwrite')
     const store = tx.objectStore(STREAMS)
-    const current = await requestToPromise(store.get(record.generationId))
+    const current = await requestToPromise(store.get(record.taskId))
     if (!current) store.put(normalizeRecord(record))
     await transactionDone(tx)
     return true
@@ -81,18 +81,18 @@ export async function beginCachedStream(userId: string, record: CachedStreamReco
 /** 批量写事件日志，并把 appliedSeq 推进到本批最大 seq */
 export async function appendCachedStreamEvents(
   userId: string,
-  generationId: string,
+  taskId: string,
   events: CachedStreamEventRecord[],
   appliedSeq: number,
 ): Promise<boolean> {
-  if (!generationId || (!events.length && !Number.isFinite(appliedSeq))) return false
+  if (!taskId || (!events.length && !Number.isFinite(appliedSeq))) return false
   const db = await openAgentCacheDb(userId)
   if (!db) return false
   try {
     const tx = db.transaction([STREAMS, EVENTS], 'readwrite')
     const streamStore = tx.objectStore(STREAMS)
     const eventStore = tx.objectStore(EVENTS)
-    const current = await requestToPromise(streamStore.get(generationId)) as CachedStreamRecord | undefined
+    const current = await requestToPromise(streamStore.get(taskId)) as CachedStreamRecord | undefined
     if (!current) {
       await transactionDone(tx)
       return false
@@ -103,7 +103,7 @@ export async function appendCachedStreamEvents(
       if (!Number.isFinite(event.seq) || event.seq <= 0) continue
       // 已经被完整快照覆盖的事件不再写回，避免“快照压缩后 journal 又复活”
       if (event.seq <= snapshotSeq) continue
-      eventStore.put({ ...event, generationId })
+      eventStore.put({ ...event, taskId })
     }
 
     const nextApplied = Math.max(
@@ -135,7 +135,7 @@ export async function commitCachedStreamSnapshot(
     const record = normalizeRecord(snapshot)
     const tx = db.transaction([STREAMS, EVENTS], 'readwrite')
     const streamStore = tx.objectStore(STREAMS)
-    const current = await requestToPromise(streamStore.get(record.generationId)) as CachedStreamRecord | undefined
+    const current = await requestToPromise(streamStore.get(record.taskId)) as CachedStreamRecord | undefined
     // 两个标签页并发时，低游标/更旧快照都不能覆盖新快照。
     // 特别注意：只比 appliedSeq 不够——旧快照可能 appliedSeq 相同但 snapshotSeq 更小，
     // 覆盖后会把新快照已经删掉的 journal 区间重新变成“空洞”。
@@ -150,8 +150,8 @@ export async function commitCachedStreamSnapshot(
     streamStore.put({ ...record, updatedAt: Date.now() })
     if (record.snapshotSeq > 0) {
       const range = IDBKeyRange.bound(
-        [record.generationId, 0],
-        [record.generationId, record.snapshotSeq],
+        [record.taskId, 0],
+        [record.taskId, record.snapshotSeq],
       )
       tx.objectStore(EVENTS).delete(range)
     }
@@ -174,22 +174,22 @@ export interface LoadedCachedStream {
 
 export async function loadCachedStream(
   userId: string,
-  generationId: string,
+  taskId: string,
 ): Promise<LoadedCachedStream | null> {
-  if (!generationId) return null
+  if (!taskId) return null
   const db = await openAgentCacheDb(userId)
   if (!db) return null
 
   try {
     const tx = db.transaction([STREAMS, EVENTS], 'readonly')
-    const record = await requestToPromise(tx.objectStore(STREAMS).get(generationId)) as CachedStreamRecord | undefined
+    const record = await requestToPromise(tx.objectStore(STREAMS).get(taskId)) as CachedStreamRecord | undefined
     if (!record) {
       await transactionDone(tx)
       return null
     }
 
     const lower = Math.max(1, Number(record.snapshotSeq) + 1)
-    const range = IDBKeyRange.bound([generationId, lower], [generationId, maxSeq()])
+    const range = IDBKeyRange.bound([taskId, lower], [taskId, maxSeq()])
     const events: CachedStreamEventRecord[] = []
     await new Promise<void>((resolve, reject) => {
       const request = tx.objectStore(EVENTS).openCursor(range, 'next')
@@ -236,7 +236,7 @@ export async function loadCachedStream(
 /** 终态：写最终消息、更新会话同步元数据、删除流与日志 */
 export async function finalizeCachedStream(
   userId: string,
-  generationId: string,
+  taskId: string,
   message: CachedMessageRecord,
   sync?: ConversationSyncRecord,
 ): Promise<boolean> {
@@ -246,9 +246,9 @@ export async function finalizeCachedStream(
     const tx = db.transaction([MESSAGES, STREAMS, EVENTS, SYNC], 'readwrite')
     tx.objectStore(MESSAGES).put(message)
     if (sync) tx.objectStore(SYNC).put(sync)
-    tx.objectStore(STREAMS).delete(generationId)
+    tx.objectStore(STREAMS).delete(taskId)
     tx.objectStore(EVENTS).delete(
-      IDBKeyRange.bound([generationId, 0], [generationId, maxSeq()]),
+      IDBKeyRange.bound([taskId, 0], [taskId, maxSeq()]),
     )
     await transactionDone(tx)
     return true
@@ -258,14 +258,14 @@ export async function finalizeCachedStream(
   }
 }
 
-export async function clearCachedStream(userId: string, generationId: string): Promise<void> {
+export async function clearCachedStream(userId: string, taskId: string): Promise<void> {
   const db = await openAgentCacheDb(userId)
   if (!db) return
   try {
     const tx = db.transaction([STREAMS, EVENTS], 'readwrite')
-    tx.objectStore(STREAMS).delete(generationId)
+    tx.objectStore(STREAMS).delete(taskId)
     tx.objectStore(EVENTS).delete(
-      IDBKeyRange.bound([generationId, 0], [generationId, maxSeq()]),
+      IDBKeyRange.bound([taskId, 0], [taskId, maxSeq()]),
     )
     await transactionDone(tx)
   } catch (err) {

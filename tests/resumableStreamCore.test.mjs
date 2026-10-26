@@ -26,7 +26,7 @@ const {
   parseRetryAfter,
   createSeqGate,
   parseEventSeq,
-  shouldResumeGeneration,
+  shouldResumeTask,
   classifyHttpStatus,
   shouldResetRetryWindow,
   DEFAULT_STREAM_TIMING,
@@ -116,14 +116,14 @@ test('event id 解析为 seq', () => {
   assert.equal(parseEventSeq('abc'), null)
 })
 
-test('刷新后只对未完成生成接流', () => {
-  assert.equal(shouldResumeGeneration('CREATED'), true)
-  assert.equal(shouldResumeGeneration('RUNNING'), true)
-  assert.equal(shouldResumeGeneration('COMPLETED'), false)
-  assert.equal(shouldResumeGeneration('FAILED'), false)
-  assert.equal(shouldResumeGeneration('CANCELLED'), false)
-  assert.equal(shouldResumeGeneration('INTERRUPTED'), false)
-  assert.equal(shouldResumeGeneration(null), false)
+test('刷新后只对未完成任务接流', () => {
+  assert.equal(shouldResumeTask('CREATED'), true)
+  assert.equal(shouldResumeTask('RUNNING'), true)
+  assert.equal(shouldResumeTask('COMPLETED'), false)
+  assert.equal(shouldResumeTask('FAILED'), false)
+  assert.equal(shouldResumeTask('CANCELLED'), false)
+  assert.equal(shouldResumeTask('INTERRUPTED'), false)
+  assert.equal(shouldResumeTask(null), false)
 })
 
 test('400/404/410 交给终态对账，而不是直接判死', () => {

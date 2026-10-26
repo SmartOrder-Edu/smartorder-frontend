@@ -48,7 +48,7 @@ const {
 } = snapshotModule
 
 const sampleInput = () => ({
-  generationId: 'g-1',
+  taskId: 'g-1',
   conversationId: 'c-1',
   lastSeq: 12.9,
   answerText: '回答',
@@ -65,7 +65,7 @@ test('build 快照时归一化 lastSeq 并克隆数组', () => {
   const input = sampleInput()
   const snapshot = buildAgentStreamSnapshot(input)
 
-  assert.equal(snapshot.version, 1)
+  assert.equal(snapshot.version, 2)
   assert.equal(snapshot.lastSeq, 12)
   assert.equal(snapshot.answerText, '回答')
   assert.notEqual(snapshot.toolCalls, input.toolCalls)
@@ -98,10 +98,10 @@ test('损坏或版本不匹配的快照会被丢弃并清理', () => {
   assert.equal(globalThis.sessionStorage.getItem(AGENT_STREAM_SNAPSHOT_KEY), null)
 })
 
-test('generationId 为空或 lastSeq 非法的快照不会被接受', () => {
+test('taskId 为空或 lastSeq 非法的快照不会被接受', () => {
   clearAgentStreamSnapshot()
   globalThis.sessionStorage.setItem(AGENT_STREAM_SNAPSHOT_KEY,
-    JSON.stringify({ ...buildAgentStreamSnapshot(sampleInput()), generationId: '' }))
+    JSON.stringify({ ...buildAgentStreamSnapshot(sampleInput()), taskId: '' }))
   assert.equal(loadAgentStreamSnapshot(), null)
 
   globalThis.sessionStorage.setItem(AGENT_STREAM_SNAPSHOT_KEY,

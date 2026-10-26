@@ -20,9 +20,9 @@ export interface AgentChatRequest {
   clientRequestId?: string
 }
 
-/** 一次生成任务的状态视图（发送接口同步返回，含会话与消息 ID） */
-export interface AgentGenerationVO {
-  generationId: string
+/** 一次对话任务的状态视图（发送接口同步返回，含会话与消息 ID） */
+export interface AgentTaskVO {
+  taskId: string
   conversationId?: string | null
   /** 本轮追踪 ID */
   traceId?: string | null
@@ -35,7 +35,7 @@ export interface AgentGenerationVO {
   title?: string | null
   /** CREATED / RUNNING / COMPLETED / FAILED / CANCELLED / INTERRUPTED */
   status: string
-  /** 是否本次新建（false = 命中幂等键，复用了已有生成） */
+  /** 是否本次新建（false = 命中幂等键，复用了已有任务） */
   created?: boolean
   /** 已产生事件的最大 seq，作为断线重连的 after 游标 */
   lastSeq: number
@@ -143,41 +143,41 @@ export const agentApi = {
   },
 
   /**
-   * 创建生成任务（幂等）。
-   * 返回后通过 generationEventsUrl 订阅 SSE，断线重连时用 lastSeq 作为 after 游标。
+   * 创建对话任务（幂等）。
+   * 返回后通过 taskEventsUrl 订阅 SSE，断线重连时用 lastSeq 作为 after 游标。
    */
-  createGeneration(payload: AgentChatRequest) {
+  createTask(payload: AgentChatRequest) {
     // 重试由调用方控制（复用 clientRequestId），避免每次都弹全局错误提示
-    return request.post<AgentGenerationVO>('/agent/generations', payload, { showError: false })
+    return request.post<AgentTaskVO>('/agent/tasks', payload, { showError: false })
   },
 
-  /** SSE 订阅地址：after = 已成功应用的最大 seq，服务端只补发之后的事件 */
-  generationEventsUrl(generationId: string, after = 0): string {
+  /** SSE 订阅地址（读取 Redis Stream）：after = 已成功应用的最大 seq，服务端只补发之后的事件 */
+  taskEventsUrl(taskId: string, after = 0): string {
     const base = import.meta.env.VITE_API_BASE_URL || '/api'
-    return `${base}/agent/generations/${encodeURIComponent(generationId)}/events?after=${Math.max(0, after)}`
+    return `${base}/agent/tasks/${encodeURIComponent(taskId)}/events?after=${Math.max(0, after)}`
   },
 
-  /** 查询生成状态（断线兜底 / 刷新恢复） */
-  getGeneration(generationId: string) {
-    return request.get<AgentGenerationVO>(
-      `/agent/generations/${encodeURIComponent(generationId)}`,
+  /** 查询任务状态（断线兜底 / 刷新恢复） */
+  getTask(taskId: string) {
+    return request.get<AgentTaskVO>(
+      `/agent/tasks/${encodeURIComponent(taskId)}`,
       { showError: false },
     )
   },
 
-  /** 协作式取消：停止后仍可回放已产生的事件 */
-  cancelGeneration(generationId: string) {
-    return request.post<{ generationId: string; cancelAccepted: boolean }>(
-      `/agent/generations/${encodeURIComponent(generationId)}/cancel`,
+  /** 协作式取消：停止后仍可回放 Redis Stream 已产生的事件 */
+  cancelTask(taskId: string) {
+    return request.post<{ taskId: string; cancelAccepted: boolean }>(
+      `/agent/tasks/${encodeURIComponent(taskId)}/cancel`,
       undefined,
       { showError: false },
     )
   },
 
-  /** 会话当前生成（刷新页面后恢复会话） */
-  getActiveGeneration(conversationId: string) {
-    return request.get<AgentGenerationVO | null>(
-      `/agent/generations/conversations/${encodeURIComponent(conversationId)}/active`,
+  /** 会话当前任务（刷新页面后恢复会话） */
+  getActiveTask(conversationId: string) {
+    return request.get<AgentTaskVO | null>(
+      `/agent/tasks/conversations/${encodeURIComponent(conversationId)}/active`,
       { showError: false },
     )
   },

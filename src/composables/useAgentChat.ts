@@ -2,14 +2,14 @@ import { ref, watch } from 'vue'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { useAgentStore, type AgentTraceEvent, type ToolCallState, type ReasoningSegment } from '@/stores/agent'
 import { useUserStore } from '@/stores/user'
-import { agentApi, type AgentGenerationVO, type AgentTraceEventBrief, type ExecutionStep, type PlanSummary } from '@/api/agent'
+import { agentApi, type AgentTaskVO, type AgentTraceEventBrief, type ExecutionStep, type PlanSummary } from '@/api/agent'
 import { refreshAccessToken } from '@/api/request'
 import {
   createResumableStream,
   type ResumableStream,
   type StreamFailure,
 } from '@/composables/useResumableAgentStream'
-import { shouldResumeGeneration } from '@/composables/resumableStreamCore'
+import { shouldResumeTask } from '@/composables/resumableStreamCore'
 import { mergeTraceEventsForMessage } from '@/utils/agentTrace'
 import { normalizeAgentTraceEvent } from '@/utils/agentTraceEvent'
 import {
@@ -131,8 +131,8 @@ export interface ChatMessage {
   status: ChatMessageStatus
   /** 网络中断后是否正在自动重连（气泡保持“生成中”，不提前定稿） */
   reconnecting?: boolean
-  /** 后端生成任务 ID（断线重连 / 刷新恢复用） */
-  generationId?: string
+  /** 后端对话任务 ID（断线重连 / 刷新恢复用） */
+  taskId?: string
   /** 发送幂等键：本地待确认消息在拿到服务端 ID 前用它做稳定 key */
   clientRequestId?: string
   /** 后端 conversation_message 主键（agent.message.created / done 下发） */
@@ -229,19 +229,19 @@ function forgetConversation() {
 }
 
 /**
- * 创建生成任务（带短重试）。
+ * 创建对话任务（带短重试）。
  *
  * 请求超时/网络抖动时服务端可能已经建好任务，复用 clientRequestId 重试会直接拿回原任务，
  * 不会重复生成；403/404 这类明确的拒绝不重试。
  */
-async function createGenerationWithRetry(
-  payload: Parameters<typeof agentApi.createGeneration>[0],
+async function createTaskWithRetry(
+  payload: Parameters<typeof agentApi.createTask>[0],
   attempts = 3,
-): Promise<AgentGenerationVO> {
+): Promise<AgentTaskVO> {
   let lastError: any
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
-      return await agentApi.createGeneration(payload)
+      return await agentApi.createTask(payload)
     } catch (err: any) {
       lastError = err
       const status = err?.response?.status
@@ -441,8 +441,8 @@ export function useAgentChat(scrollCallback?: () => void) {
   let abortController: AbortController | null = null
   /** 当前正在运行的“可恢复事件流”（断线自动重连） */
   let activeStream: ResumableStream | null = null
-  /** 当前生成任务 ID：停止时用于通知服务端取消 */
-  let activeGenerationId: string | null = null
+  /** 当前对话任务 ID：停止时用于通知服务端取消 */
+  let activeTaskId: string | null = null
 
   /** 当前登录用户 ID（后端 bigint 以字符串下发）；未登录/加载中返回 null，缓存自动降级 */
   const cacheUserId = (): string | null => {
@@ -582,7 +582,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   const SNAPSHOT_FLUSH_INTERVAL_MS = 1000
   const STREAM_EVENT_FLUSH_INTERVAL_MS = 250
   let snapshotTracking = false
-  let snapshotGenerationId = ''
+  let snapshotTaskId = ''
   let snapshotConversationId = ''
   let snapshotLastSeq = 0
   let snapshotAppliedSeq = 0
@@ -610,18 +610,18 @@ export function useAgentChat(scrollCallback?: () => void) {
       snapshotEventTimer = null
     }
     const uid = snapshotUserId
-    const generationId = snapshotGenerationId
+    const taskId = snapshotTaskId
     const events = snapshotEventBuffer
     const appliedSeq = snapshotAppliedSeq
     const init = streamCacheInit
     snapshotEventBuffer = []
-    if (!uid || !generationId || events.length === 0) return
+    if (!uid || !taskId || events.length === 0) return
 
     const write = async () => {
       if (init) {
         await init
       }
-      await appendCachedStreamEvents(uid, generationId, events, appliedSeq)
+      await appendCachedStreamEvents(uid, taskId, events, appliedSeq)
     }
     void write().catch(err => {
       console.warn('[useAgentChat] 写流事件日志失败:', err)
@@ -638,7 +638,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   }
 
   const buildCachedStreamRecord = (): CachedStreamRecord => ({
-    generationId: snapshotGenerationId,
+    taskId: snapshotTaskId,
     conversationId: snapshotConversationId,
     assistantMessageId: agentStore.currentAssistantMessageId || undefined,
     status: 'RUNNING',
@@ -658,10 +658,10 @@ export function useAgentChat(scrollCallback?: () => void) {
   })
 
   const writeStreamSnapshot = () => {
-    if (!snapshotTracking || !snapshotGenerationId) return
+    if (!snapshotTracking || !snapshotTaskId) return
 
     saveAgentStreamSnapshot(buildAgentStreamSnapshot({
-      generationId: snapshotGenerationId,
+      taskId: snapshotTaskId,
       conversationId: snapshotConversationId,
       lastSeq: snapshotLastSeq,
       answerText: agentStore.answerText,
@@ -724,7 +724,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     snapshotPageHideHandler = null
     snapshotTracking = false
     snapshotDirty = false
-    snapshotGenerationId = ''
+    snapshotTaskId = ''
     snapshotConversationId = ''
     snapshotLastSeq = 0
     snapshotAppliedSeq = 0
@@ -741,18 +741,18 @@ export function useAgentChat(scrollCallback?: () => void) {
    * @param clearCache 是否同时删除 IndexedDB 里的流快照（用户停止/终态清理时为 true）
    */
   const clearStreamSnapshot = (clearCache = true) => {
-    const generationId = snapshotGenerationId
+    const taskId = snapshotTaskId
     const uid = snapshotUserId
     stopStreamSnapshot(true)
-    if (clearCache && uid && generationId) {
-      void clearCachedStream(uid, generationId)
+    if (clearCache && uid && taskId) {
+      void clearCachedStream(uid, taskId)
     }
   }
 
-  const beginStreamSnapshot = (generationId: string, conversationId: string, afterSeq: number) => {
+  const beginStreamSnapshot = (taskId: string, conversationId: string, afterSeq: number) => {
     stopStreamSnapshot(false)
     snapshotTracking = true
-    snapshotGenerationId = generationId
+    snapshotTaskId = taskId
     snapshotConversationId = conversationId || ''
     snapshotLastSeq = Math.max(0, Math.floor(Number(afterSeq) || 0))
     snapshotAppliedSeq = snapshotLastSeq
@@ -790,7 +790,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   const onStreamEvent = (eventName: string, data: any, seq: number) => {
     if (!snapshotTracking || !Number.isFinite(seq) || seq <= 0) return
     snapshotEventBuffer.push({
-      generationId: snapshotGenerationId,
+      taskId: snapshotTaskId,
       seq,
       eventName,
       data: cloneEventForCache(data),
@@ -882,7 +882,7 @@ export function useAgentChat(scrollCallback?: () => void) {
    *
    * 仍然把正在流式的占位气泡“原地定稿”，避免出现两条 AI 气泡。
    */
-  const stopGeneration = () => {
+  const stopTask = () => {
     // 用户主动停止：快照不再代表“可恢复的进行中生成”
     clearStreamSnapshot()
     // ① 先停本地订阅，保证停止后不会再有事件写进气泡
@@ -891,11 +891,11 @@ export function useAgentChat(scrollCallback?: () => void) {
       activeStream = null
     }
     // ② 协作式取消：服务端在循环边界退出，已提交的副作用不回滚
-    if (activeGenerationId) {
-      const generationId = activeGenerationId
-      activeGenerationId = null
-      agentApi.cancelGeneration(generationId).catch(err => {
-        console.warn('[useAgentChat] 取消生成失败:', generationId, err)
+    if (activeTaskId) {
+      const taskId = activeTaskId
+      activeTaskId = null
+      agentApi.cancelTask(taskId).catch(err => {
+        console.warn('[useAgentChat] 取消生成失败:', taskId, err)
       })
     }
     if (abortController) {
@@ -959,9 +959,9 @@ export function useAgentChat(scrollCallback?: () => void) {
         // 终态正文落 IndexedDB：下次打开会话先显示缓存，再后台校验。
         // 没有 messageId 时不能当成服务端消息缓存，避免与历史消息重复。
         const uid = snapshotUserId || cacheUserId()
-        const generationId = assistantMsg.generationId || snapshotGenerationId
+        const taskId = assistantMsg.taskId || snapshotTaskId
         const conversationId = agentStore.currentConversationId || snapshotConversationId
-        if (uid && conversationId && generationId && assistantMsg.messageId) {
+        if (uid && conversationId && taskId && assistantMsg.messageId) {
           const record = toCachedMessage(
             conversationId,
             assistantMsg,
@@ -969,7 +969,7 @@ export function useAgentChat(scrollCallback?: () => void) {
           )
           record.serverSyncedAt = Date.now()
           record.localOnly = false
-          void finalizeCachedStream(uid, generationId, record).catch(err => {
+          void finalizeCachedStream(uid, taskId, record).catch(err => {
             console.warn('[useAgentChat] 终结流缓存失败:', err)
           })
         }
@@ -1082,7 +1082,7 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 仍在 RUNNING 时保留 IndexedDB 流快照，刷新/重新进入会话还能继续接收。</p>
    */
   const reconcileStreamFailure = async (
-    generationId: string,
+    taskId: string,
     assistantMsg: ChatMessage,
     failure: StreamFailure,
     countMessageOnDone: boolean,
@@ -1106,9 +1106,9 @@ export function useAgentChat(scrollCallback?: () => void) {
       return
     }
 
-    let status: AgentGenerationVO | null = null
+    let status: AgentTaskVO | null = null
     try {
-      status = await agentApi.getGeneration(generationId)
+      status = await agentApi.getTask(taskId)
     } catch (err) {
       console.warn('[useAgentChat] 对账查询生成状态失败:', err)
     }
@@ -1184,20 +1184,20 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 发送新消息与刷新后恢复共用这套逻辑：应用事件 → 按 seq 去重/重连 → done 定稿。
    * 区别只在 initialAfterSeq：新消息从 0 开始；刷新恢复从快照的 lastSeq 开始，只补增量。
    */
-  const runGenerationStream = async (
-    generationId: string,
+  const runTaskStream = async (
+    taskId: string,
     assistantMsg: ChatMessage,
     initialAfterSeq = 0,
     countMessageOnDone = true,
   ) => {
-    activeGenerationId = generationId
+    activeTaskId = taskId
     abortController = new AbortController()
     const stream = createResumableStream()
     activeStream = stream
 
     try {
       await stream.run({
-        generationId,
+        taskId,
         initialAfterSeq,
         signal: abortController.signal,
 
@@ -1223,7 +1223,7 @@ export function useAgentChat(scrollCallback?: () => void) {
         onApplied: (seq) => onStreamEventApplied(seq),
 
         onTerminal: (payload) => {
-          activeGenerationId = null
+          activeTaskId = null
           finalizeAssistantTurn(assistantMsg, payload, countMessageOnDone)
         },
 
@@ -1233,7 +1233,7 @@ export function useAgentChat(scrollCallback?: () => void) {
         },
 
         onFailure(failure: StreamFailure) {
-          void reconcileStreamFailure(generationId, assistantMsg, failure, countMessageOnDone)
+          void reconcileStreamFailure(taskId, assistantMsg, failure, countMessageOnDone)
         },
       })
     } catch (err: any) {
@@ -1246,8 +1246,8 @@ export function useAgentChat(scrollCallback?: () => void) {
         activeStream = null
       }
       abortController = null
-      if (activeGenerationId === generationId) {
-        activeGenerationId = null
+      if (activeTaskId === taskId) {
+        activeTaskId = null
       }
       // 正常 done/失败/停止都会在各自路径清快照；这里只做停止跟踪的兜底
       stopStreamSnapshot(false)
@@ -1261,24 +1261,24 @@ export function useAgentChat(scrollCallback?: () => void) {
    * 有匹配快照时先水合文本/思考/工具，再从 lastSeq 之后只补增量；
    * 没有快照时退回从 0 回放，保证内容正确。
    */
-  const resumeActiveGenerationInternal = async (conversationId: string) => {
+  const resumeActiveTaskInternal = async (conversationId: string) => {
     if (!conversationId || activeStream) return
 
     const uid = cacheUserId()
-    let active: AgentGenerationVO | null = null
+    let active: AgentTaskVO | null = null
     try {
-      active = await agentApi.getActiveGeneration(conversationId)
+      active = await agentApi.getActiveTask(conversationId)
     } catch (err) {
       console.warn('[useAgentChat] 查询活跃生成失败（非关键）:', err)
     }
 
     // 服务端索引暂时不可用/已清理时，用本地未终结的流兜底；必须交叉校验，不能盲信缓存
-    if (!active?.generationId && uid) {
+    if (!active?.taskId && uid) {
       const latest = await findLatestCachedStream(uid, conversationId)
       const fresh = latest && Date.now() - latest.updatedAt < 24 * 60 * 60_000
       if (latest && fresh && (latest.status === 'RUNNING' || latest.status === 'CREATED')) {
         active = {
-          generationId: latest.generationId,
+          taskId: latest.taskId,
           conversationId,
           // 后端 bigint 以字符串下发；这里保留字符串，后面统一 String(...) 比较
           assistantMessageId: (latest.assistantMessageId as any) ?? null,
@@ -1292,10 +1292,10 @@ export function useAgentChat(scrollCallback?: () => void) {
       }
     }
 
-    // 快照只在本会话、本次 generation 上有效；不匹配时宁可从头回放，也不能拼错状态
+    // 快照只在本会话、本次 task 上有效；不匹配时宁可从头回放，也不能拼错状态
     const storedSnapshot = loadAgentStreamSnapshot()
 
-    if (!active?.generationId) {
+    if (!active?.taskId) {
       if (storedSnapshot && storedSnapshot.conversationId === conversationId) {
         clearStreamSnapshot()
       }
@@ -1314,10 +1314,10 @@ export function useAgentChat(scrollCallback?: () => void) {
     // 查询期间用户已经切走：不要给旧会话接流，避免污染新会话
     if (agentStore.currentConversationId !== conversationId) return
 
-    const generationId = active.generationId
+    const taskId = active.taskId
     let cachedStream: LoadedCachedStream | null = null
     if (uid) {
-      cachedStream = await loadCachedStream(uid, generationId)
+      cachedStream = await loadCachedStream(uid, taskId)
     }
 
     // 复用历史里的 assistant 占位气泡（同一 messageId），避免出现两个空气泡
@@ -1331,7 +1331,7 @@ export function useAgentChat(scrollCallback?: () => void) {
 
     // 进程已退出的生成：库里只是空的 RUNNING 占位行，明确标记中断，别留一个永久空泡
     if (active.status === 'INTERRUPTED') {
-      if (uid) void clearCachedStream(uid, generationId)
+      if (uid) void clearCachedStream(uid, taskId)
       clearStreamSnapshot(false)
       const placeholder = target || (messages.value[messages.value.length - 1]?.role === 'ai'
         ? messages.value[messages.value.length - 1]
@@ -1344,8 +1344,8 @@ export function useAgentChat(scrollCallback?: () => void) {
       return
     }
     // 已终态：正文已经落库，历史消息里就是完整答案，不需要再接流
-    if (!shouldResumeGeneration(active.status)) {
-      if (uid) void clearCachedStream(uid, generationId)
+    if (!shouldResumeTask(active.status)) {
+      if (uid) void clearCachedStream(uid, taskId)
       clearStreamSnapshot(false)
       // 历史接口可能没拿到最终正文（或缓存气泡还没被覆盖）：不要把 streaming 留在页面上
       const placeholder = target || [...messages.value].reverse().find(item => item.role === 'ai')
@@ -1377,7 +1377,7 @@ export function useAgentChat(scrollCallback?: () => void) {
 
     const serverLastSeq = Number(active.lastSeq) || 0
     const sessionUsable = !!storedSnapshot
-      && storedSnapshot.generationId === generationId
+      && storedSnapshot.taskId === taskId
       && storedSnapshot.conversationId === conversationId
       && Number.isInteger(storedSnapshot.lastSeq)
       && storedSnapshot.lastSeq >= 0
@@ -1398,7 +1398,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       clearStreamSnapshot(false)
     }
     if (uid && cachedStream && !cachedUsable) {
-      void clearCachedStream(uid, generationId)
+      void clearCachedStream(uid, taskId)
     }
 
     resetStreamingState()
@@ -1406,7 +1406,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     target.status = 'streaming'
     target.content = ''
     target.reconnecting = false
-    target.generationId = generationId
+    target.taskId = taskId
     if (active.assistantMessageId != null) {
       target.messageId = String(active.assistantMessageId)
       agentStore.currentAssistantMessageId = String(active.assistantMessageId)
@@ -1460,10 +1460,10 @@ export function useAgentChat(scrollCallback?: () => void) {
     }
     scrollCallback?.()
 
-    console.info('[useAgentChat] 恢复进行中的生成:', generationId,
+    console.info('[useAgentChat] 恢复进行中的生成:', taskId,
       useCached ? `idb after=${initialAfterSeq}` : (useSession ? `session after=${initialAfterSeq}` : 'after=0'))
-    beginStreamSnapshot(generationId, conversationId, initialAfterSeq)
-    await runGenerationStream(generationId, target, initialAfterSeq, false)
+    beginStreamSnapshot(taskId, conversationId, initialAfterSeq)
+    await runTaskStream(taskId, target, initialAfterSeq, false)
   }
 
   /** 正在恢复的会话 ID：同一会话防重入，但不阻塞用户切到另一个会话 */
@@ -1477,11 +1477,11 @@ export function useAgentChat(scrollCallback?: () => void) {
    * <p>恢复需要先查服务端/本地缓存，再决定从哪个游标接流；这段时间内不允许给同一会话
    * 发送新消息，否则两条流会同时写同一个 agentStore。</p>
    */
-  const resumeActiveGeneration = async (conversationId: string) => {
+  const resumeActiveTask = async (conversationId: string) => {
     if (!conversationId || resumingConversationId === conversationId) return
     resumingConversationId = conversationId
     try {
-      await resumeActiveGenerationInternal(conversationId)
+      await resumeActiveTaskInternal(conversationId)
     } finally {
       if (resumingConversationId === conversationId) resumingConversationId = ''
     }
@@ -1490,7 +1490,7 @@ export function useAgentChat(scrollCallback?: () => void) {
   /**
    * 发送消息给 Agent。
    *
-   * 流程：创建生成任务（幂等）→ 订阅可恢复事件流（GET SSE）→ 按 seq 增量应用。
+   * 流程：创建对话任务（幂等）→ 订阅可恢复事件流（GET SSE）→ 按 seq 增量应用。
    * 网络中断时保留气泡并自动重连，重连只补发遗漏事件，不会重复追加正文。
    */
   const sendMessage = async (message: string, references?: RagReference[]) => {
@@ -1518,7 +1518,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       })
     }
 
-    // ③ 创建生成任务：执行与订阅解耦。
+    // ③ 创建对话任务：执行与订阅解耦。
     //    同一个 clientRequestId 重试只会命中同一任务，不会重复调用一次模型。
     const clientRequestId = createClientRequestId()
 
@@ -1556,7 +1556,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       }
     }
 
-    const requestPayload: Parameters<typeof agentApi.createGeneration>[0] = {
+    const requestPayload: Parameters<typeof agentApi.createTask>[0] = {
       message,
       conversationId: agentStore.currentConversationId || undefined,
       fileIds: fileIds && fileIds.length > 0 ? fileIds : undefined,
@@ -1585,13 +1585,13 @@ export function useAgentChat(scrollCallback?: () => void) {
       }
     }
 
-    let generation: AgentGenerationVO
+    let task: AgentTaskVO
     try {
-      generation = await createGenerationWithRetry(requestPayload)
+      task = await createTaskWithRetry(requestPayload)
     } catch (err: any) {
       const reason = err?.message || '请求失败，请重试'
       const status = err?.response?.status
-      console.error('[useAgentChat] 创建生成任务失败:', err)
+      console.error('[useAgentChat] 创建对话任务失败:', err)
 
       if (uid) {
         if (typeof status === 'number' && status >= 400 && status < 500
@@ -1620,27 +1620,27 @@ export function useAgentChat(scrollCallback?: () => void) {
 
     // 发送接口已经同步落库：会话与占位消息 ID 立即可用，不必等第一个 SSE 事件。
     // 即使随后 SSE 一次都没连上，页面也知道这段消息属于哪个会话、是哪一行。
-    if (generation.conversationId) {
-      agentStore.currentConversationId = generation.conversationId
-      agentStore.upsertConversation(generation.conversationId, generation.title || '')
-      rememberConversation(generation.conversationId)
+    if (task.conversationId) {
+      agentStore.currentConversationId = task.conversationId
+      agentStore.upsertConversation(task.conversationId, task.title || '')
+      rememberConversation(task.conversationId)
     }
-    if (generation.userMessageId != null) {
-      userMsg.messageId = String(generation.userMessageId)
+    if (task.userMessageId != null) {
+      userMsg.messageId = String(task.userMessageId)
     }
-    if (generation.assistantMessageId != null) {
-      assistantMsg.messageId = String(generation.assistantMessageId)
-      agentStore.currentAssistantMessageId = String(generation.assistantMessageId)
+    if (task.assistantMessageId != null) {
+      assistantMsg.messageId = String(task.assistantMessageId)
+      agentStore.currentAssistantMessageId = String(task.assistantMessageId)
     }
-    if (generation.assistantSequenceNo != null) {
-      assistantMsg.sequenceNo = generation.assistantSequenceNo
+    if (task.assistantSequenceNo != null) {
+      assistantMsg.sequenceNo = task.assistantSequenceNo
       // 发送接口只回 assistant 序号；同一轮 user 行紧随其前。
       // 不给 user 排个序号的话，缓存恢复时它会被 1e15 的本地 sortKey 排到 AI 后面。
-      userMsg.sequenceNo = Math.max(1, Number(generation.assistantSequenceNo) - 1)
+      userMsg.sequenceNo = Math.max(1, Number(task.assistantSequenceNo) - 1)
     }
 
-    assistantMsg.generationId = generation.generationId
-    const conversationId = generation.conversationId || agentStore.currentConversationId
+    assistantMsg.taskId = task.taskId
+    const conversationId = task.conversationId || agentStore.currentConversationId
     if (uid) {
       // 创建响应已拿到：删除发送意图，把本地占位迁移成服务端消息 key
       void removeCachedOutbox(uid, clientRequestId)
@@ -1653,8 +1653,8 @@ export function useAgentChat(scrollCallback?: () => void) {
 
     // 发送与刷新恢复共用同一套“应用事件 / 断线重连 / done 定稿”逻辑。
     // 新生成从 0 开始记录快照；恢复路径会从快照的 lastSeq 开始。
-    beginStreamSnapshot(generation.generationId, conversationId, 0)
-    await runGenerationStream(generation.generationId, assistantMsg)
+    beginStreamSnapshot(task.taskId, conversationId, 0)
+    await runTaskStream(task.taskId, assistantMsg)
   }
 
   /**
@@ -2099,7 +2099,7 @@ export function useAgentChat(scrollCallback?: () => void) {
    */
   const loadConversation = async (conversationId: string) => {
     const loadToken = ++conversationLoadToken
-    // 切换会话：旧会话的快照不再适用；同会话刷新则保留，交给 resumeActiveGeneration 使用
+    // 切换会话：旧会话的快照不再适用；同会话刷新则保留，交给 resumeActiveTask 使用
     const previousConversationId = agentStore.currentConversationId
     const storedSnapshot = loadAgentStreamSnapshot()
     if ((previousConversationId && previousConversationId !== conversationId)
@@ -2121,7 +2121,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       abortController.abort()
       abortController = null
     }
-    activeGenerationId = null
+    activeTaskId = null
     // 清掉上一个会话可能残留的 loading/answerText，避免新会话输入框被禁用
     agentStore.finishTurn()
     streamingMessage = null
@@ -2504,7 +2504,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       if (loadToken === conversationLoadToken) {
         loadingHistory.value = false
         // 即使历史请求失败（离线/服务端异常），也要尝试从本地流快照恢复进行中的生成
-        void resumeActiveGeneration(conversationId)
+        void resumeActiveTask(conversationId)
       }
     }
   }
@@ -2620,12 +2620,12 @@ export function useAgentChat(scrollCallback?: () => void) {
           continue
         }
         try {
-          const generation = await createGenerationWithRetry(record.payload)
+          const task = await createTaskWithRetry(record.payload)
           await removeCachedOutbox(uid, record.clientRequestId)
           await deleteCachedMessage(uid, buildLocalMessageKey(record.clientRequestId, 'user'))
           await deleteCachedMessage(uid, buildLocalMessageKey(record.clientRequestId, 'ai'))
 
-          const conversationId = generation.conversationId || record.conversationId
+          const conversationId = task.conversationId || record.conversationId
           if (conversationId && agentStore.currentConversationId === conversationId) {
             // 用服务端历史重建这一轮，并继续接收仍在运行的生成
             await loadConversation(conversationId)
@@ -2676,7 +2676,7 @@ export function useAgentChat(scrollCallback?: () => void) {
       abortController.abort()
       abortController = null
     }
-    activeGenerationId = null
+    activeTaskId = null
     clearStreamSnapshot()
     messages.value = []
     streamingMessage = null
@@ -2718,7 +2718,7 @@ export function useAgentChat(scrollCallback?: () => void) {
     loadOlderMessages,
     currentForceMode,
     sendMessage,
-    stopGeneration,
+    stopTask,
     confirmPlan,
     cancelPlan,
     loadConversation,

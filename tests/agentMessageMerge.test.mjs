@@ -109,7 +109,7 @@ test('流式气泡在服务端页面缺失时保留，且不复制对象', () =>
     sequenceNo: 9,
     status: 'streaming',
     content: '正在输出',
-    generationId: 'g9',
+    taskId: 'g9',
   })
   const server = [message({ id: 's1', messageId: '1', sequenceNo: 1, content: '旧' })]
   const merged = mergeChatMessages([streaming], server)
