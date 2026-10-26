@@ -7,15 +7,13 @@ const TRACE_BATCH_SIZE = 50
 export interface AgentChatRequest {
   message: string
   /**
-   * @deprecated 旧字段名；新链路使用 conversationUuid。
-   * 后端以 conversationUuid 为准，两者同时存在时忽略本字段。
+   * 前端生成的会话 ID：新建对话时生成，重试必须复用同一个值。
+   * 向后端只传这一个会话字段（服务端缺失时自行生成）。
    */
   conversationId?: string
-  /** 前端生成的会话 UUID：新建对话时生成，重试必须复用同一个值 */
-  conversationUuid?: string
-  /** 前端生成的消息 UUID：同一 conversationUuid + messageUuid 只会入库一次 */
+  /** 前端生成的消息 UUID：同一 conversationId + messageUuid 只会入库一次 */
   messageUuid?: string
-  /** 新对话草稿 ID：与 conversationUuid 一对一；同一 requestId 不允许更换 */
+  /** 新对话草稿 ID：与 conversationId 一对一；同一 taskRequestId 不允许更换 */
   draftId?: string
   fileIds?: number[]
   /** 知识库 ID 列表（与 fileIds 分开传给后端） */
@@ -26,17 +24,15 @@ export interface AgentChatRequest {
   forceMode?: 'REACT' | 'PLAN_AND_EXECUTE'
   /** 结构化澄清回答 JSON（可选），格式: {"clarificationId": "uuid", "answer": "用户回答"} */
   clarificationAnswerJson?: string
-  /** 客户端幂等键：同一次发送重试时必须复用，服务端据此避免重复执行 */
-  clientRequestId?: string
+  /** 任务请求幂等键：同一次发送重试时必须复用，服务端据此避免重复执行 */
+  taskRequestId?: string
 }
 
 /** 一次对话任务的状态视图（发送接口同步返回，含会话与消息 ID） */
 export interface AgentTaskVO {
   taskId: string
-  /** 会话 UUID（兼容旧字段名，值等于 conversationUuid） */
+  /** 会话 ID（后端 conversation_id） */
   conversationId?: string | null
-  /** 会话 UUID（后端 conversation_uuid） */
-  conversationUuid?: string | null
   /** 本轮追踪 ID */
   traceId?: string | null
   /** 用户消息行 ID（已落库） */
@@ -86,8 +82,6 @@ export interface ExecutionStep {
 
 export interface ConversationVO {
   conversationId: string
-  /** 会话 UUID（与 conversationId 同值） */
-  conversationUuid?: string
   title: string | null
   lastMessage: string | null
   messageCount: number
@@ -164,7 +158,7 @@ export const agentApi = {
    * 返回后通过 taskEventsUrl 订阅 SSE，断线重连时用 lastSeq 作为 after 游标。
    */
   createTask(payload: AgentChatRequest) {
-    // 重试由调用方控制（复用 clientRequestId），避免每次都弹全局错误提示
+    // 重试由调用方控制（复用 taskRequestId），避免每次都弹全局错误提示
     return request.post<AgentTaskVO>('/agent/tasks', payload, { showError: false })
   },
 

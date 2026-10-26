@@ -11,6 +11,9 @@ import type { OutboxRecord } from './types'
  *
  * <p>发送前先落盘 `clientRequestId + payload`，创建响应丢失时可以用同一个幂等键重放；
  * 服务端会命中幂等直接返回原任务，不会重复开轮或重复调用模型。</p>
+ *
+ * <p>注意：本地 IndexedDB 的主键字段仍叫 `clientRequestId`（历史库兼容），
+ * 它的值就是服务端的 `taskRequestId`；请求 payload 里传的是 `taskRequestId`。</p>
  */
 
 const OUTBOX = AGENT_CACHE_STORE.outbox
